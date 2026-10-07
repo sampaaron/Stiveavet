@@ -103,6 +103,7 @@ export const followups = pgTable("followups", {
   endedAt: timestamp("ended_at", { withTimezone: true }),
   createdAt,
   updatedAt,
+  protocolVersionId: uuid("protocol_version_id"),
 });
 
 export const followupShares = pgTable(

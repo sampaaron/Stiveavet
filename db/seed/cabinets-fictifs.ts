@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import {
   cabinet as tilleuls,
@@ -18,9 +18,14 @@ import {
   organizations,
   ownerContacts,
   owners,
+  protocols,
   users,
 } from "../../src/server/db/schema";
 import { hashPassword } from "../../src/domains/auth/password";
+import type { Actor } from "../../src/domains/equipe/actor";
+import { ROLE_PERMISSIONS } from "../../src/domains/equipe/permissions";
+import { PROTOCOL_LIBRARY } from "../../src/domains/protocoles/library";
+import { protocolsService } from "../../src/domains/protocoles/service";
 import { withTenant } from "../../src/server/db/tenant";
 import type { Database, TenantTransaction } from "../../src/server/db/tenant";
 
@@ -113,6 +118,7 @@ export async function insertFollowup(
   organizationId: string,
   responsibleMembershipId: string,
   data: Followup,
+  protocolVersionId: string | null = null,
 ) {
   const [animal] = await tx
     .insert(animals)
@@ -159,7 +165,85 @@ export async function insertFollowup(
     triage: data.triage,
     isPrivate: data.isPrivate,
     startedAt,
+    protocolVersionId,
   });
+}
+
+/** Membre du jeu fictif agissant avec les droits par défaut de son rôle. */
+async function seedActor(
+  db: Database,
+  organizationId: string,
+  membershipId: string,
+): Promise<Actor> {
+  const [member] = await withTenant(db, { organizationId }, (tx) =>
+    tx
+      .select({ userId: memberships.userId, role: memberships.role })
+      .from(memberships)
+      .where(eq(memberships.id, membershipId)),
+  );
+  if (!member) throw new Error("Membre fictif introuvable");
+  return {
+    organizationId,
+    userId: member.userId,
+    membershipId,
+    role: member.role,
+    permissions: new Set(ROLE_PERMISSIONS[member.role].defaults),
+  };
+}
+
+/** Modèle de la bibliothèque correspondant à l'intervention d'un suivi fictif. */
+function libraryKeyFor(followup: Followup): string | null {
+  if (/ovariectomie|stérilisation/i.test(followup.procedure))
+    return followup.animal.species === "chat"
+      ? "sterilisation-chatte"
+      : "sterilisation-chienne";
+  if (/détartrage/i.test(followup.procedure)) return "detartrage";
+  if (/traitement/i.test(followup.procedure)) return "suivi-traitement";
+  return null;
+}
+
+/**
+ * Protocoles des Tilleuls : la bibliothèque de départ, validée par Claire sauf la castration
+ * (laissée « à valider »), et un protocole personnel de Hugo.
+ */
+async function seedProtocols(db: Database, claire: Actor, hugo: Actor) {
+  const service = protocolsService(db);
+  for (const { key } of PROTOCOL_LIBRARY) {
+    const id = await service.installFromLibrary(claire, key);
+    if (key !== "castration-chien") await service.validate(claire, id);
+  }
+  const versions = await withTenant(
+    db,
+    { organizationId: claire.organizationId },
+    (tx) =>
+      tx
+        .select({
+          key: protocols.libraryKey,
+          versionId: protocols.currentVersionId,
+          id: protocols.id,
+        })
+        .from(protocols),
+  );
+  const castration = versions.find((row) => row.key === "castration-chien");
+  if (castration) {
+    const copy = await service.duplicate(hugo, castration.id, "personal");
+    const detail = await service.get(hugo, copy);
+    await service.update(
+      hugo,
+      copy,
+      {
+        ...detail.version.content,
+        name: "Castration du chien (Dr Marchal)",
+        durationDays: 14,
+      },
+      "Suivi prolongé à 14 jours",
+    );
+  }
+  return new Map(
+    versions.flatMap((row) =>
+      row.key && row.versionId ? [[row.key, row.versionId] as const] : [],
+    ),
+  );
 }
 
 export async function seedFictionalCabinets(db: Database) {
@@ -194,12 +278,27 @@ export async function seedFictionalCabinets(db: Database) {
     vets.map((vet, index) => [vet.id, tilleulsMembers[index]]),
   );
 
+  const [claireId, hugoId] = tilleulsMembers;
+  if (!claireId || !hugoId) throw new Error("Cabinet des Tilleuls incomplet");
+  const versionByKey = await seedProtocols(
+    db,
+    await seedActor(db, SEED.tilleuls, claireId),
+    await seedActor(db, SEED.tilleuls, hugoId),
+  );
+
   await withTenant(db, { organizationId: SEED.tilleuls }, async (tx) => {
     for (const followup of tilleulsFollowups) {
       const responsible = membershipByVet.get(followup.responsibleVetId);
       if (!responsible)
         throw new Error(`Vétérinaire inconnu : ${followup.responsibleVetId}`);
-      await insertFollowup(tx, SEED.tilleuls, responsible, followup);
+      const key = libraryKeyFor(followup);
+      await insertFollowup(
+        tx,
+        SEED.tilleuls,
+        responsible,
+        followup,
+        key ? (versionByKey.get(key) ?? null) : null,
+      );
     }
   });
 

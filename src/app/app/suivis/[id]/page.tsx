@@ -8,6 +8,7 @@ import type { FollowupView } from "@/domains/suivis/service";
 import { findFollowup } from "@/fixtures/cabinet-tilleuls";
 import { showsReferenceFixtures } from "@/fixtures/seed-ids";
 import type { Followup } from "@/fixtures/types";
+import { canBrowseProtocols } from "@/domains/protocoles/policies";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
@@ -45,6 +46,14 @@ export default async function FollowupPage({
       ? findFollowup(id)
       : undefined;
 
+  const protocolLink =
+    followup.access === "clinical" && followup.protocol ? (
+      <ProtocolLink
+        protocol={followup.protocol}
+        linked={canBrowseProtocols(context)}
+      />
+    ) : null;
+
   const accessPanel = opened.canManageAccess ? (
     <AccessPanel
       context={context}
@@ -66,13 +75,18 @@ export default async function FollowupPage({
 
       {fixture ? (
         <ReferenceDossier
+          protocolLink={protocolLink}
           fixture={fixture}
           followup={followup}
           canAct={context.permissions.has("owner_messages.reply")}
           accessPanel={accessPanel}
         />
       ) : (
-        <BasicDossier followup={followup} accessPanel={accessPanel} />
+        <BasicDossier
+          followup={followup}
+          accessPanel={accessPanel}
+          protocolLink={protocolLink}
+        />
       )}
     </>
   );
@@ -89,12 +103,35 @@ function PrivateMark({ isPrivate }: { isPrivate: boolean }) {
 }
 
 /** Dossier construit depuis la base : organisation seulement, ou clinique sans écran de référence. */
+/** Version de protocole avec laquelle le suivi a été lancé ; elle ne change plus. */
+function ProtocolLink({
+  protocol,
+  linked,
+}: {
+  protocol: { id: string; name: string; versionNumber: number };
+  linked: boolean;
+}) {
+  const label = `${protocol.name}, version ${protocol.versionNumber}`;
+  return linked ? (
+    <Link
+      href={`/app/protocoles/${protocol.id}?version=${protocol.versionNumber}`}
+      className="font-semibold text-brand-ink underline-offset-2 hover:underline"
+    >
+      {label}
+    </Link>
+  ) : (
+    <span className="font-semibold text-ink">{label}</span>
+  );
+}
+
 function BasicDossier({
   followup,
   accessPanel,
+  protocolLink,
 }: {
   followup: FollowupView;
   accessPanel: ReactNode;
+  protocolLink: ReactNode;
 }) {
   const badge = followupBadge(followup);
   return (
@@ -153,6 +190,12 @@ function BasicDossier({
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <Fact label="Acte" value={followup.procedure} />
                 <Fact label="Date" value={formatDate(followup.procedureAt)} />
+                {protocolLink ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-ink-muted">Protocole</dt>
+                    <dd>{protocolLink}</dd>
+                  </div>
+                ) : null}
               </dl>
             </SectionCard>
           ) : (
@@ -184,7 +227,9 @@ function ReferenceDossier({
   followup,
   canAct,
   accessPanel,
+  protocolLink,
 }: {
+  protocolLink: ReactNode;
   fixture: Followup;
   followup: FollowupView;
   canAct: boolean;
@@ -214,6 +259,11 @@ function ReferenceDossier({
               {followup.responsibleName}
             </span>
           </p>
+          {protocolLink ? (
+            <p className="mt-0.5 text-sm text-ink-muted">
+              Protocole : {protocolLink}
+            </p>
+          ) : null}
         </div>
       </header>
 

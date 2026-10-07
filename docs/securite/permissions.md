@@ -9,6 +9,7 @@ Les droits sont des permissions précises, attribuées à chaque membre. « oui 
 | Modifier les réglages du cabinet (`organization.settings`)                                    | oui                        | non          | non                   |
 | Gérer l'équipe et les droits (`team.manage`)                                                  | oui                        | non          | non                   |
 | Créer et modifier les protocoles (`protocols.manage`)                                         | oui                        | sur décision | non                   |
+| Créer et modifier ses propres protocoles (`protocols.create_own`)                             | oui                        | oui          | non                   |
 | Gérer l'abonnement et la facturation (`billing.manage`)                                       | oui                        | non          | non                   |
 | Consulter le journal d'activité (`activity_log.read`)                                         | oui                        | non          | non                   |
 | Voir tous les suivis du cabinet (hors dossiers privés) (`followups.read_all`)                 | oui                        | sur décision | non                   |

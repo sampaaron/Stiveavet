@@ -17,7 +17,12 @@ const MESSAGES: Record<DomainError["code"], string> = {
   reassignment_required:
     "Choisissez d'abord le vétérinaire qui reprend ses suivis en cours.",
   permission_not_allowed: "Cette permission n'est pas possible pour ce rôle.",
+  already_installed: "Ce modèle est déjà dans les protocoles du cabinet.",
 };
+
+export function domainFailure(error: DomainError): ActionState {
+  return { error: MESSAGES[error.code] };
+}
 
 /** Traduit un refus métier en message ; toute autre erreur remonte (page d'erreur générique). */
 export async function attempt(
@@ -28,7 +33,7 @@ export async function attempt(
     await run();
     return { notice };
   } catch (error) {
-    if (error instanceof DomainError) return { error: MESSAGES[error.code] };
+    if (error instanceof DomainError) return domainFailure(error);
     throw error;
   }
 }
