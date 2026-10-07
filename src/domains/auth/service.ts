@@ -20,7 +20,7 @@ import {
   securityCodeEmail,
 } from "./emails";
 import { hashPassword, passwordProblems, verifyPassword } from "./password";
-import { AUTH_POLICY, RATE_LIMITS } from "./policy";
+import { AUTH_POLICY, RATE_LIMITS, TERMS_VERSION } from "./policy";
 import type { RateLimitName } from "./policy";
 import { authRepository } from "./repository";
 import type { MemberRole, ResolvedSession } from "./repository";
@@ -397,6 +397,9 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         email: string;
         plan: Plan;
         password: string;
+        /** Conditions acceptées et pouvoir de souscrire confirmé : obligatoires (cahier §14). */
+        acceptTerms: true;
+        authorized: true;
       },
       origin: RequestOrigin,
     ): Promise<RegisterResult> {
@@ -457,6 +460,11 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
               action: "organization.created",
               targetType: "organization",
               targetId: organizationId,
+              metadata: {
+                termsVersion: TERMS_VERSION,
+                termsAccepted: input.acceptTerms,
+                authorityConfirmed: input.authorized,
+              },
             },
             {
               organizationId,

@@ -57,6 +57,16 @@ export const signupInput = z
     plan: z.enum(PLANS, "Choisissez la formule qui suivra l'essai."),
     password: z.string().max(AUTH_POLICY.password.maxLength * 4),
     confirmation: z.string().max(AUTH_POLICY.password.maxLength * 4),
+    // Cases à cocher exigées par le cahier des charges (§14) : jamais cochées par défaut.
+    acceptTerms: z
+      .literal("on", "Acceptez les conditions d'utilisation pour continuer.")
+      .transform(() => true as const),
+    authorized: z
+      .literal(
+        "on",
+        "Confirmez que vous êtes autorisé à souscrire au nom du cabinet.",
+      )
+      .transform(() => true as const),
   })
   .refine((value) => value.password === value.confirmation, {
     message: "Les deux mots de passe ne correspondent pas.",

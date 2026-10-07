@@ -103,7 +103,8 @@ export async function verifyCodeAction(
   await clearAuthCookie("challenge");
   await setSessionCookie(result.sessionToken, result.sessionExpiresAt);
   if (result.deviceToken) await setDeviceCookie(result.deviceToken);
-  redirect("/app");
+  // Après l'inscription, le cabinet arrive directement dans l'installation guidée (cahier §14).
+  redirect(form.get("origine") === "inscription" ? "/app/demarrage" : "/app");
 }
 
 export async function unlockAction(
@@ -184,12 +185,16 @@ export async function signupAction(
     "plan",
     "password",
     "confirmation",
+    "acceptTerms",
+    "authorized",
   ]);
   const values = {
     organizationName: raw.organizationName?.slice(0, 160),
     displayName: raw.displayName?.slice(0, 120),
     email: raw.email?.slice(0, 254),
     plan: raw.plan?.slice(0, 16),
+    acceptTerms: raw.acceptTerms === "on" ? "on" : "",
+    authorized: raw.authorized === "on" ? "on" : "",
   };
   const parsed = signupInput.safeParse(raw);
   if (!parsed.success)

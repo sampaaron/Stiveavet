@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { localeOfPath } from "@/i18n/routes";
 import { buildContentSecurityPolicy, createNonce } from "@/server/security/csp";
 
 export function proxy(request: NextRequest) {
@@ -13,6 +14,8 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  // Langue de la page pour <html lang> ; toujours réécrite, jamais reprise du navigateur.
+  requestHeaders.set("x-stivea-locale", localeOfPath(request.nextUrl.pathname));
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);

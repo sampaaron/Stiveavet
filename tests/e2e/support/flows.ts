@@ -48,6 +48,10 @@ export async function signUp(page: Page, plan?: string) {
     await page.getByRole("radio", { name: new RegExp(`^${plan} ·`) }).check();
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByLabel("Confirmer le mot de passe").fill(password);
+  await page.getByLabel(/J'accepte les conditions d'utilisation/).check();
+  await page
+    .getByLabel("Je confirme être autorisé à souscrire au nom de ce cabinet.")
+    .check();
   await page.getByRole("button", { name: "Créer le cabinet" }).click();
 
   await expect(page).toHaveURL(/\/connexion\/code\?origine=inscription$/);
@@ -55,7 +59,8 @@ export async function signUp(page: Page, plan?: string) {
     .getByLabel("Code de sécurité")
     .fill(await securityCode(email, since));
   await page.getByRole("button", { name: "Valider le code" }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  // Après l'inscription, le cabinet arrive directement dans l'installation guidée.
+  await expect(page).toHaveURL(/\/app\/demarrage$/);
   return { email, password };
 }
 

@@ -16,10 +16,12 @@
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
     "db:migrate": "tsx --env-file-if-exists=.env db/migrate.mts",
     "db:seed": "tsx --env-file-if-exists=.env db/seed.mts",
+    "demo:emails": "tsx --env-file-if-exists=.env scripts/demo-emails.mts",
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "docs:permissions": "tsx scripts/docs-permissions.mts"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@node-rs/argon2": "^2.2.2",
     "drizzle-orm": "^0.45.3",
