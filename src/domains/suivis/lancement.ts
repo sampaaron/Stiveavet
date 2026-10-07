@@ -17,6 +17,8 @@ import {
   animalOwners,
   animals,
   auditEvents,
+  availabilityWindows,
+  consents,
   followupAlertRules,
   followupContacts,
   followupImports,
@@ -37,6 +39,7 @@ import {
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
+import { nextSendTime } from "./envoi";
 import {
   FIRST_CONTACT_SUGGESTION_HOURS,
   MAX_TREATMENTS,
@@ -216,13 +219,13 @@ async function isConnected(
   return Boolean(row);
 }
 
-async function setStatusReason(tx: TenantTransaction, reason: string) {
+export async function setStatusReason(tx: TenantTransaction, reason: string) {
   await tx.execute(
     sql`SELECT set_config('app.status_reason', ${reason}, true)`,
   );
 }
 
-type LoadedFollowup = {
+export type LoadedFollowup = {
   id: string;
   status: Status;
   isTest: boolean;
@@ -246,7 +249,7 @@ type LoadedFollowup = {
  * Suivi et niveau d'accès de l'acteur. Inexistant, autre cabinet ou invisible : not_found,
  * comme partout ailleurs. `lock` verrouille la ligne pour un changement d'état.
  */
-async function loadFollowup(
+export async function loadFollowup(
   tx: TenantTransaction,
   actor: Actor,
   followupId: string,
@@ -504,6 +507,57 @@ async function upsertOwner(
   return { ownerId, ownerContactId: contact.id };
 }
 
+/**
+ * Planifie le premier message de Numa : à l'heure choisie par le vétérinaire, ou tout de
+ * suite si elle est passée, toujours dans la plage d'envoi du cabinet (cahier des charges
+ * §3.5). Rien ne part pour un suivi test. `attempt` distingue une replanification après une
+ * pause ou une réactivation ; le message lui-même reste unique (clé du message, ADR 0016).
+ */
+async function scheduleIntro(
+  tx: TenantTransaction,
+  organizationId: string,
+  followup: { id: string; firstContactAt: Date | null },
+  now: Date,
+  attempt?: string,
+) {
+  // Premier message déjà envoyé : une demande d'accord existe.
+  const [sent] = await tx
+    .select({ id: consents.id })
+    .from(consents)
+    .where(eq(consents.followupId, followup.id))
+    .limit(1);
+  if (sent) return;
+  const windows = await tx
+    .select({
+      weekday: availabilityWindows.weekday,
+      startsAt: availabilityWindows.startsAt,
+      endsAt: availabilityWindows.endsAt,
+    })
+    .from(availabilityWindows)
+    .where(eq(availabilityWindows.kind, "messages"));
+  const wanted =
+    followup.firstContactAt && followup.firstContactAt.getTime() > now.getTime()
+      ? followup.firstContactAt
+      : now;
+  await enqueue(tx, {
+    organizationId,
+    kind: "followup.message",
+    idempotencyKey: attempt
+      ? `followup:${followup.id}:intro:${attempt}`
+      : `followup:${followup.id}:intro`,
+    runAt: nextSendTime(
+      windows.map((window) => ({
+        weekday: window.weekday,
+        startsAt: window.startsAt.slice(0, 5),
+        endsAt: window.endsAt.slice(0, 5),
+      })),
+      wanted,
+    ),
+    followupId: followup.id,
+    payload: { step: "intro" },
+  });
+}
+
 export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
   const { db, drveto } = deps;
   const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
@@ -562,19 +616,8 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
         { followupId, kind: "launch", idempotencyKey: `launch:${followupId}` },
         now,
       );
-      // Premier message de Numa, au nom du cabinet et du vétérinaire responsable (lot 13).
-      const sendAt =
-        followup.firstContactAt.getTime() > now.getTime()
-          ? followup.firstContactAt
-          : now;
-      await enqueue(tx, {
-        organizationId: actor.organizationId,
-        kind: "followup.message",
-        idempotencyKey: `followup:${followupId}:intro`,
-        runAt: sendAt,
-        followupId,
-        payload: { step: "intro" },
-      });
+      // Premier message de Numa, au nom du cabinet et du vétérinaire responsable.
+      await scheduleIntro(tx, actor.organizationId, followup, now);
     }
     await emit(tx, {
       organizationId: actor.organizationId,
@@ -1228,6 +1271,15 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
                 eq(scheduledJobs.status, "pending"),
               ),
             );
+        // Premier message jamais parti (pause ou arrêt avant l'heure) : il est replanifié.
+        if (transition.to === "active" && !followup.isTest)
+          await scheduleIntro(
+            tx,
+            actor.organizationId,
+            followup,
+            now,
+            randomUUID(),
+          );
         if (change === "reactivate" && !followup.isTest)
           await recordUsage(
             tx,

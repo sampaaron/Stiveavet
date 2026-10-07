@@ -53,6 +53,16 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
   "followup.resumed": ({ actorName }) => `${actorName} a repris un suivi`,
   "followup.stopped": ({ actorName }) => `${actorName} a arrêté un suivi`,
   "followup.reactivated": ({ actorName }) => `${actorName} a réactivé un suivi`,
+  "followup.human_takeover": ({ actorName }) =>
+    `${actorName} a repris la main sur une conversation (Numa en pause)`,
+  "followup.numa_resumed": ({ actorName }) =>
+    `${actorName} a rendu la conversation à Numa`,
+  "conversation.message_sent": ({ actorName }) =>
+    `${actorName} a écrit à un propriétaire`,
+  "numa.reply_blocked": () =>
+    "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
+  "simulator.owner_message": ({ actorName }) =>
+    `${actorName} a simulé un message de propriétaire (local)`,
   "job.retried": ({ actorName }) => `${actorName} a relancé une tâche en échec`,
   "job.cancelled": ({ actorName }) =>
     `${actorName} a abandonné une tâche en échec`,

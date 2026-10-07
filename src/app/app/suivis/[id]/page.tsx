@@ -15,6 +15,7 @@ import {
 } from "@/domains/suivis/policies";
 import type { MemberContext } from "@/server/authz";
 import { memberContext } from "@/server/authz";
+import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
@@ -32,6 +33,7 @@ import { TestMark } from "../test-mark";
 
 import { AccessPanel } from "./access-panel";
 import { FollowupWorkspace } from "./followup-workspace";
+import { LiveConversation } from "./live-conversation";
 import { SteeringButtons } from "./steering";
 
 // Titre générique : le nom de l'animal n'apparaît qu'après contrôle d'accès, dans la page.
@@ -45,6 +47,10 @@ const DONE: Record<string, string> = {
   reprise: "Suivi repris.",
   arret: "Suivi arrêté : les envois et rappels prévus sont annulés.",
   reactivation: "Suivi réactivé.",
+  "reprise-en-main":
+    "Message envoyé : vous avez repris la main, Numa est en pause jusqu'à « Reprendre Numa ».",
+  message: "Message envoyé depuis le WhatsApp du cabinet.",
+  numa: "Numa reprend la conversation.",
 };
 
 export default async function FollowupPage({
@@ -72,6 +78,21 @@ export default async function FollowupPage({
       <ProtocolLink
         protocol={followup.protocol}
         linked={canBrowseProtocols(context)}
+      />
+    ) : null;
+
+  // Conversation réelle : suivi lancé et accès clinique seulement.
+  const conversation =
+    !fixture &&
+    followup.access === "clinical" &&
+    followup.status !== "draft" ? (
+      <LiveConversation
+        view={await services.conversations().view(context, followup.id)}
+        simulatorHref={
+          serverEnv().APP_ENV === "local" && !followup.isTest
+            ? `/app/suivis/${followup.id}/simulateur`
+            : null
+        }
       />
     ) : null;
 
@@ -117,6 +138,7 @@ export default async function FollowupPage({
           accessPanel={accessPanel}
           protocolLink={protocolLink}
           steering={<Steering context={context} followup={followup} />}
+          conversation={conversation}
         />
       )}
     </>
@@ -205,11 +227,13 @@ function BasicDossier({
   accessPanel,
   protocolLink,
   steering,
+  conversation,
 }: {
   followup: FollowupView;
   accessPanel: ReactNode;
   protocolLink: ReactNode;
   steering: ReactNode;
+  conversation: ReactNode;
 }) {
   const badge = followupBadge(followup);
   return (
@@ -241,6 +265,7 @@ function BasicDossier({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
+          {conversation}
           <SectionCard title="Organisation">
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <Fact label="Propriétaire" value={followup.ownerName ?? "—"} />

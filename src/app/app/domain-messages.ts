@@ -33,6 +33,8 @@ const MESSAGES: Record<DomainError["code"], string> = {
     "Ce suivi a changé d'état entre-temps. Rechargez la page.",
   past_step:
     "Une étape déjà passée ne se modifie plus : choisissez un délai à venir.",
+  consent_missing:
+    "Le propriétaire n'a pas donné son accord (ou l'a retiré) : aucun message ne peut lui être envoyé.",
 };
 
 export function domainFailure(error: DomainError): ActionState {

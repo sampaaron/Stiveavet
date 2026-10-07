@@ -33,7 +33,8 @@ export class DomainError extends Error {
       | "already_followed"
       | "launch_incomplete"
       | "invalid_transition"
-      | "past_step",
+      | "past_step"
+      | "consent_missing",
   ) {
     super(code);
   }

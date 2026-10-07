@@ -38,3 +38,13 @@ export function toDateTimeInput(value: Date): string {
     inputFormat.formatToParts(value).find((p) => p.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
 }
+
+const timeFormat = new Intl.DateTimeFormat("fr-FR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Paris",
+});
+
+export function formatTime(value: Date): string {
+  return timeFormat.format(value);
+}
