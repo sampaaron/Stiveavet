@@ -27,6 +27,12 @@
 
   --color-accent: #5b4fe0;
 
+  /* Site public uniquement : touche éditoriale du héros et nuit des sections sombres. */
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --color-night: #0b1220;
+  --color-night-soft: #141d2e;
+  --color-mint: #8ce8c3;
+
   --radius-card: 16px;
   --radius-control: 12px;
 
@@ -57,4 +63,27 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/*
+ * Halos très discrets du héros du site public (référence visuelle) : menthe, turquoise et
+ * violet sur fond bleu nuit. Décor seulement, jamais porteur d'information.
+ */
+@utility site-halos {
+  background:
+    radial-gradient(
+      38rem 26rem at 12% 8%,
+      rgb(140 232 195 / 0.16),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 24rem at 88% 22%,
+      rgb(91 79 224 / 0.22),
+      transparent 70%
+    ),
+    radial-gradient(
+      34rem 26rem at 60% 110%,
+      rgb(45 212 191 / 0.14),
+      transparent 70%
+    );
 }

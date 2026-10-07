@@ -81,6 +81,7 @@ test("inscription d'un cabinet : code e-mail, puis cabinet vide et isolé", asyn
   page,
 }) => {
   await signUp(page);
+  await page.goto("/app");
   await expect(
     page.getByRole("heading", { name: "Bonjour Alix" }),
   ).toBeVisible();

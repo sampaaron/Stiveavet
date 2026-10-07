@@ -26,7 +26,6 @@ test.describe("nouveau cabinet", () => {
     page,
   }) => {
     await signUp(page);
-    await page.getByRole("link", { name: "Ouvrir le démarrage guidé" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: "Démarrage guidé" }),
     ).toBeVisible();

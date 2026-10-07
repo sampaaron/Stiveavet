@@ -21,6 +21,8 @@ export const COOKIE = {
   session: () => name("sv_session"),
   device: () => name("sv_device"),
   challenge: () => name("sv_challenge"),
+  /** Accès à la démo du site public : n'ouvre que des données fictives (ADR 0012). */
+  demo: () => name("sv_demo"),
 };
 
 function options(maxAgeSeconds: number) {
@@ -65,4 +67,9 @@ export async function setChallengeCookie(token: string) {
 
 export async function clearAuthCookie(kind: "session" | "challenge") {
   (await cookies()).delete(COOKIE[kind]());
+}
+
+/** Accès à la démo : 14 jours, comme la validité côté serveur (migration 0007). */
+export async function setDemoCookie(token: string) {
+  (await cookies()).set(COOKIE.demo(), token, options(14 * 24 * 3600));
 }

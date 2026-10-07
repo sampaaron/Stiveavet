@@ -32,14 +32,19 @@ export function followupStatus(followup: Followup): Status {
   return "normal";
 }
 
-type FollowupCardProps = { followup: Followup; vetName: string };
+type FollowupCardProps = {
+  followup: Followup;
+  vetName: string;
+  /** Adresse du dossier ; la démo du site public pointe vers sa propre page. */
+  href?: string;
+};
 
 /** Ligne de suivi cliquable, utilisée dans les priorités et la liste des suivis. */
-export function FollowupCard({ followup, vetName }: FollowupCardProps) {
+export function FollowupCard({ followup, vetName, href }: FollowupCardProps) {
   const { animal } = followup;
   return (
     <Link
-      href={`/app/suivis/${followup.id}`}
+      href={href ?? `/app/suivis/${followup.id}`}
       className="group flex items-center gap-4 rounded-[var(--radius-control)] px-3 py-3 transition-colors hover:bg-canvas-subtle"
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted group-hover:bg-surface">

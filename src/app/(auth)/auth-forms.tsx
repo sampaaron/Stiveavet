@@ -10,6 +10,7 @@ import {
   TRIAL_MONTHS,
   formatEuros,
 } from "@/domains/facturation/rules";
+import { pathFor } from "@/i18n/routes";
 import { AlertBanner } from "@/ui/alert-banner";
 import { Button } from "@/ui/button";
 import { TextField } from "@/ui/text-field";
@@ -86,7 +87,7 @@ export function LoginForm() {
   );
 }
 
-export function CodeForm() {
+export function CodeForm({ afterSignup = false }: { afterSignup?: boolean }) {
   const [state, action, pending] = useActionState(
     verifyCodeAction,
     initialFormState,
@@ -94,6 +95,9 @@ export function CodeForm() {
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>
       <Messages state={state} />
+      {afterSignup ? (
+        <input type="hidden" name="origine" value="inscription" />
+      ) : null}
       <TextField
         label="Code de sécurité"
         name="code"
@@ -245,6 +249,7 @@ export function SignupForm() {
         required
         errors={state.fieldErrors?.confirmation}
       />
+      <Consents values={state.values} errors={state.fieldErrors} />
       <Submit pending={pending}>Créer le cabinet</Submit>
     </form>
   );
@@ -307,6 +312,76 @@ export function InvitationForm({
 }
 
 /** Formule appliquée après les 2 mois d'essai pilote ; modifiable ensuite dans Facturation. */
+/** Acceptation des conditions et pouvoir de souscrire : deux cases distinctes, jamais pré-cochées. */
+function Consents({
+  values,
+  errors,
+}: {
+  values: FormState["values"];
+  errors: FormState["fieldErrors"];
+}) {
+  const id = useId();
+  const boxes = [
+    {
+      name: "acceptTerms",
+      label: (
+        <>
+          J&apos;accepte les{" "}
+          <Link
+            href={pathFor("terms", "fr")}
+            target="_blank"
+            className="font-semibold text-brand-ink underline underline-offset-2"
+          >
+            conditions d&apos;utilisation
+          </Link>{" "}
+          et j&apos;ai lu la{" "}
+          <Link
+            href={pathFor("privacy", "fr")}
+            target="_blank"
+            className="font-semibold text-brand-ink underline underline-offset-2"
+          >
+            politique de confidentialité
+          </Link>
+          .
+        </>
+      ),
+    },
+    {
+      name: "authorized",
+      label: <>Je confirme être autorisé à souscrire au nom de ce cabinet.</>,
+    },
+  ] as const;
+  return (
+    <div className="grid gap-3">
+      {boxes.map((box) => {
+        const boxErrors = errors?.[box.name];
+        const errorId = `${id}-${box.name}-erreur`;
+        return (
+          <div key={box.name} className="grid gap-1">
+            <label className="flex items-start gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                name={box.name}
+                required
+                defaultChecked={values?.[box.name] === "on"}
+                aria-invalid={boxErrors?.length ? true : undefined}
+                aria-describedby={boxErrors?.length ? errorId : undefined}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]"
+              />
+              <span>{box.label}</span>
+            </label>
+            {boxErrors?.length ? (
+              <p id={errorId} className="text-[13px] font-medium text-urgent">
+                {boxErrors[0]}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PlanChoice({
   value,
   errors,

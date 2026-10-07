@@ -48,6 +48,8 @@ async function newAdmin() {
       displayName: "Dr Essai Test",
       email,
       plan: "clinic",
+      acceptTerms: true,
+      authorized: true,
       password: STRONG,
     },
     origin,
@@ -420,6 +422,23 @@ describe("inscription", () => {
       },
     );
     expect(actions).toEqual(["membership.created", "organization.created"]);
+
+    // Conditions acceptées et pouvoir de souscrire confirmé : consignés au journal (cahier §14).
+    const consent = await asApp(
+      app,
+      session?.organizationId ?? null,
+      async (client) => {
+        const { rows } = await client.query(
+          "SELECT metadata FROM audit_events WHERE action = 'organization.created'",
+        );
+        return (rows[0] as { metadata: unknown } | undefined)?.metadata;
+      },
+    );
+    expect(consent).toEqual({
+      termsVersion: "2026-10-07-projet",
+      termsAccepted: true,
+      authorityConfirmed: true,
+    });
   });
 
   it("adresse déjà enregistrée : même écran, e-mail d'information, aucun cabinet créé", async () => {
@@ -433,6 +452,8 @@ describe("inscription", () => {
         displayName: "Dr Usurpateur",
         email,
         plan: "clinic",
+        acceptTerms: true,
+        authorized: true,
         password: STRONG,
       },
       origin,
@@ -461,6 +482,8 @@ describe("inscription", () => {
         displayName: "Dr Bertrand Lemoine",
         email: "bertrand@essai.test",
         plan: "clinic",
+        acceptTerms: true,
+        authorized: true,
         password: "Bertrand-cabinet-2026",
       },
       origin,

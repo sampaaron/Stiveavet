@@ -16,7 +16,7 @@ export default async function CodePage({
           ? "Pour confirmer votre adresse, saisissez le code à 6 chiffres que nous venons de vous envoyer par e-mail."
           : "Cet appareil n'est pas encore reconnu. Saisissez le code à 6 chiffres envoyé à votre adresse e-mail."}
       </AuthHeading>
-      <CodeForm />
+      <CodeForm afterSignup={origine === "inscription"} />
     </>
   );
 }

@@ -2,9 +2,11 @@ import "server-only";
 
 import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
-import { emailSender } from "@/adapters/email";
+import { emailSender, marketingEmailSender } from "@/adapters/email";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
+import { demoService } from "@/domains/demo/service";
+import type { DemoService } from "@/domains/demo/service";
 import { teamService } from "@/domains/equipe/service";
 import { billingService } from "@/domains/facturation/service";
 import type { BillingService } from "@/domains/facturation/service";
@@ -23,6 +25,7 @@ let followups: FollowupsService | undefined;
 let protocols: ProtocolsService | undefined;
 let settings: SettingsService | undefined;
 let billing: BillingService | undefined;
+let demo: DemoService | undefined;
 
 /** Services métier branchés sur la base applicative et l'envoi d'e-mails. */
 export const services = {
@@ -59,5 +62,14 @@ export const services = {
       provider: fakeBillingProvider(),
     });
     return billing;
+  },
+  /** Démo du site public : e-mails commerciaux séparés, vers Mailpit uniquement (ADR 0012). */
+  demo(): DemoService {
+    demo ??= demoService({
+      db: appDatabase(),
+      email: { send: (message) => marketingEmailSender().send(message) },
+      appUrl: serverEnv().APP_URL,
+    });
+    return demo;
   },
 };

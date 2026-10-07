@@ -22,9 +22,12 @@ const kindLabel: Record<AgendaEventData["kind"], string> = {
 export function AgendaEvent({
   event,
   vetName,
+  followupHref = (id) => `/app/suivis/${id}`,
 }: {
   event: AgendaEventData;
   vetName: string;
+  /** Adresse du suivi lié ; la démo du site public pointe vers sa propre page. */
+  followupHref?: (followupId: string) => string;
 }) {
   const body = (
     <>
@@ -52,7 +55,7 @@ export function AgendaEvent({
   );
   return event.followupId ? (
     <Link
-      href={`/app/suivis/${event.followupId}`}
+      href={followupHref(event.followupId)}
       className={cn(className, "hover:bg-canvas-subtle")}
     >
       {body}

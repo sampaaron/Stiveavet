@@ -29,3 +29,9 @@ export const RATE_LIMITS = {
 } as const satisfies Record<string, readonly [number, number]>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
+
+/**
+ * Version des conditions d'utilisation acceptées à l'inscription, consignée dans le journal
+ * d'activité du cabinet. Les conditions sont un projet tant qu'un juriste ne les a pas validées.
+ */
+export const TERMS_VERSION = "2026-10-07-projet";

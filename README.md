@@ -41,6 +41,8 @@ Installation : les Tilleuls ont terminé sept étapes sur huit (connexions simul
 
 Facturation (simulée) : les Tilleuls sont en formule Clinique au 5e mois, choix de l'engagement annuel à faire ; le cabinet du Dr Martin est en formule Solo, avec un prélèvement refusé il y a 12 jours (`paul.martin@cabinet-martin.test`, à régulariser depuis Facturation).
 
+Site public : http://localhost:3000/fr (ou `/en`). La démo s'ouvre après la demande sur `/fr/demo` (données fictives, lecture seule) ; le premier e-mail arrive dans Mailpit. `pnpm demo:emails` envoie les e-mails suivants de la séquence quand ils sont dus (aucune tâche de fond en phase 1).
+
 ## Vérifier
 
 ```bash
@@ -52,4 +54,5 @@ pnpm test:integration    # PostgreSQL réel ; requiert TEST_DATABASE_ADMIN_URL
 ## Organisation
 
 - `src/app` : routes Next.js ; `src/domains` : logique métier par domaine ; `src/server` : sécurité, configuration, accès aux données ; `src/adapters` : connecteurs externes simulés.
+- `src/i18n` : langues, adresses et textes du site public (français de référence, anglais typé sur le français).
 - `docs/adr` : décisions d'architecture ; `docs/securite` : règles de sécurité.
