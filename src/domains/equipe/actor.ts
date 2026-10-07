@@ -24,7 +24,8 @@ export class DomainError extends Error {
       | "self_action"
       | "last_admin"
       | "reassignment_required"
-      | "permission_not_allowed",
+      | "permission_not_allowed"
+      | "already_installed",
   ) {
     super(code);
   }

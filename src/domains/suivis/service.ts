@@ -11,6 +11,7 @@ import {
   followups,
   memberships,
   owners,
+  protocolVersions,
   users,
 } from "@/server/db/schema";
 import type { AuditMetadata } from "@/domains/audit/schema";
@@ -43,6 +44,8 @@ export type FollowupClinical = Omit<FollowupSummary, "access"> & {
   procedure: string;
   procedureAt: Date;
   triage: Triage;
+  /** Version de protocole figée au lancement (null : suivi sans protocole). */
+  protocol: { id: string; name: string; versionNumber: number } | null;
 };
 
 export type FollowupView = FollowupSummary | FollowupClinical;
@@ -66,6 +69,9 @@ type Row = {
   startedAt: Date | null;
   responsibleMembershipId: string;
   responsibleName: string;
+  protocolId: string | null;
+  protocolName: string | null;
+  protocolVersionNumber: number | null;
 };
 
 const idSchema = z.uuid();
@@ -99,6 +105,14 @@ function toView(
     procedure: row.procedure,
     procedureAt: row.procedureAt,
     triage: row.triage,
+    protocol:
+      row.protocolId && row.protocolName && row.protocolVersionNumber
+        ? {
+            id: row.protocolId,
+            name: row.protocolName,
+            versionNumber: row.protocolVersionNumber,
+          }
+        : null,
   };
 }
 
@@ -117,6 +131,9 @@ function selectRows(tx: TenantTransaction) {
       startedAt: followups.startedAt,
       responsibleMembershipId: followups.responsibleMembershipId,
       responsibleName: users.displayName,
+      protocolId: protocolVersions.protocolId,
+      protocolName: protocolVersions.name,
+      protocolVersionNumber: protocolVersions.versionNumber,
     })
     .from(followups)
     .innerJoin(animals, eq(animals.id, followups.animalId))
@@ -124,7 +141,11 @@ function selectRows(tx: TenantTransaction) {
       memberships,
       eq(memberships.id, followups.responsibleMembershipId),
     )
-    .innerJoin(users, eq(users.id, memberships.userId));
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(
+      protocolVersions,
+      eq(protocolVersions.id, followups.protocolVersionId),
+    );
 }
 
 async function activeShares(tx: TenantTransaction, followupIds: string[]) {

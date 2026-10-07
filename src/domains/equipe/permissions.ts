@@ -9,6 +9,7 @@ export const PERMISSIONS = {
   "organization.settings": "Modifier les réglages du cabinet",
   "team.manage": "Gérer l'équipe et les droits",
   "protocols.manage": "Créer et modifier les protocoles",
+  "protocols.create_own": "Créer et modifier ses propres protocoles",
   "billing.manage": "Gérer l'abonnement et la facturation",
   "activity_log.read": "Consulter le journal d'activité",
   "followups.read_all":
@@ -41,6 +42,7 @@ export const ROLE_PERMISSIONS: Record<MemberRole, RoleGrants> = {
     defaults: [
       "followups.read_own",
       "followups.launch",
+      "protocols.create_own",
       "followups.share",
       "clinical.read",
       "owner_messages.reply",

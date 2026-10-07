@@ -61,7 +61,7 @@ export const appNavigation: NavSection[] = [
         href: "/app/protocoles",
         label: "Protocoles",
         icon: ClipboardList,
-        anyOf: ["protocols.manage"],
+        anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
       },
       {
         href: "/app/reglages",

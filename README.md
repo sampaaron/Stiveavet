@@ -35,6 +35,8 @@ Les vétérinaires reçoivent un code dans Mailpit à la première connexion dep
 
 Droits par défaut : Claire voit tout et gère l'équipe ; Hugo et Inès ne voient que leurs suivis et ceux qu'on leur partage ; Léa voit l'organisation des suivis sans aucune donnée clinique. Détail : `docs/securite/permissions.md`.
 
+Protocoles : la bibliothèque de départ (contenu fictif, à valider par un vétérinaire) est installée aux Tilleuls ; la castration du chien y reste « à valider », et Hugo a un protocole personnel.
+
 ## Vérifier
 
 ```bash

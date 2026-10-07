@@ -15,6 +15,12 @@ export const TENANT_TABLES = [
   "followup_shares",
   "audit_events",
   "login_events",
+  "membership_permissions",
+  "invitations",
+  "protocols",
+  "protocol_versions",
+  "protocol_steps",
+  "alert_rules",
 ] as const;
 
 export function pools() {
