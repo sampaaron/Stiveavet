@@ -14,8 +14,10 @@ pnpm dev                 # http://localhost:3000
 Pile complète (application, PostgreSQL, Mailpit) :
 
 ```bash
-cp .env.example .env     # puis renseigner POSTGRES_PASSWORD (valeur locale quelconque)
+cp .env.example .env     # puis renseigner les trois mots de passe locaux et les URL associées
 docker compose -f docker/compose.yaml --env-file .env up --build
+pnpm db:migrate          # schéma, avec le rôle stivea_migrator
+pnpm db:seed             # deux cabinets fictifs, avec le rôle applicatif (sous RLS)
 ```
 
 Mailpit (e-mails capturés) : http://localhost:8025.
@@ -25,6 +27,7 @@ Mailpit (e-mails capturés) : http://localhost:8025.
 ```bash
 pnpm check               # lint, format, types, tests unitaires
 pnpm build && pnpm test:e2e
+pnpm test:integration    # PostgreSQL réel ; requiert TEST_DATABASE_ADMIN_URL
 ```
 
 ## Organisation
