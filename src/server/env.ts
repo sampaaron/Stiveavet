@@ -7,14 +7,37 @@ import { z } from "zod";
  * Aucune valeur secrète n'a de défaut dans le code : elles viennent de `.env` en local
  * et du gestionnaire de secrets Scaleway en staging/production.
  */
-export const serverEnvSchema = z.object({
-  APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
-  APP_URL: z.url().default("http://localhost:3000"),
-  // Obligatoire à partir du lot 3 (base de données).
-  DATABASE_URL: z.url().optional(),
-  SMTP_HOST: z.string().min(1).optional(),
-  SMTP_PORT: z.coerce.number().int().positive().optional(),
-});
+export const serverEnvSchema = z
+  .object({
+    APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
+    APP_URL: z.url().default("http://localhost:3000"),
+    // Obligatoire à partir du lot 3 (base de données).
+    DATABASE_URL: z.url().optional(),
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().positive().optional(),
+    // « true » seulement derrière le répartiteur de charge, qui écrit X-Forwarded-For.
+    // Sinon l'en-tête est falsifiable : l'IP est alors ignorée (pas de limite par IP).
+    TRUST_PROXY: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+  })
+  .superRefine((env, context) => {
+    // Hors local, la limite de tentatives par adresse IP est obligatoire, donc l'IP aussi.
+    if (env.APP_ENV !== "local" && !env.TRUST_PROXY)
+      context.addIssue({
+        code: "custom",
+        path: ["TRUST_PROXY"],
+        message: "requis",
+      });
+    // Hors local, les cookies d'authentification doivent être Secure.
+    if (env.APP_ENV !== "local" && !env.APP_URL.startsWith("https://"))
+      context.addIssue({
+        code: "custom",
+        path: ["APP_URL"],
+        message: "https requis",
+      });
+  });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 

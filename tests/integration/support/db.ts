@@ -14,6 +14,7 @@ export const TENANT_TABLES = [
   "followups",
   "followup_shares",
   "audit_events",
+  "login_events",
 ] as const;
 
 export function pools() {

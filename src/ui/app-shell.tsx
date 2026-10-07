@@ -7,11 +7,18 @@ import { SidebarNav } from "./sidebar-nav";
 type AppShellProps = {
   organizationName: string;
   user: { name: string; roleLabel: string };
+  /** Actions du compte (verrouiller, se déconnecter), sous l'identité. */
+  accountActions?: ReactNode;
   children: ReactNode;
 };
 
 /** Poste de travail : barre latérale blanche à gauche, zone centrale très claire. */
-export function AppShell({ organizationName, user, children }: AppShellProps) {
+export function AppShell({
+  organizationName,
+  user,
+  accountActions,
+  children,
+}: AppShellProps) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[264px_1fr]">
       <a
@@ -41,21 +48,24 @@ export function AppShell({ organizationName, user, children }: AppShellProps) {
           </Link>
         }
         footer={
-          <div className="flex items-center gap-3 rounded-[var(--radius-control)] p-2">
-            <span
-              aria-hidden="true"
-              className="grid size-9 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand-ink"
-            >
-              {initials(user.name)}
-            </span>
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate text-sm font-semibold">
-                {user.name}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 rounded-[var(--radius-control)] p-2">
+              <span
+                aria-hidden="true"
+                className="grid size-9 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand-ink"
+              >
+                {initials(user.name)}
               </span>
-              <span className="block truncate text-xs text-ink-muted">
-                {user.roleLabel}
+              <span className="min-w-0 leading-tight">
+                <span className="block truncate text-sm font-semibold">
+                  {user.name}
+                </span>
+                <span className="block truncate text-xs text-ink-muted">
+                  {user.roleLabel}
+                </span>
               </span>
-            </span>
+            </div>
+            {accountActions}
           </div>
         }
       />

@@ -14,6 +14,19 @@ describe("parseServerEnv", () => {
     expect(() => parseServerEnv({ APP_ENV: "demo" })).toThrow("APP_ENV");
   });
 
+  it("exige HTTPS et l'IP du répartiteur hors local", () => {
+    expect(() =>
+      parseServerEnv({ APP_ENV: "production", APP_URL: "http://stivea.test" }),
+    ).toThrow("Configuration invalide : TRUST_PROXY, APP_URL");
+    expect(
+      parseServerEnv({
+        APP_ENV: "production",
+        APP_URL: "https://stivea.test",
+        TRUST_PROXY: "true",
+      }).TRUST_PROXY,
+    ).toBe(true);
+  });
+
   it("ne révèle jamais la valeur fautive dans l'erreur", () => {
     const secret = "motdepasse-secret-sans-schema";
 

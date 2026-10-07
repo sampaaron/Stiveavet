@@ -20,9 +20,12 @@ export default function Home() {
           Démonstration avec des données fictives. Le site public arrive avec le
           lot 9.
         </p>
-        <ButtonLink href="/app" className="mt-6">
-          Ouvrir l&apos;espace cabinet
-        </ButtonLink>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <ButtonLink href="/connexion">Se connecter</ButtonLink>
+          <ButtonLink href="/inscription" variant="secondary">
+            Créer un cabinet
+          </ButtonLink>
+        </div>
         <p className="mt-6 flex w-fit items-center gap-2 rounded-full bg-brand-soft px-3 py-1 text-sm font-semibold text-brand-ink">
           <span aria-hidden="true">●</span>
           Environnement local, données fictives uniquement
