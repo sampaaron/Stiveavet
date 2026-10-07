@@ -1,0 +1,29 @@
+import type { NextConfig } from "next";
+
+import { staticSecurityHeaders } from "./src/server/security/headers";
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+  poweredByHeader: false,
+  reactStrictMode: true,
+  // Pas de pré-rendu statique partiel : chaque page doit recevoir le nonce CSP de sa requête
+  // (voir docs/adr/0003-csp-nonce-rendu-dynamique.md).
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: staticSecurityHeaders.map((header) => ({ ...header })),
+      },
+    ];
+  },
+};
+
+export default nextConfig;

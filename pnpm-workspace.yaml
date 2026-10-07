@@ -1,0 +1,7 @@
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+
+# Une seule version de Playwright dans tout l'arbre (navigateurs préinstallés en local et en CI).
+overrides:
+  playwright-core: 1.56.1

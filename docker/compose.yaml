@@ -1,0 +1,57 @@
+# Environnement local Stivea Vet : données fictives uniquement, aucun service externe.
+# Usage : cp .env.example .env (puis renseigner POSTGRES_PASSWORD), puis
+#         docker compose -f docker/compose.yaml --env-file .env up --build
+name: stivea-vet
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      APP_ENV: local
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-stivea}:${POSTGRES_PASSWORD:?Renseigner POSTGRES_PASSWORD dans .env}@db:5432/${POSTGRES_DB:-stivea}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1001,gid=1001
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stivea}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Renseigner POSTGRES_PASSWORD dans .env}
+      POSTGRES_DB: ${POSTGRES_DB:-stivea}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Capture tous les e-mails (codes de sécurité, factures…) : rien ne sort de la machine.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+volumes:
+  db-data:

@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/*
+ * Jetons de design Stivea Vet, issus de la référence visuelle.
+ * Le vert est l'accent principal ; ambre et rouge sont réservés aux niveaux de gravité.
+ */
+@theme {
+  --font-sans:
+    "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #f6f8fb;
+  --color-canvas-subtle: #edf1f5;
+  --color-surface: #ffffff;
+  --color-ink: #0b1220;
+  --color-ink-muted: #64748b;
+  --color-line: #e6eaf1;
+
+  --color-brand: #087a54;
+  --color-brand-strong: #066044;
+  --color-brand-soft: #dcf5ea;
+  --color-brand-ink: #07603f;
+
+  --color-watch: #9a6424;
+  --color-watch-soft: #f8eedd;
+  --color-urgent: #a8412f;
+  --color-urgent-soft: #f8e3dd;
+
+  --color-accent: #5b4fe0;
+
+  --radius-card: 16px;
+  --radius-control: 12px;
+
+  --shadow-card:
+    0 1px 2px rgb(11 18 32 / 0.04), 0 4px 16px rgb(11 18 32 / 0.04);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-[15px] leading-relaxed text-ink;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
