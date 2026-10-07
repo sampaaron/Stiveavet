@@ -17,6 +17,7 @@
     "db:migrate": "tsx --env-file-if-exists=.env db/migrate.mts",
     "db:seed": "tsx --env-file-if-exists=.env db/seed.mts",
     "demo:emails": "tsx --env-file-if-exists=.env scripts/demo-emails.mts",
+    "worker": "tsx --env-file-if-exists=.env scripts/worker.mts",
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "docs:permissions": "tsx scripts/docs-permissions.mts"
   },

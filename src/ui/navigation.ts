@@ -1,6 +1,7 @@
 import {
   Activity,
   BookOpen,
+  CircleAlert,
   CalendarDays,
   ClipboardList,
   CreditCard,
@@ -80,6 +81,12 @@ export const appNavigation: NavSection[] = [
         label: "Facturation",
         icon: CreditCard,
         anyOf: ["billing.manage"],
+      },
+      {
+        href: "/app/taches",
+        label: "Tâches en échec",
+        icon: CircleAlert,
+        anyOf: ["organization.settings"],
       },
       {
         href: "/app/journal",

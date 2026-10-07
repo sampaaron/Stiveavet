@@ -111,6 +111,14 @@ jobs:
           file: docker/Dockerfile
           push: false
           tags: stivea-vet:ci
+      # Image du worker de la file de tâches (même code, cible séparée).
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: worker
+          push: false
+          tags: stivea-vet-worker:ci
 
   securite:
     name: Secrets et dépendances

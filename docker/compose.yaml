@@ -32,6 +32,27 @@ services:
     cap_drop:
       - ALL
 
+  # Worker de la file de tâches : envois, rappels, alertes (aucun service externe en phase 2).
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: worker
+    environment:
+      APP_ENV: local
+      DATABASE_URL: postgres://stivea_app:${STIVEA_APP_PASSWORD:?Renseigner STIVEA_APP_PASSWORD dans .env}@db:5432/stivea
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     environment:
