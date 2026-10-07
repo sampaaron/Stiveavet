@@ -6,6 +6,13 @@ import { defineConfig } from "vitest/config";
  * y applique les migrations et le jeu fictif, puis la supprime.
  * Requiert TEST_DATABASE_ADMIN_URL (superutilisateur d'une instance locale ou de CI).
  */
+// Variables locales (.env), sans écraser celles déjà définies (CI).
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // Pas de .env : la CI fournit TEST_DATABASE_ADMIN_URL.
+}
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   resolve: {

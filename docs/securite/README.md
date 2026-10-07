@@ -8,3 +8,4 @@ Ce dossier accueille le modèle de menaces et la matrice des permissions (lot 5)
 - Aucun secret versionné (`.env` ignoré, détection gitleaks en CI) ; audit des dépendances de production bloquant.
 - Image Docker sans root, système de fichiers en lecture seule, capacités Linux retirées.
 - Base de données (ADR 0006) : l'application se connecte avec un rôle sans privilège de propriétaire ni `BYPASSRLS` ; RLS forcée sur chaque table, cabinet fixé par transaction ; clés étrangères composites entre cabinets ; journal d'audit en ajout seul.
+- Authentification (ADR 0007) : Argon2id, schéma `auth` inaccessible au rôle applicatif, sessions en base, code e-mail des vétérinaires sur nouvel appareil, verrouillage serveur à 40 min, réinitialisation à usage unique, limitation des tentatives, journal de connexion sans donnée en clair.

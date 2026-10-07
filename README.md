@@ -20,13 +20,24 @@ pnpm db:migrate          # schéma, avec le rôle stivea_migrator
 pnpm db:seed             # deux cabinets fictifs, avec le rôle applicatif (sous RLS)
 ```
 
-Mailpit (e-mails capturés) : http://localhost:8025.
+Mailpit (e-mails capturés, dont les codes de sécurité) : http://localhost:8025.
+
+Comptes fictifs créés par `pnpm db:seed`, tous avec la phrase de passe `tilleuls fictifs en local` :
+
+| Compte                                                    | Rôle                        | Cabinet               |
+| --------------------------------------------------------- | --------------------------- | --------------------- |
+| `claire.fontaine@tilleuls.test`                           | vétérinaire administratrice | Clinique des Tilleuls |
+| `hugo.marchal@tilleuls.test`, `ines.benali@tilleuls.test` | vétérinaires                | Clinique des Tilleuls |
+| `lea.roux@tilleuls.test`                                  | assistante (pas de code)    | Clinique des Tilleuls |
+| `paul.martin@cabinet-martin.test`                         | vétérinaire administrateur  | Cabinet du Dr Martin  |
+
+Les vétérinaires reçoivent un code dans Mailpit à la première connexion depuis un navigateur.
 
 ## Vérifier
 
 ```bash
 pnpm check               # lint, format, types, tests unitaires
-pnpm build && pnpm test:e2e
+pnpm build && pnpm test:e2e   # PostgreSQL + Mailpit lancés (docker compose up db db-roles mailpit)
 pnpm test:integration    # PostgreSQL réel ; requiert TEST_DATABASE_ADMIN_URL
 ```
 

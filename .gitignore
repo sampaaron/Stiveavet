@@ -46,3 +46,6 @@ next-env.d.ts
 # tests
 /playwright-report
 /test-results
+
+# Session de test Playwright (cookies de comptes fictifs)
+tests/e2e/.auth/

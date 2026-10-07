@@ -4,9 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { findFollowup, vetById } from "@/fixtures/cabinet-tilleuls";
+import { showsReferenceFixtures } from "@/fixtures/seed-ids";
 import type { Followup } from "@/fixtures/types";
 import { SectionCard } from "@/ui/card";
 import { SpeciesIcon, followupStatus } from "@/ui/followup-card";
+import { currentSession, requireSession } from "@/server/auth";
 import { StatusBadge } from "@/ui/status-badge";
 
 import { FollowupWorkspace } from "./followup-workspace";
@@ -14,14 +16,21 @@ import { FollowupWorkspace } from "./followup-workspace";
 type Params = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const followup = findFollowup((await params).id);
+  const session = await currentSession();
+  const followup =
+    session && !session.locked && showsReferenceFixtures(session.organizationId)
+      ? findFollowup((await params).id)
+      : undefined;
   return {
     title: followup ? `Dossier ${followup.animal.name}` : "Dossier introuvable",
   };
 }
 
 export default async function FollowupPage({ params }: Params) {
-  const followup = findFollowup((await params).id);
+  const session = await requireSession();
+  const followup = showsReferenceFixtures(session.organizationId)
+    ? findFollowup((await params).id)
+    : undefined;
   // Identifiant inconnu ou hors du cabinet : même réponse, pour ne rien révéler.
   if (!followup) notFound();
 

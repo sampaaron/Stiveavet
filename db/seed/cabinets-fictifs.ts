@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 
+import { sql } from "drizzle-orm";
+
 import {
   cabinet as tilleuls,
   followups as tilleulsFollowups,
   vets,
 } from "../../src/fixtures/cabinet-tilleuls";
+import { SEED } from "../../src/fixtures/seed-ids";
 import type { Followup } from "../../src/fixtures/types";
 import {
   animalOwners,
@@ -17,6 +20,7 @@ import {
   owners,
   users,
 } from "../../src/server/db/schema";
+import { hashPassword } from "../../src/domains/auth/password";
 import { withTenant } from "../../src/server/db/tenant";
 import type { Database, TenantTransaction } from "../../src/server/db/tenant";
 
@@ -24,10 +28,13 @@ import type { Database, TenantTransaction } from "../../src/server/db/tenant";
  * Jeu de données 100 % fictif : deux cabinets pour éprouver l'isolation.
  * Adresses e-mail en `.test` (domaine réservé, jamais routable).
  */
-export const SEED = {
-  tilleuls: "0b9f2c11-6a3e-4d27-9c40-5e1d8a7b3f01",
-  martin: "7c4e1a90-2b5d-4f38-8e16-9a0c3d2b1e02",
-} as const;
+export { SEED };
+
+/**
+ * Phrase de passe commune à tous les comptes fictifs, pour se connecter en local et en CI.
+ * Ces comptes n'existent que dans une base locale (le seed refuse tout autre environnement).
+ */
+export const FICTIONAL_LOGIN_PHRASE = "tilleuls fictifs en local";
 
 type MemberSeed = {
   email: string;
@@ -46,6 +53,7 @@ async function createOrganization(
   );
 
   const membershipIds: string[] = [];
+  const passwordHash = await hashPassword(FICTIONAL_LOGIN_PHRASE);
   for (const member of members) {
     const userId = randomUUID();
     const membershipId = randomUUID();
@@ -62,6 +70,9 @@ async function createOrganization(
         userId,
         role: member.role,
       });
+      await tx.execute(
+        sql`SELECT auth.set_initial_password(${userId}, ${passwordHash})`,
+      );
       await tx.insert(auditEvents).values({
         organizationId: id,
         actorMembershipId: membershipId,

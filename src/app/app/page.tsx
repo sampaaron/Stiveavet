@@ -9,7 +9,6 @@ import type { Metadata } from "next";
 import {
   agendaToday,
   cabinet,
-  currentUser,
   followups,
   todayLabel,
   vetById,
@@ -20,6 +19,9 @@ import { AssistantCard } from "@/ui/assistant-card";
 import { ButtonLink } from "@/ui/button";
 import { CapacityMeter } from "@/ui/capacity-meter";
 import { Card, SectionCard, StatCard } from "@/ui/card";
+import { showsReferenceFixtures } from "@/fixtures/seed-ids";
+import { requireSession } from "@/server/auth";
+import { memberProfile } from "@/server/auth/profile";
 import { FollowupCard } from "@/ui/followup-card";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
@@ -28,7 +30,25 @@ export const metadata: Metadata = { title: "Aujourd'hui" };
 
 const vetName = (id: string) => vetById(id)?.shortName ?? "Vétérinaire";
 
-export default function TodayPage() {
+export default async function TodayPage() {
+  const session = await requireSession();
+  const profile = await memberProfile(session);
+  if (!showsReferenceFixtures(session.organizationId))
+    return (
+      <>
+        <PageHeader
+          title={`Bonjour ${profile.firstName}`}
+          description={profile.organizationName}
+        />
+        <Card>
+          <EmptyState
+            title="Aucun suivi pour l'instant"
+            description="Votre cabinet est créé. L'installation guidée (WhatsApp, agenda, équipe, protocoles) arrive dans une prochaine étape ; vos suivis apparaîtront ici."
+          />
+        </Card>
+      </>
+    );
+
   const urgent = followups.filter((followup) => followup.triage === "urgent");
   const watch = followups.filter((followup) => followup.triage === "watch");
   const others = followups.filter((followup) => followup.triage === "normal");
@@ -38,7 +58,7 @@ export default function TodayPage() {
   return (
     <>
       <PageHeader
-        title={`Bonjour ${currentUser.firstName}`}
+        title={`Bonjour ${profile.firstName}`}
         description={`${todayLabel} · ${plural(urgent.length, "urgence")} et ${plural(watch.length, "cas à surveiller", "cas à surveiller")}`}
         actions={
           <>
