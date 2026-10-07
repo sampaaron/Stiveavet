@@ -19,6 +19,7 @@ import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { canManageFollowupAccess, followupAccess } from "./policies";
+import { loadFollowupRecord } from "./record";
 
 type Status = "draft" | "active" | "paused" | "human_takeover" | "ended";
 type Triage = "normal" | "watch" | "urgent";
@@ -327,6 +328,8 @@ export function followupsService(db: Database) {
         const canManage = canManageFollowupAccess(actor, facts);
         return {
           followup: toView(loaded.row, ownerName, access),
+          // Contacts pour tous ; conversation, triage et alertes avec `clinical.read` seulement.
+          record: await loadFollowupRecord(tx, followupId, access),
           canManageAccess: canManage,
           // La liste des partages n'est montrée qu'au responsable.
           shares: canManage ? loaded.shares : [],

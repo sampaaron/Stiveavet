@@ -120,3 +120,64 @@ export const followupShares = pgTable(
   },
   (table) => [primaryKey({ columns: [table.followupId, table.membershipId] })],
 );
+
+// Migration 0008 : contacts, historique des statuts et consentements.
+
+export const followupContactRole = pgEnum("followup_contact_role", [
+  "primary",
+  "secondary",
+]);
+export const consentState = pgEnum("consent_state", [
+  "requested",
+  "given",
+  "withdrawn",
+]);
+
+export const followupContacts = pgTable("followup_contacts", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  ownerId: uuid("owner_id").notNull(),
+  ownerContactId: uuid("owner_contact_id").notNull(),
+  role: followupContactRole("role").notNull(),
+  active: boolean("active").notNull().default(true),
+  language: language("language").notNull().default("fr"),
+  leftGroupAt: timestamp("left_group_at", { withTimezone: true }),
+  createdAt,
+  updatedAt,
+});
+
+/** Écrit par la base à chaque changement de statut (ajout seul). */
+export const followupStatusEvents = pgTable("followup_status_events", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  fromStatus: followupStatus("from_status"),
+  toStatus: followupStatus("to_status").notNull(),
+  actorMembershipId: uuid("actor_membership_id"),
+  reason: text("reason"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Ajout seul : l'état courant d'un contact est sa ligne la plus récente. */
+export const consents = pgTable("consents", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  followupContactId: uuid("followup_contact_id").notNull(),
+  state: consentState("state").notNull(),
+  wordingVersion: text("wording_version").notNull(),
+  groupExplained: boolean("group_explained").notNull().default(false),
+  messageId: uuid("message_id"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

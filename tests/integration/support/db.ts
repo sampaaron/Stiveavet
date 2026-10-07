@@ -32,6 +32,21 @@ export const TENANT_TABLES = [
   "invoices",
   "usage_events",
   "payment_events",
+  "followup_contacts",
+  "followup_status_events",
+  "consents",
+  "conversation_threads",
+  "messages",
+  "attachments",
+  "voice_transcripts",
+  "triage_events",
+  "alerts",
+  "acknowledgements",
+  "appointments",
+  "outbox_events",
+  "scheduled_jobs",
+  "job_attempts",
+  "notification_deliveries",
 ] as const;
 
 export function pools() {

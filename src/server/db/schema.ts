@@ -6,3 +6,8 @@ export * from "@/domains/suivis/schema";
 export * from "@/domains/protocoles/schema";
 export * from "@/domains/reglages/schema";
 export * from "@/domains/facturation/schema";
+export * from "@/domains/conversations/schema";
+export * from "@/domains/urgences/schema";
+export * from "@/domains/agenda/schema";
+export * from "@/domains/taches/schema";
+export * from "@/domains/notifications/schema";

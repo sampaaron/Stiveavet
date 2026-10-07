@@ -37,6 +37,8 @@ import { fakeDrVeto } from "../../src/adapters/drveto/fake";
 import { fakePaymentMandate } from "../../src/adapters/payments/fake";
 import { fakeWhatsApp } from "../../src/adapters/whatsapp/fake";
 import { withTenant } from "../../src/server/db/tenant";
+
+import { insertFollowupRecord } from "./dossiers-fictifs";
 import type { Database, TenantTransaction } from "../../src/server/db/tenant";
 
 /**
@@ -123,6 +125,12 @@ function grams(weight: string): number {
   );
 }
 
+export type SeededContact = {
+  ownerId: string;
+  ownerContactId: string;
+  owner: Followup["owners"][number];
+};
+
 export async function insertFollowup(
   tx: TenantTransaction,
   organizationId: string,
@@ -142,6 +150,7 @@ export async function insertFollowup(
     .returning({ id: animals.id });
   if (!animal) throw new Error("Insertion de l'animal impossible");
 
+  const contacts: SeededContact[] = [];
   for (const contact of data.owners) {
     const [owner] = await tx
       .insert(owners)
@@ -152,11 +161,20 @@ export async function insertFollowup(
       })
       .returning({ id: owners.id });
     if (!owner) throw new Error("Insertion du propriétaire impossible");
-    await tx.insert(ownerContacts).values({
-      organizationId,
+    const [whatsapp] = await tx
+      .insert(ownerContacts)
+      .values({
+        organizationId,
+        ownerId: owner.id,
+        kind: "whatsapp",
+        value: contact.phone,
+      })
+      .returning({ id: ownerContacts.id });
+    if (!whatsapp) throw new Error("Insertion du contact impossible");
+    contacts.push({
       ownerId: owner.id,
-      kind: "whatsapp",
-      value: contact.phone,
+      ownerContactId: whatsapp.id,
+      owner: contact,
     });
     await tx
       .insert(animalOwners)
@@ -177,6 +195,7 @@ export async function insertFollowup(
     startedAt,
     protocolVersionId,
   });
+  return { animalId: animal.id, startedAt, contacts };
 }
 
 /** Membre du jeu fictif agissant avec les droits par défaut de son rôle. */
@@ -391,12 +410,19 @@ export async function seedFictionalCabinets(db: Database) {
       if (!responsible)
         throw new Error(`Vétérinaire inconnu : ${followup.responsibleVetId}`);
       const key = libraryKeyFor(followup);
-      await insertFollowup(
+      const seeded = await insertFollowup(
         tx,
         SEED.tilleuls,
         responsible,
         followup,
         key ? (versionByKey.get(key) ?? null) : null,
+      );
+      await insertFollowupRecord(
+        tx,
+        SEED.tilleuls,
+        responsible,
+        followup,
+        seeded,
       );
     }
   });
@@ -423,8 +449,8 @@ export async function seedFictionalCabinets(db: Database) {
     payments: fakePaymentMandate,
   }).connect(paul, "payment_mandate", "");
 
-  await withTenant(db, { organizationId: SEED.martin }, (tx) =>
-    insertFollowup(tx, SEED.martin, martin, {
+  await withTenant(db, { organizationId: SEED.martin }, async (tx) => {
+    const sushi: Followup = {
       ...structuredClone(tilleulsFollowups[1]!),
       id: "e3a9c4d1-8b2f-4e67-a0d5-2c7f1b9e6a38",
       animal: {
@@ -443,8 +469,15 @@ export async function seedFictionalCabinets(db: Database) {
           language: "fr",
         },
       ],
-    }),
-  );
+    };
+    sushi.messages = sushi.messages.map((message) =>
+      message.author === "owner"
+        ? { ...message, authorName: "Élodie Masson" }
+        : message,
+    );
+    const seeded = await insertFollowup(tx, SEED.martin, martin, sushi);
+    await insertFollowupRecord(tx, SEED.martin, martin, sushi, seeded);
+  });
 
   await seedSubscription(db, paul, "solo", {
     monthsAgo: 3,

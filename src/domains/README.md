@@ -1,6 +1,6 @@
 # Domaines métier
 
-Un dossier par domaine (`ARCHITECTURE_TECHNIQUE_STRIVEA.md` §5) : `auth`, `cabinet`, `suivis`, `protocoles`, `agenda`, `facturation`, `notifications`, `audit`, `stive`, `whatsapp`, `integrations`.
+Un dossier par domaine (`ARCHITECTURE_TECHNIQUE_STRIVEA.md` §5) : `auth`, `cabinet`, `suivis`, `protocoles`, `agenda`, `facturation`, `notifications`, `audit`, `stive`, `whatsapp`, `integrations`, plus `conversations` (fils, messages, pièces jointes), `urgences` (triage, alertes) et `taches` (file de tâches).
 
 Chaque domaine contient, au fur et à mesure des lots :
 
