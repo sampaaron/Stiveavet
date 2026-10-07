@@ -21,6 +21,13 @@ export const TENANT_TABLES = [
   "protocol_versions",
   "protocol_steps",
   "alert_rules",
+  "organization_settings",
+  "availability_windows",
+  "emergency_instructions",
+  "emergency_contacts",
+  "on_call_schedules",
+  "integration_connections",
+  "onboarding_steps",
 ] as const;
 
 export function pools() {

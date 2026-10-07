@@ -104,6 +104,7 @@ export const followups = pgTable("followups", {
   createdAt,
   updatedAt,
   protocolVersionId: uuid("protocol_version_id"),
+  isTest: boolean("is_test").notNull().default(false),
 });
 
 export const followupShares = pgTable(

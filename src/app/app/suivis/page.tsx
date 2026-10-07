@@ -12,6 +12,7 @@ import { EmptyState } from "@/ui/states";
 import { StatusBadge } from "@/ui/status-badge";
 
 import { FOLLOWUP_STATUS_LABELS, followupBadge } from "./followup-labels";
+import { TestMark } from "./test-mark";
 
 export const metadata: Metadata = { title: "Suivis" };
 
@@ -67,6 +68,7 @@ export default async function FollowupsPage() {
                             Privé
                           </span>
                         ) : null}
+                        {followup.isTest ? <TestMark /> : null}
                       </span>
                       <span className="mt-0.5 block truncate text-sm text-ink-muted">
                         {[
