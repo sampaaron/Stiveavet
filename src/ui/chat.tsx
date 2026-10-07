@@ -1,4 +1,4 @@
-import { ImageIcon, Mic } from "lucide-react";
+import { FileX, ImageIcon, Mic, ScanEye } from "lucide-react";
 
 import type { Message } from "@/fixtures/types";
 
@@ -66,7 +66,10 @@ export function ChatBubble({ message }: { message: Message }) {
           ) : null}
         </p>
         {message.attachment ? (
-          <AttachmentView attachment={message.attachment} />
+          <AttachmentView
+            attachment={message.attachment}
+            ownerName={message.authorName ?? "le propriétaire"}
+          />
         ) : null}
         {message.text ? (
           <p className="text-[15px] whitespace-pre-line">{message.text}</p>
@@ -90,15 +93,49 @@ function authorLabel(message: Message): string {
 
 function AttachmentView({
   attachment,
+  ownerName,
 }: {
   attachment: NonNullable<Message["attachment"]>;
+  ownerName: string;
 }) {
+  if (attachment.kind === "deleted")
+    return (
+      <p className="mb-1 flex items-center gap-2 rounded-xl bg-surface/70 p-2.5 text-sm text-ink-muted">
+        <FileX aria-hidden="true" className="size-4 shrink-0" />
+        {attachment.label}
+      </p>
+    );
   if (attachment.kind === "photo") {
     return (
-      <div className="mb-2 flex h-32 w-56 max-w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink-muted/40 bg-surface text-xs text-ink-muted">
-        <ImageIcon aria-hidden="true" className="size-6" />
-        {attachment.label} (fictive)
-      </div>
+      <figure className="mb-2">
+        {attachment.src ? (
+          // Lien signé de deux minutes, servi par l'application : pas d'optimisation d'image.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={attachment.src}
+            alt={`Photo envoyée par ${ownerName}`}
+            className="max-h-72 w-auto max-w-full rounded-xl border border-line bg-surface object-contain"
+          />
+        ) : (
+          <div className="flex h-32 w-56 max-w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink-muted/40 bg-surface text-xs text-ink-muted">
+            <ImageIcon aria-hidden="true" className="size-6" />
+            {attachment.label} (fictive)
+          </div>
+        )}
+        {attachment.observations?.length ? (
+          <figcaption className="mt-2 rounded-xl bg-surface/70 p-2.5 text-sm">
+            <p className="flex items-center gap-1.5 font-semibold">
+              <ScanEye aria-hidden="true" className="size-4 shrink-0" />
+              Observations de l&apos;IA, à vérifier (aucun diagnostic)
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              {attachment.observations.map((observation) => (
+                <li key={observation}>{observation}</li>
+              ))}
+            </ul>
+          </figcaption>
+        ) : null}
+      </figure>
     );
   }
   return (
@@ -107,9 +144,22 @@ function AttachmentView({
         <Mic aria-hidden="true" className="size-4" />
         Message vocal · {attachment.durationLabel}
       </p>
+      {attachment.src ? (
+        <audio
+          controls
+          preload="auto"
+          src={attachment.src}
+          aria-label={`Message vocal de ${ownerName}`}
+          className="mt-2 w-full max-w-xs"
+        />
+      ) : null}
       <p className="mt-1 text-sm">
-        <span className="font-semibold">Transcription : </span>«{" "}
-        {attachment.transcript} »
+        <span className="font-semibold">Transcription : </span>
+        {attachment.transcript === null ? (
+          <span className="text-ink-muted">en cours…</span>
+        ) : (
+          <>« {attachment.transcript} »</>
+        )}
       </p>
     </div>
   );

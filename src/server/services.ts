@@ -1,15 +1,23 @@
 import "server-only";
 
+import { randomBytes } from "node:crypto";
+
+import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { emailSender, marketingEmailSender } from "@/adapters/email";
+import { lazyObjectStorage } from "@/adapters/object-storage";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
+import { agendaService } from "@/domains/agenda/captures";
+import type { AgendaService } from "@/domains/agenda/captures";
 import { conversationsService } from "@/domains/conversations/service";
 import type { ConversationsService } from "@/domains/conversations/service";
 import { demoService } from "@/domains/demo/service";
 import type { DemoService } from "@/domains/demo/service";
 import { teamService } from "@/domains/equipe/service";
+import { mediaService } from "@/domains/fichiers/service";
+import type { MediaService } from "@/domains/fichiers/service";
 import { billingService } from "@/domains/facturation/service";
 import type { BillingService } from "@/domains/facturation/service";
 import type { TeamService } from "@/domains/equipe/service";
@@ -40,7 +48,26 @@ let jobs: JobsService | undefined;
 let launch: LaunchService | undefined;
 let conversations: ConversationsService | undefined;
 let alerts: AlertsService | undefined;
+let media: MediaService | undefined;
+let agenda: AgendaService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
+
+declare global {
+  var stiveaLocalFileLinkSecret: string | undefined;
+}
+
+/**
+ * Clé des liens de lecture signés (ADR 0019) : celle de l'environnement, obligatoire hors
+ * local ; en local, à défaut, une clé aléatoire propre à ce processus. Elle est gardée au
+ * niveau du processus : pages et routes de fichiers sont des modules distincts.
+ */
+function fileLinkSecret(): string {
+  const configured = serverEnv().FILE_LINK_SECRET;
+  if (configured) return configured;
+  globalThis.stiveaLocalFileLinkSecret ??=
+    randomBytes(48).toString("base64url");
+  return globalThis.stiveaLocalFileLinkSecret;
+}
 
 /** Services métier branchés sur la base applicative et l'envoi d'e-mails. */
 export const services = {
@@ -92,6 +119,24 @@ export const services = {
   alerts(): AlertsService {
     alerts ??= alertsService(appDatabase());
     return alerts;
+  },
+  /** Photos et vocaux : réception, liens de lecture signés, ouverture (ADR 0019). */
+  media(): MediaService {
+    media ??= mediaService({
+      db: appDatabase(),
+      storage: lazyObjectStorage,
+      linkSecret: fileLinkSecret(),
+    });
+    return media;
+  },
+  /** Captures d'agenda et créneaux libres, lecture simulée (ADR 0019). */
+  agenda(): AgendaService {
+    agenda ??= agendaService({
+      db: appDatabase(),
+      storage: lazyObjectStorage,
+      ai: fakeAiGateway,
+    });
+    return agenda;
   },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement

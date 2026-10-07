@@ -122,8 +122,9 @@ async function domainError(promise: Promise<unknown>) {
 
 describe("droits par défaut des rôles", () => {
   it("chaque membre reçoit en base les permissions par défaut de son rôle", async () => {
-    expect([...(await actor(ids.admin)).permissions]).toHaveLength(16);
+    expect([...(await actor(ids.admin)).permissions]).toHaveLength(17);
     expect([...(await actor(ids.vet1)).permissions].sort()).toEqual([
+      "agenda.capture",
       "agenda.read",
       "appointments.confirm",
       "clinical.read",

@@ -224,6 +224,42 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  {
+    ref: "DV-20669",
+    animal: {
+      name: "Moka",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2024-05-12",
+      weightGrams: 3100,
+    },
+    owners: [
+      { fullName: "Camille Dubois", phone: "+33639980113", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20683",
+    animal: {
+      name: "Maple",
+      species: "cat",
+      breed: "British shorthair",
+      birthDate: "2023-11-08",
+      weightGrams: 4300,
+    },
+    owners: [
+      { fullName: "Harry Collins", phone: "+33639980114", language: "en" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

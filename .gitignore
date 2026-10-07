@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Session de test Playwright (cookies de comptes fictifs)
 tests/e2e/.auth/
+
+# Stockage objet local (photos, vocaux, captures) : jamais versionné
+/.data/

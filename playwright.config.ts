@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import { defineConfig, devices } from "@playwright/test";
@@ -58,6 +60,8 @@ export default defineConfig({
       DATABASE_URL: e2eDatabaseUrl(),
       SMTP_HOST: process.env.E2E_SMTP_HOST ?? "localhost",
       SMTP_PORT: process.env.E2E_SMTP_PORT ?? "1025",
+      // Photos, vocaux et captures des tests : hors du dépôt, jamais versionnés.
+      OBJECT_STORAGE_DIR: join(tmpdir(), "stivea-e2e-objets"),
     },
   },
 });

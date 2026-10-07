@@ -20,7 +20,8 @@ RUN pnpm build
 # reste celle de l'application, ci-dessous.
 FROM build AS worker
 ENV NODE_ENV=production
-RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea
+RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea \
+  && mkdir -p /data/objets && chown stivea:stivea /data/objets && chmod 700 /data/objets
 USER stivea
 CMD ["node_modules/.bin/tsx", "scripts/worker.mts"]
 
@@ -33,6 +34,8 @@ COPY --from=build --chown=stivea:stivea /app/.next/static ./.next/static
 COPY --from=build --chown=stivea:stivea /app/public ./public
 # Seul répertoire inscriptible (cache d'images) ; monté en tmpfs quand le système de fichiers est en lecture seule.
 RUN mkdir -p .next/cache && chown stivea:stivea .next/cache
+# Stockage objet local de la phase 2 (ADR 0019) : volume partagé avec le worker, privé.
+RUN mkdir -p /data/objets && chown stivea:stivea /data/objets && chmod 700 /data/objets
 USER stivea
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \

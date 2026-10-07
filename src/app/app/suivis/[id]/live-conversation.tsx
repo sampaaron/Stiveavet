@@ -4,8 +4,11 @@ import Link from "next/link";
 import type {
   ConversationMessage,
   ConversationView,
+  MessageAttachment,
 } from "@/domains/conversations/service";
-import type { Message } from "@/fixtures/types";
+import type { SignedLink } from "@/domains/fichiers/liens";
+import { durationLabel } from "@/domains/fichiers/media";
+import type { Attachment, Message } from "@/fixtures/types";
 import { Card } from "@/ui/card";
 import { ChatThread } from "@/ui/chat";
 import { formatDate, formatTime } from "@/ui/format";
@@ -20,18 +23,55 @@ const DELIVERY_NOTE: Partial<
   failed: "non envoyé",
 };
 
-function toBubble(message: ConversationMessage): Message {
+function toAttachment(
+  attachment: MessageAttachment,
+  links: Record<string, SignedLink>,
+): Attachment {
+  if (attachment.deleted)
+    return {
+      kind: "deleted",
+      label:
+        attachment.kind === "photo"
+          ? "Photo supprimée (durée de conservation atteinte)"
+          : "Message vocal supprimé (durée de conservation atteinte)",
+    };
+  const src = links[attachment.id]?.url;
+  return attachment.kind === "photo"
+    ? {
+        kind: "photo",
+        label: "Photo",
+        src,
+        observations: attachment.observations,
+      }
+    : {
+        kind: "voice",
+        durationLabel: durationLabel(attachment.durationMs),
+        transcript: attachment.transcript,
+        src,
+      };
+}
+
+function toBubble(
+  message: ConversationMessage,
+  links: Record<string, SignedLink>,
+  ownerFirstName: string | null,
+): Message {
   const note = message.delivery ? DELIVERY_NOTE[message.delivery] : undefined;
   return {
     id: message.id,
     author: message.author,
-    authorName: message.authorName ?? undefined,
+    authorName:
+      (message.author === "owner" ? ownerFirstName : message.authorName) ??
+      undefined,
     at: note
       ? `${formatTime(message.occurredAt)} · ${note}`
       : formatTime(message.occurredAt),
     dayLabel: formatDate(message.occurredAt),
     text: message.body,
     triage: message.triage ?? undefined,
+    attachment: message.attachment
+      ? toAttachment(message.attachment, links)
+      : undefined,
   };
 }
 
@@ -60,9 +100,12 @@ function stateLabel(view: ConversationView): string {
 /** Conversation WhatsApp réelle d'un suivi lancé (données en base). */
 export function LiveConversation({
   view,
+  links,
   simulatorHref,
 }: {
   view: ConversationView;
+  /** Liens de lecture signés des photos et vocaux, pour la personne qui consulte. */
+  links: Record<string, SignedLink>;
   /** Lien vers le simulateur du propriétaire, en local seulement. */
   simulatorHref: string | null;
 }) {
@@ -95,7 +138,11 @@ export function LiveConversation({
 
       <div className="px-4 py-5 sm:px-5">
         {view.messages.length > 0 ? (
-          <ChatThread messages={view.messages.map(toBubble)} />
+          <ChatThread
+            messages={view.messages.map((message) =>
+              toBubble(message, links, view.ownerFirstName),
+            )}
+          />
         ) : (
           <EmptyState
             title="Aucun message pour l'instant"

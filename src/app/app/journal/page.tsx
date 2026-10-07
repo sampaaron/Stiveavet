@@ -63,6 +63,18 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
   "simulator.owner_message": ({ actorName }) =>
     `${actorName} a simulé un message de propriétaire (local)`,
+  "simulator.owner_media": ({ actorName }) =>
+    `${actorName} a simulé une photo ou un message vocal de propriétaire (local)`,
+  "attachment.opened": ({ actorName }) =>
+    `${actorName} a ouvert une photo ou un message vocal d'un suivi`,
+  "attachment.purged": () =>
+    "Un fichier arrivé à sa date limite de conservation a été supprimé",
+  "photo.observation_blocked": () =>
+    "Garde-fou : une observation de l'analyse photo a été écartée (elle ressemblait à un avis médical)",
+  "agenda.capture_read": ({ actorName }) =>
+    `${actorName} a envoyé une capture d'agenda : créneaux libres lus, capture supprimée`,
+  "agenda.slot_removed": ({ actorName }) =>
+    `${actorName} a retiré un créneau libre de l'agenda`,
   "followup.ended_automatically": () =>
     "Fin du suivi automatisé à la date de contrôle (la conversation reste ouverte)",
   "alert.raised": () =>

@@ -24,6 +24,7 @@ export const PERMISSIONS = {
   "owner_messages.reply": "Répondre aux propriétaires",
   "appointments.confirm": "Confirmer manuellement un rendez-vous",
   "agenda.read": "Consulter l'agenda",
+  "agenda.capture": "Envoyer une capture d'agenda (créneaux libres)",
   "stive.use": "Utiliser Stive, l'assistant IA interne",
 } as const;
 
@@ -49,6 +50,7 @@ export const ROLE_PERMISSIONS: Record<MemberRole, RoleGrants> = {
       "owner_messages.reply",
       "appointments.confirm",
       "agenda.read",
+      "agenda.capture",
       "stive.use",
     ],
     optional: ["followups.read_all", "protocols.manage"],
@@ -57,6 +59,7 @@ export const ROLE_PERMISSIONS: Record<MemberRole, RoleGrants> = {
     defaults: ["followups.read_summary", "agenda.read"],
     optional: [
       "appointments.confirm",
+      "agenda.capture",
       "owner_messages.reply",
       "clinical.read",
       "followups.launch",

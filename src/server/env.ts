@@ -17,6 +17,15 @@ export const serverEnvSchema = z
     SMTP_PORT: z.coerce.number().int().positive().optional(),
     // « true » seulement derrière le répartiteur de charge, qui écrit X-Forwarded-For.
     // Sinon l'en-tête est falsifiable : l'IP est alors ignorée (pas de limite par IP).
+    // Clé des liens de lecture signés des fichiers (ADR 0019), 32 caractères au moins.
+    // En local, sans valeur, une clé aléatoire est tirée au démarrage (liens perdus au
+    // redémarrage, sans conséquence : ils ne vivent que deux minutes).
+    FILE_LINK_SECRET: z.string().min(32).optional(),
+    // Stockage objet local de la phase 2 : chemin absolu (défaut : .data/objets).
+    OBJECT_STORAGE_DIR: z
+      .string()
+      .refine((value) => value.startsWith("/"))
+      .optional(),
     TRUST_PROXY: z
       .enum(["true", "false"])
       .default("false")
@@ -28,6 +37,13 @@ export const serverEnvSchema = z
       context.addIssue({
         code: "custom",
         path: ["TRUST_PROXY"],
+        message: "requis",
+      });
+    // Hors local, la clé des liens signés est fixe et vient du gestionnaire de secrets.
+    if (env.APP_ENV !== "local" && !env.FILE_LINK_SECRET)
+      context.addIssue({
+        code: "custom",
+        path: ["FILE_LINK_SECRET"],
         message: "requis",
       });
     // Hors local, les cookies d'authentification doivent être Secure.

@@ -35,6 +35,10 @@ const MESSAGES: Record<DomainError["code"], string> = {
     "Une étape déjà passée ne se modifie plus : choisissez un délai à venir.",
   consent_missing:
     "Le propriétaire n'a pas donné son accord (ou l'a retiré) : aucun message ne peut lui être envoyé.",
+  invalid_file:
+    "Fichier refusé : envoyez une image JPEG, PNG ou WebP de 5 Mo au plus (ou un message vocal).",
+  capture_unreadable:
+    "Aucun créneau libre n'a pu être lu sur cette capture. Elle a été supprimée ; réessayez avec une capture plus nette.",
 };
 
 export function domainFailure(error: DomainError): ActionState {

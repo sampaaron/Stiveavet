@@ -17,14 +17,26 @@ describe("parseServerEnv", () => {
   it("exige HTTPS et l'IP du répartiteur hors local", () => {
     expect(() =>
       parseServerEnv({ APP_ENV: "production", APP_URL: "http://stivea.test" }),
-    ).toThrow("Configuration invalide : TRUST_PROXY, APP_URL");
+    ).toThrow(
+      "Configuration invalide : TRUST_PROXY, FILE_LINK_SECRET, APP_URL",
+    );
     expect(
       parseServerEnv({
         APP_ENV: "production",
         APP_URL: "https://stivea.test",
         TRUST_PROXY: "true",
+        FILE_LINK_SECRET: "x".repeat(48),
       }).TRUST_PROXY,
     ).toBe(true);
+  });
+
+  it("refuse une clé de liens trop courte et un dossier de stockage relatif", () => {
+    expect(() => parseServerEnv({ FILE_LINK_SECRET: "court" })).toThrow(
+      "FILE_LINK_SECRET",
+    );
+    expect(() => parseServerEnv({ OBJECT_STORAGE_DIR: "data" })).toThrow(
+      "OBJECT_STORAGE_DIR",
+    );
   });
 
   it("ne révèle jamais la valeur fautive dans l'erreur", () => {

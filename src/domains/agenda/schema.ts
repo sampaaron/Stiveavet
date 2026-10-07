@@ -42,3 +42,17 @@ export const appointments = pgTable("appointments", {
   createdAt: at("created_at").notNull().defaultNow(),
   updatedAt: at("updated_at").notNull().defaultNow(),
 });
+
+/** Migration 0012 : créneaux libres lus sur une capture d'agenda. */
+export const agendaFreeSlots = pgTable("agenda_free_slots", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  membershipId: uuid("membership_id").notNull(),
+  startsAt: at("starts_at").notNull(),
+  endsAt: at("ends_at").notNull(),
+  source: text("source").notNull().default("capture"),
+  createdByMembershipId: uuid("created_by_membership_id").notNull(),
+  createdAt: at("created_at").notNull().defaultNow(),
+});

@@ -93,6 +93,8 @@ export const attachments = pgTable("attachments", {
   retentionUntil: at("retention_until").notNull(),
   deletedAt: at("deleted_at"),
   createdAt: at("created_at").notNull().defaultNow(),
+  /** Migration 0012 : durée d'un message vocal. */
+  durationMs: integer("duration_ms"),
 });
 
 export const voiceTranscripts = pgTable("voice_transcripts", {
@@ -104,6 +106,19 @@ export const voiceTranscripts = pgTable("voice_transcripts", {
   attachmentId: uuid("attachment_id").notNull(),
   text: text("text").notNull(),
   language: language("language"),
+  engine: text("engine").notNull().default("simulated"),
+  createdAt: at("created_at").notNull().defaultNow(),
+});
+
+/** Migration 0012 : observations de l'analyse photo (jamais de diagnostic). */
+export const photoObservations = pgTable("photo_observations", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  attachmentId: uuid("attachment_id").notNull(),
+  observations: text("observations").notNull(),
   engine: text("engine").notNull().default("simulated"),
   createdAt: at("created_at").notNull().defaultNow(),
 });
