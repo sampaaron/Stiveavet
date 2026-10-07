@@ -5,12 +5,15 @@ import type { z } from "zod";
 
 import {
   codeInput,
+  invitationInput,
   loginInput,
   newPasswordInput,
   resetRequestInput,
   signupInput,
   unlockInput,
 } from "@/domains/auth/validators";
+import { hashPassword, passwordProblems } from "@/domains/auth/password";
+import { acceptInvitation, previewInvitation } from "@/domains/equipe/service";
 import { auth } from "@/server/auth";
 import {
   clearAuthCookie,
@@ -20,6 +23,7 @@ import {
   setSessionCookie,
 } from "@/server/auth/cookies";
 import { requestOrigin } from "@/server/auth/origin";
+import { appDatabase } from "@/server/db/client";
 
 import type { FormState } from "./form-state";
 
@@ -219,4 +223,58 @@ export async function keepAliveAction(): Promise<
   const session = await auth().resolveSession(await readAuthCookie("session"));
   if (!session) return "signed_out";
   return session.locked ? "locked" : "active";
+}
+
+const INVITATION_EXPIRED =
+  "Cette invitation n'est plus valable. Demandez une nouvelle invitation au cabinet.";
+
+/** Création du compte d'une personne invitée ; elle se connecte ensuite normalement. */
+export async function acceptInvitationAction(
+  _previous: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const raw = fields(form, [
+    "token",
+    "displayName",
+    "password",
+    "confirmation",
+  ]);
+  const values = { displayName: raw.displayName?.slice(0, 120) };
+  const parsed = invitationInput.safeParse(raw);
+  if (!parsed.success)
+    return { fieldErrors: fieldErrors(parsed.error), values };
+
+  const db = appDatabase();
+  // Jeton vérifié avant le calcul coûteux du hachage.
+  const invitation = await previewInvitation(db, parsed.data.token);
+  if (!invitation) return { error: INVITATION_EXPIRED, values };
+  const problems = passwordProblems(parsed.data.password, {
+    email: invitation.email,
+    displayName: parsed.data.displayName,
+  });
+  if (problems.length) return { fieldErrors: { password: problems }, values };
+
+  const result = await acceptInvitation(db, {
+    token: parsed.data.token,
+    displayName: parsed.data.displayName,
+    passwordHash: await hashPassword(parsed.data.password),
+  });
+  switch (result) {
+    case "expired":
+      return { error: INVITATION_EXPIRED, values };
+    case "email_registered":
+      return {
+        error:
+          "Cette adresse a déjà un compte Stivea Vet. Demandez au cabinet de vous inviter avec une autre adresse.",
+        values,
+      };
+    case "vet_limit":
+      return {
+        error:
+          "Le cabinet compte déjà 3 vétérinaires. Contactez la personne qui vous a invité.",
+        values,
+      };
+    case "accepted":
+      return redirect("/connexion?raison=invitation");
+  }
 }

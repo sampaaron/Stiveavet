@@ -8,6 +8,7 @@ import { Button } from "@/ui/button";
 import { TextField } from "@/ui/text-field";
 
 import {
+  acceptInvitationAction,
   loginAction,
   requestResetAction,
   resetPasswordAction,
@@ -237,6 +238,62 @@ export function SignupForm() {
         errors={state.fieldErrors?.confirmation}
       />
       <Submit pending={pending}>Créer le cabinet</Submit>
+    </form>
+  );
+}
+
+export function InvitationForm({
+  token,
+  email,
+  displayName,
+}: {
+  token: string;
+  email: string;
+  displayName: string;
+}) {
+  const [state, action, pending] = useActionState(
+    acceptInvitationAction,
+    initialFormState,
+  );
+  return (
+    <form action={action} className="flex flex-col gap-4" noValidate>
+      <Messages state={state} />
+      <input type="hidden" name="token" value={token} />
+      <TextField
+        label="Adresse e-mail"
+        name="email"
+        type="email"
+        autoComplete="username"
+        value={email}
+        readOnly
+        hint="L'adresse à laquelle l'invitation a été envoyée."
+      />
+      <TextField
+        label="Votre nom"
+        name="displayName"
+        autoComplete="name"
+        required
+        defaultValue={state.values?.displayName ?? displayName}
+        errors={state.fieldErrors?.displayName}
+      />
+      <TextField
+        label="Mot de passe"
+        name="password"
+        type="password"
+        autoComplete="new-password"
+        required
+        hint={PASSWORD_HINT}
+        errors={state.fieldErrors?.password}
+      />
+      <TextField
+        label="Confirmer le mot de passe"
+        name="confirmation"
+        type="password"
+        autoComplete="new-password"
+        required
+        errors={state.fieldErrors?.confirmation}
+      />
+      <Submit pending={pending}>Créer mon compte</Submit>
     </form>
   );
 }

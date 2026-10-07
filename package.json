@@ -16,7 +16,8 @@
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
     "db:migrate": "tsx --env-file-if-exists=.env db/migrate.mts",
     "db:seed": "tsx --env-file-if-exists=.env db/seed.mts",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "docs:permissions": "tsx scripts/docs-permissions.mts"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",

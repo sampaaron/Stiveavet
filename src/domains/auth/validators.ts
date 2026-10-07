@@ -59,3 +59,19 @@ export const signupInput = z
     message: "Les deux mots de passe ne correspondent pas.",
     path: ["confirmation"],
   });
+
+export const invitationInput = z
+  .object({
+    token: z.string().max(64),
+    displayName: z
+      .string()
+      .trim()
+      .min(2, "Indiquez votre nom.")
+      .max(120, "Nom trop long."),
+    password: z.string().max(AUTH_POLICY.password.maxLength * 4),
+    confirmation: z.string().max(AUTH_POLICY.password.maxLength * 4),
+  })
+  .refine((value) => value.password === value.confirmation, {
+    message: "Les deux mots de passe ne correspondent pas.",
+    path: ["confirmation"],
+  });

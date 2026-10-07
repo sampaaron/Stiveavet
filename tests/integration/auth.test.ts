@@ -294,7 +294,18 @@ describe("session et verrouillage", () => {
         .status,
     ).toBe("invalid");
 
-    const removed = await newAdmin();
+    // Retrait d'un vétérinaire du cabinet (le dernier administrateur ne peut pas l'être).
+    const ines = "ines.benali@tilleuls.test";
+    const challenge = await service.login(
+      { email: ines, password: FICTIONAL_LOGIN_PHRASE },
+      origin,
+    );
+    if (challenge.status !== "code_required") throw new Error("code attendu");
+    const removed = await service.verifyCode(
+      { challengeToken: challenge.challengeToken, code: codeSentTo(ines) },
+      origin,
+    );
+    if (removed.status !== "signed_in") throw new Error("session attendue");
     const removedSession = await service.resolveSession(removed.sessionToken);
     await admin.query(
       "UPDATE memberships SET deactivated_at = now() WHERE id = $1",
@@ -302,6 +313,10 @@ describe("session et verrouillage", () => {
     );
     expect(await service.resolveSession(removed.sessionToken)).toBeNull();
     expect((await sessionRow(removed.sessionToken))?.revoked_at).not.toBeNull();
+    await admin.query(
+      "UPDATE memberships SET deactivated_at = NULL WHERE id = $1",
+      [removedSession?.membershipId],
+    );
   });
 
   it("refuse un jeton mal formé sans interroger la base", async () => {

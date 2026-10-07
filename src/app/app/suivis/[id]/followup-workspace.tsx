@@ -25,6 +25,8 @@ type Props = {
   initialState: FollowupState;
   messages: Message[];
   lastActivity: string;
+  /** Répondre au propriétaire et piloter Numa (permission owner_messages.reply). */
+  canAct: boolean;
 };
 
 const stateLabel: Record<FollowupState, string> = {
@@ -45,6 +47,7 @@ export function FollowupWorkspace({
   initialState,
   messages: initialMessages,
   lastActivity,
+  canAct,
 }: Props) {
   const [state, setState] = useState<FollowupState>(initialState);
   const [messages, setMessages] = useState(initialMessages);
@@ -78,9 +81,11 @@ export function FollowupWorkspace({
           tone="urgent"
           title={`Urgence signalée à ${lastActivity}, sans accusé de réception`}
           action={
-            <Button size="sm" onClick={() => setAcknowledged(true)}>
-              Accuser réception
-            </Button>
+            canAct ? (
+              <Button size="sm" onClick={() => setAcknowledged(true)}>
+                Accuser réception
+              </Button>
+            ) : undefined
           }
         >
           Tant que personne n&apos;accuse réception, l&apos;équipe sera prévenue
@@ -105,34 +110,36 @@ export function FollowupWorkspace({
               {stateLabel[state]}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {state === "human" || state === "paused" ? (
+          {canAct ? (
+            <div className="flex flex-wrap gap-2">
+              {state === "human" || state === "paused" ? (
+                <Button
+                  size="sm"
+                  icon={<CirclePlay aria-hidden="true" className="size-4" />}
+                  onClick={() => setState("active")}
+                >
+                  Reprendre Numa
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<CirclePause aria-hidden="true" className="size-4" />}
+                  onClick={() => setState("paused")}
+                  disabled={state === "ended"}
+                >
+                  Mettre en pause
+                </Button>
+              )}
               <Button
                 size="sm"
-                icon={<CirclePlay aria-hidden="true" className="size-4" />}
-                onClick={() => setState("active")}
+                variant="quiet"
+                icon={<CalendarPlus aria-hidden="true" className="size-4" />}
               >
-                Reprendre Numa
+                Proposer un rendez-vous
               </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<CirclePause aria-hidden="true" className="size-4" />}
-                onClick={() => setState("paused")}
-                disabled={state === "ended"}
-              >
-                Mettre en pause
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="quiet"
-              icon={<CalendarPlus aria-hidden="true" className="size-4" />}
-            >
-              Proposer un rendez-vous
-            </Button>
-          </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-start gap-2 border-b border-line bg-canvas px-5 py-3 text-sm text-ink-muted">
@@ -158,58 +165,67 @@ export function FollowupWorkspace({
           )}
         </div>
 
-        <form
-          className="border-t border-line p-4 sm:p-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            sendDraft();
-          }}
-        >
-          <label htmlFor={composerId} className="text-sm font-semibold">
-            Écrire à {ownerFirstName}
-          </label>
-          <p className="mb-2 text-xs text-ink-muted">
-            Le message part du WhatsApp professionnel du cabinet. Numa se met en
-            pause dès que vous écrivez.
+        {canAct ? (
+          <form
+            className="border-t border-line p-4 sm:p-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              sendDraft();
+            }}
+          >
+            <label htmlFor={composerId} className="text-sm font-semibold">
+              Écrire à {ownerFirstName}
+            </label>
+            <p className="mb-2 text-xs text-ink-muted">
+              Le message part du WhatsApp professionnel du cabinet. Numa se met
+              en pause dès que vous écrivez.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <textarea
+                id={composerId}
+                rows={2}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                disabled={state === "ended"}
+                className="min-h-11 flex-1 resize-y rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] placeholder:text-ink-muted"
+                placeholder={`Votre message au sujet de ${animalName}`}
+              />
+              <Button
+                type="submit"
+                disabled={!draft.trim() || state === "ended"}
+                icon={<Send aria-hidden="true" className="size-4" />}
+              >
+                Envoyer
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <p className="border-t border-line p-4 text-sm text-ink-muted sm:p-5">
+            Lecture seule : répondre au propriétaire demande un droit que
+            l&apos;administrateur peut vous ouvrir.
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <textarea
-              id={composerId}
-              rows={2}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={state === "ended"}
-              className="min-h-11 flex-1 resize-y rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] placeholder:text-ink-muted"
-              placeholder={`Votre message au sujet de ${animalName}`}
-            />
-            <Button
-              type="submit"
-              disabled={!draft.trim() || state === "ended"}
-              icon={<Send aria-hidden="true" className="size-4" />}
-            >
-              Envoyer
-            </Button>
-          </div>
-        </form>
+        )}
       </Card>
 
-      <div className="flex flex-wrap items-center gap-3">
-        {state === "ended" ? (
-          <StatusBadge status="paused" label="Suivi arrêté" />
-        ) : (
-          <ConfirmDialog
-            triggerLabel="Arrêter le suivi"
-            title={`Arrêter le suivi de ${animalName} ?`}
-            description="Numa n'enverra plus de relance. La conversation WhatsApp reste ouverte et l'historique est conservé."
-            confirmLabel="Arrêter le suivi"
-            tone="urgent"
-            onConfirm={() => setState("ended")}
-          />
-        )}
-        <p className="text-xs text-ink-muted">
-          Démonstration : aucune action n&apos;est enregistrée ni envoyée.
-        </p>
-      </div>
+      {canAct ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {state === "ended" ? (
+            <StatusBadge status="paused" label="Suivi arrêté" />
+          ) : (
+            <ConfirmDialog
+              triggerLabel="Arrêter le suivi"
+              title={`Arrêter le suivi de ${animalName} ?`}
+              description="Numa n'enverra plus de relance. La conversation WhatsApp reste ouverte et l'historique est conservé."
+              confirmLabel="Arrêter le suivi"
+              tone="urgent"
+              onConfirm={() => setState("ended")}
+            />
+          )}
+          <p className="text-xs text-ink-muted">
+            Démonstration : aucune action n&apos;est enregistrée ni envoyée.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

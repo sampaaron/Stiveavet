@@ -2,6 +2,7 @@ import { CalendarPlus, MessageSquareText, PawPrint } from "lucide-react";
 import type { Metadata } from "next";
 
 import { AlertBanner } from "@/ui/alert-banner";
+import { PERMISSION_KEYS } from "@/domains/equipe/permissions";
 import { AppShell } from "@/ui/app-shell";
 import { AssistantCard } from "@/ui/assistant-card";
 import { Button, ButtonLink } from "@/ui/button";
@@ -34,6 +35,7 @@ export default function DesignSystemPage() {
         name: "Dr Claire Fontaine",
         roleLabel: "Vétérinaire administratrice",
       }}
+      permissions={PERMISSION_KEYS}
     >
       <PageHeader
         title="Design system"

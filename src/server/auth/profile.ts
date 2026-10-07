@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { cache } from "react";
 
-import type { MemberRole, ResolvedSession } from "@/domains/auth/repository";
+import type { MemberRole } from "@/domains/auth/repository";
 import { appDatabase } from "@/server/db/client";
 import { organizations, users } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
@@ -15,7 +15,13 @@ const roleLabels: Record<MemberRole, string> = {
 };
 
 /** Nom affiché, rôle et cabinet de la personne connectée (lu sous RLS). */
-export const memberProfile = cache(async (session: ResolvedSession) =>
+type Who = {
+  organizationId: string;
+  userId: string;
+  role: MemberRole;
+};
+
+export const memberProfile = cache(async (session: Who) =>
   withTenant(
     appDatabase(),
     { organizationId: session.organizationId, userId: session.userId },
