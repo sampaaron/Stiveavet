@@ -28,6 +28,10 @@ export const TENANT_TABLES = [
   "on_call_schedules",
   "integration_connections",
   "onboarding_steps",
+  "subscriptions",
+  "invoices",
+  "usage_events",
+  "payment_events",
 ] as const;
 
 export function pools() {

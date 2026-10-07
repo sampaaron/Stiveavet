@@ -181,6 +181,7 @@ export async function signupAction(
     "organizationName",
     "displayName",
     "email",
+    "plan",
     "password",
     "confirmation",
   ]);
@@ -188,6 +189,7 @@ export async function signupAction(
     organizationName: raw.organizationName?.slice(0, 160),
     displayName: raw.displayName?.slice(0, 120),
     email: raw.email?.slice(0, 254),
+    plan: raw.plan?.slice(0, 16),
   };
   const parsed = signupInput.safeParse(raw);
   if (!parsed.success)
@@ -271,7 +273,7 @@ export async function acceptInvitationAction(
     case "vet_limit":
       return {
         error:
-          "Le cabinet compte déjà 3 vétérinaires. Contactez la personne qui vous a invité.",
+          "Le cabinet a atteint le nombre de vétérinaires de sa formule. Contactez la personne qui vous a invité.",
         values,
       };
     case "accepted":

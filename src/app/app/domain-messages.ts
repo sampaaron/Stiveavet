@@ -8,7 +8,7 @@ const MESSAGES: Record<DomainError["code"], string> = {
   not_found: "Cet élément n'est plus accessible.",
   forbidden: "Vous n'avez pas le droit de faire cette modification.",
   vet_limit:
-    "Le cabinet compte déjà 3 vétérinaires (invitations en attente comprises).",
+    "Votre formule est au complet en vétérinaires (invitations en attente comprises). Changez de formule dans Facturation.",
   already_member: "Cette adresse appartient déjà à un membre du cabinet.",
   already_invited: "Une invitation est déjà en attente pour cette adresse.",
   invalid_target: "Ce choix n'est plus possible. Rechargez la page.",
@@ -18,6 +18,10 @@ const MESSAGES: Record<DomainError["code"], string> = {
     "Choisissez d'abord le vétérinaire qui reprend ses suivis en cours.",
   permission_not_allowed: "Cette permission n'est pas possible pour ce rôle.",
   already_installed: "Ce modèle est déjà dans les protocoles du cabinet.",
+  billing_blocked:
+    "Les nouveaux suivis sont suspendus : régularisez le paiement dans Facturation. Les suivis en cours continuent.",
+  plan_vet_limit:
+    "Cette formule compte moins de vétérinaires que votre équipe actuelle (invitations en attente comprises).",
   on_call_overlap: "Cette garde chevauche une garde déjà prévue.",
 };
 

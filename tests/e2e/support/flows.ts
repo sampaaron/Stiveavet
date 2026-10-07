@@ -34,7 +34,7 @@ export async function openAccountMenu(page: Page) {
   if (await menu.isVisible()) await menu.click();
 }
 
-export async function signUp(page: Page) {
+export async function signUp(page: Page, plan?: string) {
   const email = `e2e-${randomUUID().slice(0, 8)}@essai.test`;
   const password = "une phrase de passe e2e solide";
   const since = new Date(Date.now() - 1000);
@@ -44,6 +44,8 @@ export async function signUp(page: Page) {
     .fill("Cabinet vétérinaire de l'Essai");
   await page.getByLabel("Votre nom").fill("Dr Alix Essai");
   await page.getByLabel("Adresse e-mail professionnelle").fill(email);
+  if (plan)
+    await page.getByRole("radio", { name: new RegExp(`^${plan} ·`) }).check();
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByLabel("Confirmer le mot de passe").fill(password);
   await page.getByRole("button", { name: "Créer le cabinet" }).click();

@@ -9,6 +9,7 @@ import { Button } from "@/ui/button";
 
 import { lockAction, logoutAction } from "../(auth)/actions";
 
+import { BillingNotice } from "./billing-notice";
 import { IdleLock } from "./idle-lock";
 
 /**
@@ -55,6 +56,10 @@ export default async function CabinetLayout({
       }
     >
       <IdleLock idleMinutes={AUTH_POLICY.idleLockMinutes} />
+      <BillingNotice
+        access={context.billing}
+        canManage={context.permissions.has("billing.manage")}
+      />
       {children}
     </AppShell>
   );

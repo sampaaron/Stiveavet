@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import type { TeamMember } from "@/domains/equipe/service";
 import {
-  MAX_VETS_PER_ORGANIZATION,
   PERMISSIONS,
   ROLE_LABELS,
   ROLE_PERMISSIONS,
@@ -32,9 +31,10 @@ const ROLE_OPTIONS = (["admin_vet", "vet", "assistant"] as const).map(
 export default async function TeamPage() {
   const context = await requirePermission("team.manage");
   const team = services.team();
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, limit] = await Promise.all([
     team.members(context),
     team.pendingInvitations(context),
+    team.vetLimit(context),
   ]);
   const activeVets = members.filter(
     (member) => member.active && VET_ROLES.has(member.role),
@@ -47,7 +47,7 @@ export default async function TeamPage() {
     <>
       <PageHeader
         title="Équipe et droits"
-        description={`${activeVets.length + pendingVets} vétérinaire(s) sur ${MAX_VETS_PER_ORGANIZATION}, invitations en attente comprises. Les assistants ne sont pas limités.`}
+        description={`${activeVets.length + pendingVets} vétérinaire(s) sur ${limit} avec votre formule, invitations en attente comprises. Les assistants ne sont pas limités.`}
       />
       <div className="grid gap-6">
         <SectionCard

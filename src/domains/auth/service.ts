@@ -7,6 +7,8 @@ import {
   organizations,
   users,
 } from "@/server/db/schema";
+import { startSubscription } from "@/domains/facturation/service";
+import type { Plan } from "@/domains/facturation/rules";
 import { withTenant } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
 import { sql } from "drizzle-orm";
@@ -393,6 +395,7 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         organizationName: string;
         displayName: string;
         email: string;
+        plan: Plan;
         password: string;
       },
       origin: RequestOrigin,
@@ -445,6 +448,8 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
           await tx.execute(
             sql`SELECT auth.set_initial_password(${userId}, ${passwordHash})`,
           );
+          // Essai pilote de 2 mois, puis la formule choisie (ADR 0011).
+          await startSubscription(tx, organizationId, input.plan);
           await tx.insert(auditEvents).values([
             {
               organizationId,
