@@ -26,7 +26,9 @@ export class DomainError extends Error {
       | "reassignment_required"
       | "permission_not_allowed"
       | "already_installed"
-      | "on_call_overlap",
+      | "on_call_overlap"
+      | "billing_blocked"
+      | "plan_vet_limit",
   ) {
     super(code);
   }

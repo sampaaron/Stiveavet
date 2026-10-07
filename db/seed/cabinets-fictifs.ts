@@ -27,6 +27,12 @@ import { ROLE_PERMISSIONS } from "../../src/domains/equipe/permissions";
 import { PROTOCOL_LIBRARY } from "../../src/domains/protocoles/library";
 import { protocolsService } from "../../src/domains/protocoles/service";
 import { settingsService } from "../../src/domains/reglages/service";
+import { addMonths } from "../../src/domains/facturation/rules";
+import {
+  billingService,
+  startSubscription,
+} from "../../src/domains/facturation/service";
+import { fakeBillingProvider } from "../../src/adapters/billing-provider/fake";
 import { fakeDrVeto } from "../../src/adapters/drveto/fake";
 import { fakePaymentMandate } from "../../src/adapters/payments/fake";
 import { fakeWhatsApp } from "../../src/adapters/whatsapp/fake";
@@ -293,6 +299,44 @@ async function seedSettings(
   });
 }
 
+/**
+ * Abonnement fictif au mois `monthsAgo + 1`, commencé depuis `daysIntoMonth` jours ;
+ * échéances passées émises et prélevées. `declineLast` : la dernière échéance est refusée.
+ */
+async function seedSubscription(
+  db: Database,
+  admin: Actor,
+  plan: "solo" | "clinic",
+  {
+    monthsAgo,
+    daysIntoMonth,
+    declineLast = false,
+  }: {
+    monthsAgo: number;
+    daysIntoMonth: number;
+    declineLast?: boolean;
+  },
+) {
+  const now = new Date();
+  const startedAt = new Date(
+    addMonths(now, -monthsAgo).getTime() - daysIntoMonth * 86_400_000,
+  );
+  await withTenant(db, { organizationId: admin.organizationId }, (tx) =>
+    startSubscription(tx, admin.organizationId, plan, startedAt),
+  );
+  const paying = billingService({ db, provider: fakeBillingProvider() });
+  if (!declineLast) {
+    await paying.overview(admin, now);
+    return;
+  }
+  const lastDue = addMonths(startedAt, monthsAgo);
+  await paying.overview(admin, new Date(lastDue.getTime() - 1));
+  await billingService({
+    db,
+    provider: fakeBillingProvider({ decline: new Set([admin.organizationId]) }),
+  }).overview(admin, lastDue);
+}
+
 export async function seedFictionalCabinets(db: Database) {
   const tilleulsMembers = await createOrganization(
     db,
@@ -335,6 +379,11 @@ export async function seedFictionalCabinets(db: Database) {
     await seedActor(db, SEED.tilleuls, hugoId),
   );
   await seedSettings(db, claire, [hugoId, inesId]);
+  // Clinique au 5e mois : essai terminé, choix de l'engagement annuel encore à faire.
+  await seedSubscription(db, claire, "clinic", {
+    monthsAgo: 4,
+    daysIntoMonth: 6,
+  });
 
   await withTenant(db, { organizationId: SEED.tilleuls }, async (tx) => {
     for (const followup of tilleulsFollowups) {
@@ -365,6 +414,14 @@ export async function seedFictionalCabinets(db: Database) {
     ],
   );
   if (!martin) throw new Error("Cabinet du Dr Martin incomplet");
+  // Cabinet solo en impayé : la dernière échéance a été refusée il y a 12 jours.
+  const paul = await seedActor(db, SEED.martin, martin);
+  await settingsService({
+    db,
+    whatsapp: fakeWhatsApp,
+    drveto: fakeDrVeto,
+    payments: fakePaymentMandate,
+  }).connect(paul, "payment_mandate", "");
 
   await withTenant(db, { organizationId: SEED.martin }, (tx) =>
     insertFollowup(tx, SEED.martin, martin, {
@@ -388,4 +445,10 @@ export async function seedFictionalCabinets(db: Database) {
       ],
     }),
   );
+
+  await seedSubscription(db, paul, "solo", {
+    monthsAgo: 3,
+    daysIntoMonth: 12,
+    declineLast: true,
+  });
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { PLANS } from "@/domains/facturation/rules";
+
 import { AUTH_POLICY } from "./policy";
 
 const email = z
@@ -52,6 +54,7 @@ export const signupInput = z
       .min(2, "Indiquez votre nom.")
       .max(120, "Nom trop long."),
     email,
+    plan: z.enum(PLANS, "Choisissez la formule qui suivra l'essai."),
     password: z.string().max(AUTH_POLICY.password.maxLength * 4),
     confirmation: z.string().max(AUTH_POLICY.password.maxLength * 4),
   })

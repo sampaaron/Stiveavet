@@ -6,10 +6,13 @@ import { cache } from "react";
 
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
+import { restrictPermissions } from "@/domains/facturation/rules";
+import type { Access } from "@/domains/facturation/rules";
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import { requireSession } from "@/server/auth";
 import { appDatabase } from "@/server/db/client";
 import { membershipPermissions } from "@/server/db/schema";
+import { services } from "@/server/services";
 import { withTenant } from "@/server/db/tenant";
 import type { TenantTransaction } from "@/server/db/tenant";
 
@@ -19,7 +22,10 @@ import type { TenantTransaction } from "@/server/db/tenant";
  * privé → audit. Les permissions sont relues en base à chaque requête : un droit retiré
  * s'applique immédiatement, sans attendre une nouvelle connexion.
  */
-export type MemberContext = Actor;
+export type MemberContext = Actor & {
+  /** Accès du cabinet selon sa facturation (impayé, résiliation, lecture seule). */
+  billing: Access;
+};
 
 export const memberContext = cache(async (): Promise<MemberContext> => {
   const session = await requireSession();
@@ -32,14 +38,22 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
         .from(membershipPermissions)
         .where(eq(membershipPermissions.membershipId, session.membershipId)),
   );
+  // En lecture seule ou après la fin de l'accès, seuls les droits de consultation restent
+  // effectifs ; les droits en base ne changent pas et reviennent après régularisation.
+  const billing = await services.billing().accessFor({
+    organizationId: session.organizationId,
+    userId: session.userId,
+  });
   return {
     organizationId: session.organizationId,
     userId: session.userId,
     membershipId: session.membershipId,
     role: session.role,
-    permissions: new Set(
-      rows.map((row) => row.permission).filter(isPermissionKey),
+    permissions: restrictPermissions(
+      new Set(rows.map((row) => row.permission).filter(isPermissionKey)),
+      billing,
     ),
+    billing,
   };
 });
 

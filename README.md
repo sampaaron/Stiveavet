@@ -39,6 +39,8 @@ Protocoles : la bibliothèque de départ (contenu fictif, à valider par un vét
 
 Installation : les Tilleuls ont terminé sept étapes sur huit (connexions simulées, réglages de départ, deux contacts d'urgence, garde de Hugo puis d'Inès) ; le suivi test reste à créer depuis `/app/demarrage`. Un cabinet créé par inscription part de zéro.
 
+Facturation (simulée) : les Tilleuls sont en formule Clinique au 5e mois, choix de l'engagement annuel à faire ; le cabinet du Dr Martin est en formule Solo, avec un prélèvement refusé il y a 12 jours (`paul.martin@cabinet-martin.test`, à régulariser depuis Facturation).
+
 ## Vérifier
 
 ```bash

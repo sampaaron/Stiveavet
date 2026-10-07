@@ -5,3 +5,4 @@ export * from "@/domains/equipe/schema";
 export * from "@/domains/suivis/schema";
 export * from "@/domains/protocoles/schema";
 export * from "@/domains/reglages/schema";
+export * from "@/domains/facturation/schema";

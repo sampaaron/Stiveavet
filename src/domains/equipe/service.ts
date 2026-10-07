@@ -33,6 +33,7 @@ import {
   users,
 } from "@/server/db/schema";
 import type { AuditMetadata } from "@/domains/audit/schema";
+import { vetLimit } from "@/domains/facturation/limits";
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
@@ -40,7 +41,6 @@ import { DomainError, assertPermission } from "./actor";
 import type { Actor } from "./actor";
 import { invitationEmail } from "./emails";
 import {
-  MAX_VETS_PER_ORGANIZATION,
   PERMISSION_KEYS,
   ROLE_PERMISSIONS,
   VET_ROLES,
@@ -90,7 +90,8 @@ function audit(
 }
 
 /** Vétérinaires actifs et invitations de vétérinaires en attente (limite de 3 par cabinet). */
-async function vetSeats(tx: TenantTransaction, includePending = true) {
+/** Places de vétérinaires occupées : membres actifs et, par défaut, invitations en attente. */
+export async function vetSeats(tx: TenantTransaction, includePending = true) {
   const [active] = await tx
     .select({ n: count() })
     .from(memberships)
@@ -208,6 +209,12 @@ export function teamService(deps: {
       });
     },
 
+    /** Vétérinaires autorisés par la formule du cabinet. */
+    async vetLimit(actor: Actor): Promise<number> {
+      assertPermission(actor, "team.manage");
+      return run(actor, (tx) => vetLimit(tx));
+    },
+
     async pendingInvitations(actor: Actor): Promise<PendingInvitation[]> {
       assertPermission(actor, "team.manage");
       return run(actor, (tx) =>
@@ -250,7 +257,7 @@ export function teamService(deps: {
         if (existing) throw new DomainError("already_member");
         if (
           VET_ROLES.has(input.role) &&
-          (await vetSeats(tx)) >= MAX_VETS_PER_ORGANIZATION
+          (await vetSeats(tx)) >= (await vetLimit(tx))
         )
           throw new DomainError("vet_limit");
 
@@ -401,7 +408,7 @@ export function teamService(deps: {
         if (
           VET_ROLES.has(role) &&
           !VET_ROLES.has(member.role) &&
-          (await vetSeats(tx)) >= MAX_VETS_PER_ORGANIZATION
+          (await vetSeats(tx)) >= (await vetLimit(tx))
         )
           throw new DomainError("vet_limit");
         // Un assistant ne peut pas rester responsable de suivis.
@@ -533,7 +540,7 @@ export function teamService(deps: {
         if (!member.deactivatedAt) return;
         if (
           VET_ROLES.has(member.role) &&
-          (await vetSeats(tx)) >= MAX_VETS_PER_ORGANIZATION
+          (await vetSeats(tx)) >= (await vetLimit(tx))
         )
           throw new DomainError("vet_limit");
         await tx
@@ -719,7 +726,7 @@ export async function acceptInvitation(
         if (!invitedBy) return "expired" as const;
         if (
           VET_ROLES.has(invitation.role) &&
-          (await vetSeats(tx, false)) >= MAX_VETS_PER_ORGANIZATION
+          (await vetSeats(tx, false)) >= (await vetLimit(tx))
         )
           throw new DomainError("vet_limit");
 

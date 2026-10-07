@@ -1,8 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 
+import {
+  PLANS,
+  PLAN_CATALOG,
+  TRIAL_MONTHLY_CENTS,
+  TRIAL_MONTHS,
+  formatEuros,
+} from "@/domains/facturation/rules";
 import { AlertBanner } from "@/ui/alert-banner";
 import { Button } from "@/ui/button";
 import { TextField } from "@/ui/text-field";
@@ -220,6 +227,7 @@ export function SignupForm() {
         defaultValue={state.values?.email}
         errors={state.fieldErrors?.email}
       />
+      <PlanChoice value={state.values?.plan} errors={state.fieldErrors?.plan} />
       <TextField
         label="Mot de passe"
         name="password"
@@ -295,5 +303,66 @@ export function InvitationForm({
       />
       <Submit pending={pending}>Créer mon compte</Submit>
     </form>
+  );
+}
+
+/** Formule appliquée après les 2 mois d'essai pilote ; modifiable ensuite dans Facturation. */
+function PlanChoice({
+  value,
+  errors,
+}: {
+  value?: string;
+  errors?: readonly string[];
+}) {
+  const id = useId();
+  return (
+    <fieldset
+      className="grid gap-2"
+      aria-describedby={`${id}-aide${errors?.length ? ` ${id}-erreur` : ""}`}
+    >
+      <legend className="mb-1 text-sm font-semibold">
+        Formule après l&apos;essai
+      </legend>
+      <p id={`${id}-aide`} className="text-[13px] text-ink-muted">
+        Essai pilote à {formatEuros(TRIAL_MONTHLY_CENTS)} HT par mois pendant{" "}
+        {TRIAL_MONTHS} mois, sans engagement. Ensuite, la formule choisie, au
+        mois : l&apos;engagement annuel n&apos;est jamais automatique.
+      </p>
+      {PLANS.map((plan) => {
+        const definition = PLAN_CATALOG[plan];
+        return (
+          <label
+            key={plan}
+            className="flex items-start gap-2.5 rounded-[var(--radius-control)] border border-line p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
+          >
+            <input
+              type="radio"
+              name="plan"
+              value={plan}
+              defaultChecked={(value ?? "clinic") === plan}
+              className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]"
+            />
+            <span>
+              <span className="block font-semibold">
+                {definition.label} · {formatEuros(definition.monthlyCents)} HT
+                par mois
+              </span>
+              <span className="block text-ink-muted">
+                {definition.maxVets === 1
+                  ? "1 vétérinaire"
+                  : `Jusqu'à ${definition.maxVets} vétérinaires`}
+                . Avec engagement annuel :{" "}
+                {formatEuros(definition.annualMonthlyCents)} HT par mois.
+              </span>
+            </span>
+          </label>
+        );
+      })}
+      {errors?.length ? (
+        <p id={`${id}-erreur`} className="text-[13px] font-medium text-urgent">
+          {errors[0]}
+        </p>
+      ) : null}
+    </fieldset>
   );
 }
