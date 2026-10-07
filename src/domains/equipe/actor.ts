@@ -25,7 +25,8 @@ export class DomainError extends Error {
       | "last_admin"
       | "reassignment_required"
       | "permission_not_allowed"
-      | "already_installed",
+      | "already_installed"
+      | "on_call_overlap",
   ) {
     super(code);
   }

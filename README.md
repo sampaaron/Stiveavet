@@ -37,6 +37,8 @@ Droits par défaut : Claire voit tout et gère l'équipe ; Hugo et Inès ne voie
 
 Protocoles : la bibliothèque de départ (contenu fictif, à valider par un vétérinaire) est installée aux Tilleuls ; la castration du chien y reste « à valider », et Hugo a un protocole personnel.
 
+Installation : les Tilleuls ont terminé sept étapes sur huit (connexions simulées, réglages de départ, deux contacts d'urgence, garde de Hugo puis d'Inès) ; le suivi test reste à créer depuis `/app/demarrage`. Un cabinet créé par inscription part de zéro.
+
 ## Vérifier
 
 ```bash

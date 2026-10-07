@@ -34,6 +34,8 @@ export type FollowupSummary = {
   responsibleMembershipId: string;
   responsibleName: string;
   isPrivate: boolean;
+  /** Suivi test de l'installation : jamais compté, facturé ni envoyé. */
+  isTest: boolean;
   controlAppointmentAt: Date | null;
   startedAt: Date | null;
 };
@@ -65,6 +67,7 @@ type Row = {
   procedure: string;
   procedureAt: Date;
   isPrivate: boolean;
+  isTest: boolean;
   controlAppointmentAt: Date | null;
   startedAt: Date | null;
   responsibleMembershipId: string;
@@ -95,6 +98,7 @@ function toView(
     responsibleMembershipId: row.responsibleMembershipId,
     responsibleName: row.responsibleName,
     isPrivate: row.isPrivate,
+    isTest: row.isTest,
     controlAppointmentAt: row.controlAppointmentAt,
     startedAt: row.startedAt,
   };
@@ -127,6 +131,7 @@ function selectRows(tx: TenantTransaction) {
       procedure: followups.procedure,
       procedureAt: followups.procedureAt,
       isPrivate: followups.isPrivate,
+      isTest: followups.isTest,
       controlAppointmentAt: followups.controlAppointmentAt,
       startedAt: followups.startedAt,
       responsibleMembershipId: followups.responsibleMembershipId,

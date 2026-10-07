@@ -22,6 +22,7 @@ import {
   SPECIES_LABELS,
   followupBadge,
 } from "../followup-labels";
+import { TestMark } from "../test-mark";
 
 import { AccessPanel } from "./access-panel";
 import { FollowupWorkspace } from "./followup-workspace";
@@ -150,6 +151,7 @@ function BasicDossier({
             </h1>
             {badge ? <StatusBadge status={badge} /> : null}
             <PrivateMark isPrivate={followup.isPrivate} />
+            {followup.isTest ? <TestMark /> : null}
           </div>
           <p className="mt-1 text-ink-muted">
             {SPECIES_LABELS[followup.species]} · Responsable :{" "}
@@ -247,6 +249,7 @@ function ReferenceDossier({
             <h1 className="text-2xl font-bold tracking-tight">{animal.name}</h1>
             <StatusBadge status={followupStatus(fixture)} />
             <PrivateMark isPrivate={followup.isPrivate} />
+            {followup.isTest ? <TestMark /> : null}
           </div>
           <p className="mt-1 text-ink-muted">
             {capitalize(animal.species)} · {animal.breed} · {animal.age} ·{" "}

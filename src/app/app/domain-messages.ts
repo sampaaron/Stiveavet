@@ -18,6 +18,7 @@ const MESSAGES: Record<DomainError["code"], string> = {
     "Choisissez d'abord le vétérinaire qui reprend ses suivis en cours.",
   permission_not_allowed: "Cette permission n'est pas possible pour ce rôle.",
   already_installed: "Ce modèle est déjà dans les protocoles du cabinet.",
+  on_call_overlap: "Cette garde chevauche une garde déjà prévue.",
 };
 
 export function domainFailure(error: DomainError): ActionState {

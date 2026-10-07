@@ -51,7 +51,18 @@ export default async function TodayPage() {
         <Card>
           <EmptyState
             title="Aucun suivi pour l'instant"
-            description="Votre cabinet est créé. L'installation guidée (WhatsApp, agenda, équipe, protocoles) arrive dans une prochaine étape ; vos suivis apparaîtront ici."
+            description={
+              can("organization.settings")
+                ? "Votre cabinet est créé. Le démarrage guidé vous accompagne : WhatsApp, dr.veto, urgences, équipe, protocoles et suivi test. Vos suivis apparaîtront ici."
+                : "Vos suivis apparaîtront ici."
+            }
+            action={
+              can("organization.settings") ? (
+                <ButtonLink href="/app/demarrage">
+                  Ouvrir le démarrage guidé
+                </ButtonLink>
+              ) : null
+            }
           />
         </Card>
       </>

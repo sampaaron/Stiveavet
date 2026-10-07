@@ -26,6 +26,10 @@ import type { Actor } from "../../src/domains/equipe/actor";
 import { ROLE_PERMISSIONS } from "../../src/domains/equipe/permissions";
 import { PROTOCOL_LIBRARY } from "../../src/domains/protocoles/library";
 import { protocolsService } from "../../src/domains/protocoles/service";
+import { settingsService } from "../../src/domains/reglages/service";
+import { fakeDrVeto } from "../../src/adapters/drveto/fake";
+import { fakePaymentMandate } from "../../src/adapters/payments/fake";
+import { fakeWhatsApp } from "../../src/adapters/whatsapp/fake";
 import { withTenant } from "../../src/server/db/tenant";
 import type { Database, TenantTransaction } from "../../src/server/db/tenant";
 
@@ -246,6 +250,49 @@ async function seedProtocols(db: Database, claire: Actor, hugo: Actor) {
   );
 }
 
+/**
+ * Réglages des Tilleuls : installation menée par Claire, sauf le suivi test (étape laissée
+ * ouverte). Connexions simulées, garde de Hugo puis d'Inès.
+ */
+async function seedSettings(
+  db: Database,
+  claire: Actor,
+  vetsOnCall: [string, string],
+) {
+  const service = settingsService({
+    db,
+    whatsapp: fakeWhatsApp,
+    drveto: fakeDrVeto,
+    payments: fakePaymentMandate,
+  });
+  await service.applyDefaults(claire);
+  await service.addContact(claire, {
+    label: "Accueil des Tilleuls",
+    phone: "01 02 03 04 05",
+  });
+  await service.addContact(claire, {
+    label: "Clinique de garde partenaire",
+    phone: "01 09 08 07 06",
+  });
+  await service.connect(claire, "whatsapp", "06 00 00 00 42");
+  await service.connect(claire, "drveto", "TILLEULS-01");
+  await service.connect(claire, "payment_mandate", "");
+  await service.completeStep(claire, "team");
+  const start = new Date();
+  start.setMinutes(0, 0, 0);
+  const at = (hours: number) => new Date(start.getTime() + hours * 3_600_000);
+  await service.addOnCall(claire, {
+    membershipId: vetsOnCall[0],
+    startsAt: at(0),
+    endsAt: at(24),
+  });
+  await service.addOnCall(claire, {
+    membershipId: vetsOnCall[1],
+    startsAt: at(24),
+    endsAt: at(48),
+  });
+}
+
 export async function seedFictionalCabinets(db: Database) {
   const tilleulsMembers = await createOrganization(
     db,
@@ -278,13 +325,16 @@ export async function seedFictionalCabinets(db: Database) {
     vets.map((vet, index) => [vet.id, tilleulsMembers[index]]),
   );
 
-  const [claireId, hugoId] = tilleulsMembers;
-  if (!claireId || !hugoId) throw new Error("Cabinet des Tilleuls incomplet");
+  const [claireId, hugoId, inesId] = tilleulsMembers;
+  if (!claireId || !hugoId || !inesId)
+    throw new Error("Cabinet des Tilleuls incomplet");
+  const claire = await seedActor(db, SEED.tilleuls, claireId);
   const versionByKey = await seedProtocols(
     db,
-    await seedActor(db, SEED.tilleuls, claireId),
+    claire,
     await seedActor(db, SEED.tilleuls, hugoId),
   );
+  await seedSettings(db, claire, [hugoId, inesId]);
 
   await withTenant(db, { organizationId: SEED.tilleuls }, async (tx) => {
     for (const followup of tilleulsFollowups) {
