@@ -188,6 +188,42 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  {
+    ref: "DV-20641",
+    animal: {
+      name: "Pistache",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2023-09-03",
+      weightGrams: 3300,
+    },
+    owners: [
+      { fullName: "Lucie Perrin", phone: "+33639980111", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20655",
+    animal: {
+      name: "Mistral",
+      species: "cat",
+      breed: "Maine coon",
+      birthDate: "2021-04-22",
+      weightGrams: 5200,
+    },
+    owners: [
+      { fullName: "Grace Miller", phone: "+33639980112", language: "en" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

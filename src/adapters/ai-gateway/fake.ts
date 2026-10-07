@@ -1,4 +1,9 @@
-import type { AiGateway, NumaReply, NumaReplyInput } from "./types";
+import type {
+  AiGateway,
+  NumaReply,
+  NumaReplyInput,
+  NumaStepInput,
+} from "./types";
 
 /**
  * Numa simulée : réponses tirées de règles écrites, sans hasard ni appel réseau, pour des
@@ -55,9 +60,59 @@ export function simulatedNumaReply(input: NumaReplyInput): NumaReply {
   return { text: templates[intent](input), intent };
 }
 
+function appointment(at: Date, language: "fr" | "en"): string {
+  const locale = language === "en" ? "en-GB" : "fr-FR";
+  const day = new Intl.DateTimeFormat(locale, {
+    timeZone: "Europe/Paris",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(at);
+  const time = new Intl.DateTimeFormat(locale, {
+    timeZone: "Europe/Paris",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(at);
+  return language === "en" ? `on ${day} at ${time}` : `le ${day} à ${time}`;
+}
+
+/**
+ * Étape programmée, en simulation : un texte fixe par type d'étape. Une vraie IA suivrait la
+ * consigne du vétérinaire dans la langue du propriétaire ; la simulation, elle, ne reprend la
+ * consigne telle quelle qu'en français, pour les questions et les rappels.
+ */
+export function simulatedNumaStep(input: NumaStepInput): { text: string } {
+  const { animalName: animal, practiceName: practice } = input;
+  if (input.language === "en") {
+    const texts: Record<NumaStepInput["kind"], string> = {
+      message: `Hello, this is Numa, the AI assistant of ${practice}. How is ${animal} doing? Tell me in a few words, the team will read your reply.`,
+      question: `A follow-up question about ${animal}: is ${animal} eating, drinking and moving around as usual? The ${practice} team will read your reply.`,
+      photo_request: `To help the ${practice} team follow ${animal}'s recovery, could you send me a photo of the operated area, taken in daylight?`,
+      reminder: `A reminder from the ${practice} team about ${animal}'s follow-up. Reply here if you have any question for the team.`,
+      control: input.controlAppointmentAt
+        ? `Reminder: ${animal}'s check-up appointment at ${practice} is ${appointment(input.controlAppointmentAt, "en")}. If you can't make it, write it here and the team will offer another slot.`
+        : `Remember to book ${animal}'s check-up appointment with ${practice}.`,
+    };
+    return { text: texts[input.kind] };
+  }
+  const texts: Record<NumaStepInput["kind"], string> = {
+    message: `Bonjour, ici Numa, l'assistante IA de ${practice}. Comment va ${animal} ? Racontez-moi en quelques mots, l'équipe lira votre réponse.`,
+    question: `Une question de suivi pour ${animal} : ${input.instruction}`,
+    photo_request: `Pour aider l'équipe de ${practice} à suivre ${animal}, pourriez-vous m'envoyer une photo de la zone opérée, prise à la lumière du jour ?`,
+    reminder: `Un rappel de l'équipe de ${practice} : ${input.instruction}`,
+    control: input.controlAppointmentAt
+      ? `Rappel : le rendez-vous de contrôle de ${animal} chez ${practice} est prévu ${appointment(input.controlAppointmentAt, "fr")}. Si vous ne pouvez pas venir, écrivez-le ici : l'équipe vous proposera un autre créneau.`
+      : `Pensez à prendre rendez-vous auprès de ${practice} pour le contrôle de ${animal}.`,
+  };
+  return { text: texts[input.kind] };
+}
+
 export const fakeAiGateway: AiGateway = {
   simulated: true,
   async numaReply(input) {
     return simulatedNumaReply(input);
+  },
+  async numaStep(input) {
+    return simulatedNumaStep(input);
   },
 };

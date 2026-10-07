@@ -63,6 +63,8 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
   "simulator.owner_message": ({ actorName }) =>
     `${actorName} a simulé un message de propriétaire (local)`,
+  "followup.ended_automatically": () =>
+    "Fin du suivi automatisé à la date de contrôle (la conversation reste ouverte)",
   "alert.raised": () =>
     "Triage : un message de propriétaire a ouvert une alerte",
   "alert.escalated": () =>

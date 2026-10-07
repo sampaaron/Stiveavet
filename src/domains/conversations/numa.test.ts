@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { simulatedNumaReply } from "@/adapters/ai-gateway/fake";
+import {
+  simulatedNumaReply,
+  simulatedNumaStep,
+} from "@/adapters/ai-gateway/fake";
 
 import { checkNumaReply, safeFallback } from "./guard";
 import { ownerKeyword } from "./keywords";
@@ -53,12 +56,58 @@ describe("textes fixes de Numa", () => {
       "consent_reminder",
       "stopped",
       "resumed",
+      "closing",
+      "check_in",
     ];
     for (const language of ["fr", "en"] as const)
       for (const step of steps)
         expect(
           checkNumaReply(fixedMessage(step, { ...context, language })),
         ).toEqual({ ok: true });
+  });
+});
+
+describe("étapes programmées (simulation)", () => {
+  const kinds = [
+    "message",
+    "question",
+    "photo_request",
+    "reminder",
+    "control",
+  ] as const;
+
+  it("chaque étape passe les garde-fous, en français et en anglais", () => {
+    for (const language of ["fr", "en"] as const)
+      for (const kind of kinds)
+        for (const controlAppointmentAt of [
+          null,
+          new Date("2026-10-17T09:00:00Z"),
+        ])
+          expect(
+            checkNumaReply(
+              simulatedNumaStep({
+                language,
+                animalName: "Plume",
+                practiceName: "Clinique des Tilleuls",
+                kind,
+                instruction: "A-t-elle mangé et bu depuis le retour ?",
+                controlAppointmentAt,
+              }).text,
+            ),
+          ).toEqual({ ok: true });
+  });
+
+  it("le rappel de contrôle donne la date et l'heure de Paris", () => {
+    const text = simulatedNumaStep({
+      language: "fr",
+      animalName: "Plume",
+      practiceName: "Clinique des Tilleuls",
+      kind: "control",
+      instruction: "Rappeler le rendez-vous de contrôle.",
+      // Samedi 17 octobre 2026, 11 h à Paris.
+      controlAppointmentAt: new Date("2026-10-17T09:00:00Z"),
+    }).text;
+    expect(text).toContain("le samedi 17 octobre à 11:00");
   });
 });
 

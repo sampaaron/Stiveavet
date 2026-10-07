@@ -466,15 +466,31 @@ describe("lancement", () => {
       { kind: "launch", idempotency_key: `launch:${plume}` },
     ]);
     const jobs = await admin.query(
-      "SELECT kind, status, run_at, payload FROM scheduled_jobs WHERE followup_id = $1",
+      "SELECT kind, status, run_at, payload FROM scheduled_jobs WHERE followup_id = $1 ORDER BY run_at",
       [plume],
     );
+    const {
+      rows: [planned],
+    } = await admin.query(
+      "SELECT control_appointment_at FROM followups WHERE id = $1",
+      [plume],
+    );
+    const control = (planned as { control_appointment_at: Date })
+      .control_appointment_at;
+    // Premier message, puis fin du suivi automatisé à la date de contrôle (lot 15).
+    // Les rappels attendent l'accord du propriétaire.
     expect(jobs.rows).toEqual([
       {
         kind: "followup.message",
         status: "pending",
         run_at: new Date(NOW.getTime() + 2 * HOUR),
         payload: { step: "intro" },
+      },
+      {
+        kind: "followup.end",
+        status: "pending",
+        run_at: control,
+        payload: { endAt: String(control.getTime()) },
       },
     ]);
     const outbox = await admin.query(
@@ -611,7 +627,7 @@ describe("pause, reprise, arrêt et réactivation", () => {
 
     // Premier message replanifié à la reprise (jamais parti), puis tout annulé à l'arrêt.
     const { rows: jobs } = await admin.query(
-      "SELECT status, payload FROM scheduled_jobs WHERE followup_id = $1",
+      "SELECT status, payload FROM scheduled_jobs WHERE followup_id = $1 AND kind = 'followup.message'",
       [plume],
     );
     expect(jobs).toEqual([
@@ -621,10 +637,14 @@ describe("pause, reprise, arrêt et réactivation", () => {
 
     await service.changeStatus(leo, plume, "reactivate", NOW);
     const { rows: pending } = await admin.query(
-      "SELECT payload FROM scheduled_jobs WHERE followup_id = $1 AND status = 'pending'",
+      "SELECT kind, payload FROM scheduled_jobs WHERE followup_id = $1 AND status = 'pending' ORDER BY run_at",
       [plume],
     );
-    expect(pending).toEqual([{ payload: { step: "intro" } }]);
+    // La fin du suivi automatisé est annulée à l'arrêt, replanifiée à la réactivation.
+    expect(pending).toEqual([
+      { kind: "followup.message", payload: { step: "intro" } },
+      { kind: "followup.end", payload: expect.any(Object) },
+    ]);
     expect((await service.sheet(leo, plume)).followup.status).toBe("active");
     expect((await statusEvents(plume)).slice(2)).toEqual([
       { from_status: "active", to_status: "paused", reason: "vet_paused" },

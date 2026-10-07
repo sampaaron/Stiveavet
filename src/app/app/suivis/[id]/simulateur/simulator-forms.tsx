@@ -91,7 +91,7 @@ export function RunDueNowForm({ followupId }: { followupId: string }) {
         aria-busy={pending}
         icon={<FastForward aria-hidden="true" className="size-4" />}
       >
-        Avancer jusqu&apos;aux envois prévus
+        Avancer jusqu&apos;au prochain envoi prévu
       </Button>
       <ActionMessage state={state} />
     </form>

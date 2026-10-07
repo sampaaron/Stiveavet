@@ -69,7 +69,7 @@ test("accord, échange, reprise en main puis « Reprendre Numa »", async ({
     page.getByRole("heading", { level: 1, name: "Simulateur du propriétaire" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Avancer jusqu'aux envois prévus" })
+    .getByRole("button", { name: "Avancer jusqu'au prochain envoi prévu" })
     .click();
   await expect(page).toHaveURL(/\?fait=avance$/);
   await expectLastBubble(page, story.intro);
@@ -110,7 +110,7 @@ test("accord, échange, reprise en main puis « Reprendre Numa »", async ({
   // 5. Le propriétaire reçoit le message de la vétérinaire ; Numa ne répond plus.
   await page.goto(`${dossier}/simulateur`);
   await page
-    .getByRole("button", { name: "Avancer jusqu'aux envois prévus" })
+    .getByRole("button", { name: "Avancer jusqu'au prochain envoi prévu" })
     .click();
   await expect(page).toHaveURL(/\?fait=avance$/);
   await expectLastBubble(page, "Bonjour, ici Dr Fontaine.");

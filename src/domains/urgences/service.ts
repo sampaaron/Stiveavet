@@ -24,6 +24,7 @@ import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { loadFollowup } from "@/domains/suivis/lancement";
 import { followupAccess } from "@/domains/suivis/policies";
+import { messageWindows } from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
@@ -32,7 +33,6 @@ import {
   alerts,
   animals,
   auditEvents,
-  availabilityWindows,
   emergencyContacts,
   emergencyInstructions,
   followupAlertRules,
@@ -91,22 +91,6 @@ export type AlertView = {
 
 const uuid = z.uuid();
 const alertPayload = z.object({ alertId: z.uuid() });
-
-async function windowsOf(tx: TenantTransaction) {
-  const rows = await tx
-    .select({
-      weekday: availabilityWindows.weekday,
-      startsAt: availabilityWindows.startsAt,
-      endsAt: availabilityWindows.endsAt,
-    })
-    .from(availabilityWindows)
-    .where(eq(availabilityWindows.kind, "messages"));
-  return rows.map((row) => ({
-    weekday: row.weekday,
-    startsAt: row.startsAt.slice(0, 5),
-    endsAt: row.endsAt.slice(0, 5),
-  }));
-}
 
 /** Vétérinaire prévenu en premier : responsable aux heures du cabinet, sinon la garde. */
 async function recipientFor(
@@ -192,6 +176,8 @@ export async function triageOwnerMessage(
     responsibleMembershipId: string;
     messageId: string;
     body: string;
+    /** Message reçu après la fin du suivi automatisé (lot 15) : le vétérinaire est informé. */
+    afterAutomaticEnd?: boolean;
   },
   now = new Date(),
 ): Promise<TriageResult> {
@@ -208,7 +194,26 @@ export async function triageOwnerMessage(
         isNull(followupAlertRules.supersededAt),
       ),
     );
-  const assessment = assessOwnerMessage(input.body, rules);
+  let assessment = assessOwnerMessage(input.body, rules);
+  if (assessment.level === "normal" && input.afterAutomaticEnd) {
+    // Une seule information à la fois : pas de nouvelle alerte si une est encore ouverte.
+    const [open] = await tx
+      .select({ id: alerts.id })
+      .from(alerts)
+      .where(
+        and(
+          eq(alerts.followupId, input.followupId),
+          ne(alerts.status, "resolved"),
+        ),
+      )
+      .limit(1);
+    if (!open)
+      assessment = {
+        level: "watch",
+        ruleId: null,
+        reason: "Le propriétaire a réécrit après la fin du suivi automatisé.",
+      };
+  }
   const [event] = await tx
     .insert(triageEvents)
     .values({
@@ -226,7 +231,7 @@ export async function triageOwnerMessage(
   if (assessment.level === "normal") return { level: "normal", alertId: null };
 
   const level: AlertLevel = assessment.level;
-  const period = emergencyPeriod(now, await windowsOf(tx));
+  const period = emergencyPeriod(now, await messageWindows(tx));
   const target = await recipientFor(
     tx,
     input.responsibleMembershipId,
@@ -300,7 +305,7 @@ export async function emergencyGuidance(
   instructions: string;
   contacts: { label: string; phone: string }[];
 }> {
-  const period = emergencyPeriod(now, await windowsOf(tx));
+  const period = emergencyPeriod(now, await messageWindows(tx));
   const [row] = await tx
     .select({ instructions: emergencyInstructions.instructions })
     .from(emergencyInstructions)

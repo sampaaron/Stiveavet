@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Simulateur du propriétaire" };
 
 const DONE: Record<string, string> = {
   envoye: "Message du propriétaire reçu par Stivea Vet.",
-  avance: "Envois prévus exécutés.",
+  avance: "Prochain envoi prévu exécuté.",
 };
 
 async function loadView(
@@ -130,9 +130,10 @@ export default async function OwnerSimulatorPage({
         <div className="flex min-w-0 flex-col gap-4">
           <AlertBanner tone="info" title="Comment l'utiliser">
             Le premier message de Numa part à l&apos;heure choisie sur la fiche
-            de lancement. Pour ne pas attendre, avancez jusqu&apos;aux envois
-            prévus. Répondez ensuite OUI pour donner l&apos;accord, STOP pour le
-            retirer, REPRENDRE pour le redonner.
+            de lancement. Pour ne pas attendre, avancez jusqu&apos;au prochain
+            envoi prévu : premier message, rappel du programme, puis fin du
+            suivi à la date de contrôle. Répondez OUI pour donner l&apos;accord,
+            STOP pour le retirer, REPRENDRE pour le redonner.
           </AlertBanner>
           <RunDueNowForm followupId={view.followupId} />
         </div>

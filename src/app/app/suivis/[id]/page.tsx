@@ -35,6 +35,7 @@ import { TestMark } from "../test-mark";
 import { AccessPanel } from "./access-panel";
 import { FollowupWorkspace } from "./followup-workspace";
 import { LiveConversation } from "./live-conversation";
+import { ProgrammeCard } from "./programme-card";
 import { SteeringButtons } from "./steering";
 
 // Titre générique : le nom de l'animal n'apparaît qu'après contrôle d'accès, dans la page.
@@ -114,6 +115,15 @@ export default async function FollowupPage({
     </section>
   ) : null;
 
+  const programme =
+    !fixture &&
+    followup.access === "clinical" &&
+    followup.status !== "draft" ? (
+      <ProgrammeCard
+        programme={await services.launch().programme(context, followup.id)}
+      />
+    ) : null;
+
   const accessPanel = opened.canManageAccess ? (
     <AccessPanel
       context={context}
@@ -158,6 +168,7 @@ export default async function FollowupPage({
           steering={<Steering context={context} followup={followup} />}
           alerts={alertCards}
           conversation={conversation}
+          programme={programme}
         />
       )}
     </>
@@ -248,6 +259,7 @@ function BasicDossier({
   steering,
   alerts,
   conversation,
+  programme,
 }: {
   followup: FollowupView;
   accessPanel: ReactNode;
@@ -255,6 +267,7 @@ function BasicDossier({
   steering: ReactNode;
   alerts: ReactNode;
   conversation: ReactNode;
+  programme: ReactNode;
 }) {
   const badge = followupBadge(followup);
   return (
@@ -333,6 +346,7 @@ function BasicDossier({
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           {steering}
+          {programme}
           {accessPanel}
         </div>
       </div>

@@ -51,7 +51,7 @@ test("urgence : consignes immédiates, alerte, accusé de réception puis clôtu
   const dossier = await launchFollowup(page, story.animal, "5");
   await page.goto(`${dossier}/simulateur`);
   await page
-    .getByRole("button", { name: "Avancer jusqu'aux envois prévus" })
+    .getByRole("button", { name: "Avancer jusqu'au prochain envoi prévu" })
     .click();
   await expect(page).toHaveURL(/\?fait=avance$/);
   await expectLastBubble(page, story.intro);

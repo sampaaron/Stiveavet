@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AiGateway } from "@/adapters/ai-gateway/types";
@@ -10,6 +10,13 @@ import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup, setStatusReason } from "@/domains/suivis/lancement";
 import { canResumeNuma, canWriteToOwner } from "@/domains/suivis/policies";
+import {
+  AUTOMATIC_END_REASON,
+  END_KIND,
+  REMINDER_KIND,
+  lastStatusReason,
+  scheduleReminders,
+} from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
 import {
   emergencyGuidance,
@@ -24,6 +31,7 @@ import {
   consents,
   conversationThreads,
   followupContacts,
+  followupSteps,
   followups,
   memberships,
   messages,
@@ -83,6 +91,8 @@ export type ConversationView = {
   animalName: string;
   ownerFirstName: string | null;
   consent: ConsentState | null;
+  /** Terminé à la date de contrôle (et non arrêté par le vétérinaire). */
+  endedAutomatically: boolean;
   messages: ConversationMessage[];
   rights: { canWrite: boolean; canResume: boolean };
 };
@@ -98,6 +108,8 @@ export type InboundOutcome =
   | "stored";
 
 const MAX_BODY = 4096;
+/** Tâches qu'un clic du simulateur peut avancer. */
+const SIMULATED_KINDS = ["followup.message", REMINDER_KIND, END_KIND] as const;
 const MAX_VIEW_MESSAGES = 300;
 
 export const ownerMessageInput = z
@@ -110,6 +122,8 @@ const uuid = z.uuid();
 
 const jobPayload = z.discriminatedUnion("step", [
   z.object({ step: z.literal("intro") }),
+  // Fin du suivi automatisé (lot 15) : un message de clôture par fin.
+  z.object({ step: z.literal("closing"), token: z.uuid() }),
   z.object({
     step: z.enum([
       "consent_given",
@@ -123,6 +137,8 @@ const jobPayload = z.discriminatedUnion("step", [
     messageId: z.uuid(),
   }),
 ]);
+
+const reminderPayload = z.object({ stepId: z.uuid() });
 
 type Contact = {
   id: string;
@@ -222,6 +238,22 @@ async function latestConsent(
     .orderBy(desc(consents.recordedAt))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * Numa répond aux messages du propriétaire quand elle a la main : suivi actif, ou suivi
+ * automatisé terminé à la date de contrôle (la conversation reste ouverte, cahier des
+ * charges §5). Jamais en pause, reprise en main ou après un arrêt par le vétérinaire.
+ */
+async function numaMayReply(
+  tx: TenantTransaction,
+  ctx: ConversationContext,
+): Promise<boolean> {
+  if (ctx.status === "active") return true;
+  return (
+    ctx.status === "ended" &&
+    (await lastStatusReason(tx, ctx.followupId)) === AUTOMATIC_END_REASON
+  );
 }
 
 async function recordConsent(
@@ -427,6 +459,20 @@ export function conversationHandlers(deps: {
       return;
     }
 
+    if (payload.step === "closing") {
+      // Réactivé entre-temps, ou accord retiré : pas de message de clôture.
+      if (ctx.status !== "ended") return;
+      if ((await latestConsent(tx, contact.id))?.state !== "given") return;
+      await sendNuma(
+        tx,
+        ctx,
+        contact,
+        `closing:${payload.token}`,
+        fixedMessage("closing", wordingOf(ctx, contact)),
+      );
+      return;
+    }
+
     if (payload.step === "deliver") {
       const [message] = await tx
         .select({
@@ -495,7 +541,7 @@ export function conversationHandlers(deps: {
         }),
       );
       // Puis Numa poursuit la discussion, si elle a la main et l'accord du propriétaire.
-      if (ctx.status === "active" && consent?.state === "given")
+      if (consent?.state === "given" && (await numaMayReply(tx, ctx)))
         await reply(tx, ctx, contact, source);
       return;
     }
@@ -503,7 +549,7 @@ export function conversationHandlers(deps: {
     if (payload.step === "reply") {
       const consent = await latestConsent(tx, contact.id);
       // Reprise en main, pause, arrêt ou accord retiré depuis l'arrivée du message.
-      if (ctx.status !== "active" || consent?.state !== "given") return;
+      if (consent?.state !== "given" || !(await numaMayReply(tx, ctx))) return;
       await reply(tx, ctx, contact, source);
       return;
     }
@@ -556,7 +602,78 @@ export function conversationHandlers(deps: {
     await sendNuma(tx, ctx, contact, key, body);
   }
 
-  return { "followup.message": handler };
+  /**
+   * Étape programmée de la fiche (`followup.reminder`, lot 15) : rédigée par Numa d'après la
+   * consigne validée par le vétérinaire, filtrée par les garde-fous. Elle ne part que si le
+   * suivi est actif, l'accord donné et l'étape toujours dans la fiche.
+   */
+  const reminder: JobHandler = async ({ tx, job }) => {
+    const parsed = reminderPayload.safeParse(job.payload);
+    if (!parsed.success) throw new JobError("invalid_payload");
+    if (!job.followupId) throw new JobError("target_missing");
+    const ctx = await loadContext(tx, job.followupId, true).catch(
+      (error: unknown) => {
+        if (error instanceof DomainError) throw new JobError("target_missing");
+        throw error;
+      },
+    );
+    if (ctx.isTest) return;
+    const contact = ctx.contact;
+    if (!contact) throw new JobError("target_missing");
+    // En pause, repris en main ou terminé : l'étape ne part pas, et ne repartira pas.
+    if (ctx.status !== "active") return;
+    if ((await latestConsent(tx, contact.id))?.state !== "given") return;
+    const [step] = await tx
+      .select({
+        id: followupSteps.id,
+        kind: followupSteps.kind,
+        content: followupSteps.content,
+        supersededAt: followupSteps.supersededAt,
+        controlAppointmentAt: followups.controlAppointmentAt,
+      })
+      .from(followupSteps)
+      .innerJoin(followups, eq(followups.id, followupSteps.followupId))
+      .where(
+        and(
+          eq(followupSteps.id, parsed.data.stepId),
+          eq(followupSteps.followupId, ctx.followupId),
+        ),
+      );
+    if (!step) throw new JobError("target_missing");
+    // Étape remplacée par une modification de la fiche : la nouvelle a sa propre tâche.
+    if (step.supersededAt) return;
+    let text: string;
+    try {
+      ({ text } = await ai.numaStep({
+        language: contact.language,
+        animalName: ctx.animalName,
+        practiceName: ctx.practiceName,
+        kind: step.kind,
+        instruction: step.content,
+        controlAppointmentAt: step.controlAppointmentAt,
+      }));
+    } catch {
+      throw new JobError("provider_unavailable");
+    }
+    const verdict = checkNumaReply(text);
+    if (!verdict.ok)
+      await auditSystem(
+        tx,
+        ctx.organizationId,
+        "numa.reply_blocked",
+        ctx.followupId,
+        { reason: verdict.reason },
+      );
+    await sendNuma(
+      tx,
+      ctx,
+      contact,
+      `step:${step.id}`,
+      verdict.ok ? text : fixedMessage("check_in", wordingOf(ctx, contact)),
+    );
+  };
+
+  return { "followup.message": handler, [REMINDER_KIND]: reminder };
 }
 
 /**
@@ -610,20 +727,26 @@ async function receiveInTx(
   ) {
     await recordConsent(tx, ctx, contact.id, "given", messageId);
     await enqueueMessageJob(tx, ctx, "consent_given", messageId);
+    await scheduleReminders(tx, followupId, new Date());
     outcome = "consent_given";
   } else if (keyword === "resume" && consent?.state === "withdrawn") {
     await recordConsent(tx, ctx, contact.id, "given", messageId);
     await enqueueMessageJob(tx, ctx, "resumed", messageId);
+    await scheduleReminders(tx, followupId, new Date());
     outcome = "resumed";
   } else {
     // Un message de contenu est toujours évalué, même repris en main ou en pause : l'équipe
     // est alertée dans tous les cas.
+    const mayReply =
+      consent?.state === "given" && (await numaMayReply(tx, ctx));
     ({ level: triage } = await triageOwnerMessage(tx, {
       organizationId: ctx.organizationId,
       followupId,
       responsibleMembershipId: ctx.responsibleMembershipId,
       messageId,
       body,
+      // Le propriétaire réécrit après la fin du suivi automatisé : le vétérinaire est informé.
+      afterAutomaticEnd: mayReply && ctx.status === "ended",
     }));
     if (triage === "urgent" && consent?.state !== "withdrawn") {
       // Consignes d'urgence tout de suite, même avant l'accord : ce sont les numéros du
@@ -640,11 +763,11 @@ async function receiveInTx(
         consent.id,
       );
       outcome = "consent_reminder";
-    } else if (consent?.state === "given" && ctx.status === "active") {
+    } else if (mayReply) {
       await enqueueMessageJob(tx, ctx, "reply", messageId);
       outcome = "reply";
     }
-    // Sinon (repris en main, en pause, terminé, accord retiré) : conservé pour l'équipe.
+    // Sinon (repris en main, en pause, arrêté, accord retiré) : conservé pour l'équipe.
   }
 
   await emit(tx, {
@@ -727,6 +850,9 @@ export function conversationsService(db: Database) {
             ? firstName(ctx.contact.ownerFullName)
             : null,
           consent: consent?.state ?? null,
+          endedAutomatically:
+            followup.status === "ended" &&
+            (await lastStatusReason(tx, followupId)) === AUTOMATIC_END_REASON,
           messages: rows.reverse(),
           rights: {
             canWrite: canWriteToOwner(actor, followup.access),
@@ -813,6 +939,8 @@ export function conversationsService(db: Database) {
           .update(followups)
           .set({ status: "active" })
           .where(eq(followups.id, followupId));
+        // Les rappels à venir reprennent ; ceux passés pendant la reprise en main, non.
+        await scheduleReminders(tx, followupId, new Date());
         await audit(tx, actor, "followup.numa_resumed", followupId);
       });
     },
@@ -853,22 +981,36 @@ export function conversationsService(db: Database) {
       });
     },
 
-    /** Simulateur : les envois en attente de ce suivi deviennent dus tout de suite. */
+    /**
+     * Simulateur : avance jusqu'au prochain envoi prévu de ce suivi (message, rappel ou fin
+     * du suivi automatisé) ; les tâches prévues à la même heure, ou déjà dues, partent aussi.
+     */
     async makeDueNow(actor: Actor, followupId: string): Promise<number> {
       assertPermission(actor, "clinical.read");
       return run(actor, async (tx) => {
         const followup = await loadFollowup(tx, actor, followupId);
         if (followup.access !== "clinical") throw new DomainError("not_found");
+        const pending = and(
+          eq(scheduledJobs.followupId, followupId),
+          eq(scheduledJobs.status, "pending"),
+          inArray(scheduledJobs.kind, [...SIMULATED_KINDS]),
+        );
+        const [next] = await tx
+          .select({ runAt: scheduledJobs.runAt })
+          .from(scheduledJobs)
+          .where(pending)
+          .orderBy(asc(scheduledJobs.runAt))
+          .limit(1);
+        if (!next) return 0;
+        const now = new Date();
+        // La base garde les microsecondes : une milliseconde de marge inclut l'envoi suivant.
+        const until = new Date(
+          Math.max(next.runAt.getTime(), now.getTime()) + 1,
+        );
         const updated = await tx
           .update(scheduledJobs)
-          .set({ runAt: new Date() })
-          .where(
-            and(
-              eq(scheduledJobs.followupId, followupId),
-              eq(scheduledJobs.status, "pending"),
-              inArray(scheduledJobs.kind, ["followup.message"]),
-            ),
-          )
+          .set({ runAt: now })
+          .where(and(pending, lte(scheduledJobs.runAt, until)))
           .returning({ id: scheduledJobs.id });
         return updated.length;
       });
