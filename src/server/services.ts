@@ -15,6 +15,8 @@ import { protocolsService } from "@/domains/protocoles/service";
 import type { ProtocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import type { SettingsService } from "@/domains/reglages/service";
+import { launchService } from "@/domains/suivis/lancement";
+import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
 import { jobsService } from "@/domains/taches/service";
 import type { JobsService } from "@/domains/taches/service";
@@ -29,6 +31,7 @@ let settings: SettingsService | undefined;
 let billing: BillingService | undefined;
 let demo: DemoService | undefined;
 let jobs: JobsService | undefined;
+let launch: LaunchService | undefined;
 
 /** Services métier branchés sur la base applicative et l'envoi d'e-mails. */
 export const services = {
@@ -65,6 +68,11 @@ export const services = {
       provider: fakeBillingProvider(),
     });
     return billing;
+  },
+  /** Lancement manuel des suivis, depuis dr.veto simulé (ADR 0015). */
+  launch(): LaunchService {
+    launch ??= launchService({ db: appDatabase(), drveto: fakeDrVeto });
+    return launch;
   },
   /** Tâches en échec, relance et abandon (ADR 0014). */
   jobs(): JobsService {

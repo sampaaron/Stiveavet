@@ -17,7 +17,8 @@ export const PERMISSIONS = {
   "followups.read_own": "Voir ses suivis et ceux partagés avec soi",
   "followups.read_summary":
     "Voir la liste organisationnelle des suivis, sans données cliniques",
-  "followups.launch": "Lancer un suivi",
+  "followups.launch":
+    "Préparer et lancer un suivi (lancement réservé aux vétérinaires)",
   "followups.share": "Partager ses suivis avec un confrère",
   "clinical.read": "Lire conversations, photos, vocaux et synthèses cliniques",
   "owner_messages.reply": "Répondre aux propriétaires",

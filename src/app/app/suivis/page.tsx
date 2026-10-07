@@ -1,9 +1,10 @@
-import { ChevronRight, Lock } from "lucide-react";
+import { ChevronRight, Lock, PawPrint } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
+import { ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { SpeciesIcon } from "@/ui/followup-card";
 import { formatDate } from "@/ui/format";
@@ -33,6 +34,16 @@ export default async function FollowupsPage() {
           clinical
             ? "Les suivis que vous pouvez consulter."
             : "Vue d'organisation : animal, propriétaire, état et responsable. Les données cliniques sont réservées aux vétérinaires."
+        }
+        actions={
+          context.permissions.has("followups.launch") && clinical ? (
+            <ButtonLink
+              href="/app/suivis/nouveau"
+              icon={<PawPrint aria-hidden="true" className="size-4" />}
+            >
+              Lancer un suivi
+            </ButtonLink>
+          ) : null
         }
       />
       <Card>

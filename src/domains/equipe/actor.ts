@@ -28,7 +28,12 @@ export class DomainError extends Error {
       | "already_installed"
       | "on_call_overlap"
       | "billing_blocked"
-      | "plan_vet_limit",
+      | "plan_vet_limit"
+      | "integration_missing"
+      | "already_followed"
+      | "launch_incomplete"
+      | "invalid_transition"
+      | "past_step",
   ) {
     super(code);
   }

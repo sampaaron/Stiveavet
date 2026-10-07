@@ -40,6 +40,19 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     `${actorName} a changé la confidentialité d'un dossier`,
   "followup.reassigned": ({ actorName }) =>
     `${actorName} a réattribué un dossier`,
+  "followup.prepared": ({ actorName }) =>
+    `${actorName} a préparé un suivi depuis dr.veto`,
+  "followup.protocol_chosen": ({ actorName }) =>
+    `${actorName} a choisi le protocole d'un suivi`,
+  "followup.plan_updated": ({ actorName }) =>
+    `${actorName} a modifié la fiche d'un suivi`,
+  "followup.treatments_validated": ({ actorName }) =>
+    `${actorName} a validé des traitements importés`,
+  "followup.launched": ({ actorName }) => `${actorName} a lancé un suivi`,
+  "followup.paused": ({ actorName }) => `${actorName} a mis un suivi en pause`,
+  "followup.resumed": ({ actorName }) => `${actorName} a repris un suivi`,
+  "followup.stopped": ({ actorName }) => `${actorName} a arrêté un suivi`,
+  "followup.reactivated": ({ actorName }) => `${actorName} a réactivé un suivi`,
   "job.retried": ({ actorName }) => `${actorName} a relancé une tâche en échec`,
   "job.cancelled": ({ actorName }) =>
     `${actorName} a abandonné une tâche en échec`,
