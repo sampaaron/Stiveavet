@@ -114,6 +114,7 @@ export const followupShares = pgTable(
     grantedByMembershipId: uuid("granted_by_membership_id").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt,
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.followupId, table.membershipId] })],
 );

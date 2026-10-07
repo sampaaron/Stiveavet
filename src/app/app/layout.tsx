@@ -2,8 +2,8 @@ import { LockKeyhole, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { AUTH_POLICY } from "@/domains/auth/policy";
-import { requireSession } from "@/server/auth";
 import { memberProfile } from "@/server/auth/profile";
+import { memberContext } from "@/server/authz";
 import { AppShell } from "@/ui/app-shell";
 import { Button } from "@/ui/button";
 
@@ -19,13 +19,14 @@ import { IdleLock } from "./idle-lock";
 export default async function CabinetLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const session = await requireSession();
-  const profile = await memberProfile(session);
+  const context = await memberContext();
+  const profile = await memberProfile(context);
 
   return (
     <AppShell
       organizationName={profile.organizationName}
       user={{ name: profile.displayName, roleLabel: profile.roleLabel }}
+      permissions={[...context.permissions]}
       accountActions={
         <div className="flex gap-2">
           <form action={lockAction} className="flex-1">

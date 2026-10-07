@@ -13,6 +13,8 @@ export const metadata: Metadata = { title: "Connexion" };
 const reasons: Record<string, string> = {
   deconnexion: "Vous êtes déconnecté.",
   session: "Votre session a été fermée. Reconnectez-vous.",
+  invitation:
+    "Votre compte est créé. Connectez-vous pour rejoindre votre cabinet.",
   "mot-de-passe":
     "Mot de passe modifié. Toutes vos sessions ont été fermées : connectez-vous avec le nouveau.",
 };

@@ -9,6 +9,8 @@ type AppShellProps = {
   user: { name: string; roleLabel: string };
   /** Actions du compte (verrouiller, se déconnecter), sous l'identité. */
   accountActions?: ReactNode;
+  /** Permissions de la personne, pour n'afficher que les écrans autorisés. */
+  permissions: readonly string[];
   children: ReactNode;
 };
 
@@ -17,6 +19,7 @@ export function AppShell({
   organizationName,
   user,
   accountActions,
+  permissions,
   children,
 }: AppShellProps) {
   return (
@@ -28,6 +31,7 @@ export function AppShell({
         Aller au contenu
       </a>
       <SidebarNav
+        permissions={permissions}
         brand={
           <Link href="/app" className="flex items-center gap-3">
             <Image

@@ -31,7 +31,9 @@ Comptes fictifs créés par `pnpm db:seed`, tous avec la phrase de passe `tilleu
 | `lea.roux@tilleuls.test`                                  | assistante (pas de code)    | Clinique des Tilleuls |
 | `paul.martin@cabinet-martin.test`                         | vétérinaire administrateur  | Cabinet du Dr Martin  |
 
-Les vétérinaires reçoivent un code dans Mailpit à la première connexion depuis un navigateur.
+Les vétérinaires reçoivent un code dans Mailpit à la première connexion depuis un navigateur. Les invitations envoyées depuis « Équipe et droits » arrivent aussi dans Mailpit.
+
+Droits par défaut : Claire voit tout et gère l'équipe ; Hugo et Inès ne voient que leurs suivis et ceux qu'on leur partage ; Léa voit l'organisation des suivis sans aucune donnée clinique. Détail : `docs/securite/permissions.md`.
 
 ## Vérifier
 

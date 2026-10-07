@@ -7,11 +7,16 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { cn } from "./cn";
-import { appNavigation, isNavItemActive } from "./navigation";
+import { isNavItemActive, visibleNavigation } from "./navigation";
 
-type SidebarNavProps = { brand: ReactNode; footer: ReactNode };
+type SidebarNavProps = {
+  brand: ReactNode;
+  footer: ReactNode;
+  /** Permissions de la personne : seules les entrées autorisées sont affichées. */
+  permissions: readonly string[];
+};
 
-export function SidebarNav({ brand, footer }: SidebarNavProps) {
+export function SidebarNav({ brand, footer, permissions }: SidebarNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -44,7 +49,7 @@ export function SidebarNav({ brand, footer }: SidebarNavProps) {
         )}
       >
         <nav aria-label="Navigation principale" className="flex-1">
-          {appNavigation.map((section, index) => (
+          {visibleNavigation(new Set(permissions)).map((section, index) => (
             <div key={section.label ?? index} className="mb-4">
               {section.label ? (
                 <p className="px-3 pb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase">

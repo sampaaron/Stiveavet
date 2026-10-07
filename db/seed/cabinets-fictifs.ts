@@ -42,7 +42,7 @@ type MemberSeed = {
   role: "admin_vet" | "vet" | "assistant";
 };
 
-async function createOrganization(
+export async function createOrganization(
   db: Database,
   id: string,
   name: string,
@@ -108,7 +108,7 @@ function grams(weight: string): number {
   );
 }
 
-async function insertFollowup(
+export async function insertFollowup(
   tx: TenantTransaction,
   organizationId: string,
   responsibleMembershipId: string,

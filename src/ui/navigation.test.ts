@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { appNavigation, isNavItemActive } from "./navigation";
+import {
+  appNavigation,
+  isNavItemActive,
+  visibleNavigation,
+} from "./navigation";
 
 describe("isNavItemActive", () => {
   it("n'active « Aujourd'hui » que sur la racine de l'espace cabinet", () => {
@@ -21,5 +25,24 @@ describe("appNavigation", () => {
     );
 
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+});
+
+describe("visibleNavigation", () => {
+  it("ne cite que des permissions du catalogue", async () => {
+    const { PERMISSION_KEYS } = await import("@/domains/equipe/permissions");
+    for (const item of appNavigation.flatMap((section) => section.items))
+      for (const key of item.anyOf ?? [])
+        expect(PERMISSION_KEYS).toContain(key);
+  });
+
+  it("n'affiche à un assistant ni l'équipe, ni le journal, ni la facturation", async () => {
+    const { ROLE_PERMISSIONS } = await import("@/domains/equipe/permissions");
+    const hrefs = visibleNavigation(
+      new Set(ROLE_PERMISSIONS.assistant.defaults),
+    ).flatMap((section) => section.items.map((item) => item.href));
+    expect(hrefs).toContain("/app/suivis");
+    for (const hidden of ["/app/equipe", "/app/journal", "/app/facturation"])
+      expect(hrefs).not.toContain(hidden);
   });
 });
