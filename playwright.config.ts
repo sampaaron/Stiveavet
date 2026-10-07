@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   // Les tests tournent contre le build de production, pas le serveur de développement.
   webServer: {
-    command: `pnpm start --port ${port}`,
+    command: `PORT=${port} pnpm start`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
