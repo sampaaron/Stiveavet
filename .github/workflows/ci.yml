@@ -74,10 +74,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: pnpm/action-setup@v4
+      # Pas de cache pnpm ici : l'audit lit le lockfile sans installer les dépendances.
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: pnpm
       # Bloquant pour ce qui part en production.
       - run: pnpm audit --prod --audit-level high
       # Informatif pour les outils de développement (failles sans correctif publié possibles).
