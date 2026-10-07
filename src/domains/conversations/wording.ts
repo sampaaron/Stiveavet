@@ -50,3 +50,33 @@ export function fixedMessage(step: FixedStep, context: WordingContext): string {
 export function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
+
+export type EmergencyContext = {
+  language: "fr" | "en";
+  ownerFirstName: string;
+  animalName: string;
+  practiceName: string;
+  /** Consignes du cabinet pour la période (jour, nuit, week-end, férié), telles qu'écrites. */
+  instructions: string;
+  contacts: readonly { label: string; phone: string }[];
+};
+
+/**
+ * Consignes d'urgence envoyées tout de suite au propriétaire (cahier des charges §7), même
+ * hors horaires et sans attendre l'escalade. Aucun diagnostic : Numa signale que le message
+ * peut indiquer une urgence et renvoie vers le cabinet.
+ */
+export function emergencyMessage(context: EmergencyContext): string {
+  const en = context.language === "en";
+  const lines = context.contacts.map(
+    (contact) => `• ${contact.label} : ${contact.phone}`,
+  );
+  const numbers = lines.length
+    ? `${en ? "Numbers to call:" : "Numéros à appeler :"}\n${lines.join("\n")}`
+    : en
+      ? `Call ${context.practiceName} directly.`
+      : `Appelez directement ${context.practiceName}.`;
+  return en
+    ? `${context.ownerFirstName}, your message may indicate an emergency for ${context.animalName}. Please do not wait: contact the clinic now.\n\nClinic instructions: ${context.instructions}\n\n${numbers}\n\nI have alerted the ${context.practiceName} team. You can keep writing to me here to give more details.`
+    : `${context.ownerFirstName}, votre message peut signaler une urgence pour ${context.animalName}. N'attendez pas : contactez le cabinet maintenant.\n\nConsignes du cabinet : ${context.instructions}\n\n${numbers}\n\nJ'ai prévenu l'équipe de ${context.practiceName}. Vous pouvez continuer à m'écrire ici pour donner plus de détails.`;
+}

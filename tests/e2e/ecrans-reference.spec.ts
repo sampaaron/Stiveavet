@@ -34,8 +34,9 @@ test.describe("tableau de bord « Aujourd'hui »", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Bonjour Claire" }),
     ).toBeVisible();
-    const alert = page.getByRole("alert").first();
-    await expect(alert).toContainText("Caramel");
+    // Le bandeau des alertes réelles (lot 14) peut précéder la carte de référence.
+    const alert = page.getByRole("alert").filter({ hasText: "Caramel" });
+    await expect(alert).toBeVisible();
 
     await alert.getByRole("link", { name: "Ouvrir le dossier" }).click();
     await expect(page).toHaveURL(caramel);

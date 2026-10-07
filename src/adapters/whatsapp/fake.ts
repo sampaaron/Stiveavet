@@ -8,6 +8,14 @@ export function maskPhone(phone: string): string {
   return `•• •• •• •• ${digits.slice(-2)}`;
 }
 
+function simulatedRef(idempotencyKey: string): string {
+  const digest = createHash("sha256")
+    .update(idempotencyKey)
+    .digest("hex")
+    .slice(0, 32);
+  return `simule:${digest}`;
+}
+
 /**
  * Simulation : aucun appel réseau, aucun compte. Le numéro complet n'est jamais conservé.
  * Un envoi simulé « réussit » toujours ; sa référence dérive de la clé d'idempotence, comme
@@ -19,10 +27,9 @@ export const fakeWhatsApp: WhatsAppConnector = {
     return { displayLabel: `${maskPhone(phone)} (simulé)` };
   },
   async sendMessage({ idempotencyKey }) {
-    const digest = createHash("sha256")
-      .update(idempotencyKey)
-      .digest("hex")
-      .slice(0, 32);
-    return { externalRef: `simule:${digest}` };
+    return { externalRef: simulatedRef(idempotencyKey) };
+  },
+  async sendStaffAlert({ idempotencyKey }) {
+    return { externalRef: simulatedRef(idempotencyKey) };
   },
 };

@@ -13,4 +13,14 @@ export type WhatsAppConnector = {
     body: string;
     idempotencyKey: string;
   }): Promise<{ externalRef: string }>;
+  /**
+   * Alerte WhatsApp à un vétérinaire (urgence, escalade). Le texte ne contient aucun contenu
+   * clinique : il invite à ouvrir Stivea Vet. Le numéro du vétérinaire est résolu par le
+   * prestataire (phase 3) ; il n'est jamais journalisé.
+   */
+  sendStaffAlert(input: {
+    membershipId: string;
+    kind: "urgent" | "escalation";
+    idempotencyKey: string;
+  }): Promise<{ externalRef: string }>;
 };

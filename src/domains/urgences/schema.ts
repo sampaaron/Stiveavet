@@ -34,6 +34,8 @@ export const triageEvents = pgTable("triage_events", {
   level: triageLevel("level").notNull(),
   source: triageSource("source").notNull(),
   alertRuleId: uuid("alert_rule_id"),
+  /** Migration 0011 : signe d'alerte de la fiche du suivi reconnu par une règle. */
+  followupAlertRuleId: uuid("followup_alert_rule_id"),
   reason: text("reason").notNull(),
   createdByMembershipId: uuid("created_by_membership_id"),
   createdAt: at("created_at").notNull().defaultNow(),

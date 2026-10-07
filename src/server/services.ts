@@ -23,6 +23,8 @@ import { followupsService } from "@/domains/suivis/service";
 import { JOB_HANDLERS, OUTBOX_ROUTES } from "@/domains/taches/registry";
 import { jobsService } from "@/domains/taches/service";
 import { createWorker } from "@/domains/taches/worker";
+import { alertsService } from "@/domains/urgences/service";
+import type { AlertsService } from "@/domains/urgences/service";
 import type { JobsService } from "@/domains/taches/service";
 import type { FollowupsService } from "@/domains/suivis/service";
 import { appDatabase } from "@/server/db/client";
@@ -37,6 +39,7 @@ let demo: DemoService | undefined;
 let jobs: JobsService | undefined;
 let launch: LaunchService | undefined;
 let conversations: ConversationsService | undefined;
+let alerts: AlertsService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 /** Services métier branchés sur la base applicative et l'envoi d'e-mails. */
@@ -84,6 +87,11 @@ export const services = {
   conversations(): ConversationsService {
     conversations ??= conversationsService(appDatabase());
     return conversations;
+  },
+  /** Alertes du triage : accusé de réception, clôture (ADR 0017). */
+  alerts(): AlertsService {
+    alerts ??= alertsService(appDatabase());
+    return alerts;
   },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement
