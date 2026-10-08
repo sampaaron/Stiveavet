@@ -76,6 +76,7 @@ const ai: AiGateway = {
   transcribeVoice: fakeAiGateway.transcribeVoice,
   observePhoto: fakeAiGateway.observePhoto,
   readAgendaCapture: fakeAiGateway.readAgendaCapture,
+  summarizeFollowup: fakeAiGateway.summarizeFollowup,
 };
 const handlers = conversationHandlers({ whatsapp, ai });
 // Base partagée : les tâches laissées par les autres fichiers de test ne sont pas exécutées.

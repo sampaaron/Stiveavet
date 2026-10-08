@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -252,4 +253,17 @@ export const followupAlertRules = pgTable("followup_alert_rules", {
   description: text("description").notNull(),
   supersededAt: timestamp("superseded_at", { withTimezone: true }),
   createdAt,
+});
+
+// Migration 0013 : synthèse pré-consultation, refaite quand les échanges changent.
+
+export const followupSyntheses = pgTable("followup_syntheses", {
+  followupId: uuid("followup_id").primaryKey(),
+  organizationId: uuid("organization_id").notNull(),
+  content: jsonb("content").notNull(),
+  sourceDigest: text("source_digest").notNull(),
+  engine: text("engine").notNull().default("simulated"),
+  generatedAt: timestamp("generated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

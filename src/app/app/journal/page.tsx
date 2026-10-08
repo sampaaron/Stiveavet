@@ -75,6 +75,10 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     `${actorName} a envoyé une capture d'agenda : créneaux libres lus, capture supprimée`,
   "agenda.slot_removed": ({ actorName }) =>
     `${actorName} a retiré un créneau libre de l'agenda`,
+  "synthesis.generated": ({ actorName }) =>
+    `Synthèse pré-consultation préparée par l'IA (simulation) à l'ouverture d'un dossier par ${actorName}`,
+  "followup.purged": () =>
+    "Un suivi arrivé à un an de conservation a été effacé ; seules des statistiques anonymes restent",
   "followup.ended_automatically": () =>
     "Fin du suivi automatisé à la date de contrôle (la conversation reste ouverte)",
   "alert.raised": () =>

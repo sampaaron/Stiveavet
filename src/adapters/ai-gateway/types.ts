@@ -60,6 +60,40 @@ export type AgendaCaptureInput = {
 
 export type FreeSlot = { startsAt: Date; endsAt: Date };
 
+/**
+ * Élément d'un dossier transmis pour la synthèse pré-consultation (lot 17) : le texte d'un
+ * message ou la transcription d'un vocal, jamais un nom, un numéro ni un fichier.
+ */
+export type SynthesisEvent = {
+  at: Date;
+  from: "owner" | "numa" | "vet";
+  text: string;
+  media: "photo" | "voice" | null;
+  /** Niveau donné par le triage déterministe (messages du propriétaire seulement). */
+  triage: "normal" | "watch" | "urgent" | null;
+};
+
+export type SynthesisInput = {
+  /** Langue du vétérinaire qui lit la synthèse. */
+  language: "fr" | "en";
+  procedure: string;
+  /** Jours écoulés depuis l'intervention (J+n), heure de Paris. */
+  dayNumber: number;
+  events: SynthesisEvent[];
+};
+
+/**
+ * Partie rédigée de la synthèse. Les paroles du propriétaire n'y figurent qu'entre
+ * guillemets et mot pour mot ; tout le reste repasse par les garde-fous (ni diagnostic, ni
+ * dosage, ni réassurance), comme une réponse de Numa.
+ */
+export type SynthesisDraft = {
+  evolution: string;
+  positives: string[];
+  negatives: string[];
+  openQuestions: string[];
+};
+
 export type AiGateway = {
   readonly simulated: boolean;
   numaReply(input: NumaReplyInput): Promise<NumaReply>;
@@ -69,4 +103,5 @@ export type AiGateway = {
     input: PhotoObservationInput,
   ): Promise<{ observations: string[] }>;
   readAgendaCapture(input: AgendaCaptureInput): Promise<{ slots: FreeSlot[] }>;
+  summarizeFollowup(input: SynthesisInput): Promise<SynthesisDraft>;
 };

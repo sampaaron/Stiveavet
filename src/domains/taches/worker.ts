@@ -13,6 +13,7 @@ import type { EnqueueInput } from "./queue";
 
 /**
  * Worker de la file de tâches (architecture §9). Un passage :
+ * 0. laisse les planificateurs inscrire les tâches périodiques du jour (balayage quotidien) ;
  * 1. publie les événements de l'outbox en tâches (idempotent) ;
  * 2. prend les tâches dues qu'il sait exécuter (`jobs.claim`, jamais deux fois la même) ;
  * 3. exécute chacune dans la transaction de son cabinet, puis la marque réussie dans cette
@@ -51,16 +52,22 @@ export type OutboxRoute = (
   event: OutboxEvent,
 ) => Array<Omit<EnqueueInput, "organizationId" | "idempotencyKey">>;
 
+/** Planification périodique (ex. balayage quotidien de conservation) : renvoie un nombre. */
+export type JobPlanner = (db: Database) => Promise<number>;
+
 export type WorkerOptions = {
   db: Database;
   workerId: string;
   handlers: Readonly<Record<string, JobHandler>>;
   routes?: Readonly<Record<string, OutboxRoute>>;
+  planners?: readonly JobPlanner[];
   batchSize?: number;
   leaseSeconds?: number;
 };
 
 export type PassResult = {
+  /** Tâches périodiques inscrites par les planificateurs. */
+  planned: number;
   published: number;
   succeeded: number;
   retried: number;
@@ -96,6 +103,7 @@ export function createWorker(options: WorkerOptions) {
     db,
     handlers,
     routes = {},
+    planners = [],
     batchSize = 20,
     leaseSeconds = 300,
   } = options;
@@ -205,7 +213,10 @@ export function createWorker(options: WorkerOptions) {
     workerId,
     /** Un passage complet ; renvoie des compteurs seulement. */
     async runOnce(): Promise<PassResult> {
+      let planned = 0;
+      for (const planner of planners) planned += await planner(db);
       const result: PassResult = {
+        planned,
         published: await publishOutbox(),
         succeeded: 0,
         retried: 0,

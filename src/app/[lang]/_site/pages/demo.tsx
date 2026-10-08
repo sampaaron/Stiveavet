@@ -16,7 +16,7 @@ import { services } from "@/server/services";
 import { AgendaEvent } from "@/ui/agenda-event";
 import { Card, SectionCard } from "@/ui/card";
 import { ChatThread } from "@/ui/chat";
-import { FollowupCard } from "@/ui/followup-card";
+import { FollowupCard, fixtureCard } from "@/ui/followup-card";
 
 import { CtaBand, PageIntro, Section, TextLink } from "../blocks";
 import type { SiteProps } from "../chrome";
@@ -107,8 +107,10 @@ export async function DemoSpacePage({
                   .map((followup) => (
                     <li key={followup.id}>
                       <FollowupCard
-                        followup={followup}
-                        vetName={vetName(followup.responsibleVetId)}
+                        followup={fixtureCard(
+                          followup,
+                          vetName(followup.responsibleVetId),
+                        )}
                         href={hrefFor(followup.id)}
                       />
                     </li>

@@ -13,6 +13,8 @@ export const JOB_KIND_LABELS: Record<string, string> = {
   "media.transcribe": "Transcription d'un message vocal",
   "media.observe": "Analyse d'une photo",
   "attachment.purge": "Suppression d'un fichier",
+  "retention.sweep": "Recherche des données arrivées à échéance",
+  "followup.purge": "Effacement d'un suivi arrivé à échéance",
 };
 
 export function jobKindLabel(kind: string): string {

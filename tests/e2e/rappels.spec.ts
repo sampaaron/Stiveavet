@@ -44,6 +44,12 @@ const CASES: Record<
 
 test.describe.configure({ retries: 0 });
 
+/** Programme complet, replié sous « Prochaines étapes » dans le dossier (lot 17). */
+async function openProgramme(page: Page) {
+  await page.getByText(/^Programme complet \(/).click();
+  return page.getByRole("list", { name: "Étapes du suivi" });
+}
+
 const advance = (page: Page) =>
   page.getByRole("button", { name: "Avancer jusqu'au prochain envoi prévu" });
 
@@ -57,8 +63,9 @@ test("rappels programmés, fin à la date de contrôle, puis le propriétaire r�
 
   // 1. Lancement, premier message et accord.
   const dossier = await launchFollowup(page, story.animal, "5");
-  const programme = page.getByRole("list", { name: "Étapes du suivi" });
-  await expect(programme).toContainText("Après l'accord du propriétaire");
+  await expect(await openProgramme(page)).toContainText(
+    "Après l'accord du propriétaire",
+  );
   await page.goto(`${dossier}/simulateur`);
   await advance(page).click();
   await expect(page).toHaveURL(/\?fait=avance$/);
@@ -69,7 +76,7 @@ test("rappels programmés, fin à la date de contrôle, puis le propriétaire r�
 
   // 2. Le programme est planifié dans la plage d'envoi du cabinet.
   await page.goto(dossier);
-  await expect(programme).toContainText("Prévu le");
+  await expect(await openProgramme(page)).toContainText("Prévu le");
   await expect(
     page.getByText(/Fin du suivi automatisé le .*date du contrôle/),
   ).toBeVisible();
@@ -85,6 +92,7 @@ test("rappels programmés, fin à la date de contrôle, puis le propriétaire r�
 
   // 4. Dossier : rappels envoyés, suivi terminé, conversation ouverte.
   await page.goto(dossier);
+  const programme = await openProgramme(page);
   await expect(programme).toContainText("Envoyé le");
   await expect(programme).not.toContainText("Prévu le");
   await expect(page.locator("#conversation")).toContainText(

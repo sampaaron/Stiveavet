@@ -1,13 +1,18 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   acknowledgements,
   alerts,
+  animals,
   attachments,
   consents,
   followupContacts,
+  followupImports,
+  followupTreatments,
+  followups,
   memberships,
   messages,
+  ownerContacts,
   owners,
   triageEvents,
   users,
@@ -23,10 +28,12 @@ import type { TenantTransaction } from "@/server/db/tenant";
 
 export type ConsentStateView = "requested" | "given" | "withdrawn";
 
-/** Contact du suivi, sans numéro de téléphone. */
+/** Contact du suivi, sans numéro de téléphone : seulement ses deux derniers chiffres. */
 export type FollowupContactView = {
   id: string;
   name: string;
+  /** Deux derniers chiffres du numéro WhatsApp, pour reconnaître le contact. */
+  phoneEnding: string | null;
   role: "primary" | "secondary";
   active: boolean;
   language: "fr" | "en";
@@ -72,6 +79,29 @@ export type AlertView = {
   acknowledgedBy: string[];
 };
 
+/** Traitement de la fiche : importé de dr.veto ou ajouté, validé ou en attente. */
+export type TreatmentView = {
+  id: string;
+  source: "drveto" | "vet";
+  name: string;
+  instructions: string;
+  /** Vétérinaire qui l'a validé ; null tant qu'il ne l'est pas (aucun rappel). */
+  validatedBy: string | null;
+};
+
+/** Ce que le dossier montre de l'animal et du résumé importé (accès clinique). */
+export type ClinicalFacts = {
+  animal: {
+    breed: string | null;
+    /** `AAAA-MM-JJ`. */
+    birthDate: string | null;
+    weightGrams: number | null;
+  };
+  treatments: TreatmentView[];
+  /** Résumé importé de dr.veto au lancement ; null si le suivi n'en a pas. */
+  imported: { allergies: string[]; antecedents: string[] } | null;
+};
+
 export type FollowupRecord =
   | { access: "summary"; contacts: FollowupContactView[] }
   | {
@@ -80,6 +110,7 @@ export type FollowupRecord =
       messages: MessageView[];
       triage: TriageEventView[];
       alerts: AlertView[];
+      facts: ClinicalFacts;
     };
 
 async function loadContacts(
@@ -94,9 +125,14 @@ async function loadContacts(
       active: followupContacts.active,
       language: followupContacts.language,
       leftGroupAt: followupContacts.leftGroupAt,
+      phone: ownerContacts.value,
     })
     .from(followupContacts)
     .innerJoin(owners, eq(owners.id, followupContacts.ownerId))
+    .innerJoin(
+      ownerContacts,
+      eq(ownerContacts.id, followupContacts.ownerContactId),
+    )
     .where(eq(followupContacts.followupId, followupId))
     .orderBy(asc(followupContacts.role));
   const history = await tx
@@ -113,6 +149,8 @@ async function loadContacts(
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
+    // Le numéro complet ne quitte jamais cette fonction.
+    phoneEnding: row.phone.replace(/\D/g, "").slice(-2) || null,
     role: row.role,
     active: row.active,
     language: row.language,
@@ -268,6 +306,66 @@ async function loadAlerts(
   }));
 }
 
+async function loadFacts(
+  tx: TenantTransaction,
+  followupId: string,
+): Promise<ClinicalFacts> {
+  const [animal] = await tx
+    .select({
+      breed: animals.breed,
+      birthDate: animals.birthDate,
+      weightGrams: animals.weightGrams,
+    })
+    .from(followups)
+    .innerJoin(animals, eq(animals.id, followups.animalId))
+    .where(eq(followups.id, followupId));
+  const treatments = await tx
+    .select({
+      id: followupTreatments.id,
+      source: followupTreatments.source,
+      name: followupTreatments.name,
+      instructions: followupTreatments.instructions,
+      validatedBy: users.displayName,
+    })
+    .from(followupTreatments)
+    .leftJoin(
+      memberships,
+      eq(memberships.id, followupTreatments.validatedByMembershipId),
+    )
+    .leftJoin(users, eq(users.id, memberships.userId))
+    .where(
+      and(
+        eq(followupTreatments.followupId, followupId),
+        isNull(followupTreatments.removedAt),
+      ),
+    )
+    .orderBy(asc(followupTreatments.createdAt), asc(followupTreatments.id));
+  const [imported] = await tx
+    .select({
+      allergies: followupImports.allergies,
+      antecedents: followupImports.antecedents,
+    })
+    .from(followupImports)
+    .where(eq(followupImports.followupId, followupId));
+  return {
+    animal: {
+      breed: animal?.breed ?? null,
+      birthDate: animal?.birthDate ?? null,
+      weightGrams: animal?.weightGrams ?? null,
+    },
+    treatments: treatments.map((row) => ({
+      id: row.id,
+      source: row.source,
+      name: row.name,
+      instructions: row.instructions,
+      validatedBy: row.validatedBy,
+    })),
+    imported: imported
+      ? { allergies: imported.allergies, antecedents: imported.antecedents }
+      : null,
+  };
+}
+
 export async function loadFollowupRecord(
   tx: TenantTransaction,
   followupId: string,
@@ -281,5 +379,6 @@ export async function loadFollowupRecord(
     messages: await loadMessages(tx, followupId),
     triage: await loadTriage(tx, followupId),
     alerts: await loadAlerts(tx, followupId),
+    facts: await loadFacts(tx, followupId),
   };
 }

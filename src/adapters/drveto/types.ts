@@ -47,6 +47,21 @@ export type DrVetoRecord = {
   treatments: DrVetoTreatment[];
 };
 
+/**
+ * Rendez-vous de l'agenda dr.veto (lecture seule, lot 17) : de quoi l'afficher dans
+ * « Aujourd'hui », jamais de note clinique.
+ */
+export type DrVetoAgendaEntry = {
+  ref: string;
+  startsAt: Date;
+  endsAt: Date;
+  /** Intitulé court de dr.veto : motif et nom de l'animal. */
+  title: string;
+  kind: "consultation" | "surgery" | "control" | "emergency";
+  /** Praticien, tel que nommé dans dr.veto. */
+  practitionerName: string;
+};
+
 export type DrVetoConnector = {
   readonly simulated: boolean;
   connectPractice(practiceCode: string): Promise<{ displayLabel: string }>;
@@ -54,4 +69,6 @@ export type DrVetoConnector = {
   searchAnimals(query: string): Promise<DrVetoAnimalHit[]>;
   /** Résumé utile d'un animal ; null s'il n'existe pas. */
   importRecord(ref: string): Promise<DrVetoRecord | null>;
+  /** Agenda complet du cabinet pour le jour (heure de Paris) qui contient `day`. */
+  agendaOfDay(day: Date): Promise<DrVetoAgendaEntry[]>;
 };
