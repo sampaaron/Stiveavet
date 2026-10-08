@@ -16,7 +16,6 @@ import {
 import { z } from "zod";
 
 import { WhatsAppSendError } from "@/adapters/whatsapp/types";
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
@@ -36,7 +35,6 @@ import {
   acknowledgements,
   alerts,
   animals,
-  auditEvents,
   emergencyContacts,
   emergencyInstructions,
   followupAlertRules,
@@ -51,8 +49,13 @@ import {
   triageEvents,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import {
+  auditFollowup as audit,
+  recordAudit,
+  systemAuthor,
+} from "@/domains/audit/journal";
 
 import { triageReason, triageReasonColumns, triageRuleJoin } from "./reason";
 import type { TriageReason } from "./reason";
@@ -100,7 +103,7 @@ const uuid = z.uuid();
 const alertPayload = z.object({ alertId: z.uuid() });
 const deliveryPayload = z.object({ deliveryId: z.uuid() });
 
-export const ALERT_DELIVERY_JOB = "alert.deliver";
+const ALERT_DELIVERY_JOB = "alert.deliver";
 
 /**
  * Numéro fictif des alertes simulées, quand le vétérinaire n'a pas encore donné le sien :
@@ -275,9 +278,9 @@ export async function triageOwnerMessage(
     .returning({ id: alerts.id });
   if (!alert) throw new Error("Alerte non enregistrée");
   // Traçabilité sans contenu clinique : le niveau et l'identifiant suffisent.
-  await auditSystem(
+  await audit(
     tx,
-    input.organizationId,
+    systemAuthor(input.organizationId),
     "alert.raised",
     input.followupId,
     {
@@ -336,23 +339,6 @@ export async function emergencyGuidance(
     instructions: row?.instructions ?? DEFAULT_INSTRUCTIONS[period],
     contacts,
   };
-}
-
-async function auditSystem(
-  tx: TenantTransaction,
-  organizationId: string,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId,
-    actorMembershipId: null,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
 }
 
 /**
@@ -592,9 +578,9 @@ export function alertHandlers(deps: {
       );
     for (const other of others)
       await notify(tx, alert, other.id, "whatsapp", "escalation");
-    await auditSystem(
+    await audit(
       tx,
-      alert.organizationId,
+      systemAuthor(alert.organizationId),
       "alert.escalated",
       alert.followupId,
       {
@@ -615,29 +601,7 @@ export function alertHandlers(deps: {
 }
 
 export function alertsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
-
-  async function audit(
-    tx: TenantTransaction,
-    actor: Actor,
-    action: string,
-    followupId: string,
-    metadata: AuditMetadata,
-  ) {
-    await tx.insert(auditEvents).values({
-      organizationId: actor.organizationId,
-      actorMembershipId: actor.membershipId,
-      action,
-      targetType: "followup",
-      targetId: followupId,
-      metadata,
-    });
-  }
+  const run = tenantRunner(db);
 
   /** Alerte visible et modifiable par un vétérinaire ayant l'accès clinique au dossier. */
   async function lockAlert(
@@ -816,14 +780,13 @@ export function alertsService(db: Database) {
           .update(memberships)
           .set({ alertPhone: parsed.data })
           .where(eq(memberships.id, actor.membershipId));
-        await tx.insert(auditEvents).values({
-          organizationId: actor.organizationId,
-          actorMembershipId: actor.membershipId,
-          action: "alert_phone.changed",
-          targetType: "membership",
-          targetId: actor.membershipId,
-          metadata: { removed: parsed.data === null },
-        });
+        await recordAudit(
+          tx,
+          actor,
+          "alert_phone.changed",
+          { type: "membership", id: actor.membershipId },
+          { removed: parsed.data === null },
+        );
       });
     },
 

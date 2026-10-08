@@ -14,8 +14,8 @@ import { stepDueAt } from "./plan";
  */
 
 const HOUR = 3_600_000;
-export const CATCH_UP_HOURS = 2;
-export const END_WITHOUT_CONTROL_HOURS = 24;
+const CATCH_UP_HOURS = 2;
+const END_WITHOUT_CONTROL_HOURS = 24;
 
 /** Fin du suivi automatisé : rendez-vous de contrôle, sinon un jour après la dernière étape. */
 export function automaticEndAt(input: {

@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
@@ -13,15 +12,15 @@ import {
   appointmentDurations,
   appointmentRequests,
   appointments,
-  auditEvents,
   availabilityWindows,
   followups,
   memberships,
   protocolVersions,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditFollowup as audit } from "@/domains/audit/journal";
 
 import {
   DEFAULT_APPOINTMENT_MINUTES,
@@ -240,29 +239,7 @@ async function notifyOwner(
 }
 
 export function appointmentsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
-
-  async function audit(
-    tx: TenantTransaction,
-    actor: Actor,
-    action: string,
-    followupId: string,
-    metadata: AuditMetadata = {},
-  ) {
-    await tx.insert(auditEvents).values({
-      organizationId: actor.organizationId,
-      actorMembershipId: actor.membershipId,
-      action,
-      targetType: "followup",
-      targetId: followupId,
-      metadata,
-    });
-  }
+  const run = tenantRunner(db);
 
   /** Rendez-vous proposé par Numa, d'un suivi que la personne peut voir. */
   async function loadPending(

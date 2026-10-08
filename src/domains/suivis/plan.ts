@@ -7,6 +7,8 @@ import {
   stepInput,
 } from "@/domains/protocoles/content";
 
+import { foldText } from "@/domains/commun";
+
 /**
  * Fiche de lancement d'un suivi (cahier des charges §4) : règles pures, sans base de données.
  * Les délais des étapes comptent en heures après l'intervention, comme dans les protocoles.
@@ -26,7 +28,7 @@ const text = (min: number, max: number, label: string) =>
     .min(min, `${label} : ${min} caractère(s) minimum.`)
     .max(max, `${label} : ${max} caractères maximum.`);
 
-export const treatmentInput = z.object({
+const treatmentInput = z.object({
   name: text(1, 120, "Traitement"),
   instructions: text(1, 300, "Posologie"),
 });
@@ -91,12 +93,6 @@ export function firstContactHours(procedureAt: Date, at: Date): number {
 }
 
 /** Minuscules sans accents. */
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-}
 
 export type ProtocolCandidate = {
   versionId: string;
@@ -123,13 +119,13 @@ export function suggestProtocol(
   species: "dog" | "cat",
   candidates: readonly ProtocolCandidate[],
 ): string | null {
-  const words = normalize(procedure)
+  const words = foldText(procedure)
     .split(/[^a-z]+/)
     .filter((word) => word.length >= 5);
   let best: { versionId: string; score: number } | null = null;
   for (const candidate of candidates) {
     if (!fitsSpecies(candidate, species)) continue;
-    const haystack = normalize(`${candidate.name} ${candidate.description}`);
+    const haystack = foldText(`${candidate.name} ${candidate.description}`);
     const matches = words.filter((word) => haystack.includes(word)).length;
     if (matches === 0) continue;
     const score = matches * 2 + (candidate.species === species ? 1 : 0);

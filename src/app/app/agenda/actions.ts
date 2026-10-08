@@ -11,17 +11,12 @@ import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
-import { domainFailure } from "../domain-messages";
+import { domainFailure, invalidRequest } from "../domain-messages";
 
 /**
  * Capture d'agenda et créneaux libres (ADR 0019). Le service vérifie `agenda.capture`, le
  * vétérinaire choisi et le type réel du fichier ; la capture est supprimée dès la lecture.
  */
-
-async function invalid(): Promise<ActionState> {
-  const { t } = await appText();
-  return { error: t.common.invalidRequest };
-}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -63,7 +58,7 @@ export async function removeSlotAction(
   form: FormData,
 ): Promise<ActionState> {
   const slot = z.uuid().safeParse(text(form, "slotId"));
-  if (!slot.success) return invalid();
+  if (!slot.success) return invalidRequest();
   const context = await memberContext();
   try {
     await services.agenda().removeSlot(context, slot.data);
@@ -89,7 +84,7 @@ export async function decideAppointmentAction(
     appointmentId: text(form, "appointmentId"),
     decision: text(form, "decision"),
   });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const context = await memberContext();
   const { appointmentId, decision } = parsed.data;
   try {
@@ -116,7 +111,7 @@ export async function closeCallbackAction(
   form: FormData,
 ): Promise<ActionState> {
   const request = z.uuid().safeParse(text(form, "requestId"));
-  if (!request.success) return invalid();
+  if (!request.success) return invalidRequest();
   const context = await memberContext();
   try {
     await services.appointments().closeCallback(context, request.data);

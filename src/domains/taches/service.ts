@@ -1,11 +1,12 @@
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { recordAudit } from "@/domains/audit/journal";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
-import { auditEvents, scheduledJobs } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
-import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { scheduledJobs } from "@/server/db/schema";
+import { tenantRunner } from "@/server/db/tenant";
+import type { Database } from "@/server/db/tenant";
 
 import { jobErrorCode } from "./kinds";
 import type { JobErrorCode } from "./kinds";
@@ -31,12 +32,7 @@ export type FailedJobView = {
 const idSchema = z.uuid();
 
 export function jobsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   async function changeDeadJob(
     actor: Actor,
@@ -63,14 +59,13 @@ export function jobsService(db: Database) {
         )
         .returning({ id: scheduledJobs.id, kind: scheduledJobs.kind });
       if (!job) throw new DomainError("not_found");
-      await tx.insert(auditEvents).values({
-        organizationId: actor.organizationId,
-        actorMembershipId: actor.membershipId,
-        action: change === "retry" ? "job.retried" : "job.cancelled",
-        targetType: "job",
-        targetId: job.id,
-        metadata: { kind: job.kind },
-      });
+      await recordAudit(
+        tx,
+        actor,
+        change === "retry" ? "job.retried" : "job.cancelled",
+        { type: "job", id: job.id },
+        { kind: job.kind },
+      );
     });
   }
 

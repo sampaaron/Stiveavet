@@ -21,13 +21,7 @@ import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
-import { attempt, domainFailure } from "../domain-messages";
-
-/** Requête altérée (identifiant, choix fermé) : message générique, sans détail. */
-async function invalid(): Promise<ActionState> {
-  const { t } = await appText();
-  return { error: t.common.invalidRequest };
-}
+import { attempt, domainFailure, invalidRequest } from "../domain-messages";
 
 const idInput = z.object({ id: z.uuid() });
 const periodInput = z.object({
@@ -219,7 +213,7 @@ export async function removeContactAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const context = await memberContext();
   return finish(
     await attempt(
@@ -237,7 +231,7 @@ export async function saveAlertSettingsAction(
     escalationDelayMinutes: text(form, "escalationDelayMinutes"),
     photoAnalysisEnabled: form.get("photoAnalysisEnabled") === "on",
   });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const context = await memberContext();
   return finish(
     await attempt(
@@ -283,7 +277,7 @@ export async function removeOnCallAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const context = await memberContext();
   return finish(
     await attempt(
@@ -298,7 +292,7 @@ export async function connectAction(
   form: FormData,
 ): Promise<ActionState> {
   const provider = providerInput.safeParse(text(form, "provider"));
-  if (!provider.success) return invalid();
+  if (!provider.success) return invalidRequest();
   const value = text(form, "value").slice(0, 64);
   if (provider.data === "whatsapp") {
     const phone = contactInput.shape.phone.safeParse(value);
@@ -345,7 +339,7 @@ export async function disconnectAction(
   form: FormData,
 ): Promise<ActionState> {
   const provider = providerInput.safeParse(text(form, "provider"));
-  if (!provider.success) return invalid();
+  if (!provider.success) return invalidRequest();
   const context = await memberContext();
   return finish(
     await attempt(

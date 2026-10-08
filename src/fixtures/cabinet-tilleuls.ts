@@ -17,13 +17,6 @@ export const vets: Vet[] = [
   { id: "vet-benali", name: "Dr Inès Benali", shortName: "Dr Benali" },
 ];
 
-export const currentUser = {
-  vetId: "vet-fontaine",
-  name: "Dr Claire Fontaine",
-  firstName: "Claire",
-  roleLabel: "Vétérinaire administratrice",
-};
-
 export const todayLabel = "Mercredi 7 octobre";
 
 export const followups: Followup[] = [
@@ -532,10 +525,6 @@ export const agendaToday: AgendaEvent[] = [
     fromStivea: false,
   },
 ];
-
-export function findFollowup(id: string): Followup | undefined {
-  return followups.find((followup) => followup.id === id);
-}
 
 export function vetById(id: string): Vet | undefined {
   return vets.find((vet) => vet.id === id);

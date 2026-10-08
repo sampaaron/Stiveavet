@@ -1,3 +1,4 @@
+import { foldText } from "@/domains/commun";
 import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
 
 import type {
@@ -346,13 +347,6 @@ const ANIMALS: readonly FakeAnimal[] = [
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
 
 /** Heure de l'intervention : arrondie au quart d'heure, pour des fiches lisibles. */
 function hoursBefore(now: Date, hours: number): Date {
@@ -438,12 +432,12 @@ export function createFakeDrVeto(
       };
     },
     async searchAnimals(query) {
-      const needle = normalize(query);
+      const needle = foldText(query).trim();
       if (needle.length < 2) return [];
       const now = clock();
       return ANIMALS.filter((entry) =>
         [entry.ref, entry.animal.name, ...entry.owners.map((o) => o.fullName)]
-          .map(normalize)
+          .map((value) => foldText(value).trim())
           .some((value) => value.includes(needle)),
       )
         .slice(0, 10)

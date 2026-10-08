@@ -22,7 +22,7 @@ type ModalProps = {
  * Fenêtre modale accessible fondée sur l'élément natif <dialog> :
  * le reste de la page devient inerte, Échap ferme, le focus revient à l'élément d'origine.
  */
-export function Modal({
+function Modal({
   open,
   onClose,
   title,

@@ -7,7 +7,7 @@ import { z } from "zod";
  * Aucune valeur secrète n'a de défaut dans le code : elles viennent de `.env` en local
  * et du gestionnaire de secrets Scaleway en staging/production.
  */
-export const serverEnvSchema = z
+const serverEnvSchema = z
   .object({
     APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
     APP_URL: z.url().default("http://localhost:3000"),

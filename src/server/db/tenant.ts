@@ -36,3 +36,16 @@ export async function withTenant<T>(
     return run(tx);
   });
 }
+
+/** Transactions au nom d'un membre connecté : cabinet et personne fixés pour la RLS. */
+export function tenantRunner(db: Database) {
+  return <T>(
+    member: { organizationId: string; userId: string },
+    run: (tx: TenantTransaction) => Promise<T>,
+  ) =>
+    withTenant(
+      db,
+      { organizationId: member.organizationId, userId: member.userId },
+      run,
+    );
+}

@@ -50,7 +50,7 @@ export function AssistantAvatar({
   );
 }
 
-export function AiBadge({ assistant }: { assistant: Assistant }) {
+function AiBadge({ assistant }: { assistant: Assistant }) {
   const t = useAppText();
   return (
     <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">

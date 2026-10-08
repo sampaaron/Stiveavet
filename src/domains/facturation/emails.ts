@@ -1,17 +1,10 @@
+import { htmlParagraphs } from "@/adapters/email/html";
 import type { EmailMessage } from "@/adapters/email/types";
 
 /**
  * E-mail de l'offre d'engagement annuel (ADR 0023), envoyé à qui gère la facturation. En
  * français, comme les autres e-mails de l'équipe (ADR 0022) ; aucune donnée clinique.
  */
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
 export function annualOfferEmail(
   to: string,
@@ -48,6 +41,6 @@ export function annualOfferEmail(
         ? "Après votre essai Stivea Vet : engagement annuel ou mensuel ?"
         : "Stivea Vet : dernier rappel pour l'engagement annuel",
     text: lines.join("\n\n"),
-    html: lines.map((line) => `<p>${escapeHtml(line)}</p>`).join(""),
+    html: htmlParagraphs(lines),
   };
 }

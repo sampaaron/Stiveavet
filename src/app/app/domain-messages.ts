@@ -24,3 +24,9 @@ export async function attempt(
     throw error;
   }
 }
+
+/** Saisie refusée par la validation Zod : message générique, sans détail du champ. */
+export async function invalidRequest(): Promise<ActionState> {
+  const { t } = await appText();
+  return { error: t.common.invalidRequest };
+}

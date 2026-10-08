@@ -12,7 +12,6 @@ import {
   DEFAULT_APPOINTMENT_MINUTES,
 } from "@/domains/agenda/rendez-vous";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
@@ -24,7 +23,6 @@ import {
   animalOwners,
   animals,
   appointmentDurations,
-  auditEvents,
   availabilityWindows,
   emergencyContacts,
   emergencyInstructions,
@@ -41,8 +39,12 @@ import {
   users,
   whatsappAccounts,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import {
+  auditOrganization as audit,
+  recordAudit,
+} from "@/domains/audit/journal";
 
 import {
   DEFAULT_APPOINTMENT_WINDOWS,
@@ -110,22 +112,6 @@ const ON_CALL_MAX_DAYS = 14;
 /** `08:00:00` (PostgreSQL) → `08:00`. */
 const hhmm = (value: string) => value.slice(0, 5);
 
-function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  metadata: AuditMetadata = {},
-) {
-  return tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "organization",
-    targetId: actor.organizationId,
-    metadata,
-  });
-}
-
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw new DomainError("invalid_target");
@@ -139,13 +125,10 @@ export function settingsService(deps: {
   payments: PaymentMandateProvider;
 }) {
   const { db } = deps;
+  const inTenant = tenantRunner(db);
   const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) => {
     assertPermission(actor, "organization.settings");
-    return withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+    return inTenant(actor, fn);
   };
 
   async function upsertSettings(
@@ -808,14 +791,13 @@ export function settingsService(deps: {
           protocolVersionId: protocol.versionId,
           isTest: true,
         });
-        await tx.insert(auditEvents).values({
-          organizationId: actor.organizationId,
-          actorMembershipId: actor.membershipId,
-          action: "followup.test_created",
-          targetType: "followup",
-          targetId: followupId,
-          metadata: {},
-        });
+        await recordAudit(
+          tx,
+          actor,
+          "followup.test_created",
+          { type: "followup", id: followupId },
+          {},
+        );
         return followupId;
       });
     },

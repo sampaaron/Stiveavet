@@ -1,3 +1,4 @@
+import { escapeHtml } from "@/adapters/email/html";
 import type { EmailMessage } from "@/adapters/email/types";
 import { TRIAL_MONTHLY_CENTS, TRIAL_MONTHS } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
@@ -154,14 +155,6 @@ function templates(
       ],
     },
   };
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 export function demoEmail(

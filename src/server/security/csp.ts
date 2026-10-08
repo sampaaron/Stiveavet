@@ -5,7 +5,7 @@
  * intégrée de Meta (`metaSignup`, ADR 0024) ; ses domaines ne valent que sur cette page.
  * `'unsafe-eval'` n'est accepté qu'en développement (exigence de React pour ses traces d'erreur).
  */
-export const META_SIGNUP_HOSTS = {
+const META_SIGNUP_HOSTS = {
   script: ["https://connect.facebook.net"],
   frame: [
     "https://www.facebook.com",

@@ -19,7 +19,7 @@ const payload = z.object({ membershipId: z.uuid() });
 
 const LOOKBACK_MS = 24 * 3_600_000;
 
-export function failureEmail(
+function failureEmail(
   to: string,
   details: {
     displayName: string;
