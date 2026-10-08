@@ -30,8 +30,43 @@ export type NumaStepInput = {
   controlAppointmentAt: Date | null;
 };
 
+/** Message vocal du propriétaire (lot 16) : le fichier seul, sans nom ni numéro. */
+export type VoiceTranscriptionInput = {
+  audio: Uint8Array;
+  contentType: string;
+  languageHint: "fr" | "en";
+};
+
+export type VoiceTranscription = { text: string; language: "fr" | "en" };
+
+/**
+ * Analyse photo assistée (lot 16), si le cabinet l'a activée : des observations visibles
+ * sur l'image et des signaux à regarder, jamais un diagnostic ni un conseil de traitement.
+ * Chaque observation repasse par les garde-fous de Stivea Vet avant d'être gardée.
+ */
+export type PhotoObservationInput = {
+  image: Uint8Array;
+  contentType: string;
+  language: "fr" | "en";
+  animalName: string;
+};
+
+/** Capture d'écran d'un agenda (lot 16) : seuls les créneaux libres en sont tirés. */
+export type AgendaCaptureInput = {
+  image: Uint8Array;
+  contentType: string;
+  now: Date;
+};
+
+export type FreeSlot = { startsAt: Date; endsAt: Date };
+
 export type AiGateway = {
   readonly simulated: boolean;
   numaReply(input: NumaReplyInput): Promise<NumaReply>;
   numaStep(input: NumaStepInput): Promise<{ text: string }>;
+  transcribeVoice(input: VoiceTranscriptionInput): Promise<VoiceTranscription>;
+  observePhoto(
+    input: PhotoObservationInput,
+  ): Promise<{ observations: string[] }>;
+  readAgendaCapture(input: AgendaCaptureInput): Promise<{ slots: FreeSlot[] }>;
 };

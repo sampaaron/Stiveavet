@@ -1,6 +1,6 @@
 "use client";
 
-import { FastForward, Send } from "lucide-react";
+import { FastForward, ImagePlus, Mic, Send } from "lucide-react";
 import { useActionState, useId } from "react";
 
 import { Button } from "@/ui/button";
@@ -10,6 +10,8 @@ import { initialActionState } from "../../../action-state";
 import {
   runDueNowAction,
   simulateOwnerAction,
+  simulateOwnerPhotoAction,
+  simulateOwnerVoiceAction,
 } from "../../conversation-actions";
 
 const QUICK_REPLIES = ["OUI", "STOP", "REPRENDRE"] as const;
@@ -92,6 +94,110 @@ export function RunDueNowForm({ followupId }: { followupId: string }) {
         icon={<FastForward aria-hidden="true" className="size-4" />}
       >
         Avancer jusqu&apos;au prochain envoi prévu
+      </Button>
+      <ActionMessage state={state} />
+    </form>
+  );
+}
+
+const FIELD =
+  "min-h-11 min-w-0 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] placeholder:text-ink-muted";
+
+/** Photo envoyée par le propriétaire (fichier de votre appareil, jamais une vraie photo de patient). */
+export function OwnerPhotoForm({
+  followupId,
+  ownerFirstName,
+}: {
+  followupId: string;
+  ownerFirstName: string;
+}) {
+  const [state, action, pending] = useActionState(
+    simulateOwnerPhotoAction,
+    initialActionState,
+  );
+  const id = useId();
+  return (
+    <form action={action} className="grid gap-2">
+      <input type="hidden" name="followupId" value={followupId} />
+      <label htmlFor={`${id}-file`} className="text-sm font-semibold">
+        Photo envoyée par {ownerFirstName}
+      </label>
+      <input
+        id={`${id}-file`}
+        name="photo"
+        type="file"
+        required
+        accept="image/jpeg,image/png,image/webp"
+        className={`${FIELD} w-full file:mr-3 file:rounded-full file:border-0 file:bg-brand-soft file:px-3 file:py-1 file:text-sm file:font-semibold file:text-brand-ink`}
+      />
+      <label htmlFor={`${id}-caption`} className="text-sm font-semibold">
+        Légende (facultative)
+      </label>
+      <input
+        id={`${id}-caption`}
+        name="caption"
+        type="text"
+        maxLength={1024}
+        className={FIELD}
+      />
+      <p className="text-xs text-ink-muted">
+        JPEG, PNG ou WebP, 5 Mo au plus. Utilisez une image sans donnée réelle.
+      </p>
+      <Button
+        type="submit"
+        size="sm"
+        variant="secondary"
+        disabled={pending}
+        aria-busy={pending}
+        icon={<ImagePlus aria-hidden="true" className="size-4" />}
+      >
+        Envoyer la photo
+      </Button>
+      <ActionMessage state={state} />
+    </form>
+  );
+}
+
+/** Message vocal simulé : le texte « prononcé » devient un fichier son. */
+export function OwnerVoiceForm({
+  followupId,
+  ownerFirstName,
+}: {
+  followupId: string;
+  ownerFirstName: string;
+}) {
+  const [state, action, pending] = useActionState(
+    simulateOwnerVoiceAction,
+    initialActionState,
+  );
+  const id = useId();
+  return (
+    <form action={action} className="grid gap-2">
+      <input type="hidden" name="followupId" value={followupId} />
+      <label htmlFor={id} className="text-sm font-semibold">
+        Ce que dit le message vocal de {ownerFirstName}
+      </label>
+      <textarea
+        id={id}
+        name="spoken"
+        rows={2}
+        required
+        maxLength={1000}
+        className={`${FIELD} resize-y`}
+        placeholder="Par exemple : elle mange bien depuis ce matin"
+      />
+      <p className="text-xs text-ink-muted">
+        Un vrai fichier son est créé ; la transcription simulée relit ce texte.
+      </p>
+      <Button
+        type="submit"
+        size="sm"
+        variant="secondary"
+        disabled={pending}
+        aria-busy={pending}
+        icon={<Mic aria-hidden="true" className="size-4" />}
+      >
+        Envoyer le vocal
       </Button>
       <ActionMessage state={state} />
     </form>

@@ -92,6 +92,7 @@ export default async function FollowupPage({
     followup.status !== "draft" ? (
       <LiveConversation
         view={await services.conversations().view(context, followup.id)}
+        links={await services.media().readLinks(context, followup.id)}
         simulatorHref={
           serverEnv().APP_ENV === "local" && !followup.isTest
             ? `/app/suivis/${followup.id}/simulateur`

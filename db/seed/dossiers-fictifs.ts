@@ -167,7 +167,8 @@ export async function insertFollowupRecord(
       .returning({ id: messages.id });
     if (!row) throw new Error("Insertion du message impossible");
 
-    if (message.attachment) {
+    // Fichiers fictifs : seule la trace est en base, aucun objet dans le stockage.
+    if (message.attachment && message.attachment.kind !== "deleted") {
       const voice = message.attachment.kind === "voice";
       const storageKey = `fictif/${organizationId}/${followupId}/${message.id}.${voice ? "ogg" : "jpg"}`;
       const [file] = await tx
@@ -186,7 +187,7 @@ export async function insertFollowupRecord(
         })
         .returning({ id: attachments.id });
       if (!file) throw new Error("Insertion de la pièce jointe impossible");
-      if (message.attachment.kind === "voice")
+      if (message.attachment.kind === "voice" && message.attachment.transcript)
         await tx.insert(voiceTranscripts).values({
           organizationId,
           followupId,

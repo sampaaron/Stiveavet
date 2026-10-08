@@ -10,6 +10,9 @@ export const JOB_KIND_LABELS: Record<string, string> = {
   "followup.end": "Fin du suivi automatisé",
   "alert.escalate": "Escalade d'une alerte urgente",
   "alert.notify": "Alerte au vétérinaire",
+  "media.transcribe": "Transcription d'un message vocal",
+  "media.observe": "Analyse d'une photo",
+  "attachment.purge": "Suppression d'un fichier",
 };
 
 export function jobKindLabel(kind: string): string {

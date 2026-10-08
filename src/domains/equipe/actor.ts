@@ -34,7 +34,9 @@ export class DomainError extends Error {
       | "launch_incomplete"
       | "invalid_transition"
       | "past_step"
-      | "consent_missing",
+      | "consent_missing"
+      | "invalid_file"
+      | "capture_unreadable",
   ) {
     super(code);
   }

@@ -58,6 +58,7 @@ describe("textes fixes de Numa", () => {
       "resumed",
       "closing",
       "check_in",
+      "photo_received",
     ];
     for (const language of ["fr", "en"] as const)
       for (const step of steps)

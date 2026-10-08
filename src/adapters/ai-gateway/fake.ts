@@ -1,8 +1,16 @@
+import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
+
+import { readSimulatedVoiceText } from "./simulated-voice";
 import type {
+  AgendaCaptureInput,
   AiGateway,
+  FreeSlot,
   NumaReply,
   NumaReplyInput,
   NumaStepInput,
+  PhotoObservationInput,
+  VoiceTranscription,
+  VoiceTranscriptionInput,
 } from "./types";
 
 /**
@@ -107,6 +115,72 @@ export function simulatedNumaStep(input: NumaStepInput): { text: string } {
   return { text: texts[input.kind] };
 }
 
+/**
+ * Transcription simulée : le texte « prononcé » d'un vocal du simulateur ; pour tout autre
+ * fichier, une mention qui invite à écouter le message (aucune transcription inventée).
+ */
+export function simulatedTranscription(
+  input: VoiceTranscriptionInput,
+): VoiceTranscription {
+  const spoken = readSimulatedVoiceText(input.audio);
+  if (spoken) return { text: spoken, language: input.languageHint };
+  return {
+    text:
+      input.languageHint === "en"
+        ? "(Simulated transcription unavailable for this file: please listen to the message.)"
+        : "(Transcription simulée indisponible pour ce fichier : écoutez le message.)",
+    language: input.languageHint,
+  };
+}
+
+/** Analyse photo simulée : aucune image n'est examinée, et elle le dit. */
+export function simulatedPhotoObservations(input: PhotoObservationInput): {
+  observations: string[];
+} {
+  return {
+    observations:
+      input.language === "en"
+        ? [
+            "Simulated analysis: no image is actually examined in this version.",
+            `A photo of ${input.animalName} was received; only the vet can interpret it.`,
+          ]
+        : [
+            "Analyse simulée : aucune image n'est réellement examinée dans cette version.",
+            `Une photo de ${input.animalName} a été reçue ; seul le vétérinaire peut l'interpréter.`,
+          ],
+  };
+}
+
+const CAPTURE_TIMES = ["09:30", "11:00", "14:30", "16:00"] as const;
+const CAPTURE_SLOT_MINUTES = 30;
+const pad = (value: number) => String(value).padStart(2, "0");
+
+/**
+ * Lecture simulée d'une capture d'agenda : quatre créneaux libres de 30 minutes sur chacun
+ * des deux prochains jours ouvrés (heure de Paris). Une vraie lecture les tirera de l'image.
+ */
+export function simulatedAgendaReading(input: AgendaCaptureInput): {
+  slots: FreeSlot[];
+} {
+  const today = Math.floor(parisWallMinutes(input.now) / 1440);
+  const slots: FreeSlot[] = [];
+  for (let offset = 1; slots.length < 8 && offset <= 7; offset += 1) {
+    const day = new Date((today + offset) * 86_400_000);
+    const weekday = day.getUTCDay();
+    if (weekday === 0 || weekday === 6) continue;
+    const date = `${day.getUTCFullYear()}-${pad(day.getUTCMonth() + 1)}-${pad(day.getUTCDate())}`;
+    for (const time of CAPTURE_TIMES) {
+      const startsAt = parisLocalToDate(`${date}T${time}`);
+      if (!startsAt) continue;
+      slots.push({
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + CAPTURE_SLOT_MINUTES * 60_000),
+      });
+    }
+  }
+  return { slots };
+}
+
 export const fakeAiGateway: AiGateway = {
   simulated: true,
   async numaReply(input) {
@@ -114,5 +188,14 @@ export const fakeAiGateway: AiGateway = {
   },
   async numaStep(input) {
     return simulatedNumaStep(input);
+  },
+  async transcribeVoice(input) {
+    return simulatedTranscription(input);
+  },
+  async observePhoto(input) {
+    return simulatedPhotoObservations(input);
+  },
+  async readAgendaCapture(input) {
+    return simulatedAgendaReading(input);
   },
 };

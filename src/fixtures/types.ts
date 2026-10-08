@@ -19,9 +19,20 @@ export type OwnerContact = {
 
 export type MessageAuthor = "numa" | "owner" | "vet" | "system";
 
+/**
+ * Pièce jointe affichée dans le fil. Données fictives (phase 1) : sans `src`. Données réelles
+ * (lot 16) : `src` est un lien de lecture signé, de deux minutes, propre à la personne.
+ */
 export type Attachment =
-  | { kind: "photo"; label: string }
-  | { kind: "voice"; durationLabel: string; transcript: string };
+  | { kind: "photo"; label: string; src?: string; observations?: string[] }
+  | {
+      kind: "voice";
+      durationLabel: string;
+      /** Null tant que la transcription n'est pas faite. */
+      transcript: string | null;
+      src?: string;
+    }
+  | { kind: "deleted"; label: string };
 
 export type Message = {
   id: string;

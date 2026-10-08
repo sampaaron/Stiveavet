@@ -21,6 +21,7 @@ Les droits sont des permissions précises, attribuées à chaque membre. « oui 
 | Répondre aux propriétaires (`owner_messages.reply`)                                           | oui                        | oui          | sur décision          |
 | Confirmer manuellement un rendez-vous (`appointments.confirm`)                                | oui                        | oui          | sur décision          |
 | Consulter l'agenda (`agenda.read`)                                                            | oui                        | oui          | oui                   |
+| Envoyer une capture d'agenda (créneaux libres) (`agenda.capture`)                             | oui                        | oui          | sur décision          |
 | Utiliser Stive, l'assistant IA interne (`stive.use`)                                          | oui                        | oui          | sur décision          |
 
 ## Accès à un dossier (droits par défaut)

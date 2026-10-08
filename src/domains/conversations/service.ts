@@ -27,6 +27,7 @@ import { emit, enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
 import {
   animals,
+  attachments,
   auditEvents,
   consents,
   conversationThreads,
@@ -38,9 +39,11 @@ import {
   organizations,
   ownerContacts,
   owners,
+  photoObservations,
   scheduledJobs,
   triageEvents,
   users,
+  voiceTranscripts,
 } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
@@ -82,6 +85,20 @@ export type ConversationMessage = {
   delivery: "queued" | "sent" | "delivered" | "read" | "failed" | null;
   /** Niveau du triage d'un message du propriétaire, s'il a été évalué. */
   triage: TriageLevel | null;
+  /** Photo ou message vocal joint (lot 16) ; le fichier se lit par un lien signé. */
+  attachment: MessageAttachment | null;
+};
+
+export type MessageAttachment = {
+  id: string;
+  kind: "photo" | "voice";
+  durationMs: number | null;
+  /** Fichier supprimé (conservation échue) : seule la trace reste. */
+  deleted: boolean;
+  /** Transcription simulée d'un vocal, quand elle est faite. */
+  transcript: string | null;
+  /** Analyse photo (si activée) : observations seulement, jamais de diagnostic. */
+  observations: string[];
 };
 
 export type ConversationView = {
@@ -133,6 +150,7 @@ const jobPayload = z.discriminatedUnion("step", [
       "reply",
       "urgent",
       "deliver",
+      "photo_received",
     ]),
     messageId: z.uuid(),
   }),
@@ -238,6 +256,17 @@ async function latestConsent(
     .orderBy(desc(consents.recordedAt))
     .limit(1);
   return row ?? null;
+}
+
+/** Accord en cours du contact principal (lot 16 : analyse photo seulement après l'accord). */
+export async function currentConsentState(
+  tx: TenantTransaction,
+  followupId: string,
+): Promise<ConsentState | null> {
+  const ctx = await loadContext(tx, followupId);
+  return ctx.contact
+    ? ((await latestConsent(tx, ctx.contact.id))?.state ?? null)
+    : null;
 }
 
 /**
@@ -429,7 +458,15 @@ export function conversationHandlers(deps: {
       .where(eq(messages.id, messageId));
     if (!message || message.author !== "owner")
       throw new JobError("target_missing");
-    return message;
+    if (message.body.length > 0) return message;
+    // Message vocal (lot 16) : Numa répond à sa transcription.
+    const [transcript] = await tx
+      .select({ text: voiceTranscripts.text })
+      .from(voiceTranscripts)
+      .innerJoin(attachments, eq(attachments.id, voiceTranscripts.attachmentId))
+      .where(eq(attachments.messageId, message.id))
+      .limit(1);
+    return transcript ? { ...message, body: transcript.text } : message;
   }
 
   const handler: JobHandler = async ({ tx, job }) => {
@@ -546,11 +583,19 @@ export function conversationHandlers(deps: {
       return;
     }
 
-    if (payload.step === "reply") {
+    if (payload.step === "reply" || payload.step === "photo_received") {
       const consent = await latestConsent(tx, contact.id);
       // Reprise en main, pause, arrêt ou accord retiré depuis l'arrivée du message.
       if (consent?.state !== "given" || !(await numaMayReply(tx, ctx))) return;
-      await reply(tx, ctx, contact, source);
+      if (payload.step === "reply") await reply(tx, ctx, contact, source);
+      else
+        await sendNuma(
+          tx,
+          ctx,
+          contact,
+          key,
+          fixedMessage("photo_received", wordingOf(ctx, contact)),
+        );
       return;
     }
 
@@ -677,17 +722,17 @@ export function conversationHandlers(deps: {
 }
 
 /**
- * Message du propriétaire, reçu par WhatsApp (simulé en phase 2). Il est toujours conservé ;
- * ce qu'il déclenche dépend de l'accord en cours, du triage et de l'état du suivi.
+ * Message du propriétaire, reçu par WhatsApp (simulé en phase 2) : toujours conservé, avec
+ * ou sans pièce jointe. Ce qu'il déclenche est décidé par `processInbound`.
  */
-async function receiveInTx(
+export async function recordInbound(
   tx: TenantTransaction,
   followupId: string,
   body: string,
 ): Promise<{
   messageId: string;
-  outcome: InboundOutcome;
-  triage: TriageLevel;
+  organizationId: string;
+  language: "fr" | "en";
 }> {
   const ctx = await loadContext(tx, followupId, true);
   if (ctx.status === "draft" || ctx.isTest)
@@ -709,12 +754,37 @@ async function receiveInTx(
     })
     .returning({ id: messages.id });
   if (!message) throw new Error("Message non enregistré");
-  const messageId = message.id;
+  await emit(tx, {
+    organizationId: ctx.organizationId,
+    topic: "message.received",
+    aggregateType: "message",
+    aggregateId: message.id,
+  });
+  return {
+    messageId: message.id,
+    organizationId: ctx.organizationId,
+    language: contact.language,
+  };
+}
 
-  const keyword = ownerKeyword(body);
+/**
+ * Ce que déclenche le contenu d'un message du propriétaire : son texte, la légende d'une
+ * photo ou la transcription d'un vocal (lot 16). L'accord en cours, le triage et l'état du
+ * suivi décident ; l'appelant tient déjà le verrou du suivi.
+ */
+export async function processInbound(
+  tx: TenantTransaction,
+  followupId: string,
+  messageId: string,
+  text: string,
+  options: { photo?: boolean } = {},
+): Promise<{ outcome: InboundOutcome; triage: TriageLevel }> {
+  const ctx = await loadContext(tx, followupId, true);
+  const contact = ctx.contact;
+  if (!contact) throw new DomainError("not_found");
+  const keyword = ownerKeyword(text);
   const consent = await latestConsent(tx, contact.id);
   let outcome: InboundOutcome = "stored";
-
   let triage: TriageLevel = "normal";
 
   if (keyword === "stop" && consent?.state !== "withdrawn") {
@@ -744,7 +814,7 @@ async function receiveInTx(
       followupId,
       responsibleMembershipId: ctx.responsibleMembershipId,
       messageId,
-      body,
+      body: text,
       // Le propriétaire réécrit après la fin du suivi automatisé : le vétérinaire est informé.
       afterAutomaticEnd: mayReply && ctx.status === "ended",
     }));
@@ -764,19 +834,81 @@ async function receiveInTx(
       );
       outcome = "consent_reminder";
     } else if (mayReply) {
-      await enqueueMessageJob(tx, ctx, "reply", messageId);
+      // Une photo sans légende : accusé de réception fixe, sans passer par l'IA.
+      await enqueueMessageJob(
+        tx,
+        ctx,
+        options.photo && text.length === 0 ? "photo_received" : "reply",
+        messageId,
+      );
       outcome = "reply";
     }
     // Sinon (repris en main, en pause, arrêté, accord retiré) : conservé pour l'équipe.
   }
+  return { outcome, triage };
+}
 
-  await emit(tx, {
-    organizationId: ctx.organizationId,
-    topic: "message.received",
-    aggregateType: "message",
-    aggregateId: messageId,
-  });
-  return { messageId, outcome, triage };
+async function receiveInTx(
+  tx: TenantTransaction,
+  followupId: string,
+  body: string,
+): Promise<{
+  messageId: string;
+  outcome: InboundOutcome;
+  triage: TriageLevel;
+}> {
+  const { messageId } = await recordInbound(tx, followupId, body);
+  return {
+    messageId,
+    ...(await processInbound(tx, followupId, messageId, body)),
+  };
+}
+
+/** Pièces jointes des messages affichés, avec transcription et observations. */
+async function attachmentsOf(
+  tx: TenantTransaction,
+  messageIds: string[],
+): Promise<Map<string, MessageAttachment>> {
+  const byMessage = new Map<string, MessageAttachment>();
+  if (messageIds.length === 0) return byMessage;
+  const rows = await tx
+    .select({
+      id: attachments.id,
+      messageId: attachments.messageId,
+      kind: attachments.kind,
+      durationMs: attachments.durationMs,
+      deletedAt: attachments.deletedAt,
+      transcript: voiceTranscripts.text,
+      observations: photoObservations.observations,
+    })
+    .from(attachments)
+    .leftJoin(
+      voiceTranscripts,
+      eq(voiceTranscripts.attachmentId, attachments.id),
+    )
+    .leftJoin(
+      photoObservations,
+      eq(photoObservations.attachmentId, attachments.id),
+    )
+    .where(
+      and(
+        inArray(attachments.messageId, messageIds),
+        inArray(attachments.kind, ["photo", "voice"]),
+      ),
+    );
+  for (const row of rows) {
+    if (!row.messageId || (row.kind !== "photo" && row.kind !== "voice"))
+      continue;
+    byMessage.set(row.messageId, {
+      id: row.id,
+      kind: row.kind,
+      durationMs: row.durationMs,
+      deleted: row.deletedAt !== null,
+      transcript: row.transcript,
+      observations: row.observations ? row.observations.split("\n") : [],
+    });
+  }
+  return byMessage;
 }
 
 export function conversationsService(db: Database) {
@@ -841,6 +973,10 @@ export function conversationsService(db: Database) {
           .where(eq(messages.followupId, followupId))
           .orderBy(desc(messages.occurredAt), desc(messages.id))
           .limit(MAX_VIEW_MESSAGES);
+        const media = await attachmentsOf(
+          tx,
+          rows.map((row) => row.id),
+        );
         return {
           followupId,
           status: followup.status,
@@ -853,7 +989,9 @@ export function conversationsService(db: Database) {
           endedAutomatically:
             followup.status === "ended" &&
             (await lastStatusReason(tx, followupId)) === AUTOMATIC_END_REASON,
-          messages: rows.reverse(),
+          messages: rows
+            .reverse()
+            .map((row) => ({ ...row, attachment: media.get(row.id) ?? null })),
           rights: {
             canWrite: canWriteToOwner(actor, followup.access),
             canResume: canResumeNuma(actor, followup.access),

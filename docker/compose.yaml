@@ -18,6 +18,10 @@ services:
       DATABASE_URL: postgres://stivea_app:${STIVEA_APP_PASSWORD:?Renseigner STIVEA_APP_PASSWORD dans .env}@db:5432/stivea
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
+      # Stockage objet local (photos, vocaux, captures), partagé avec le worker (ADR 0019).
+      OBJECT_STORAGE_DIR: /data/objets
+    volumes:
+      - objets:/data/objets
     depends_on:
       db-roles:
         condition: service_completed_successfully
@@ -41,6 +45,9 @@ services:
     environment:
       APP_ENV: local
       DATABASE_URL: postgres://stivea_app:${STIVEA_APP_PASSWORD:?Renseigner STIVEA_APP_PASSWORD dans .env}@db:5432/stivea
+      OBJECT_STORAGE_DIR: /data/objets
+    volumes:
+      - objets:/data/objets
     depends_on:
       db-roles:
         condition: service_completed_successfully
@@ -99,3 +106,4 @@ services:
 
 volumes:
   db-data:
+  objets:

@@ -1,4 +1,4 @@
-import { ArrowLeft, FlaskConical } from "lucide-react";
+import { ArrowLeft, FlaskConical, Mic } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +8,8 @@ import type {
   ConversationView,
 } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/equipe/actor";
+import type { SignedLink } from "@/domains/fichiers/liens";
+import { durationLabel } from "@/domains/fichiers/media";
 import { memberContext } from "@/server/authz";
 import type { MemberContext } from "@/server/authz";
 import { serverEnv } from "@/server/env";
@@ -16,13 +18,20 @@ import { AlertBanner } from "@/ui/alert-banner";
 import { cn } from "@/ui/cn";
 import { formatDateTime } from "@/ui/format";
 
-import { OwnerSimulatorForm, RunDueNowForm } from "./simulator-forms";
+import {
+  OwnerPhotoForm,
+  OwnerSimulatorForm,
+  OwnerVoiceForm,
+  RunDueNowForm,
+} from "./simulator-forms";
 
 export const metadata: Metadata = { title: "Simulateur du propriétaire" };
 
 const DONE: Record<string, string> = {
   envoye: "Message du propriétaire reçu par Stivea Vet.",
   avance: "Prochain envoi prévu exécuté.",
+  photo: "Photo du propriétaire reçue par Stivea Vet.",
+  vocal: "Message vocal du propriétaire reçu et transcrit (simulation).",
 };
 
 async function loadView(
@@ -50,6 +59,7 @@ export default async function OwnerSimulatorPage({
   const { id } = await params;
   const view = await loadView(context, id);
   if (view.status === "draft" || view.isTest) notFound();
+  const links = await services.media().readLinks(context, id);
   const { fait } = await searchParams;
   const done = typeof fait === "string" ? DONE[fait] : undefined;
   const ownerFirstName = view.ownerFirstName ?? "Propriétaire";
@@ -110,7 +120,7 @@ export default async function OwnerSimulatorPage({
             {visible.length ? (
               visible.map((message) => (
                 <li key={message.id}>
-                  <PhoneBubble message={message} />
+                  <PhoneBubble message={message} links={links} />
                 </li>
               ))
             ) : (
@@ -136,13 +146,32 @@ export default async function OwnerSimulatorPage({
             STOP pour le retirer, REPRENDRE pour le redonner.
           </AlertBanner>
           <RunDueNowForm followupId={view.followupId} />
+          <section
+            aria-label="Photo ou message vocal"
+            className="grid gap-5 rounded-[var(--radius-card)] border border-line bg-surface p-4"
+          >
+            <OwnerPhotoForm
+              followupId={view.followupId}
+              ownerFirstName={ownerFirstName}
+            />
+            <OwnerVoiceForm
+              followupId={view.followupId}
+              ownerFirstName={ownerFirstName}
+            />
+          </section>
         </div>
       </div>
     </>
   );
 }
 
-function PhoneBubble({ message }: { message: ConversationMessage }) {
+function PhoneBubble({
+  message,
+  links,
+}: {
+  message: ConversationMessage;
+  links: Record<string, SignedLink>;
+}) {
   const mine = message.author === "owner";
   return (
     <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
@@ -159,7 +188,25 @@ function PhoneBubble({ message }: { message: ConversationMessage }) {
               : (message.authorName ?? "Cabinet")}
           </p>
         )}
-        <p className="whitespace-pre-line">{message.body}</p>
+        {message.attachment?.kind === "photo" &&
+        links[message.attachment.id] ? (
+          // Lien signé de deux minutes, servi par l'application.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={links[message.attachment.id]?.url}
+            alt="Photo envoyée"
+            className="mb-1 max-h-56 w-auto max-w-full rounded-xl"
+          />
+        ) : null}
+        {message.attachment?.kind === "voice" ? (
+          <p className="flex items-center gap-2 font-medium">
+            <Mic aria-hidden="true" className="size-4" />
+            Message vocal · {durationLabel(message.attachment.durationMs)}
+          </p>
+        ) : null}
+        {message.body ? (
+          <p className="whitespace-pre-line">{message.body}</p>
+        ) : null}
         <p className="mt-1 text-right text-xs text-ink-muted">
           {formatDateTime(message.occurredAt)}
         </p>
