@@ -8,9 +8,6 @@ import type { ProtocolContent } from "./content";
  */
 export type LibraryProtocol = ProtocolContent & { key: string };
 
-export const LIBRARY_NOTICE =
-  "Contenu fictif de démonstration, à valider par un vétérinaire avant tout usage.";
-
 export const PROTOCOL_LIBRARY: readonly LibraryProtocol[] = [
   {
     key: "sterilisation-chatte",

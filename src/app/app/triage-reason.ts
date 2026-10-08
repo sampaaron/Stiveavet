@@ -15,7 +15,10 @@ export function triageReasonText(
     case null:
       return reason.text;
     case "rule":
-      return reason.rule ? labels.rule(reason.rule) : reason.text;
+      // Sans lien vers la fiche (lignes reprises), le signe cité suit le préfixe d'origine.
+      return labels.rule(
+        reason.rule ?? reason.text.replace(/^Signe d'alerte du suivi : /, ""),
+      );
     default:
       return labels[reason.code];
   }

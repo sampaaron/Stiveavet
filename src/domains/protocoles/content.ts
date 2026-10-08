@@ -18,19 +18,6 @@ export const STEP_KINDS = [
 ] as const;
 export const ALERT_LEVELS = ["watch", "urgent"] as const;
 
-/**
- * Libellés français historiques, encore lus par un écran des suivis pendant le lot 19 ; les
- * écrans des protocoles affichent `labels.stepKinds` dans la langue de la personne.
- * @deprecated Utiliser le dictionnaire de l'espace cabinet (ADR 0022).
- */
-export const STEP_KIND_LABELS: Record<(typeof STEP_KINDS)[number], string> = {
-  message: "Message",
-  question: "Question",
-  photo_request: "Demande de photo",
-  reminder: "Rappel",
-  control: "Rendez-vous de contrôle",
-};
-
 export const MAX_STEPS = 30;
 export const MAX_ALERTS = 20;
 

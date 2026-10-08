@@ -36,6 +36,7 @@ export default function DesignSystemPage() {
         roleLabel: "Vétérinaire administratrice",
       }}
       permissions={PERMISSION_KEYS}
+      locale="fr"
     >
       <PageHeader
         title="Design system"

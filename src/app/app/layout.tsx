@@ -42,31 +42,31 @@ export default async function CabinetLayout({
       locale={locale}
       accountActions={
         <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <form action={lockAction} className="flex-1">
-            <Button
-              type="submit"
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              icon={<LockKeyhole aria-hidden="true" className="size-3.5" />}
-            >
-              {t.shell.lock}
-            </Button>
-          </form>
-          <form action={logoutAction} className="flex-1">
-            <Button
-              type="submit"
-              variant="quiet"
-              size="sm"
-              className="w-full"
-              icon={<LogOut aria-hidden="true" className="size-3.5" />}
-            >
-              {t.shell.logout}
-            </Button>
-          </form>
-        </div>
-        <LanguageSwitch />
+          <div className="flex gap-2">
+            <form action={lockAction} className="flex-1">
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                icon={<LockKeyhole aria-hidden="true" className="size-3.5" />}
+              >
+                {t.shell.lock}
+              </Button>
+            </form>
+            <form action={logoutAction} className="flex-1">
+              <Button
+                type="submit"
+                variant="quiet"
+                size="sm"
+                className="w-full"
+                icon={<LogOut aria-hidden="true" className="size-3.5" />}
+              >
+                {t.shell.logout}
+              </Button>
+            </form>
+          </div>
+          <LanguageSwitch />
         </div>
       }
     >

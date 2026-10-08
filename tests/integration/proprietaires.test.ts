@@ -352,8 +352,7 @@ describe("STOP dans le groupe", () => {
     expect(current.group).toBe(true);
     expect(current.recipients).toEqual(["Antoine"]);
     expect(
-      current.messages.findLast((message) => message.author === "system")
-        ?.note,
+      current.messages.findLast((message) => message.author === "system")?.note,
     ).toEqual({ code: "left_group", names: ["Chloé"] });
     expect(current.contacts.find((c) => c.role === "secondary")).toMatchObject({
       leftGroup: true,
@@ -387,8 +386,7 @@ describe("STOP dans le groupe", () => {
     expect(current.recipients).toBeNull();
     expect(current.group).toBe(false);
     expect(
-      current.messages.findLast((message) => message.author === "system")
-        ?.note,
+      current.messages.findLast((message) => message.author === "system")?.note,
     ).toEqual({ code: "group_stopped", names: ["Antoine"] });
     const { rows } = await admin.query(
       `SELECT state, scope FROM consents WHERE followup_id = $1

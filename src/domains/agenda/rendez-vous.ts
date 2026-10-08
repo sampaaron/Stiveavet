@@ -19,13 +19,6 @@ export const APPOINTMENT_KINDS: readonly AppointmentKind[] = [
   "other",
 ];
 
-export const APPOINTMENT_KIND_LABELS: Record<AppointmentKind, string> = {
-  post_op_control: "Contrôle post-opératoire",
-  emergency: "Urgence",
-  treatment_followup: "Suivi de traitement",
-  other: "Autre rendez-vous",
-};
-
 /** Durées proposées tant que le cabinet ne les a pas réglées. */
 export const DEFAULT_APPOINTMENT_MINUTES: Record<AppointmentKind, number> = {
   post_op_control: 20,

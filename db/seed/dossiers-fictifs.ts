@@ -192,14 +192,23 @@ export async function insertFollowupRecord(
         .from(alertRules)
         .where(eq(alertRules.protocolVersionId, seeded.protocolVersionId))
     : [];
+  // Motif et code du vrai moteur de triage ; à défaut, le motif générique du niveau voulu.
   const triageReason = (text: string, level: Triage) => {
     const assessed = assessOwnerMessage(text, rules);
-    if (assessed.level === level) return assessed.reason;
+    if (assessed.level === level)
+      return { reason: assessed.reason, reasonCode: assessed.code };
     return level === "normal"
-      ? "Aucun signe d'alerte."
+      ? { reason: "Aucun signe d'alerte.", reasonCode: "none" as const }
       : level === "urgent"
-        ? "Signal d'urgence reconnu dans le message du propriétaire."
-        : "Inquiétude ou signe à vérifier, sans signe d'alerte reconnu : escaladé par prudence.";
+        ? {
+            reason: "Signal d'urgence reconnu dans le message du propriétaire.",
+            reasonCode: "red_flag" as const,
+          }
+        : {
+            reason:
+              "Inquiétude ou signe à vérifier, sans signe d'alerte reconnu : escaladé par prudence.",
+            reasonCode: "concern" as const,
+          };
   };
 
   const times = conversationTimes(data.messages, now);
@@ -284,7 +293,7 @@ export async function insertFollowupRecord(
           messageId: row.id,
           level: message.triage,
           source: "rule",
-          reason: triageReason(
+          ...triageReason(
             [
               message.text,
               message.attachment?.kind === "voice"

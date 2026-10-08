@@ -80,8 +80,7 @@ async function actor(membershipId: string): Promise<Actor> {
     [membershipId],
   );
   const row = rows[0] as
-    | { user_id: string; role: Actor["role"]; permissions: string[] }
-    | undefined;
+    { user_id: string; role: Actor["role"]; permissions: string[] } | undefined;
   if (!row) throw new Error("membre inconnu");
   return {
     organizationId: org,
@@ -107,8 +106,7 @@ async function sqlState(promise: Promise<unknown>): Promise<string | null> {
     await promise;
     return null;
   } catch (error) {
-    const cause = (error as { cause?: { code?: string }; code?: string })
-      .cause;
+    const cause = (error as { cause?: { code?: string }; code?: string }).cause;
     return cause?.code ?? (error as { code?: string }).code ?? "inconnu";
   }
 }

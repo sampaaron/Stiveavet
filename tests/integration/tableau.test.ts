@@ -94,7 +94,11 @@ describe("tableau de bord « Aujourd'hui »", () => {
     expect(first?.id).toBe(caramel);
     expect(first?.summary).toMatchObject({
       kind: "alert",
-      reason: "Signal d'urgence reconnu dans le message du propriétaire.",
+      reason: {
+        code: "red_flag",
+        text: "Signal d'urgence reconnu dans le message du propriétaire.",
+        rule: null,
+      },
       owner: {
         text: "Elle se lèche beaucoup et le pansement est rouge, je suis inquiet.",
         media: "voice",
@@ -216,7 +220,11 @@ describe("synthèse pré-consultation", () => {
     expect(synthesis?.evolution).toMatch(/^Jour 1 du suivi \(Ovariectomie\)\./);
     expect(synthesis?.alerts[0]).toMatchObject({
       level: "urgent",
-      reason: "Signal d'urgence reconnu dans le message du propriétaire.",
+      reason: {
+        code: "red_flag",
+        text: "Signal d'urgence reconnu dans le message du propriétaire.",
+        rule: null,
+      },
     });
     expect(synthesis?.withheld).toBe(0);
     expect(synthesis?.simulated).toBe(true);
