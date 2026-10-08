@@ -5,11 +5,20 @@ import { UI_LOCALE_COOKIE } from "@/i18n/cookie";
 import { requestLocale } from "@/i18n/routes";
 import { buildContentSecurityPolicy, createNonce } from "@/server/security/csp";
 
+/** Pages où le numéro WhatsApp se connecte (réglages et installation guidée). */
+const META_SIGNUP_PAGES = /^\/app\/(reglages|demarrage)\/?$/;
+
 export function proxy(request: NextRequest) {
   const nonce = createNonce();
   const csp = buildContentSecurityPolicy(
     nonce,
     process.env.NODE_ENV === "development",
+    {
+      // SDK de Meta : pages de connexion du numéro, et seulement avec WhatsApp réel.
+      metaSignup:
+        process.env.WHATSAPP_PROVIDER === "cloud_api" &&
+        META_SIGNUP_PAGES.test(request.nextUrl.pathname),
+    },
   );
 
   const requestHeaders = new Headers(request.headers);

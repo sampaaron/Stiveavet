@@ -46,4 +46,17 @@ export const alerts = {
     acknowledge: "Accuser réception",
     resolve: "Clore l'alerte",
   },
+  /** Numéro WhatsApp professionnel où le vétérinaire reçoit les urgences (ADR 0024). */
+  phone: {
+    title: "Mon numéro pour les alertes urgentes",
+    description:
+      "Numéro WhatsApp professionnel où Stivea Vet vous prévient d'une urgence, sans aucun détail médical. Il n'est utilisé que pour ces alertes.",
+    current: (masked: string) => `Numéro enregistré : ${masked}.`,
+    none: "Aucun numéro : les urgences n'apparaissent que dans Stivea Vet.",
+    label: "Numéro WhatsApp",
+    hint: "Par exemple 06 12 34 56 78, ou +32… pour un numéro étranger. Laissez vide pour le retirer.",
+    submit: "Enregistrer le numéro",
+    saved: "Numéro d'alerte enregistré.",
+    invalid: "Numéro invalide : indiquez un numéro mobile complet.",
+  },
 };

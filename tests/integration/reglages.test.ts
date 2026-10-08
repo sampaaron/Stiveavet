@@ -5,7 +5,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
@@ -23,7 +22,7 @@ afterAll(async () => {
 
 const service = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto: fakeDrVeto,
   payments: fakePaymentMandate,
 });
@@ -356,17 +355,19 @@ describe("planning de garde", () => {
     expect(code).toBe("23514");
   });
 
-  it("la base refuse toute connexion qui ne serait pas simulée", async () => {
-    const code = await errorCode(
-      asApp(app, org, (client) =>
-        client.query(
-          `INSERT INTO integration_connections (organization_id, provider, mode, display_label, connected_by_membership_id)
-           VALUES ($1, 'whatsapp', 'live', 'Numéro réel', $2)
-           ON CONFLICT DO NOTHING`,
-          [org, ids.admin],
+  it("la base refuse toute connexion réelle autre que WhatsApp (dr.veto, prélèvement)", async () => {
+    for (const provider of ["drveto", "payment_mandate"])
+      expect(
+        await errorCode(
+          asApp(app, org, (client) =>
+            client.query(
+              `INSERT INTO integration_connections (organization_id, provider, mode, display_label, connected_by_membership_id)
+               VALUES ($1, $2, 'live', 'Compte réel', $3)
+               ON CONFLICT DO NOTHING`,
+              [org, provider, ids.admin],
+            ),
+          ),
         ),
-      ),
-    );
-    expect(code).toBe("23514");
+      ).toBe("23514");
   });
 });

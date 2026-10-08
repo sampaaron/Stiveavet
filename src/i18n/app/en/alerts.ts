@@ -48,4 +48,16 @@ export const alerts: AppDictionary["alerts"] = {
     acknowledge: "Acknowledge",
     resolve: "Close the alert",
   },
+  phone: {
+    title: "My number for urgent alerts",
+    description:
+      "Business WhatsApp number where Stivea Vet tells you about an emergency, with no medical details. It is used for these alerts only.",
+    current: (masked: string) => `Saved number: ${masked}.`,
+    none: "No number: emergencies only appear in Stivea Vet.",
+    label: "WhatsApp number",
+    hint: "For example +44 7700 900123. Leave empty to remove it.",
+    submit: "Save the number",
+    saved: "Alert number saved.",
+    invalid: "Invalid number: enter a full mobile number.",
+  },
 };

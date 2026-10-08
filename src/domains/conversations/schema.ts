@@ -26,6 +26,7 @@ export const messageAuthor = pgEnum("message_author", [
 ]);
 export const messageDelivery = pgEnum("message_delivery", [
   "queued",
+  "awaiting_reply",
   "sent",
   "delivered",
   "read",
@@ -79,6 +80,9 @@ export const messages = pgTable("messages", {
   /** Migration 0015 : trace codée d'un groupe, affichée dans la langue du lecteur. */
   noteCode: text("note_code").$type<SystemNoteCode>(),
   noteNames: text("note_names").array().notNull().default([]),
+  /** Migration 0017 : modèle WhatsApp du catalogue (le corps est son texte rendu). */
+  templateKey: text("template_key"),
+  templateParams: text("template_params").array().notNull().default([]),
 });
 
 export type SystemNoteCode =

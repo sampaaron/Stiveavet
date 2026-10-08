@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
+import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
@@ -26,8 +26,12 @@ import { loadFollowup } from "@/domains/suivis/lancement";
 import { followupAccess } from "@/domains/suivis/policies";
 import { messageWindows } from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
+import type { JobErrorCode } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
-import type { JobHandler } from "@/domains/taches/worker";
+import type { DeadJobHandler, JobHandler } from "@/domains/taches/worker";
+import type { WhatsAppProvider } from "@/domains/whatsapp/connexion";
+import { renderTemplate } from "@/domains/whatsapp/modeles";
+import { alertPhoneInput, maskPhone } from "@/domains/whatsapp/numero";
 import {
   acknowledgements,
   alerts,
@@ -42,6 +46,7 @@ import {
   notificationDeliveries,
   onCallSchedules,
   organizationSettings,
+  organizations,
   scheduledJobs,
   triageEvents,
   users,
@@ -93,6 +98,15 @@ export type AlertView = {
 
 const uuid = z.uuid();
 const alertPayload = z.object({ alertId: z.uuid() });
+const deliveryPayload = z.object({ deliveryId: z.uuid() });
+
+export const ALERT_DELIVERY_JOB = "alert.deliver";
+
+/**
+ * Numéro fictif des alertes simulées, quand le vétérinaire n'a pas encore donné le sien :
+ * en simulation, rien ne sort. Avec WhatsApp réel, l'alerte exige son numéro.
+ */
+const SIMULATED_ALERT_PHONE = "+33600000000";
 
 /** Vétérinaire prévenu en premier : responsable aux heures du cabinet, sinon la garde. */
 async function recipientFor(
@@ -341,16 +355,32 @@ async function auditSystem(
   });
 }
 
-/** Tâches `alert.notify` et `alert.escalate`. */
+/**
+ * Tâches `alert.notify`, `alert.escalate` et `alert.deliver`. Chaque alerte WhatsApp à un
+ * vétérinaire est une livraison, envoyée par sa propre tâche (un seul appel au prestataire
+ * par tentative, ADR 0024) : le modèle `alerte_urgente` ou `alerte_escalade`, sans aucun
+ * détail médical, au numéro professionnel réglé dans son profil.
+ */
+/** Motif d'échec d'une livraison d'alerte selon le code de la tâche abandonnée. */
+const DELIVERY_FAILURES: Partial<Record<JobErrorCode, string>> = {
+  target_missing: "no_alert_phone",
+  recipient_unreachable: "whatsapp_unreachable",
+  provider_rejected: "whatsapp_rejected",
+  provider_account: "whatsapp_account",
+};
+
 export function alertHandlers(deps: {
-  whatsapp: WhatsAppConnector;
+  whatsapp: WhatsAppProvider;
   clock?: () => Date;
-}): Record<string, JobHandler> {
+}): {
+  handlers: Record<string, JobHandler>;
+  dead: Record<string, DeadJobHandler>;
+} {
   const { whatsapp, clock = () => new Date() } = deps;
 
   async function notify(
     tx: TenantTransaction,
-    alert: { id: string; organizationId: string },
+    alert: { id: string; organizationId: string; followupId: string },
     membershipId: string,
     channel: "whatsapp" | "desktop",
     kind: "urgent" | "escalation",
@@ -379,23 +409,131 @@ export function alertHandlers(deps: {
       .from(notificationDeliveries)
       .where(eq(notificationDeliveries.idempotencyKey, key));
     if (!delivery || delivery.status !== "pending") return;
+    if (channel === "whatsapp") {
+      await enqueue(tx, {
+        organizationId: alert.organizationId,
+        kind: ALERT_DELIVERY_JOB,
+        idempotencyKey: `alert-deliver:${delivery.id}`,
+        // Tout de suite, quelle que soit l'heure métier de l'alerte.
+        runAt: new Date(),
+        followupId: alert.followupId,
+        payload: { deliveryId: delivery.id, kind },
+      });
+      return;
+    }
     // Sur l'ordinateur : l'alerte s'affiche dans Stivea Vet, rien ne sort.
-    let externalRef: string | null = null;
-    if (channel === "whatsapp")
-      try {
-        ({ externalRef } = await whatsapp.sendStaffAlert({
-          membershipId,
-          kind,
-          idempotencyKey: key,
-        }));
-      } catch {
+    await tx
+      .update(notificationDeliveries)
+      .set({ status: "sent", sentAt: clock() })
+      .where(eq(notificationDeliveries.id, delivery.id));
+  }
+
+  async function markFailed(
+    tx: TenantTransaction,
+    deliveryId: string,
+    errorCode: string,
+  ) {
+    await tx
+      .update(notificationDeliveries)
+      .set({ status: "failed", failedAt: clock(), errorCode })
+      .where(
+        and(
+          eq(notificationDeliveries.id, deliveryId),
+          eq(notificationDeliveries.status, "pending"),
+        ),
+      );
+  }
+
+  const deliverHandler: JobHandler = async ({ tx, job }) => {
+    const parsed = deliveryPayload
+      .extend({ kind: z.enum(["urgent", "escalation"]) })
+      .safeParse(job.payload);
+    if (!parsed.success) throw new JobError("invalid_payload");
+    const [delivery] = await tx
+      .select({
+        id: notificationDeliveries.id,
+        status: notificationDeliveries.status,
+        alertStatus: alerts.status,
+        phone: memberships.alertPhone,
+        locale: users.uiLocale,
+        practiceName: organizations.name,
+      })
+      .from(notificationDeliveries)
+      .innerJoin(alerts, eq(alerts.id, notificationDeliveries.alertId))
+      .innerJoin(
+        memberships,
+        eq(memberships.id, notificationDeliveries.recipientMembershipId),
+      )
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .innerJoin(
+        organizations,
+        eq(organizations.id, notificationDeliveries.organizationId),
+      )
+      .where(eq(notificationDeliveries.id, parsed.data.deliveryId))
+      .for("update", { of: notificationDeliveries });
+    if (!delivery) throw new JobError("target_missing");
+    if (delivery.status !== "pending") return;
+    // Close entre-temps : l'alerte n'a plus lieu d'être envoyée.
+    if (delivery.alertStatus === "resolved") {
+      await markFailed(tx, delivery.id, "alert_closed");
+      return;
+    }
+    const phone =
+      delivery.phone ?? (whatsapp.live ? null : SIMULATED_ALERT_PHONE);
+    // Aucun numéro d'alerte choisi : échec visible tout de suite, l'alerte reste dans Stivea Vet.
+    if (!phone) throw new JobError("target_missing", { final: true });
+    const alert = renderTemplate(
+      parsed.data.kind === "urgent" ? "alerte_urgente" : "alerte_escalade",
+      delivery.locale,
+      { practice: delivery.practiceName },
+    );
+    let externalRef: string;
+    try {
+      const connector = await whatsapp.connectorFor(tx);
+      ({ externalRef } = await connector.send({
+        to: { kind: "phone", phone },
+        content: {
+          kind: "template",
+          key: alert.key,
+          language: delivery.locale,
+          params: alert.params,
+        },
+        reference: delivery.id,
+      }));
+    } catch (error) {
+      if (!(error instanceof WhatsAppSendError))
         throw new JobError("provider_unavailable");
+      switch (error.failure) {
+        case "retry":
+        case "unknown":
+          throw new JobError("provider_unavailable");
+        case "account":
+          throw new JobError("provider_account", { final: true });
+        case "unreachable":
+          throw new JobError("recipient_unreachable", { final: true });
+        default:
+          throw new JobError("provider_rejected", { final: true });
       }
+    }
     await tx
       .update(notificationDeliveries)
       .set({ status: "sent", sentAt: clock(), externalRef })
       .where(eq(notificationDeliveries.id, delivery.id));
-  }
+  };
+
+  /**
+   * Alerte abandonnée : la livraison est marquée en échec ; l'alerte reste dans Stivea Vet.
+   * Une tâche qui échoue annule ce qu'elle a écrit : le motif vient du code de la tâche.
+   */
+  const deliverDead: DeadJobHandler = async ({ tx, job, code }) => {
+    const parsed = deliveryPayload.safeParse(job.payload);
+    if (!parsed.success) return;
+    await markFailed(
+      tx,
+      parsed.data.deliveryId,
+      DELIVERY_FAILURES[code] ?? "whatsapp_failed",
+    );
+  };
 
   async function loadAlert(tx: TenantTransaction, payload: unknown) {
     const parsed = alertPayload.safeParse(payload);
@@ -466,7 +604,14 @@ export function alertHandlers(deps: {
     );
   };
 
-  return { "alert.notify": notifyHandler, "alert.escalate": escalateHandler };
+  return {
+    handlers: {
+      "alert.notify": notifyHandler,
+      "alert.escalate": escalateHandler,
+      [ALERT_DELIVERY_JOB]: deliverHandler,
+    },
+    dead: { [ALERT_DELIVERY_JOB]: deliverDead },
+  };
 }
 
 export function alertsService(db: Database) {
@@ -646,6 +791,42 @@ export function alertsService(db: Database) {
   }
 
   return {
+    /** Numéro d'alerte WhatsApp du vétérinaire connecté, masqué ; null s'il n'en a pas. */
+    async myAlertPhone(actor: Actor): Promise<string | null> {
+      if (!VET_ROLES.has(actor.role)) return null;
+      return run(actor, async (tx) => {
+        const [row] = await tx
+          .select({ phone: memberships.alertPhone })
+          .from(memberships)
+          .where(eq(memberships.id, actor.membershipId));
+        return row?.phone ? maskPhone(row.phone) : null;
+      });
+    },
+
+    /**
+     * Chaque vétérinaire choisit son numéro WhatsApp professionnel pour les alertes urgentes
+     * (cahier des charges §4) ; vide, il le retire. Le numéro n'entre pas dans le journal.
+     */
+    async setAlertPhone(actor: Actor, raw: unknown) {
+      if (!VET_ROLES.has(actor.role)) throw new DomainError("forbidden");
+      const parsed = alertPhoneInput.safeParse(raw);
+      if (!parsed.success) throw new DomainError("invalid_target");
+      await run(actor, async (tx) => {
+        await tx
+          .update(memberships)
+          .set({ alertPhone: parsed.data })
+          .where(eq(memberships.id, actor.membershipId));
+        await tx.insert(auditEvents).values({
+          organizationId: actor.organizationId,
+          actorMembershipId: actor.membershipId,
+          action: "alert_phone.changed",
+          targetType: "membership",
+          targetId: actor.membershipId,
+          metadata: { removed: parsed.data === null },
+        });
+      });
+    },
+
     /** Alertes non closes des dossiers que l'acteur peut lire en clinique. */
     async open(actor: Actor): Promise<AlertView[]> {
       if (!actor.permissions.has("clinical.read")) return [];

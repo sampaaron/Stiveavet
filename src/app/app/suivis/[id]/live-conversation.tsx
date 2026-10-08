@@ -82,7 +82,9 @@ function deliveryNote(
   text: Text,
   delivery: ConversationMessage["delivery"],
 ): string | undefined {
-  return delivery === "queued" || delivery === "failed"
+  return delivery === "queued" ||
+    delivery === "awaiting_reply" ||
+    delivery === "failed"
     ? text.delivery[delivery]
     : undefined;
 }

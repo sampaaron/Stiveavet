@@ -56,6 +56,11 @@ export function SheetForm({
   const [firstHours, setFirstHours] = useState(followup.firstContactHours);
   const second = sheet.contacts.find((contact) => contact.role === "secondary");
   const [secondActive, setSecondActive] = useState(second?.active ?? false);
+  const [optIn, setOptIn] = useState(() =>
+    sheet.contacts
+      .filter((contact) => contact.active)
+      .every((contact) => contact.optedIn),
+  );
   const [control, setControl] = useState(controlInput);
   const [steps, setSteps] = useState<EditableStep[]>(() =>
     sheet.steps
@@ -78,6 +83,7 @@ export function SheetForm({
     responsibleMembershipId: draft ? responsible : undefined,
     firstContactHours: draft ? firstHours : undefined,
     secondContactActive: draft && second ? secondActive : undefined,
+    whatsappOptIn: draft && !followup.isTest ? optIn : undefined,
     controlAppointmentAt: control,
     steps: steps.map(({ offsetHours, kind, content }) => ({
       offsetHours,
@@ -179,6 +185,23 @@ export function SheetForm({
               </span>
             </label>
           ) : null}
+          {followup.isTest ? null : (
+            <label className="mt-4 flex items-start gap-3 rounded-[var(--radius-control)] border border-line p-3 text-sm">
+              <input
+                type="checkbox"
+                name="whatsappOptIn"
+                className="mt-0.5 size-4 accent-[var(--color-brand)]"
+                checked={optIn}
+                onChange={(event) => setOptIn(event.target.checked)}
+              />
+              <span>
+                <span className="font-semibold">
+                  {text.optInLabel(second && secondActive ? 2 : 1)}
+                </span>
+                <span className="block text-ink-muted">{text.optInHint}</span>
+              </span>
+            </label>
+          )}
         </SectionCard>
       ) : null}
 

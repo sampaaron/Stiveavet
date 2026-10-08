@@ -44,6 +44,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} edited a follow-up's launch sheet`,
     "followup.treatments_validated": (actor: string) =>
       `${actor} validated imported treatments`,
+    "followup.whatsapp_optin": (actor: string) =>
+      `${actor} recorded the owner's WhatsApp agreement`,
     "followup.launched": (actor: string) => `${actor} launched a follow-up`,
     "followup.paused": (actor: string) => `${actor} paused a follow-up`,
     "followup.resumed": (actor: string) => `${actor} resumed a follow-up`,
@@ -112,6 +114,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} removed an on-call shift`,
     "integration.connected": (actor) =>
       `${actor} connected a service (WhatsApp, dr.veto or direct debit)`,
+    "alert_phone.changed": (actor: string) =>
+      `${actor} changed their WhatsApp alert number`,
     "integration.disconnected": (actor) =>
       `${actor} disconnected a service (WhatsApp, dr.veto or direct debit)`,
     "onboarding.step_completed": (actor) =>

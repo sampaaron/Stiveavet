@@ -15,6 +15,7 @@ import {
 import { z } from "zod";
 
 import type { AiGateway } from "@/adapters/ai-gateway/types";
+import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
 import {
   appointmentKindFor,
@@ -24,6 +25,7 @@ import {
   slotStillFree,
 } from "@/domains/agenda/demandes";
 import {
+  appointmentDecisionMessage,
   appointmentMessage,
   slotChoice,
   wantsAppointment,
@@ -47,6 +49,18 @@ import {
   triageOwnerMessage,
 } from "@/domains/urgences/service";
 import type { TriageLevel } from "@/domains/urgences/triage";
+import type { WhatsAppProvider } from "@/domains/whatsapp/connexion";
+import {
+  SEND_JOB,
+  freeTextAllowed,
+  queueSend,
+  releaseHeld,
+} from "@/domains/whatsapp/envoi";
+import {
+  TEMPLATE_BODY_MAX,
+  isTemplateKey,
+  renderTemplate,
+} from "@/domains/whatsapp/modeles";
 import { emit, enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
 import {
@@ -79,13 +93,14 @@ import { ownerKeyword } from "./keywords";
 import { detectLanguage } from "./language";
 import type { SystemNoteCode } from "./schema";
 import {
+  CONSENT_VERSION_OF,
   CONSENT_WORDING_VERSION,
   PAIR_CONSENT_WORDING_VERSION,
   emergencyMessage,
   firstName,
-  fixedMessage,
+  fixedContent,
 } from "./wording";
-import type { FixedStep, WordingContext } from "./wording";
+import type { FixedStep, NumaContent, WordingContext } from "./wording";
 
 /**
  * Conversation WhatsApp d'un suivi (cahier des charges §3 à §6 et §8, ADR 0016 et 0021).
@@ -120,7 +135,15 @@ export type ConversationMessage = {
   authorName: string | null;
   body: string;
   occurredAt: Date;
-  delivery: "queued" | "sent" | "delivered" | "read" | "failed" | null;
+  /** `awaiting_reply` : hors de la fenêtre de 24 h, il part à la prochaine réponse. */
+  delivery:
+    | "queued"
+    | "awaiting_reply"
+    | "sent"
+    | "delivered"
+    | "read"
+    | "failed"
+    | null;
   /** Niveau du triage d'un message du propriétaire, s'il a été évalué. */
   triage: TriageLevel | null;
   /** Photo ou message vocal joint (lot 16) ; le fichier se lit par un lien signé. */
@@ -202,7 +225,12 @@ export type ContactRole = "primary" | "secondary";
 
 const MAX_BODY = 4096;
 /** Tâches qu'un clic du simulateur peut avancer. */
-const SIMULATED_KINDS = ["followup.message", REMINDER_KIND, END_KIND] as const;
+const SIMULATED_KINDS = [
+  "followup.message",
+  REMINDER_KIND,
+  END_KIND,
+  SEND_JOB,
+] as const;
 const MAX_VIEW_MESSAGES = 300;
 
 export const ownerMessageInput = z
@@ -519,18 +547,27 @@ async function recordConsent(
   messageId: string,
   scope: "contact" | "followup" = "contact",
 ) {
-  // À deux propriétaires, le texte montré explique le groupe partagé (§6).
+  // Version du texte montré : celle du premier message envoyé à ce contact. À deux
+  // propriétaires, il explique le groupe partagé, ou les conversations séparées (§6).
+  const [intro] = await tx
+    .select({ templateKey: messages.templateKey })
+    .from(messages)
+    .where(eq(messages.idempotencyKey, `intro:${contactId}`));
+  const shown =
+    intro?.templateKey && isTemplateKey(intro.templateKey)
+      ? CONSENT_VERSION_OF[intro.templateKey]
+      : undefined;
   const pair = ctx.contacts.length > 1;
+  const wordingVersion =
+    shown ?? (pair ? PAIR_CONSENT_WORDING_VERSION : CONSENT_WORDING_VERSION);
   await tx.insert(consents).values({
     organizationId: ctx.organizationId,
     followupId: ctx.followupId,
     followupContactId: contactId,
     state,
     scope,
-    wordingVersion: pair
-      ? PAIR_CONSENT_WORDING_VERSION
-      : CONSENT_WORDING_VERSION,
-    groupExplained: pair,
+    wordingVersion,
+    groupExplained: wordingVersion === PAIR_CONSENT_WORDING_VERSION,
     messageId,
   });
 }
@@ -646,47 +683,38 @@ async function enqueueMessageJob(
  * le groupe) : rien ne part à tort.
  */
 export function conversationHandlers(deps: {
-  whatsapp: WhatsAppConnector;
+  whatsapp: WhatsAppProvider;
   ai: AiGateway;
 }): Record<string, JobHandler> {
   const { whatsapp, ai } = deps;
 
-  async function deliver(
+  /** Opération de groupe (simulée) : un échec du prestataire est réessayé. */
+  async function groupCall<T>(
     tx: TenantTransaction,
-    message: { id: string; body: string; idempotencyKey: string },
-    target: Target,
-  ) {
-    let externalRef: string;
+    call: (connector: WhatsAppConnector) => Promise<T>,
+  ): Promise<T> {
     try {
-      ({ externalRef } =
-        target.kind === "group"
-          ? await whatsapp.sendGroupMessage({
-              groupRef: target.group.externalRef,
-              body: message.body,
-              idempotencyKey: message.idempotencyKey,
-            })
-          : await whatsapp.sendMessage({
-              to: target.contact.phone,
-              body: message.body,
-              idempotencyKey: message.idempotencyKey,
-            }));
-    } catch {
+      return await call(await whatsapp.connectorFor(tx));
+    } catch (error) {
+      if (error instanceof WhatsAppSendError && error.failure === "account")
+        throw new JobError("provider_account");
       throw new JobError("provider_unavailable");
     }
-    await tx
-      .update(messages)
-      .set({ deliveryStatus: "sent", sentAt: new Date(), externalRef })
-      .where(eq(messages.id, message.id));
   }
 
-  /** Message de Numa : créé une seule fois par clé, envoyé tant qu'il est en attente. */
+  /**
+   * Message de Numa : créé une seule fois par clé, puis confié à la tâche d'envoi
+   * (`whatsapp.send`, ADR 0024). Un modèle garde sa clé et ses paramètres avec le texte.
+   */
   async function sendNuma(
     tx: TenantTransaction,
     ctx: ConversationContext,
     target: Target,
     key: string,
-    body: string,
+    content: NumaContent,
   ): Promise<string> {
+    const template = typeof content === "string" ? null : content;
+    const body = typeof content === "string" ? content : content.body;
     const threadId =
       target.kind === "group"
         ? target.group.id
@@ -708,6 +736,8 @@ export function conversationHandlers(deps: {
         language,
         deliveryStatus: "queued",
         idempotencyKey: key,
+        templateKey: template?.key ?? null,
+        templateParams: template?.params ?? [],
         occurredAt: sql`clock_timestamp()`,
       })
       .onConflictDoNothing({
@@ -716,18 +746,18 @@ export function conversationHandlers(deps: {
     const [message] = await tx
       .select({
         id: messages.id,
-        body: messages.body,
         deliveryStatus: messages.deliveryStatus,
       })
       .from(messages)
       .where(eq(messages.idempotencyKey, key));
     if (!message) throw new JobError("target_missing");
     if (message.deliveryStatus === "queued")
-      await deliver(
-        tx,
-        { id: message.id, body: message.body, idempotencyKey: key },
-        target,
-      );
+      await queueSend(tx, {
+        organizationId: ctx.organizationId,
+        followupId: ctx.followupId,
+        threadId,
+        id: message.id,
+      });
     return message.id;
   }
 
@@ -737,7 +767,7 @@ export function conversationHandlers(deps: {
     ctx: ConversationContext,
     targets: readonly Target[],
     key: string,
-    bodyOf: (target: Target) => string,
+    contentOf: (target: Target) => NumaContent | Promise<NumaContent>,
   ) {
     for (const target of targets)
       await sendNuma(
@@ -745,7 +775,7 @@ export function conversationHandlers(deps: {
         ctx,
         target,
         targets.length === 1 ? key : `${key}:${targetId(target)}`,
-        bodyOf(target),
+        await contentOf(target),
       );
   }
 
@@ -764,16 +794,13 @@ export function conversationHandlers(deps: {
           eq(conversationThreads.kind, "group"),
         ),
       );
-    let groupRef: string;
-    try {
-      ({ groupRef } = await whatsapp.createGroup({
+    const { groupRef } = await groupCall(tx, (connector) =>
+      connector.createGroup({
         name: `${ctx.animalName} · ${ctx.practiceName}`.slice(0, 100),
         members: members.map((member) => member.phone),
         idempotencyKey: `group:${ctx.followupId}:${(existing?.n ?? 0) + 1}`,
-      }));
-    } catch {
-      throw new JobError("provider_unavailable");
-    }
+      }),
+    );
     const [thread] = await tx
       .insert(conversationThreads)
       .values({
@@ -805,14 +832,12 @@ export function conversationHandlers(deps: {
     group: Group,
     note: SystemNote,
   ) {
-    try {
-      await whatsapp.closeGroup({
+    await groupCall(tx, (connector) =>
+      connector.closeGroup({
         groupRef: group.externalRef,
         idempotencyKey: `group-close:${group.id}`,
-      });
-    } catch {
-      throw new JobError("provider_unavailable");
-    }
+      }),
+    );
     await tx
       .update(conversationThreads)
       .set({ closedAt: new Date() })
@@ -1099,6 +1124,7 @@ export function conversationHandlers(deps: {
     if (!mayReach(reach, writer)) return;
     const other = otherOf(ctx, writer);
     if (
+      whatsapp.groups &&
       other &&
       !ctx.group &&
       mayReach(reach, other) &&
@@ -1113,11 +1139,12 @@ export function conversationHandlers(deps: {
         ctx,
         group,
         `group_welcome:${group.kind === "group" ? group.group.id : key}`,
-        fixedMessage("group_welcome", wordingFor(ctx, group)),
+        fixedContent("group_welcome", wordingFor(ctx, group)),
       );
       return;
     }
     const waiting =
+      whatsapp.groups &&
       step === "consent_given" &&
       other !== null &&
       !ctx.group &&
@@ -1127,7 +1154,7 @@ export function conversationHandlers(deps: {
       ctx,
       direct(writer),
       key,
-      fixedMessage(
+      fixedContent(
         waiting ? "consent_given_waiting" : step,
         wordingFor(ctx, direct(writer)),
       ),
@@ -1176,10 +1203,11 @@ export function conversationHandlers(deps: {
       ctx,
       target,
       `${step}:${appointmentId}`,
-      appointmentMessage(
-        step === "appointment_confirmed"
-          ? { kind: "confirmed", at: row.startsAt }
-          : { kind: "declined", at: row.startsAt },
+      appointmentDecisionMessage(
+        {
+          kind: step === "appointment_confirmed" ? "confirmed" : "declined",
+          at: row.startsAt,
+        },
         appointmentWording(ctx, target),
       ),
     );
@@ -1212,8 +1240,12 @@ export function conversationHandlers(deps: {
           ctx,
           direct(contact),
           `intro:${contact.id}`,
-          fixedMessage(
-            pair ? "intro_pair" : "intro",
+          fixedContent(
+            pair
+              ? whatsapp.groups
+                ? "intro_pair"
+                : "intro_separate"
+              : "intro",
             wordingFor(ctx, direct(contact)),
           ),
         );
@@ -1231,7 +1263,7 @@ export function conversationHandlers(deps: {
         ctx,
         broadcastTargets(ctx, reach),
         `closing:${payload.token}`,
-        (target) => fixedMessage("closing", wordingFor(ctx, target)),
+        (target) => fixedContent("closing", wordingFor(ctx, target)),
       );
       return;
     }
@@ -1287,15 +1319,12 @@ export function conversationHandlers(deps: {
           .where(eq(messages.id, message.id));
         return;
       }
-      await deliver(
-        tx,
-        {
-          id: message.id,
-          body: message.body,
-          idempotencyKey: message.idempotencyKey,
-        },
-        target,
-      );
+      await queueSend(tx, {
+        organizationId: ctx.organizationId,
+        followupId: ctx.followupId,
+        threadId: message.threadId,
+        id: message.id,
+      });
       return;
     }
 
@@ -1352,7 +1381,7 @@ export function conversationHandlers(deps: {
             ctx,
             target,
             key,
-            fixedMessage("photo_received", wordingFor(ctx, target)),
+            fixedContent("photo_received", wordingFor(ctx, target)),
           );
         return;
       }
@@ -1369,15 +1398,14 @@ export function conversationHandlers(deps: {
         break;
       case "left_group": {
         if (ctx.group) {
-          try {
-            await whatsapp.removeFromGroup({
-              groupRef: ctx.group.externalRef,
+          const { externalRef } = ctx.group;
+          await groupCall(tx, (connector) =>
+            connector.removeFromGroup({
+              groupRef: externalRef,
               member: writer.phone,
-              idempotencyKey: `group-leave:${ctx.group.id}:${writer.id}`,
-            });
-          } catch {
-            throw new JobError("provider_unavailable");
-          }
+              idempotencyKey: `group-leave:${ctx.group?.id ?? ""}:${writer.id}`,
+            }),
+          );
           const leaver = firstName(writer.ownerFullName);
           if (groupMembers(ctx).length === 0)
             await closeGroup(tx, ctx, ctx.group, {
@@ -1410,7 +1438,7 @@ export function conversationHandlers(deps: {
               ctx,
               direct(other),
               `${key}:${other.id}`,
-              fixedMessage(
+              fixedContent(
                 "stopped_by_other",
                 wordingFor(ctx, direct(other), writer),
               ),
@@ -1426,7 +1454,7 @@ export function conversationHandlers(deps: {
       ctx,
       direct(writer),
       key,
-      fixedMessage(step, wordingFor(ctx, direct(writer))),
+      fixedContent(step, wordingFor(ctx, direct(writer))),
     );
   };
 
@@ -1470,7 +1498,7 @@ export function conversationHandlers(deps: {
     if (!step) throw new JobError("target_missing");
     // Étape remplacée par une modification de la fiche : la nouvelle a sa propre tâche.
     if (step.supersededAt) return;
-    const drafts = new Map<string, string>();
+    const drafts = new Map<string, string | null>();
     for (const target of targets) {
       const wording = wordingFor(ctx, target);
       if (drafts.has(wording.language)) continue;
@@ -1496,19 +1524,46 @@ export function conversationHandlers(deps: {
           ctx.followupId,
           { reason: verdict.reason },
         );
-      drafts.set(
-        wording.language,
-        verdict.ok ? text : fixedMessage("check_in", wording),
-      );
+      drafts.set(wording.language, verdict.ok ? text : null);
     }
-    await sendEach(
-      tx,
-      ctx,
-      targets,
-      `step:${step.id}`,
-      (target) => drafts.get(wordingFor(ctx, target).language) ?? "",
+    await sendEach(tx, ctx, targets, `step:${step.id}`, (target) =>
+      stepContent(
+        tx,
+        ctx,
+        target,
+        drafts.get(wordingFor(ctx, target).language),
+      ),
     );
   };
+
+  /**
+   * Étape rédigée : en texte libre si le propriétaire a écrit depuis moins de 24 h, sinon
+   * dans le modèle `suivi_rappel` (ADR 0024). Trop longue pour le modèle, elle attendra sa
+   * prochaine réponse ; refusée par les garde-fous, la prise de nouvelles fixe la remplace.
+   */
+  async function stepContent(
+    tx: TenantTransaction,
+    ctx: ConversationContext,
+    target: Target,
+    draft: string | null | undefined,
+  ): Promise<NumaContent> {
+    const wording = wordingFor(ctx, target);
+    if (!draft) return fixedContent("check_in", wording);
+    const open = await freeTextAllowed(
+      tx,
+      target.kind === "group"
+        ? { followupId: ctx.followupId }
+        : { phone: target.contact.phone },
+    );
+    if (open) return draft;
+    const wrapped = renderTemplate("suivi_rappel", wording.language, {
+      first_name: wording.ownerFirstName,
+      animal: ctx.animalName,
+      practice: ctx.practiceName,
+      message: draft,
+    });
+    return wrapped.body.length <= TEMPLATE_BODY_MAX ? wrapped : draft;
+  }
 
   return { "followup.message": handler, [REMINDER_KIND]: reminder };
 }
@@ -1552,6 +1607,12 @@ export async function recordInbound(
     })
     .returning({ id: messages.id });
   if (!message) throw new Error("Message non enregistré");
+  // Fenêtre de 24 h rouverte : les messages qui attendaient sa réponse partent.
+  await releaseHeld(tx, {
+    id: message.id,
+    threadId,
+    followupContactId: contact.id,
+  });
   await emit(tx, {
     organizationId: ctx.organizationId,
     topic: "message.received",
@@ -1771,7 +1832,7 @@ export async function processInbound(
   return { outcome, triage };
 }
 
-async function receiveInTx(
+export async function receiveInTx(
   tx: TenantTransaction,
   followupId: string,
   body: string,

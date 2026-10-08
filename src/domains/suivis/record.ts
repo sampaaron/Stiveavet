@@ -65,7 +65,14 @@ export type MessageView = {
   authorName: string | null;
   body: string;
   occurredAt: Date;
-  delivery: "queued" | "sent" | "delivered" | "read" | "failed" | null;
+  delivery:
+    | "queued"
+    | "awaiting_reply"
+    | "sent"
+    | "delivered"
+    | "read"
+    | "failed"
+    | null;
   attachments: AttachmentView[];
 };
 

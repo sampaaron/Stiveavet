@@ -37,7 +37,6 @@ import { simulatedAgendaReading } from "../../src/adapters/ai-gateway/fake";
 import { fakeBillingProvider } from "../../src/adapters/billing-provider/fake";
 import { fakeDrVeto } from "../../src/adapters/drveto/fake";
 import { fakePaymentMandate } from "../../src/adapters/payments/fake";
-import { fakeWhatsApp } from "../../src/adapters/whatsapp/fake";
 import { withTenant } from "../../src/server/db/tenant";
 
 import { controlOf, insertFollowupRecord } from "./dossiers-fictifs";
@@ -300,7 +299,7 @@ async function seedSettings(
 ) {
   const service = settingsService({
     db,
-    whatsapp: fakeWhatsApp,
+    whatsapp: { live: false },
     drveto: fakeDrVeto,
     payments: fakePaymentMandate,
   });
@@ -476,7 +475,7 @@ export async function seedFictionalCabinets(db: Database) {
   const paul = await seedActor(db, SEED.martin, martin);
   await settingsService({
     db,
-    whatsapp: fakeWhatsApp,
+    whatsapp: { live: false },
     drveto: fakeDrVeto,
     payments: fakePaymentMandate,
   }).connect(paul, "payment_mandate", "");

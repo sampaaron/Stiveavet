@@ -34,12 +34,17 @@ export const tasks = {
     "retention.sweep": "Recherche des données arrivées à échéance",
     "followup.purge": "Effacement d'un suivi arrivé à échéance",
     "billing.annual_offer": "E-mail d'offre d'engagement annuel",
+    "whatsapp.send": "Message WhatsApp",
+    "alert.deliver": "Alerte WhatsApp à un vétérinaire",
+    "notify.whatsapp_failed": "E-mail d'échec d'un envoi WhatsApp",
   },
   unknownKind: "Tâche technique",
   /** Motifs techniques d'échec, par code (jamais le message brut d'une exception). */
   errors: {
     provider_unavailable: "Service d'envoi indisponible",
     provider_rejected: "Envoi refusé par le service",
+    provider_account: "Compte WhatsApp du cabinet à reconnecter",
+    recipient_unreachable: "Numéro injoignable sur WhatsApp",
     invalid_payload: "Données de la tâche invalides",
     target_missing: "Dossier ou destinataire introuvable",
     lease_expired: "Interrompue par un arrêt du worker",

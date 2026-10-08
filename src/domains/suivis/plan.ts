@@ -48,6 +48,11 @@ export const sheetInput = z.object({
    * alors aussi son accord ; le groupe se crée quand les deux ont accepté (lot 18).
    */
   secondContactActive: z.boolean().optional(),
+  /**
+   * Brouillon seulement : le cabinet a recueilli l'accord du ou des propriétaires pour être
+   * contactés sur WhatsApp (politique de WhatsApp, ADR 0024). Exigé pour lancer le suivi.
+   */
+  whatsappOptIn: z.boolean().optional(),
   controlAppointmentAt: z.date().nullable(),
   /** Étapes à venir (les étapes passées d'un suivi en cours ne sont jamais renvoyées). */
   steps: z.array(stepInput).max(MAX_STEPS, `${MAX_STEPS} étapes au maximum.`),
@@ -132,9 +137,4 @@ export function suggestProtocol(
       best = { versionId: candidate.versionId, score };
   }
   return best?.versionId ?? null;
-}
-
-/** Numéro masqué pour l'écran : seuls les deux derniers chiffres restent lisibles. */
-export function maskedPhone(phone: string): string {
-  return `•• •• •• •• ${phone.replace(/\D/g, "").slice(-2)}`;
 }

@@ -8,11 +8,7 @@ import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { createMemoryStorage } from "@/adapters/object-storage/memory";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { mediaHandlers, mediaService } from "@/domains/fichiers/service";
@@ -22,12 +18,10 @@ import { SWEEP_KIND, retentionHandlers } from "@/domains/suivis/conservation";
 import { launchService } from "@/domains/suivis/lancement";
 import { followupEndHandlers } from "@/domains/suivis/rappels";
 import { enqueue } from "@/domains/taches/queue";
-import type { JobHandler } from "@/domains/taches/worker";
-import { createWorker } from "@/domains/taches/worker";
-import { alertHandlers } from "@/domains/urgences/service";
 import { withTenant } from "@/server/db/tenant";
 
 import { asApp, pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Lot 17 : conservation d'un an (cahier des charges §15, architecture §12, ADR 0020).
@@ -53,7 +47,7 @@ const media = mediaService({
 });
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
@@ -63,24 +57,17 @@ const org = randomUUID();
 const tag = org.slice(0, 8);
 let vetId: string;
 
-const allHandlers: Record<string, JobHandler> = {
-  ...conversationHandlers({ whatsapp: fakeWhatsApp, ai: fakeAiGateway }),
-  ...alertHandlers({ whatsapp: fakeWhatsApp }),
-  ...followupEndHandlers(),
-  ...mediaHandlers({ storage, ai: fakeAiGateway }),
-  ...retentionHandlers({ storage }),
-};
-const worker = createWorker({
+const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-conservation",
-  handlers: Object.fromEntries(
-    Object.entries(allHandlers).map(([kind, handler]) => [
-      kind,
-      (async (context) => {
-        if (context.job.organizationId === org) await handler(context);
-      }) satisfies JobHandler,
-    ]),
-  ),
+  organizationId: () => org,
+  whatsapp: recordingWhatsApp(),
+  ai: fakeAiGateway,
+  extra: {
+    ...followupEndHandlers(),
+    ...mediaHandlers({ storage, ai: fakeAiGateway }),
+    ...retentionHandlers({ storage }),
+  },
 });
 
 async function drain() {
@@ -137,6 +124,7 @@ async function launchWithConsent(ref: string): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );

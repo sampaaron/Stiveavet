@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 
 import { LEA, PHRASE } from "./support/accounts";
 import { expectAccessible, login } from "./support/flows";
+import { OPT_IN } from "./support/suivis";
 
 /**
  * Lancement manuel d'un suivi depuis dr.veto simulé (lot 12). Chaque projet (ordinateur,
@@ -75,6 +76,12 @@ test("une vétérinaire lance, modifie, met en pause, reprend et arrête un suiv
     .getByLabel(/^Je valide ce traitement/)
     .first()
     .check();
+  // Sans l'accord du propriétaire pour WhatsApp, rien ne part.
+  await page.getByRole("button", { name: "Lancer le suivi" }).click();
+  await expect(
+    page.getByText(/Cochez l'accord du propriétaire pour WhatsApp/),
+  ).toBeVisible();
+  await page.getByRole("checkbox", { name: OPT_IN }).check();
   await page.getByRole("button", { name: "Lancer le suivi" }).click();
   await expect(page).toHaveURL(/\/app\/suivis\/[0-9a-f-]+\?fait=lance$/);
   await expect(

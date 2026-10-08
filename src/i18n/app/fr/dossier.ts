@@ -194,7 +194,11 @@ export const dossier = {
     title: "Conversation WhatsApp",
     aiNotice:
       "Numa est une IA : elle ne pose pas de diagnostic, ne modifie aucun traitement et renvoie toute question médicale au vétérinaire.",
-    delivery: { queued: "envoi en cours", failed: "non envoyé" },
+    delivery: {
+      queued: "envoi en cours",
+      awaiting_reply: "partira à la réponse du propriétaire",
+      failed: "non envoyé",
+    },
     deletedPhoto: "Photo supprimée (durée de conservation atteinte)",
     deletedVoice: "Message vocal supprimé (durée de conservation atteinte)",
     photo: "Photo",

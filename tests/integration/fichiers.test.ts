@@ -10,13 +10,8 @@ import type { AiGateway } from "@/adapters/ai-gateway/types";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { createMemoryStorage } from "@/adapters/object-storage/memory";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
 import { agendaService } from "@/domains/agenda/captures";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
@@ -27,12 +22,10 @@ import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import { followupEndHandlers } from "@/domains/suivis/rappels";
-import type { JobHandler } from "@/domains/taches/worker";
-import { createWorker } from "@/domains/taches/worker";
-import { alertHandlers } from "@/domains/urgences/service";
 import { MemoryEmailSender } from "@/adapters/email/memory";
 
 import { pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Lot 16 : photos, vocaux et captures d'agenda (ADR 0019). Livrable du plan : un assistant
@@ -54,7 +47,7 @@ const conversations = conversationsService(appDb);
 const media = mediaService({ db: appDb, storage, linkSecret: SECRET });
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
@@ -65,17 +58,8 @@ const team = teamService({
   appUrl: "http://localhost:3000",
 });
 
-const sent: { body: string }[] = [];
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  simulated: true,
-  connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
-  sendStaffAlert: fakeWhatsApp.sendStaffAlert,
-  async sendMessage(input) {
-    sent.push(input);
-    return fakeWhatsApp.sendMessage(input);
-  },
-};
+const whatsapp = recordingWhatsApp();
+const { sent } = whatsapp;
 
 /** IA simulée, avec des réponses imposées pour éprouver les garde-fous. */
 let observationsOverride: string[] | null = null;
@@ -100,23 +84,13 @@ const org = randomUUID();
 const tag = org.slice(0, 8);
 let ids: { admin: string; vet: string; assistant: string };
 
-const allHandlers: Record<string, JobHandler> = {
-  ...conversationHandlers({ whatsapp, ai }),
-  ...alertHandlers({ whatsapp }),
-  ...followupEndHandlers(),
-  ...mediaHandlers({ storage, ai }),
-};
-const worker = createWorker({
+const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-fichiers",
-  handlers: Object.fromEntries(
-    Object.entries(allHandlers).map(([kind, handler]) => [
-      kind,
-      (async (context) => {
-        if (context.job.organizationId === org) await handler(context);
-      }) satisfies JobHandler,
-    ]),
-  ),
+  organizationId: () => org,
+  whatsapp,
+  ai,
+  extra: { ...followupEndHandlers(), ...mediaHandlers({ storage, ai }) },
 });
 
 async function drain() {
@@ -183,6 +157,7 @@ async function launchWithConsent(ref: string): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );

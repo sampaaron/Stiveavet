@@ -315,6 +315,31 @@ export async function connectAction(
   );
 }
 
+/**
+ * Fin de l'inscription intégrée de Meta : le code (valable 30 secondes) et les identifiants
+ * reçus dans le navigateur, avec le PIN choisi. Le service fait les appels à Meta.
+ */
+export async function connectWhatsAppAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const pin = text(form, "pin");
+  if (!/^[0-9]{6}$/.test(pin)) return failure((e) => e.whatsappPin);
+  const context = await memberContext();
+  return finish(
+    await attempt(
+      () =>
+        services.settings().connectWhatsApp(context, {
+          code: text(form, "code").slice(0, 1024),
+          wabaId: text(form, "wabaId").slice(0, 30),
+          phoneNumberId: text(form, "phoneNumberId").slice(0, 30),
+          pin,
+        }),
+      await notice((n) => n.connected),
+    ),
+  );
+}
+
 export async function disconnectAction(
   _previous: ActionState,
   form: FormData,

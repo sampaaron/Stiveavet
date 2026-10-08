@@ -190,7 +190,11 @@ export const dossier: AppDictionary["dossier"] = {
     title: "WhatsApp conversation",
     aiNotice:
       "Numa is an AI: she does not diagnose, does not change any treatment and refers every medical question to the vet.",
-    delivery: { queued: "sending", failed: "not sent" },
+    delivery: {
+      queued: "sending",
+      awaiting_reply: "will be sent when the owner replies",
+      failed: "not sent",
+    },
     deletedPhoto: "Photo deleted (retention period reached)",
     deletedVoice: "Voice note deleted (retention period reached)",
     photo: "Photo",

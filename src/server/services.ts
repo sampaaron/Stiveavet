@@ -8,7 +8,6 @@ import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { emailSender, marketingEmailSender } from "@/adapters/email";
 import { lazyObjectStorage } from "@/adapters/object-storage";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
 import { agendaService } from "@/domains/agenda/captures";
 import type { AgendaService } from "@/domains/agenda/captures";
 import { appointmentsService } from "@/domains/agenda/demandes";
@@ -34,11 +33,16 @@ import { synthesisService } from "@/domains/suivis/synthese";
 import type { SynthesisService } from "@/domains/suivis/synthese";
 import { todayService } from "@/domains/suivis/tableau";
 import type { TodayService } from "@/domains/suivis/tableau";
-import { JOB_HANDLERS, OUTBOX_ROUTES } from "@/domains/taches/registry";
+import { OUTBOX_ROUTES, jobRegistry } from "@/domains/taches/registry";
 import { jobsService } from "@/domains/taches/service";
 import { createWorker } from "@/domains/taches/worker";
 import { alertsService } from "@/domains/urgences/service";
 import type { AlertsService } from "@/domains/urgences/service";
+import {
+  configuredWhatsApp,
+  providerFor,
+  setupFor,
+} from "@/domains/whatsapp/connexion";
 import type { JobsService } from "@/domains/taches/service";
 import type { FollowupsService } from "@/domains/suivis/service";
 import { appDatabase } from "@/server/db/client";
@@ -96,11 +100,11 @@ export const services = {
     protocols ??= protocolsService(appDatabase());
     return protocols;
   },
-  /** Connecteurs simulés uniquement en phase 1 (ADR 0004). */
+  /** dr.veto et mandat simulés (ADR 0004) ; WhatsApp simulé ou réel selon la configuration (ADR 0024). */
   settings(): SettingsService {
     settings ??= settingsService({
       db: appDatabase(),
-      whatsapp: fakeWhatsApp,
+      whatsapp: setupFor(configuredWhatsApp()),
       drveto: fakeDrVeto,
       payments: fakePaymentMandate,
     });
@@ -171,10 +175,14 @@ export const services = {
    * (l'appelant le vérifie) : mêmes exécutants que `pnpm worker`.
    */
   simulatorWorker() {
+    const registry = jobRegistry({
+      whatsapp: providerFor(configuredWhatsApp()),
+    });
     simulatorWorker ??= createWorker({
       db: appDatabase(),
       workerId: "app-simulateur",
-      handlers: JOB_HANDLERS,
+      handlers: registry.handlers,
+      deadHandlers: registry.dead,
       routes: OUTBOX_ROUTES,
     });
     return simulatorWorker;

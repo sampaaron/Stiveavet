@@ -5,7 +5,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
@@ -30,7 +29,7 @@ const drveto = createFakeDrVeto(() => NOW);
 const service = launchService({ db: appDb, drveto });
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
@@ -163,6 +162,7 @@ async function sheetInputOf(
     validateTreatmentIds: [],
     removeTreatmentIds: [],
     addTreatments: [],
+    whatsappOptIn: true,
     ...patch,
   };
 }
@@ -226,6 +226,7 @@ describe("recherche et import depuis dr.veto (simulé)", () => {
         active: true,
         phone: "•• •• •• •• 01",
         language: "fr",
+        optedIn: false,
       },
     ]);
     expect(sheet.treatments).toHaveLength(1);
@@ -432,6 +433,36 @@ describe("lancement", () => {
     // L'échec annule tout : la fiche n'a pas été enregistrée à moitié.
     expect((await service.sheet(leo, plume)).followup.status).toBe("draft");
     await settings.connect(lou, "whatsapp", "06 39 98 00 00");
+  });
+
+  it("pas de lancement sans l'accord pour WhatsApp recueilli au cabinet ; il est noté et journalisé", async () => {
+    const leo = await actor(ids.vet);
+    const input = await sheetInputOf(leo, plume, { firstContactHours: 4 });
+    expect(
+      await domainError(
+        service.save(
+          leo,
+          plume,
+          { ...input, whatsappOptIn: false },
+          { launch: true },
+          NOW,
+        ),
+      ),
+    ).toBe("optin_missing");
+    expect((await service.sheet(leo, plume)).followup.status).toBe("draft");
+    // Noté par la fiche (date et auteur d'origine gardés) ; la case se retrouve cochée.
+    await service.save(leo, plume, input, { launch: false }, NOW);
+    expect((await service.sheet(leo, plume)).contacts[0]?.optedIn).toBe(true);
+    const { rows } = await admin.query(
+      `SELECT c.whatsapp_optin_by_membership_id AS by, e.metadata
+       FROM followup_contacts c, audit_events e
+       WHERE c.followup_id = $1 AND e.target_id = $1 AND e.action = 'followup.whatsapp_optin'
+       ORDER BY e.occurred_at DESC LIMIT 1`,
+      [plume],
+    );
+    expect(rows).toEqual([
+      { by: expect.any(String), metadata: { given: true } },
+    ]);
   });
 
   it("« Lancer le suivi » fige la version, compte l'usage et planifie le premier message", async () => {

@@ -73,6 +73,8 @@ export const ownerContacts = pgTable("owner_contacts", {
   ownerId: uuid("owner_id").notNull(),
   kind: contactKind("kind").notNull(),
   value: text("value").notNull(),
+  /** Migration 0017 : identifiant WhatsApp propre au cabinet, quand le webhook l'a donné. */
+  whatsappUserId: text("whatsapp_user_id"),
   createdAt,
 });
 
@@ -162,6 +164,9 @@ export const followupContacts = pgTable("followup_contacts", {
   leftGroupAt: timestamp("left_group_at", { withTimezone: true }),
   /** Migration 0014 : STOP écrit dans le groupe, clarification en cours. */
   stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
+  /** Migration 0017 : accord recueilli au cabinet pour être contacté sur WhatsApp. */
+  whatsappOptinAt: timestamp("whatsapp_optin_at", { withTimezone: true }),
+  whatsappOptinByMembershipId: uuid("whatsapp_optin_by_membership_id"),
   createdAt,
   updatedAt,
 });
