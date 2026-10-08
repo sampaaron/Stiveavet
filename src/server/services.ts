@@ -5,6 +5,8 @@ import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { emailSender, marketingEmailSender } from "@/adapters/email";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
+import { conversationsService } from "@/domains/conversations/service";
+import type { ConversationsService } from "@/domains/conversations/service";
 import { demoService } from "@/domains/demo/service";
 import type { DemoService } from "@/domains/demo/service";
 import { teamService } from "@/domains/equipe/service";
@@ -18,7 +20,9 @@ import type { SettingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
+import { JOB_HANDLERS, OUTBOX_ROUTES } from "@/domains/taches/registry";
 import { jobsService } from "@/domains/taches/service";
+import { createWorker } from "@/domains/taches/worker";
 import type { JobsService } from "@/domains/taches/service";
 import type { FollowupsService } from "@/domains/suivis/service";
 import { appDatabase } from "@/server/db/client";
@@ -32,6 +36,8 @@ let billing: BillingService | undefined;
 let demo: DemoService | undefined;
 let jobs: JobsService | undefined;
 let launch: LaunchService | undefined;
+let conversations: ConversationsService | undefined;
+let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 /** Services métier branchés sur la base applicative et l'envoi d'e-mails. */
 export const services = {
@@ -73,6 +79,24 @@ export const services = {
   launch(): LaunchService {
     launch ??= launchService({ db: appDatabase(), drveto: fakeDrVeto });
     return launch;
+  },
+  /** Conversation WhatsApp d'un suivi : Numa, accord, reprise en main (ADR 0016). */
+  conversations(): ConversationsService {
+    conversations ??= conversationsService(appDatabase());
+    return conversations;
+  },
+  /**
+   * Passage du worker déclenché par le simulateur du propriétaire, en local seulement
+   * (l'appelant le vérifie) : mêmes exécutants que `pnpm worker`.
+   */
+  simulatorWorker() {
+    simulatorWorker ??= createWorker({
+      db: appDatabase(),
+      workerId: "app-simulateur",
+      handlers: JOB_HANDLERS,
+      routes: OUTBOX_ROUTES,
+    });
+    return simulatorWorker;
   },
   /** Tâches en échec, relance et abandon (ADR 0014). */
   jobs(): JobsService {

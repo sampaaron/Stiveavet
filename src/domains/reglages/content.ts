@@ -113,7 +113,7 @@ const PARIS = new Intl.DateTimeFormat("en-GB", {
 });
 
 /** Heure de Paris d'un instant, en minutes depuis l'époque (pour calculer le décalage). */
-function parisWallMinutes(instant: Date): number {
+export function parisWallMinutes(instant: Date): number {
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     Number(
       PARIS.formatToParts(instant).find((p) => p.type === type)?.value ?? NaN,

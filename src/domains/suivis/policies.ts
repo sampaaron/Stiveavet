@@ -88,3 +88,24 @@ export function canLaunchFollowup(
     viewer.membershipId === responsibleMembershipId
   );
 }
+
+/**
+ * Écrire au propriétaire depuis Stivea Vet (cahier des charges §5, « Contrôle humain ») :
+ * accès clinique et droit de répondre. Le message met Numa en pause.
+ */
+export function canWriteToOwner(
+  viewer: Viewer,
+  access: FollowupAccess,
+): boolean {
+  return (
+    access === "clinical" && viewer.permissions.has("owner_messages.reply")
+  );
+}
+
+/** « Reprendre Numa » : décision d'un vétérinaire qui peut écrire au propriétaire. */
+export function canResumeNuma(
+  viewer: LaunchViewer,
+  access: FollowupAccess,
+): boolean {
+  return canWriteToOwner(viewer, access) && VET_ROLES.has(viewer.role);
+}

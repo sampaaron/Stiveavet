@@ -609,13 +609,22 @@ describe("pause, reprise, arrêt et réactivation", () => {
       await domainError(service.changeStatus(leo, plume, "pause", NOW)),
     ).toBe("invalid_transition");
 
+    // Premier message replanifié à la reprise (jamais parti), puis tout annulé à l'arrêt.
     const { rows: jobs } = await admin.query(
-      "SELECT status FROM scheduled_jobs WHERE followup_id = $1",
+      "SELECT status, payload FROM scheduled_jobs WHERE followup_id = $1",
       [plume],
     );
-    expect(jobs).toEqual([{ status: "cancelled" }]);
+    expect(jobs).toEqual([
+      { status: "cancelled", payload: { step: "intro" } },
+      { status: "cancelled", payload: { step: "intro" } },
+    ]);
 
     await service.changeStatus(leo, plume, "reactivate", NOW);
+    const { rows: pending } = await admin.query(
+      "SELECT payload FROM scheduled_jobs WHERE followup_id = $1 AND status = 'pending'",
+      [plume],
+    );
+    expect(pending).toEqual([{ payload: { step: "intro" } }]);
     expect((await service.sheet(leo, plume)).followup.status).toBe("active");
     expect((await statusEvents(plume)).slice(2)).toEqual([
       { from_status: "active", to_status: "paused", reason: "vet_paused" },
