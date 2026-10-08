@@ -66,7 +66,7 @@ function channelNote(
 }
 
 /** Trace du groupe dans la langue du lecteur ; à défaut, le texte enregistré. */
-function messageText(
+export function messageText(
   t: AppDictionary,
   message: ConversationMessage,
 ): string {
@@ -225,9 +225,7 @@ export function LiveConversation({
           <EmptyState
             title={text.emptyTitle}
             description={
-              view.isTest
-                ? text.emptyTest
-                : text.emptyScheduled(ownerFirstName)
+              view.isTest ? text.emptyTest : text.emptyScheduled(ownerFirstName)
             }
           />
         )}

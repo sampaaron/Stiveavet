@@ -30,13 +30,11 @@ export const billing: AppDictionary["billing"] = {
     on: (date: string) => `On ${date}`,
     onWithSurcharges: (date: string, amount: string) =>
       `On ${date}, plus ${amount} excl. VAT in extra charges`,
-    cancelled: (date: string) =>
-      `Subscription cancelled, effective on ${date}`,
+    cancelled: (date: string) => `Subscription cancelled, effective on ${date}`,
   },
   activeFollowups: {
     title: "Active follow-ups",
-    count: (used: number, included: number) =>
-      `${used} / ${included} included`,
+    count: (used: number, included: number) => `${used} / ${included} included`,
   },
   usage: {
     title: "Numa usage",
@@ -118,7 +116,8 @@ export const billing: AppDictionary["billing"] = {
     stayMonthly: "Noted: you stay on monthly billing, with no commitment.",
     cancelled: (date: string) =>
       `Cancellation recorded. It takes effect on ${date}; your active follow-ups continue until they end.`,
-    settled: "Direct debit successful (simulated). Thank you, everything is in order.",
+    settled:
+      "Direct debit successful (simulated). Thank you, everything is in order.",
     settleFailed:
       "The direct debit failed again. Check the mandate or contact support.",
   },

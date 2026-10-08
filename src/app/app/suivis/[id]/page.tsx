@@ -664,8 +664,7 @@ function Contacts({
                 {contact.name}
                 <span className="font-normal text-ink-muted">
                   {" "}
-                  ·{" "}
-                  {contact.role === "primary" ? text.primary : text.secondary}
+                  · {contact.role === "primary" ? text.primary : text.secondary}
                 </span>
               </span>
               <span className="block text-ink-muted">

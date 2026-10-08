@@ -9,16 +9,18 @@ import {
   REACTIVATION_SURCHARGE_CENTS,
   TRIAL_MONTHS,
   cancellationEffectiveAt,
-  formatEuros,
 } from "@/domains/facturation/rules";
 import type { BillingOverview } from "@/domains/facturation/service";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { ButtonLink } from "@/ui/button";
 import { CapacityMeter } from "@/ui/capacity-meter";
 import { Card, SectionCard } from "@/ui/card";
-import { formatDate } from "@/ui/format";
+import { formatDate, formatEuros } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 
@@ -30,33 +32,37 @@ import {
   StayMonthlyForm,
 } from "./billing-forms";
 
-export const metadata: Metadata = { title: "Facturation" };
-
-const STATUS_LABELS = {
-  paid: "Payée",
-  open: "À prélever",
-  failed: "Prélèvement refusé",
-} as const;
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.billing.title };
+}
 
 export default async function BillingPage() {
   const context = await requirePermission("billing.manage");
-  const overview = await services.billing().overview(context);
+  const [overview, { t, locale }] = await Promise.all([
+    services.billing().overview(context),
+    appText(),
+  ]);
   const { facts } = overview;
+  const text = t.billing;
+  const euros = (cents: number) => formatEuros(cents, locale);
+  const date = (value: Date) => formatDate(value, locale);
 
   if (!facts)
     return (
       <>
-        <PageHeader title="Facturation" />
+        <PageHeader title={text.title} />
         <Card>
           <EmptyState
-            title="Aucun abonnement enregistré"
-            description="Ce cabinet a été créé avant la facturation. Contactez le support pour choisir votre formule."
+            title={text.noSubscription.title}
+            description={text.noSubscription.description}
           />
         </Card>
       </>
     );
 
   const plan = PLAN_CATALOG[facts.plan];
+  const planText = t.labels.plans[facts.plan];
   const now = new Date();
   const editable =
     !facts.canceledAt &&
@@ -65,58 +71,64 @@ export default async function BillingPage() {
 
   return (
     <>
-      <PageHeader
-        title="Facturation"
-        description="Prix hors taxes, facturés au cabinet et prélevés chaque mois. Prélèvements simulés pendant cette phase : aucun compte bancaire n'est débité."
-      />
+      <PageHeader title={text.title} description={text.description} />
       <div className="grid gap-6">
-        <AccessBanner access={overview.access} />
+        <AccessBanner access={overview.access} t={t} locale={locale} />
         {!overview.mandateSigned ? (
           <AlertBanner
             tone="watch"
-            title="Mandat de prélèvement à signer"
+            title={text.mandate.title}
             action={
               <ButtonLink href="/app/demarrage" variant="secondary" size="sm">
-                Ouvrir le démarrage guidé
+                {text.mandate.action}
               </ButtonLink>
             }
           >
-            Les factures restent à prélever tant que le mandat n&apos;est pas
-            signé.
+            {text.mandate.body}
           </AlertBanner>
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">Formule</p>
+            <p className="text-sm font-medium text-ink-muted">{text.plan}</p>
             <p className="mt-2 text-2xl font-bold tracking-tight">
-              {plan.label}
+              {planText.name}
             </p>
             <p className="mt-1 text-sm text-ink-muted">
-              {phaseLabel(overview)}
+              {phaseLabel(overview, t, locale)}
             </p>
           </Card>
           <Card className="p-5">
             <p className="text-sm font-medium text-ink-muted">
-              Prochain prélèvement
+              {text.next.title}
             </p>
             <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
               {overview.nextPriceCents !== null
-                ? `${formatEuros(overview.nextPriceCents)} HT`
-                : "Aucun"}
+                ? text.exclVat(euros(overview.nextPriceCents))
+                : text.next.none}
             </p>
             <p className="mt-1 text-sm text-ink-muted">
               {overview.nextPriceCents !== null && overview.period
-                ? `Le ${formatDate(overview.period.end)}${overview.pending.amountCents ? `, plus ${formatEuros(overview.pending.amountCents)} HT de suppléments` : ""}`
+                ? overview.pending.amountCents
+                  ? text.next.onWithSurcharges(
+                      date(overview.period.end),
+                      euros(overview.pending.amountCents),
+                    )
+                  : text.next.on(date(overview.period.end))
                 : facts.endsAt
-                  ? `Abonnement résilié, effectif le ${formatDate(facts.endsAt)}`
+                  ? text.next.cancelled(date(facts.endsAt))
                   : ""}
             </p>
           </Card>
           <Card className="p-5 sm:col-span-2 xl:col-span-1">
-            <p className="text-sm font-medium text-ink-muted">Suivis actifs</p>
+            <p className="text-sm font-medium text-ink-muted">
+              {text.activeFollowups.title}
+            </p>
             <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
-              {overview.activeFollowups} / {INCLUDED_ACTIVE_FOLLOWUPS} inclus
+              {text.activeFollowups.count(
+                overview.activeFollowups,
+                INCLUDED_ACTIVE_FOLLOWUPS,
+              )}
             </p>
             <div className="mt-3">
               <CapacityMeter
@@ -128,44 +140,51 @@ export default async function BillingPage() {
         </div>
 
         <SectionCard
-          title="Usage de Numa"
-          description={`${INCLUDED_ACTIVE_FOLLOWUPS} suivis actifs en même temps sont inclus. Au-delà, chaque nouveau suivi coûte ${formatEuros(LAUNCH_SURCHARGE_CENTS)} HT et chaque réactivation ${formatEuros(REACTIVATION_SURCHARGE_CENTS)} HT, prélevés avec l'abonnement suivant. Un suivi terminé libère sa place ; les suivis test ne comptent pas.`}
+          title={text.usage.title}
+          description={text.usage.description(
+            INCLUDED_ACTIVE_FOLLOWUPS,
+            euros(LAUNCH_SURCHARGE_CENTS),
+            euros(REACTIVATION_SURCHARGE_CENTS),
+          )}
         >
           <p className="text-sm">
             {overview.pending.launches + overview.pending.reactivations > 0
-              ? `En attente de facturation : ${overview.pending.launches} lancement(s) et ${overview.pending.reactivations} réactivation(s), soit ${formatEuros(overview.pending.amountCents)} HT.`
-              : "Aucun supplément en attente."}
+              ? text.usage.pending(
+                  overview.pending.launches,
+                  overview.pending.reactivations,
+                  euros(overview.pending.amountCents),
+                )
+              : text.usage.nonePending}
           </p>
         </SectionCard>
 
         {editable &&
         (overview.canCommitAnnual || overview.commitmentReminder) ? (
           <SectionCard
-            title="Engagement annuel"
+            title={text.annual.title}
             description={
               overview.commitmentReminder
-                ? "À choisir avant le 7e mois. Sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement."
-                : "Possible à tout moment, sur votre demande uniquement."
+                ? text.annual.reminder
+                : text.annual.anytime
             }
           >
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="grid content-start gap-2 text-sm">
                 <p>
-                  Avec engagement : {formatEuros(plan.annualMonthlyCents)} HT
-                  par mois pendant 12 mois. Sans engagement :{" "}
-                  {formatEuros(plan.monthlyCents)} HT par mois.
+                  {text.annual.prices(
+                    euros(plan.annualMonthlyCents),
+                    euros(plan.monthlyCents),
+                  )}
                 </p>
                 {overview.canCommitAnnual ? (
                   <CommitAnnualForm
-                    priceLabel={formatEuros(plan.annualMonthlyCents)}
+                    priceLabel={euros(plan.annualMonthlyCents)}
                   />
                 ) : null}
               </div>
               {overview.commitmentReminder ? (
                 <div className="grid content-start gap-2 text-sm">
-                  <p>
-                    Vous préférez garder la liberté de résilier chaque mois.
-                  </p>
+                  <p>{text.annual.stayMonthlyIntro}</p>
                   <StayMonthlyForm />
                 </div>
               ) : null}
@@ -175,17 +194,27 @@ export default async function BillingPage() {
 
         {editable && facts.cycle === "monthly" ? (
           <SectionCard
-            title="Changer de formule"
-            description={`La nouvelle formule s'applique à la prochaine échéance${overview.phase === "trial" ? `, après les ${TRIAL_MONTHS} mois d'essai` : ""}. Votre équipe compte ${overview.vetSeats} vétérinaire(s), invitations en attente comprises.`}
+            title={text.changePlan.title}
+            description={text.changePlan.description(
+              overview.vetSeats,
+              overview.phase === "trial" ? TRIAL_MONTHS : null,
+            )}
           >
             <PlanForm
               current={facts.plan}
               options={PLANS.map((key) => {
                 const option = PLAN_CATALOG[key];
+                const names = t.labels.plans[key];
                 return {
                   value: key,
-                  label: `${option.label} · ${formatEuros(option.monthlyCents)} HT par mois`,
-                  detail: `${option.maxVets === 1 ? "1 vétérinaire" : `Jusqu'à ${option.maxVets} vétérinaires`}. ${option.stive}.`,
+                  label: text.changePlan.option(
+                    names.name,
+                    euros(option.monthlyCents),
+                  ),
+                  detail: text.changePlan.optionDetail(
+                    option.maxVets,
+                    names.stive,
+                  ),
                   disabled: overview.vetSeats > option.maxVets,
                 };
               })}
@@ -194,8 +223,8 @@ export default async function BillingPage() {
         ) : null}
 
         <SectionCard
-          title="Factures"
-          description="Montants hors taxes et TVA à 20 %. Factures simulées pendant cette phase."
+          title={text.invoices.title}
+          description={text.invoices.description}
         >
           {overview.invoices.length ? (
             <ul className="grid gap-3">
@@ -207,13 +236,16 @@ export default async function BillingPage() {
                         <span className="font-semibold">{invoice.number}</span>
                         <span className="text-ink-muted">
                           {" "}
-                          · du {formatDate(invoice.periodStart)} au{" "}
-                          {formatDate(invoice.periodEnd)}
+                          ·{" "}
+                          {text.invoices.period(
+                            date(invoice.periodStart),
+                            date(invoice.periodEnd),
+                          )}
                         </span>
                       </span>
                       <span className="flex items-center gap-3">
                         <span className="tabular-nums">
-                          {formatEuros(invoice.totalCents)} TTC
+                          {text.inclVat(euros(invoice.totalCents))}
                         </span>
                         <span
                           className={
@@ -224,7 +256,7 @@ export default async function BillingPage() {
                                 : "font-semibold text-watch"
                           }
                         >
-                          {STATUS_LABELS[invoice.status]}
+                          {text.invoices.status[invoice.status]}
                         </span>
                       </span>
                     </summary>
@@ -236,20 +268,20 @@ export default async function BillingPage() {
                         >
                           <dt className="text-ink-muted">{line.label}</dt>
                           <dd className="tabular-nums">
-                            {formatEuros(line.amountCents)}
+                            {euros(line.amountCents)}
                           </dd>
                         </div>
                       ))}
                       <div className="flex justify-between gap-4">
-                        <dt className="text-ink-muted">TVA 20 %</dt>
+                        <dt className="text-ink-muted">{text.invoices.vat}</dt>
                         <dd className="tabular-nums">
-                          {formatEuros(invoice.vatCents)}
+                          {euros(invoice.vatCents)}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4 font-semibold">
-                        <dt>Total TTC</dt>
+                        <dt>{text.invoices.total}</dt>
                         <dd className="tabular-nums">
-                          {formatEuros(invoice.totalCents)}
+                          {euros(invoice.totalCents)}
                         </dd>
                       </div>
                     </dl>
@@ -258,19 +290,17 @@ export default async function BillingPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-ink-muted">
-              Aucune facture pour l&apos;instant.
-            </p>
+            <p className="text-sm text-ink-muted">{text.invoices.none}</p>
           )}
         </SectionCard>
 
         {editable ? (
           <SectionCard
-            title="Résilier"
-            description="Vos suivis en cours continuent jusqu'à leur fin, pour ne laisser aucun propriétaire sans réponse. Aucun nouveau suivi n'est possible après la date d'effet. Quand le dernier suivi se termine, le cabinet garde un accès en lecture seule pendant 3 mois."
+            title={text.cancel.title}
+            description={text.cancel.description}
           >
             <CancelForm
-              effectiveLabel={formatDate(cancellationEffectiveAt(facts, now))}
+              effectiveLabel={date(cancellationEffectiveAt(facts, now))}
             />
           </SectionCard>
         ) : null}
@@ -279,17 +309,35 @@ export default async function BillingPage() {
   );
 }
 
-function phaseLabel(overview: BillingOverview): string {
+function phaseLabel(
+  overview: BillingOverview,
+  t: AppDictionary,
+  locale: Locale,
+): string {
   const { facts, month } = overview;
   if (!facts || !month) return "";
+  const phase = t.billing.phase;
   if (overview.phase === "trial")
-    return `Essai pilote, mois ${month} sur ${TRIAL_MONTHS}, puis ${formatEuros(PLAN_CATALOG[facts.plan].monthlyCents)} HT par mois`;
+    return phase.trial(
+      month,
+      TRIAL_MONTHS,
+      formatEuros(PLAN_CATALOG[facts.plan].monthlyCents, locale),
+    );
   if (facts.cycle === "annual" && facts.annualEndsAt)
-    return `Engagement annuel jusqu'au ${formatDate(facts.annualEndsAt)}`;
-  return `Sans engagement, mois ${month} de votre abonnement`;
+    return phase.annualUntil(formatDate(facts.annualEndsAt, locale));
+  return phase.monthly(month);
 }
 
-function AccessBanner({ access }: { access: Access }) {
+function AccessBanner({
+  access,
+  t,
+  locale,
+}: {
+  access: Access;
+  t: AppDictionary;
+  locale: Locale;
+}) {
+  const text = t.billing.access;
   switch (access.kind) {
     case "full":
       return null;
@@ -297,42 +345,38 @@ function AccessBanner({ access }: { access: Access }) {
       return (
         <AlertBanner
           tone="watch"
-          title={`Prélèvement refusé : ${access.daysLeft} jour(s) pour régulariser`}
+          title={text.graceTitle(access.daysLeft)}
           action={<SettleForm />}
         >
-          Après le {formatDate(access.blockedAt)}, les nouveaux suivis seront
-          suspendus. Les suivis en cours continuent dans tous les cas.
+          {text.graceBody(formatDate(access.blockedAt, locale))}
         </AlertBanner>
       );
     case "blocked":
       return (
         <AlertBanner
           tone="urgent"
-          title="Nouveaux suivis suspendus"
+          title={text.blockedTitle}
           action={access.reason === "unpaid" ? <SettleForm /> : undefined}
         >
           {access.reason === "unpaid"
-            ? "Le paiement n'a pas été régularisé dans les 30 jours. Vos suivis en cours continuent jusqu'à leur fin."
-            : "L'abonnement est résilié. Vos suivis en cours continuent jusqu'à leur fin."}
+            ? text.blockedUnpaid
+            : text.blockedCancelled}
         </AlertBanner>
       );
     case "read_only":
       return (
         <AlertBanner
           tone="info"
-          title={`Accès en lecture seule jusqu'au ${formatDate(access.until)}`}
+          title={text.readOnlyTitle(formatDate(access.until, locale))}
           action={access.reason === "unpaid" ? <SettleForm /> : undefined}
         >
-          Plus aucun suivi n&apos;est en cours. Vous pouvez consulter
-          l&apos;historique ; un export PDF est disponible sur demande au
-          support.
+          {text.readOnlyBody}
         </AlertBanner>
       );
     case "closed":
       return (
-        <AlertBanner tone="info" title="Accès au cabinet terminé">
-          La période de lecture seule est terminée. Contactez le support pour
-          toute demande d&apos;export.
+        <AlertBanner tone="info" title={text.closedTitle}>
+          {text.closedBody}
         </AlertBanner>
       );
   }

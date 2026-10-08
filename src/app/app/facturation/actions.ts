@@ -13,7 +13,6 @@ import { formatDate } from "@/ui/format";
 import type { ActionState } from "../action-state";
 import { attempt, domainFailure } from "../domain-messages";
 
-
 const planInput = z.object({ plan: z.enum(PLANS) });
 const cycleInput = z.object({
   cycle: z.enum(["annual", "monthly"]),
@@ -87,8 +86,7 @@ export async function cancelAction(
       notice: t.billing.notices.cancelled(formatDate(endsAt, locale)),
     });
   } catch (error) {
-    if (error instanceof DomainError)
-      return finish(await domainFailure(error));
+    if (error instanceof DomainError) return finish(await domainFailure(error));
     throw error;
   }
 }
@@ -104,8 +102,7 @@ export async function settleAction(): Promise<ActionState> {
         : { error: t.billing.notices.settleFailed },
     );
   } catch (error) {
-    if (error instanceof DomainError)
-      return finish(await domainFailure(error));
+    if (error instanceof DomainError) return finish(await domainFailure(error));
     throw error;
   }
 }

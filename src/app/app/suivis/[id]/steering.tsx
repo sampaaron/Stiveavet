@@ -48,9 +48,7 @@ export function SteeringButtons({
         {status === "active" || status === "human_takeover"
           ? submit("pause", text.pause)
           : null}
-        {status === "paused"
-          ? submit("resume", text.resume, true)
-          : null}
+        {status === "paused" ? submit("resume", text.resume, true) : null}
         {status === "ended" ? submit("reactivate", text.reactivate) : null}
         {status !== "ended" && !confirmStop ? (
           <Button

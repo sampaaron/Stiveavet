@@ -49,11 +49,7 @@ const STATE_TONES: Record<ProgrammeStepState, string> = {
   after_end: "text-ink-muted",
 };
 
-function endLine(
-  text: Text,
-  locale: Locale,
-  programme: ProgrammeView,
-): string {
+function endLine(text: Text, locale: Locale, programme: ProgrammeView): string {
   if (programme.ended) {
     const at = programme.ended.at
       ? formatDate(programme.ended.at, locale)

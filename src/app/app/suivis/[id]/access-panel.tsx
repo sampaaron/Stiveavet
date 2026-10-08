@@ -27,9 +27,7 @@ export async function AccessPanel({
   return (
     <SectionCard
       title={text.title}
-      description={
-        isPrivate ? text.privateDescription : text.publicDescription
-      }
+      description={isPrivate ? text.privateDescription : text.publicDescription}
     >
       <div className="grid gap-5">
         <PrivacyForm followupId={followupId} isPrivate={isPrivate} />

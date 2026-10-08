@@ -132,7 +132,8 @@ export const dossier: AppDictionary["dossier"] = {
     notScheduled: "not scheduled",
     stepsLabel: "Follow-up steps",
     noSteps: "No steps scheduled.",
-    full: (count) => `Full programme (${count} ${count === 1 ? "step" : "steps"})`,
+    full: (count) =>
+      `Full programme (${count} ${count === 1 ? "step" : "steps"})`,
     states: {
       sentAt: (at) => `Sent on ${at}`,
       sent: "Sent",
@@ -297,7 +298,8 @@ export const dossier: AppDictionary["dossier"] = {
       "JPEG, PNG or WebP, 5 MB maximum. Use an image without any real data.",
     sendPhoto: "Send the photo",
     voiceOf: (name) => `What ${name}'s voice note says`,
-    voicePlaceholder: "For example: she has been eating well since this morning",
+    voicePlaceholder:
+      "For example: she has been eating well since this morning",
     voiceHelp:
       "A real audio file is created; the simulated transcript reads this text back.",
     sendVoice: "Send the voice note",

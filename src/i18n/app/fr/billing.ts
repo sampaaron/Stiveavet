@@ -51,7 +51,8 @@ export const billing = {
     anytime: "Possible à tout moment, sur votre demande uniquement.",
     prices: (annual: string, monthly: string) =>
       `Avec engagement : ${annual} HT par mois pendant 12 mois. Sans engagement : ${monthly} HT par mois.`,
-    stayMonthlyIntro: "Vous préférez garder la liberté de résilier chaque mois.",
+    stayMonthlyIntro:
+      "Vous préférez garder la liberté de résilier chaque mois.",
     confirm: (price: string) =>
       `Je m'engage pour 12 mois à ${price} HT par mois, prélevés chaque mois.`,
     submit: "Passer à l'engagement annuel",
