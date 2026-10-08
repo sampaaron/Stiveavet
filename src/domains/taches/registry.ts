@@ -1,4 +1,4 @@
-import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
+import type { AiGateway } from "@/adapters/ai-gateway/types";
 import { workerEmailSender } from "@/adapters/email/worker";
 import { lazyObjectStorage } from "@/adapters/object-storage";
 import { conversationHandlers } from "@/domains/conversations/service";
@@ -25,13 +25,16 @@ import type {
 /**
  * Exécutants des tâches et routes de l'outbox, par type. Le worker ne prend que les tâches
  * dont il connaît le type : une tâche d'un type pas encore livré attend sans échouer.
- * IA simulée (ADR 0004, ADR 0016) ; rappels et fin du suivi automatisé au lot 15 (ADR 0018) ;
+ * IA simulée ou réelle selon la configuration (ADR 0016, ADR 0026) ; rappels et fin du suivi automatisé au lot 15 (ADR 0018) ;
  * transcription, analyse photo et suppression des fichiers au lot 16 (ADR 0019), sur le
  * stockage objet local ; conservation des données au lot 17 (ADR 0020) ; offre d'engagement
  * annuel au lot 20 (ADR 0023) ; envois WhatsApp, simulés ou par l'API de Meta selon la
  * configuration, au lot 21 (ADR 0024) ; photos et vocaux reçus par WhatsApp au lot 22 (ADR 0025).
  */
-export function jobRegistry(deps: { whatsapp: WhatsAppProvider }): {
+export function jobRegistry(deps: {
+  whatsapp: WhatsAppProvider;
+  ai: AiGateway;
+}): {
   handlers: Readonly<Record<string, JobHandler>>;
   dead: Readonly<Record<string, DeadJobHandler>>;
 } {
@@ -45,13 +48,13 @@ export function jobRegistry(deps: { whatsapp: WhatsAppProvider }): {
   });
   return {
     handlers: {
-      ...conversationHandlers({ whatsapp: deps.whatsapp, ai: fakeAiGateway }),
+      ...conversationHandlers({ whatsapp: deps.whatsapp, ai: deps.ai }),
       ...sends.handlers,
       ...alerts.handlers,
       ...downloads.handlers,
       ...failureEmailHandlers({ email, appUrl }),
       ...followupEndHandlers(),
-      ...mediaHandlers({ storage: lazyObjectStorage, ai: fakeAiGateway }),
+      ...mediaHandlers({ storage: lazyObjectStorage, ai: deps.ai }),
       ...retentionHandlers({ storage: lazyObjectStorage }),
       ...billingHandlers({ email, appUrl }),
     },

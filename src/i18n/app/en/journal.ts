@@ -129,6 +129,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} retried a failed direct debit`,
   },
   automatic: {
+    "numa.ai_unavailable":
+      "AI service unavailable: Numa referred the owner to the team, without a drafted reply",
     "numa.reply_blocked":
       "Safeguard: a reply from Numa was replaced with a referral to the vet",
     "whatsapp.media_refused":

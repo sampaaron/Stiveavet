@@ -135,6 +135,8 @@ export const journal = {
       `${actor} a relancé un prélèvement refusé`,
   },
   automatic: {
+    "numa.ai_unavailable":
+      "Service d'IA indisponible : Numa a renvoyé le propriétaire vers l'équipe, sans réponse rédigée",
     "numa.reply_blocked":
       "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
     "whatsapp.media_refused":
