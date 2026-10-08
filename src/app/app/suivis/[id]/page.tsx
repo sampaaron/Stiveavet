@@ -9,12 +9,18 @@ import { findFollowup } from "@/fixtures/cabinet-tilleuls";
 import { showsReferenceFixtures } from "@/fixtures/seed-ids";
 import type { Followup } from "@/fixtures/types";
 import { canBrowseProtocols } from "@/domains/protocoles/policies";
+import {
+  canPrepareFollowup,
+  canSteerFollowup,
+} from "@/domains/suivis/policies";
+import type { MemberContext } from "@/server/authz";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
 import { SpeciesIcon, followupStatus } from "@/ui/followup-card";
 import { formatDate } from "@/ui/format";
+import { ButtonLink } from "@/ui/button";
 import { StatusBadge } from "@/ui/status-badge";
 
 import {
@@ -26,14 +32,28 @@ import { TestMark } from "../test-mark";
 
 import { AccessPanel } from "./access-panel";
 import { FollowupWorkspace } from "./followup-workspace";
+import { SteeringButtons } from "./steering";
 
 // Titre générique : le nom de l'animal n'apparaît qu'après contrôle d'accès, dans la page.
 export const metadata: Metadata = { title: "Dossier de suivi" };
 
+const DONE: Record<string, string> = {
+  lance:
+    "Suivi lancé : Numa enverra son premier message à l'heure prévue, au nom du cabinet.",
+  pause:
+    "Suivi mis en pause : aucune relance ne part tant qu'il n'est pas repris.",
+  reprise: "Suivi repris.",
+  arret: "Suivi arrêté : les envois et rappels prévus sont annulés.",
+  reactivation: "Suivi réactivé.",
+};
+
 export default async function FollowupPage({
   params,
+  searchParams,
 }: PageProps<"/app/suivis/[id]">) {
   const { id } = await params;
+  const { fait } = await searchParams;
+  const done = typeof fait === "string" ? DONE[fait] : undefined;
   const context = await memberContext();
   // Inexistant, autre cabinet ou non autorisé : même réponse 404, pour ne rien révéler.
   const opened = await services.followups().open(context, id);
@@ -74,6 +94,15 @@ export default async function FollowupPage({
         Suivis
       </Link>
 
+      {done ? (
+        <p
+          role="status"
+          className="mb-4 rounded-[var(--radius-card)] bg-brand-soft px-4 py-3 text-sm font-medium text-brand-ink"
+        >
+          {done}
+        </p>
+      ) : null}
+
       {fixture ? (
         <ReferenceDossier
           protocolLink={protocolLink}
@@ -87,6 +116,7 @@ export default async function FollowupPage({
           followup={followup}
           accessPanel={accessPanel}
           protocolLink={protocolLink}
+          steering={<Steering context={context} followup={followup} />}
         />
       )}
     </>
@@ -125,14 +155,61 @@ function ProtocolLink({
   );
 }
 
+/** Fiche de lancement, modification, pause, arrêt et reprise, selon les droits. */
+function Steering({
+  context,
+  followup,
+}: {
+  context: MemberContext;
+  followup: FollowupView;
+}) {
+  if (!canPrepareFollowup(context, followup.access)) return null;
+  const canSteer = canSteerFollowup(context, followup.access);
+  if (followup.status === "draft")
+    return (
+      <SectionCard
+        title="Suivi en préparation"
+        description="Rien n'est envoyé au propriétaire avant le lancement par le vétérinaire responsable."
+      >
+        <ButtonLink href={`/app/suivis/${followup.id}/lancement`}>
+          Ouvrir la fiche de lancement
+        </ButtonLink>
+      </SectionCard>
+    );
+  if (!canSteer) return null;
+  return (
+    <SectionCard
+      title="Pilotage du suivi"
+      description="Vous pouvez modifier, mettre en pause, arrêter ou reprendre ce suivi à tout moment."
+    >
+      <div className="grid gap-4">
+        {followup.status !== "ended" ? (
+          <div>
+            <ButtonLink
+              href={`/app/suivis/${followup.id}/lancement`}
+              variant="secondary"
+              size="sm"
+            >
+              Modifier le suivi
+            </ButtonLink>
+          </div>
+        ) : null}
+        <SteeringButtons followupId={followup.id} status={followup.status} />
+      </div>
+    </SectionCard>
+  );
+}
+
 function BasicDossier({
   followup,
   accessPanel,
   protocolLink,
+  steering,
 }: {
   followup: FollowupView;
   accessPanel: ReactNode;
   protocolLink: ReactNode;
+  steering: ReactNode;
 }) {
   const badge = followupBadge(followup);
   return (
@@ -207,9 +284,10 @@ function BasicDossier({
             </AlertBanner>
           )}
         </div>
-        {accessPanel ? (
-          <div className="flex min-w-0 flex-col gap-6">{accessPanel}</div>
-        ) : null}
+        <div className="flex min-w-0 flex-col gap-6">
+          {steering}
+          {accessPanel}
+        </div>
       </div>
     </>
   );

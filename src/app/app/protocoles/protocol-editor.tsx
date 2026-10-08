@@ -1,19 +1,12 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
 import { useActionState, useId, useState } from "react";
 
 import {
-  ALERT_LEVELS,
-  ALERT_LEVEL_LABELS,
   CATEGORY_LABELS,
-  MAX_ALERTS,
-  MAX_STEPS,
   PROTOCOL_CATEGORIES,
   PROTOCOL_SPECIES,
   SPECIES_LABELS,
-  STEP_KINDS,
-  STEP_KIND_LABELS,
 } from "@/domains/protocoles/content";
 import type { ProtocolContent } from "@/domains/protocoles/content";
 import { Button } from "@/ui/button";
@@ -22,25 +15,18 @@ import { TextField } from "@/ui/text-field";
 
 import { ActionMessage, selectClasses } from "../action-message";
 import { initialActionState } from "../action-state";
+import {
+  AlertsEditor,
+  StepsEditor,
+  keyed,
+  textareaClasses,
+} from "../plan-editors";
+import type { EditableAlert, EditableStep } from "../plan-editors";
 
 import { saveProtocolAction } from "./actions";
 
-const textareaClasses =
-  "min-h-20 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] text-ink focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand";
-
-type Step = ProtocolContent["steps"][number] & { key: number };
-type Alert = ProtocolContent["alerts"][number] & { key: number };
-type Unit = "hours" | "days";
-
-let nextKey = 0;
-const keyed = <T,>(item: T) => ({ ...item, key: nextKey++ });
-
-/** Délai affiché en jours quand il tombe juste, sinon en heures. */
-function splitOffset(offsetHours: number): { value: number; unit: Unit } {
-  return offsetHours >= 24 && offsetHours % 24 === 0
-    ? { value: offsetHours / 24, unit: "days" }
-    : { value: offsetHours, unit: "hours" };
-}
+type Step = EditableStep;
+type Alert = EditableAlert;
 
 type EditorProps =
   | {
@@ -103,15 +89,6 @@ export function ProtocolEditor(props: EditorProps) {
       description: text,
     })),
   } satisfies ProtocolContent);
-
-  const updateStep = (key: number, patch: Partial<Step>) =>
-    setSteps((list) =>
-      list.map((step) => (step.key === key ? { ...step, ...patch } : step)),
-    );
-  const updateAlert = (key: number, patch: Partial<Alert>) =>
-    setAlerts((list) =>
-      list.map((alert) => (alert.key === key ? { ...alert, ...patch } : alert)),
-    );
 
   return (
     <form action={action} className="grid gap-6" noValidate>
@@ -228,212 +205,14 @@ export function ProtocolEditor(props: EditorProps) {
         title="Étapes"
         description="Ce que Numa envoie ou demande, et quand. Elles seront rangées dans l'ordre chronologique."
       >
-        <ol className="grid gap-4">
-          {steps.map((step, index) => {
-            const offset = splitOffset(step.offsetHours);
-            return (
-              <li
-                key={step.key}
-                className="grid gap-3 rounded-[var(--radius-control)] border border-line p-4"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold">
-                    Étape {index + 1}
-                  </span>
-                  <Button
-                    variant="quiet"
-                    size="sm"
-                    disabled={steps.length <= 1}
-                    onClick={() =>
-                      setSteps((list) => list.filter((s) => s.key !== step.key))
-                    }
-                    icon={<Trash2 aria-hidden="true" className="size-3.5" />}
-                    aria-label={`Retirer l'étape ${index + 1}`}
-                  >
-                    Retirer
-                  </Button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <TextField
-                    label="Délai"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={offset.value}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      updateStep(step.key, {
-                        offsetHours:
-                          offset.unit === "days" ? value * 24 : value,
-                      });
-                    }}
-                  />
-                  <div className="flex flex-col gap-1.5">
-                    <label
-                      htmlFor={`${id}-unite-${step.key}`}
-                      className="text-sm font-semibold"
-                    >
-                      Unité
-                    </label>
-                    <select
-                      id={`${id}-unite-${step.key}`}
-                      className={selectClasses}
-                      value={offset.unit}
-                      onChange={(event) =>
-                        updateStep(step.key, {
-                          offsetHours:
-                            event.target.value === "days"
-                              ? offset.value * 24
-                              : offset.value,
-                        })
-                      }
-                    >
-                      <option value="hours">heures après</option>
-                      <option value="days">jours après</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label
-                      htmlFor={`${id}-type-${step.key}`}
-                      className="text-sm font-semibold"
-                    >
-                      Type d&apos;étape
-                    </label>
-                    <select
-                      id={`${id}-type-${step.key}`}
-                      className={selectClasses}
-                      value={step.kind}
-                      onChange={(event) =>
-                        updateStep(step.key, {
-                          kind: event.target.value as Step["kind"],
-                        })
-                      }
-                    >
-                      {STEP_KINDS.map((value) => (
-                        <option key={value} value={value}>
-                          {STEP_KIND_LABELS[value]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor={`${id}-contenu-${step.key}`}
-                    className="text-sm font-semibold"
-                  >
-                    Contenu de l&apos;étape {index + 1}
-                  </label>
-                  <textarea
-                    id={`${id}-contenu-${step.key}`}
-                    className={textareaClasses}
-                    value={step.content}
-                    maxLength={1000}
-                    onChange={(event) =>
-                      updateStep(step.key, { content: event.target.value })
-                    }
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-        <div className="mt-4">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={steps.length >= MAX_STEPS}
-            onClick={() =>
-              setSteps((list) => [
-                ...list,
-                keyed({
-                  offsetHours: (list.at(-1)?.offsetHours ?? 0) + 24,
-                  kind: "question" as const,
-                  content: "",
-                }),
-              ])
-            }
-            icon={<Plus aria-hidden="true" className="size-3.5" />}
-          >
-            Ajouter une étape
-          </Button>
-        </div>
+        <StepsEditor steps={steps} setSteps={setSteps} />
       </SectionCard>
 
       <SectionCard
         title="Signes d'alerte"
         description="Validés par le vétérinaire. Numa ne pose jamais de diagnostic : elle signale et, en cas de doute, escalade."
       >
-        <ul className="grid gap-4">
-          {alerts.map((alert, index) => (
-            <li
-              key={alert.key}
-              className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)_auto] sm:items-end"
-            >
-              <div className="flex flex-col gap-1.5">
-                <label
-                  htmlFor={`${id}-niveau-${alert.key}`}
-                  className="text-sm font-semibold"
-                >
-                  Niveau
-                </label>
-                <select
-                  id={`${id}-niveau-${alert.key}`}
-                  className={selectClasses}
-                  value={alert.level}
-                  onChange={(event) =>
-                    updateAlert(alert.key, {
-                      level: event.target.value as Alert["level"],
-                    })
-                  }
-                >
-                  {ALERT_LEVELS.map((value) => (
-                    <option key={value} value={value}>
-                      {ALERT_LEVEL_LABELS[value]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <TextField
-                label={`Signe d'alerte ${index + 1}`}
-                value={alert.description}
-                maxLength={300}
-                onChange={(event) =>
-                  updateAlert(alert.key, { description: event.target.value })
-                }
-              />
-              <Button
-                variant="quiet"
-                size="sm"
-                className="h-11"
-                disabled={alerts.length <= 1}
-                onClick={() =>
-                  setAlerts((list) => list.filter((a) => a.key !== alert.key))
-                }
-                icon={<Trash2 aria-hidden="true" className="size-3.5" />}
-                aria-label={`Retirer le signe d'alerte ${index + 1}`}
-              >
-                Retirer
-              </Button>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-4">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={alerts.length >= MAX_ALERTS}
-            onClick={() =>
-              setAlerts((list) => [
-                ...list,
-                keyed({ level: "watch" as const, description: "" }),
-              ])
-            }
-            icon={<Plus aria-hidden="true" className="size-3.5" />}
-          >
-            Ajouter un signe d&apos;alerte
-          </Button>
-        </div>
+        <AlertsEditor alerts={alerts} setAlerts={setAlerts} />
       </SectionCard>
 
       {props.mode === "update" ? (

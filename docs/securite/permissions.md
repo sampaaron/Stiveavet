@@ -15,7 +15,7 @@ Les droits sont des permissions précises, attribuées à chaque membre. « oui 
 | Voir tous les suivis du cabinet (hors dossiers privés) (`followups.read_all`)                 | oui                        | sur décision | non                   |
 | Voir ses suivis et ceux partagés avec soi (`followups.read_own`)                              | oui                        | oui          | non                   |
 | Voir la liste organisationnelle des suivis, sans données cliniques (`followups.read_summary`) | oui                        | non          | oui                   |
-| Lancer un suivi (`followups.launch`)                                                          | oui                        | oui          | sur décision          |
+| Préparer et lancer un suivi (lancement réservé aux vétérinaires) (`followups.launch`)         | oui                        | oui          | sur décision          |
 | Partager ses suivis avec un confrère (`followups.share`)                                      | oui                        | oui          | non                   |
 | Lire conversations, photos, vocaux et synthèses cliniques (`clinical.read`)                   | oui                        | oui          | sur décision          |
 | Répondre aux propriétaires (`owner_messages.reply`)                                           | oui                        | oui          | sur décision          |

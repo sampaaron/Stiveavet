@@ -11,6 +11,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { alertLevel, protocolStepKind } from "@/domains/protocoles/schema";
+
 // Miroir typé de db/migrations (source de vérité) ; un test d'intégration vérifie la concordance.
 
 export const species = pgEnum("species", ["dog", "cat"]);
@@ -105,6 +107,8 @@ export const followups = pgTable("followups", {
   updatedAt,
   protocolVersionId: uuid("protocol_version_id"),
   isTest: boolean("is_test").notNull().default(false),
+  firstContactAt: timestamp("first_contact_at", { withTimezone: true }),
+  planRevision: integer("plan_revision").notNull().default(0),
 });
 
 export const followupShares = pgTable(
@@ -180,4 +184,72 @@ export const consents = pgTable("consents", {
   recordedAt: timestamp("recorded_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// Migration 0010 : fiche de lancement (import dr.veto, traitements, étapes, signes d'alerte).
+
+export const treatmentSource = pgEnum("treatment_source", ["drveto", "vet"]);
+
+/** Résumé importé de dr.veto, figé au moment de la préparation. */
+export const followupImports = pgTable("followup_imports", {
+  followupId: uuid("followup_id").primaryKey(),
+  organizationId: uuid("organization_id").notNull(),
+  source: text("source").notNull(),
+  externalRef: text("external_ref").notNull(),
+  allergies: text("allergies")
+    .array()
+    .notNull()
+    .default(sql`'{}'`),
+  antecedents: text("antecedents")
+    .array()
+    .notNull()
+    .default(sql`'{}'`),
+  importedByMembershipId: uuid("imported_by_membership_id").notNull(),
+  importedAt: timestamp("imported_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const followupTreatments = pgTable("followup_treatments", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  source: treatmentSource("source").notNull(),
+  name: text("name").notNull(),
+  instructions: text("instructions").notNull(),
+  validatedByMembershipId: uuid("validated_by_membership_id"),
+  validatedAt: timestamp("validated_at", { withTimezone: true }),
+  removedAt: timestamp("removed_at", { withTimezone: true }),
+  createdAt,
+});
+
+export const followupSteps = pgTable("followup_steps", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  revision: integer("revision").notNull(),
+  position: integer("position").notNull(),
+  offsetHours: integer("offset_hours").notNull(),
+  kind: protocolStepKind("kind").notNull(),
+  content: text("content").notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt,
+});
+
+export const followupAlertRules = pgTable("followup_alert_rules", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  revision: integer("revision").notNull(),
+  position: integer("position").notNull(),
+  level: alertLevel("level").notNull(),
+  description: text("description").notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt,
 });

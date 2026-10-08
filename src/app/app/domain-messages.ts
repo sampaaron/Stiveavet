@@ -23,6 +23,16 @@ const MESSAGES: Record<DomainError["code"], string> = {
   plan_vet_limit:
     "Cette formule compte moins de vétérinaires que votre équipe actuelle (invitations en attente comprises).",
   on_call_overlap: "Cette garde chevauche une garde déjà prévue.",
+  integration_missing:
+    "Connectez d'abord dr.veto et le numéro WhatsApp du cabinet dans Réglages.",
+  already_followed:
+    "Cet animal a déjà un suivi en préparation ou en cours. Ouvrez-le depuis la liste des suivis.",
+  launch_incomplete:
+    "La fiche n'est pas prête : choisissez un protocole validé et la date du premier message.",
+  invalid_transition:
+    "Ce suivi a changé d'état entre-temps. Rechargez la page.",
+  past_step:
+    "Une étape déjà passée ne se modifie plus : choisissez un délai à venir.",
 };
 
 export function domainFailure(error: DomainError): ActionState {

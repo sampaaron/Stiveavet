@@ -51,7 +51,10 @@ test.describe("protocoles du cabinet des Tilleuls (Claire)", () => {
         name: "Stérilisation de la chienne",
       }),
     ).toBeVisible();
-    await expect(page.getByText("1 suivi(s) lancé(s) avec elle")).toBeVisible();
+    // Au moins le dossier de Caramel (d'autres tests lancent des suivis avec elle).
+    await expect(
+      page.getByText(/\d+ suivi\(s\) lancé\(s\) avec elle/),
+    ).toBeVisible();
   });
 });
 

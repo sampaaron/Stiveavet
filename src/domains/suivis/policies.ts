@@ -1,4 +1,6 @@
+import type { MemberRole } from "@/domains/auth/repository";
 import type { PermissionKey } from "@/domains/equipe/permissions";
+import { VET_ROLES } from "@/domains/equipe/permissions";
 
 export type Viewer = {
   membershipId: string;
@@ -48,5 +50,41 @@ export function canManageFollowupAccess(
   return (
     followup.responsibleMembershipId === viewer.membershipId &&
     viewer.permissions.has("followups.share")
+  );
+}
+
+export type LaunchViewer = Viewer & { role: MemberRole };
+
+/**
+ * Préparer la fiche d'un brouillon (import, étapes, signes d'alerte) : droit de lancement et
+ * accès clinique au dossier. Un assistant autorisé peut préparer ; il ne lance pas.
+ */
+export function canPrepareFollowup(
+  viewer: LaunchViewer,
+  access: FollowupAccess,
+): boolean {
+  return access === "clinical" && viewer.permissions.has("followups.launch");
+}
+
+/**
+ * Décisions de vétérinaire (cahier des charges §4 et §5) : valider un traitement, modifier un
+ * suivi en cours, le mettre en pause, l'arrêter ou le reprendre.
+ */
+export function canSteerFollowup(
+  viewer: LaunchViewer,
+  access: FollowupAccess,
+): boolean {
+  return canPrepareFollowup(viewer, access) && VET_ROLES.has(viewer.role);
+}
+
+/** « Lancer le suivi » : le vétérinaire responsable lui-même, au nom duquel Numa écrira. */
+export function canLaunchFollowup(
+  viewer: LaunchViewer,
+  access: FollowupAccess,
+  responsibleMembershipId: string,
+): boolean {
+  return (
+    canSteerFollowup(viewer, access) &&
+    viewer.membershipId === responsibleMembershipId
   );
 }
