@@ -76,6 +76,9 @@ export const dashboard = {
     emptyTitle: "Aucun rendez-vous aujourd'hui",
     emptyDescription:
       "Connectez dr.veto dans les réglages pour voir l'agenda complet.",
+    /** Rendez-vous Stivea : type et animal ; « autre » s'affiche simplement « Rendez-vous ». */
+    appointment: (kind: string, animal: string) => `${kind} · ${animal}`,
+    otherAppointment: "Rendez-vous",
   },
   quickActions: "Actions rapides",
   numa: (animals: number) =>

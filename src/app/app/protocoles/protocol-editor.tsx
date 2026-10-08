@@ -3,12 +3,11 @@
 import { useActionState, useId, useState } from "react";
 
 import {
-  CATEGORY_LABELS,
   PROTOCOL_CATEGORIES,
   PROTOCOL_SPECIES,
-  SPECIES_LABELS,
 } from "@/domains/protocoles/content";
 import type { ProtocolContent } from "@/domains/protocoles/content";
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 import { SectionCard } from "@/ui/card";
 import { TextField } from "@/ui/text-field";
@@ -57,6 +56,8 @@ const EMPTY: ProtocolContent = {
  * lancés gardent la leur. Le serveur revalide tout le contenu.
  */
 export function ProtocolEditor(props: EditorProps) {
+  const t = useAppText();
+  const text = t.protocols.editor;
   const initial = props.initial ?? EMPTY;
   const [state, action, pending] = useActionState(
     saveProtocolAction,
@@ -98,12 +99,12 @@ export function ProtocolEditor(props: EditorProps) {
         <input type="hidden" name="protocolId" value={props.protocolId} />
       ) : null}
 
-      <SectionCard title="Description">
+      <SectionCard title={text.descriptionSection}>
         <div className="grid gap-4">
           {props.mode === "create" && props.scopes.length > 1 ? (
             <fieldset className="grid gap-2">
               <legend className="mb-1 text-sm font-semibold">
-                Protocole destiné à
+                {text.scope}
               </legend>
               {props.scopes.map((scope, index) => (
                 <label
@@ -125,7 +126,7 @@ export function ProtocolEditor(props: EditorProps) {
             <input type="hidden" name="scope" value={props.scopes[0]?.value} />
           ) : null}
           <TextField
-            label="Nom du protocole"
+            label={text.name}
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={120}
@@ -137,7 +138,7 @@ export function ProtocolEditor(props: EditorProps) {
                 htmlFor={`${id}-categorie`}
                 className="text-sm font-semibold"
               >
-                Type
+                {text.category}
               </label>
               <select
                 id={`${id}-categorie`}
@@ -149,14 +150,14 @@ export function ProtocolEditor(props: EditorProps) {
               >
                 {PROTOCOL_CATEGORIES.map((value) => (
                   <option key={value} value={value}>
-                    {CATEGORY_LABELS[value]}
+                    {t.labels.protocolCategories[value]}
                   </option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor={`${id}-espece`} className="text-sm font-semibold">
-                Espèce
+                {text.species}
               </label>
               <select
                 id={`${id}-espece`}
@@ -168,13 +169,13 @@ export function ProtocolEditor(props: EditorProps) {
               >
                 {PROTOCOL_SPECIES.map((value) => (
                   <option key={value} value={value}>
-                    {SPECIES_LABELS[value]}
+                    {t.labels.species[value]}
                   </option>
                 ))}
               </select>
             </div>
             <TextField
-              label="Durée du suivi (jours)"
+              label={text.duration}
               type="number"
               inputMode="numeric"
               min={1}
@@ -188,7 +189,7 @@ export function ProtocolEditor(props: EditorProps) {
               htmlFor={`${id}-description`}
               className="text-sm font-semibold"
             >
-              Description
+              {text.description}
             </label>
             <textarea
               id={`${id}-description`}
@@ -202,34 +203,32 @@ export function ProtocolEditor(props: EditorProps) {
       </SectionCard>
 
       <SectionCard
-        title="Étapes"
-        description="Ce que Numa envoie ou demande, et quand. Elles seront rangées dans l'ordre chronologique."
+        title={text.steps}
+        description={text.stepsDescription}
       >
         <StepsEditor steps={steps} setSteps={setSteps} />
       </SectionCard>
 
       <SectionCard
-        title="Signes d'alerte"
-        description="Validés par le vétérinaire. Numa ne pose jamais de diagnostic : elle signale et, en cas de doute, escalade."
+        title={text.alerts}
+        description={text.alertsDescription}
       >
         <AlertsEditor alerts={alerts} setAlerts={setAlerts} />
       </SectionCard>
 
       {props.mode === "update" ? (
         <TextField
-          label="Ce qui change dans cette version"
+          label={text.changeNote}
           name="changeNote"
           maxLength={500}
-          hint="Visible dans l'historique. Les suivis déjà lancés gardent leur version."
+          hint={text.changeNoteHint}
         />
       ) : null}
 
       <ActionMessage state={state} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          {props.mode === "update"
-            ? "Enregistrer une nouvelle version"
-            : "Créer le protocole"}
+          {props.mode === "update" ? text.saveVersion : text.create}
         </Button>
       </div>
     </form>

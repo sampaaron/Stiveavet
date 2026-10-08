@@ -7,7 +7,8 @@ import { auditEvents, scheduledJobs } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
-import { jobErrorLabel, jobKindLabel } from "./kinds";
+import { jobErrorCode } from "./kinds";
+import type { JobErrorCode } from "./kinds";
 
 /**
  * Tâches en échec (architecture §9) : après la dernière tentative, une tâche est visible de
@@ -18,8 +19,9 @@ import { jobErrorLabel, jobKindLabel } from "./kinds";
 
 export type FailedJobView = {
   id: string;
-  label: string;
-  errorLabel: string;
+  /** Type technique de la tâche (`followup.reminder`…), traduit par l'écran. */
+  kind: string;
+  errorCode: JobErrorCode;
   attempts: number;
   firstPlannedAt: Date;
   failedAt: Date;
@@ -105,8 +107,8 @@ export function jobsService(db: Database) {
       );
       return rows.map((row) => ({
         id: row.id,
-        label: jobKindLabel(row.kind),
-        errorLabel: jobErrorLabel(row.errorCode),
+        kind: row.kind,
+        errorCode: jobErrorCode(row.errorCode),
         attempts: row.attempts,
         firstPlannedAt: row.createdAt,
         failedAt: row.finishedAt ?? row.createdAt,

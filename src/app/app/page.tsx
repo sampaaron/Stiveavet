@@ -135,7 +135,12 @@ function toAgendaEvent(
     // Le titre d'un rendez-vous dr.veto est affiché tel que dr.veto le donne.
     title:
       "appointment" in item.title
-        ? `${t.labels.appointmentKinds[item.title.appointment]} · ${item.title.animalName}`
+        ? t.dashboard.agenda.appointment(
+            item.title.appointment === "other"
+              ? t.dashboard.agenda.otherAppointment
+              : t.labels.appointmentKinds[item.title.appointment],
+            item.title.animalName,
+          )
         : item.title.text,
     vetId: item.vetName,
     kind: item.kind,

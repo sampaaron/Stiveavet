@@ -37,9 +37,7 @@ export default async function FollowupsPage() {
       <PageHeader
         title={t.followups.title}
         description={
-          clinical
-            ? text.descriptionClinical
-            : text.descriptionSummary
+          clinical ? text.descriptionClinical : text.descriptionSummary
         }
         actions={
           context.permissions.has("followups.launch") && clinical ? (

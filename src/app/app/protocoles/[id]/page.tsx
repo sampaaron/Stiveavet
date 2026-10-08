@@ -2,14 +2,11 @@ import { ArrowLeft, History, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import {
-  CATEGORY_LABELS,
-  SPECIES_LABELS,
-  STEP_KIND_LABELS,
-  offsetLabel,
-} from "@/domains/protocoles/content";
-import { LIBRARY_NOTICE } from "@/domains/protocoles/library";
+import { SYSTEM_CHANGE_NOTES } from "@/domains/protocoles/service";
 import type { ProtocolDetail } from "@/domains/protocoles/service";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { AlertBanner } from "@/ui/alert-banner";
 import { ButtonLink } from "@/ui/button";
 import { SectionCard } from "@/ui/card";
@@ -24,7 +21,28 @@ import {
   ValidateProtocolForm,
 } from "../protocol-forms";
 
-export const metadata: Metadata = { title: "Protocole" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.protocols.detail.metaTitle };
+}
+
+/** « 4 h après », « J+1 », « J+10, 4 h » : délai lisible d'une étape. */
+function offsetText(t: AppDictionary, offsetHours: number): string {
+  const text = t.protocols.detail;
+  if (offsetHours < 24) return text.offsetHours(offsetHours);
+  const days = Math.floor(offsetHours / 24);
+  const hours = offsetHours % 24;
+  return hours ? text.offsetDaysHours(days, hours) : text.offsetDays(days);
+}
+
+/** Notes de l'application traduites ; une note écrite par un vétérinaire reste telle quelle. */
+function changeNoteText(t: AppDictionary, note: string): string {
+  const notes = t.protocols.versions.systemNotes;
+  if (note === SYSTEM_CHANGE_NOTES.creation) return notes.creation;
+  if (note === SYSTEM_CHANGE_NOTES.copy) return notes.copy;
+  if (note === SYSTEM_CHANGE_NOTES.library) return notes.library;
+  return note;
+}
 
 export default async function ProtocolPage({
   params,
@@ -36,6 +54,8 @@ export default async function ProtocolPage({
     typeof version === "string" && /^\d{1,4}$/.test(version)
       ? Number(version)
       : undefined;
+  const { t, locale } = await appText();
+  const text = t.protocols.detail;
   const protocol = await loadProtocol(id, requested);
   const { content } = protocol.version;
 
@@ -46,7 +66,7 @@ export default async function ProtocolPage({
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Protocoles
+        {t.protocols.title}
       </Link>
 
       <header className="mb-6">
@@ -55,19 +75,21 @@ export default async function ProtocolPage({
           <ValidationBadge validated={protocol.version.validatedAt !== null} />
           {protocol.archived ? (
             <span className="text-xs font-semibold text-ink-muted">
-              Archivé
+              {text.archived}
             </span>
           ) : null}
         </div>
         <p className="mt-1 text-ink-muted">
           {[
-            CATEGORY_LABELS[content.category],
-            SPECIES_LABELS[content.species],
-            `${content.durationDays} jours`,
-            `version ${protocol.version.versionNumber}`,
-            protocol.ownerName
-              ? `protocole personnel de ${protocol.ownerName}`
-              : "protocole du cabinet",
+            t.labels.protocolCategories[content.category],
+            t.labels.species[content.species],
+            text.days(content.durationDays),
+            text.version(protocol.version.versionNumber),
+            protocol.ownerMembershipId
+              ? text.personal(
+                  protocol.ownerName ?? t.protocols.versions.removedMember,
+                )
+              : text.cabinet,
           ].join(" · ")}
         </p>
       </header>
@@ -77,42 +99,42 @@ export default async function ProtocolPage({
           {!protocol.isCurrent ? (
             <AlertBanner
               tone="info"
-              title={`Version ${protocol.version.versionNumber}, en lecture seule`}
+              title={text.readOnly(protocol.version.versionNumber)}
               action={
                 <Link
                   href={`/app/protocoles/${protocol.id}`}
                   className="text-sm font-semibold text-brand-ink underline"
                 >
-                  Voir la version actuelle
+                  {text.seeCurrent}
                 </Link>
               }
             >
-              Les suivis lancés avec cette version la gardent telle quelle.
+              {text.readOnlyBody}
             </AlertBanner>
           ) : null}
           {protocol.fromLibrary && protocol.version.validatedAt === null ? (
-            <AlertBanner tone="watch" title={LIBRARY_NOTICE} />
+            <AlertBanner tone="watch" title={t.protocols.library.notice} />
           ) : null}
           {content.description ? (
-            <SectionCard title="Description">
+            <SectionCard title={text.description}>
               <p className="text-sm whitespace-pre-line">
                 {content.description}
               </p>
             </SectionCard>
           ) : null}
           <SectionCard
-            title="Étapes"
-            description="Numa pose ces questions et envoie ces messages ; elle ne prend aucune décision médicale."
+            title={text.steps}
+            description={text.stepsDescription}
           >
             <ol className="grid gap-3">
               {content.steps.map((step, index) => (
                 <li key={index} className="flex gap-3 text-sm">
                   <span className="w-24 shrink-0 font-semibold tabular-nums">
-                    {offsetLabel(step.offsetHours)}
+                    {offsetText(t, step.offsetHours)}
                   </span>
                   <span>
                     <span className="block font-semibold">
-                      {STEP_KIND_LABELS[step.kind]}
+                      {t.labels.stepKinds[step.kind]}
                     </span>
                     <span className="block text-ink-muted">{step.content}</span>
                   </span>
@@ -121,8 +143,8 @@ export default async function ProtocolPage({
             </ol>
           </SectionCard>
           <SectionCard
-            title="Signes d'alerte"
-            description="En cas de doute, Numa escalade vers le vétérinaire."
+            title={text.alerts}
+            description={text.alertsDescription}
           >
             <ul className="grid gap-2">
               {content.alerts.map((alert, index) => (
@@ -139,15 +161,21 @@ export default async function ProtocolPage({
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          <Actions protocol={protocol} />
-          <Versions protocol={protocol} />
+          <Actions t={t} protocol={protocol} />
+          <Versions t={t} locale={locale} protocol={protocol} />
         </div>
       </div>
     </>
   );
 }
 
-function Actions({ protocol }: { protocol: ProtocolDetail }) {
+function Actions({
+  t,
+  protocol,
+}: {
+  t: AppDictionary;
+  protocol: ProtocolDetail;
+}) {
   const { can } = protocol;
   if (!protocol.isCurrent) return null;
   const any =
@@ -158,7 +186,7 @@ function Actions({ protocol }: { protocol: ProtocolDetail }) {
     can.duplicateToPersonal;
   if (!any) return null;
   return (
-    <SectionCard title="Actions">
+    <SectionCard title={t.protocols.actions.title}>
       <div className="grid gap-4">
         {can.validate ? (
           <ValidateProtocolForm protocolId={protocol.id} />
@@ -169,21 +197,21 @@ function Actions({ protocol }: { protocol: ProtocolDetail }) {
             variant="secondary"
             icon={<Pencil aria-hidden="true" className="size-4" />}
           >
-            Modifier
+            {t.common.edit}
           </ButtonLink>
         ) : null}
         {can.duplicateToPersonal ? (
           <DuplicateProtocolForm
             protocolId={protocol.id}
             scope="personal"
-            label="Dupliquer dans mes protocoles"
+            label={t.protocols.actions.duplicatePersonal}
           />
         ) : null}
         {can.duplicateToCabinet ? (
           <DuplicateProtocolForm
             protocolId={protocol.id}
             scope="cabinet"
-            label="Dupliquer pour le cabinet"
+            label={t.protocols.actions.duplicateCabinet}
           />
         ) : null}
         {can.archive ? (
@@ -197,12 +225,18 @@ function Actions({ protocol }: { protocol: ProtocolDetail }) {
   );
 }
 
-function Versions({ protocol }: { protocol: ProtocolDetail }) {
+function Versions({
+  t,
+  locale,
+  protocol,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  protocol: ProtocolDetail;
+}) {
+  const text = t.protocols.versions;
   return (
-    <SectionCard
-      title="Historique des versions"
-      description="Une version enregistrée ne change plus jamais."
-    >
+    <SectionCard title={text.title} description={text.description}>
       <ol className="grid gap-3">
         {protocol.versions.map((entry) => {
           const selected =
@@ -215,18 +249,23 @@ function Versions({ protocol }: { protocol: ProtocolDetail }) {
                 className="inline-flex items-center gap-1.5 font-semibold text-brand-ink underline-offset-2 hover:underline aria-[current=page]:text-ink"
               >
                 <History aria-hidden="true" className="size-3.5" />
-                Version {entry.versionNumber}
+                {text.version(entry.versionNumber)}
               </Link>
               <span className="block text-ink-muted">
-                {formatDate(entry.createdAt)} · {entry.createdByName}
-                {entry.changeNote ? ` · ${entry.changeNote}` : ""}
+                {formatDate(entry.createdAt, locale)} ·{" "}
+                {entry.createdByName ?? text.removedMember}
+                {entry.changeNote
+                  ? ` · ${changeNoteText(t, entry.changeNote)}`
+                  : ""}
               </span>
               <span className="block text-ink-muted">
-                {entry.validatedByName
-                  ? `Validée par ${entry.validatedByName}`
-                  : "Non validée"}
+                {entry.validatedAt
+                  ? text.validatedBy(
+                      entry.validatedByName ?? text.removedMember,
+                    )
+                  : text.notValidated}
                 {entry.followupCount > 0
-                  ? ` · ${entry.followupCount} suivi(s) lancé(s) avec elle`
+                  ? text.followups(entry.followupCount)
                   : ""}
               </span>
             </li>

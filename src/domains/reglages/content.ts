@@ -14,9 +14,7 @@ export type EmergencyPeriod = (typeof EMERGENCY_PERIODS)[number];
 export const ESCALATION_CHOICES = [180, 210, 240, 270, 300] as const;
 
 // Les messages de validation sont des codes, traduits par les actions (`settings.validation`).
-const time = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "time_format");
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "time_format");
 
 export const windowInput = z
   .object({

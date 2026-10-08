@@ -107,7 +107,8 @@ export const settings: AppDictionary["settings"] = {
     },
   },
   notices: {
-    defaultsApplied: "Starter settings applied. You can adjust them at any time.",
+    defaultsApplied:
+      "Starter settings applied. You can adjust them at any time.",
     messageWindowsSaved: "Sending hours saved.",
     appointmentWindowsSaved: "Appointment windows saved.",
     durationsSaved: "Appointment durations saved.",
@@ -171,8 +172,7 @@ export const settings: AppDictionary["settings"] = {
       billing: "Direct debit mandate and billing",
       test_followup: "First test follow-up",
     },
-    organization:
-      "Created at sign-up. You are the administrator vet.",
+    organization: "Created at sign-up. You are the administrator vet.",
     rules: {
       body: "Numa's sending hours, emergency instructions for daytime, night-time, weekends and public holidays, emergency contacts, on-call schedule and escalation delay.",
       missingWindows: "the sending hours",

@@ -76,9 +76,8 @@ export default async function LaunchSheetPage({
           {followup.isTest ? <TestMark /> : null}
         </div>
         <p className="mt-1 text-ink-muted">
-          {followup.procedure} ·{" "}
-          {formatDateTime(followup.procedureAt, locale)} ·{" "}
-          {t.labels.followupStatus[followup.status]} · {text.responsible}{" "}
+          {followup.procedure} · {formatDateTime(followup.procedureAt, locale)}{" "}
+          · {t.labels.followupStatus[followup.status]} · {text.responsible}{" "}
           <span className="font-semibold text-ink">
             {followup.responsibleName}
           </span>

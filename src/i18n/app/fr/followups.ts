@@ -68,12 +68,12 @@ export const followups = {
   /** Résumé importé de dr.veto, à côté de la fiche. */
   imported: {
     title: "Résumé importé de dr.veto",
-    importedOn: (date: string) =>
-      `Lecture seule · import du ${date} (simulé)`,
+    importedOn: (date: string) => `Lecture seule · import du ${date} (simulé)`,
     notImported: "Suivi créé dans Stivea Vet, sans import.",
     animal: "Animal",
     procedure: "Intervention",
-    procedureOn: (procedure: string, date: string) => `${procedure}, le ${date}`,
+    procedureOn: (procedure: string, date: string) =>
+      `${procedure}, le ${date}`,
     owners: "Propriétaires",
     whatsapp: (phone: string) => `· WhatsApp ${phone}`,
     /** Langue du propriétaire, d'après `labels.languages`. */
@@ -161,7 +161,8 @@ export const followups = {
       "Vérifiez la fiche : responsable, date de contrôle après l'intervention et traitements.",
     chooseProtocol: "Choisissez un protocole.",
     firstContactInteger: "Premier message : un nombre d'heures entier.",
-    firstContactNegative: "Premier message : le délai ne peut pas être négatif.",
+    firstContactNegative:
+      "Premier message : le délai ne peut pas être négatif.",
     firstContactMax: (max: number) =>
       `Premier message : ${max} heures maximum après l'intervention.`,
     tooManySteps: (max: number) => `${max} étapes au maximum.`,

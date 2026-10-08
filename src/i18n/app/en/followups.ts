@@ -27,14 +27,11 @@ export const followups: AppDictionary["followups"] = {
       "Simulated dr.veto: fictitious animals and owners, no calls to the real software.",
     notConnectedTitle: "dr.veto is not connected yet",
     openSettings: "Open settings",
-    notConnectedBody:
-      "Connect the practice software to find your patients.",
-    found: (count: number) =>
-      `${count} animal${count > 1 ? "s" : ""} found`,
+    notConnectedBody: "Connect the practice software to find your patients.",
+    found: (count: number) => `${count} animal${count > 1 ? "s" : ""} found`,
     noResults: "No results",
     noMatchTitle: "No matching animal",
-    noMatchDescription:
-      "Check the spelling or search by the owner's name.",
+    noMatchDescription: "Check the spelling or search by the owner's name.",
     openFollowupLabel: (name: string) => `Open ${name}'s follow-up`,
     alreadyOpen: "Follow-up already open",
     prepareLabel: (name: string) => `Prepare the sheet for ${name}`,
@@ -64,8 +61,7 @@ export const followups: AppDictionary["followups"] = {
   },
   imported: {
     title: "Summary imported from dr.veto",
-    importedOn: (date: string) =>
-      `Read-only · imported on ${date} (simulated)`,
+    importedOn: (date: string) => `Read-only · imported on ${date} (simulated)`,
     notImported: "Follow-up created in Stivea Vet, not imported.",
     animal: "Animal",
     procedure: "Procedure",
@@ -100,7 +96,8 @@ export const followups: AppDictionary["followups"] = {
       `Usual suggestion: 3 to 4 hours. Here: ${date}.`,
     firstContactAtLaunch: (date: string) =>
       `Usual suggestion: 3 to 4 hours. Here: ${date}, so as soon as it is launched.`,
-    firstContactDefault: "Usual suggestion: 3 to 4 hours, adjust as you see fit.",
+    firstContactDefault:
+      "Usual suggestion: 3 to 4 hours, adjust as you see fit.",
     responsibleLabel: "Responsible vet",
     responsibleHint:
       "Numa writes on their behalf; they are the one who launches the follow-up.",
@@ -166,8 +163,7 @@ export const followups: AppDictionary["followups"] = {
     alertShort: (min: number) => `Warning sign: at least ${min} characters.`,
     alertLong: (max: number) => `Warning sign: ${max} characters at most.`,
     tooManyTreatments: (max: number) => `${max} treatments at most.`,
-    treatmentShort: (min: number) =>
-      `Treatment: at least ${min} character(s).`,
+    treatmentShort: (min: number) => `Treatment: at least ${min} character(s).`,
     treatmentLong: (max: number) => `Treatment: ${max} characters at most.`,
     instructionsShort: (min: number) => `Dosage: at least ${min} character(s).`,
     instructionsLong: (max: number) => `Dosage: ${max} characters at most.`,

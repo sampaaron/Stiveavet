@@ -73,6 +73,8 @@ export const dashboard: AppDictionary["dashboard"] = {
       "Full dr.veto calendar (simulated); Stivea appointments are marked.",
     emptyTitle: "No appointments today",
     emptyDescription: "Connect dr.veto in settings to see the full calendar.",
+    appointment: (kind, animal) => `${kind} · ${animal}`,
+    otherAppointment: "Appointment",
   },
   quickActions: "Quick actions",
   numa: (animals: number) =>

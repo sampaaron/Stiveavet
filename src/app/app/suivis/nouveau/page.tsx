@@ -58,10 +58,7 @@ export default async function NewFollowupPage({
         <ArrowLeft aria-hidden="true" className="size-4" />
         {text.back}
       </Link>
-      <PageHeader
-        title={text.title}
-        description={text.description}
-      />
+      <PageHeader title={text.title} description={text.description} />
 
       <div className="grid gap-6">
         <Card className="p-5 sm:p-6">
@@ -96,9 +93,7 @@ export default async function NewFollowupPage({
               {text.search}
             </Button>
           </form>
-          <p className="mt-3 text-xs text-ink-muted">
-            {text.simulatedNote}
-          </p>
+          <p className="mt-3 text-xs text-ink-muted">{text.simulatedNote}</p>
         </Card>
 
         {hits === null ? (
@@ -115,9 +110,7 @@ export default async function NewFollowupPage({
           </AlertBanner>
         ) : query.length >= 2 ? (
           <SectionCard
-            title={
-              hits.length ? text.found(hits.length) : text.noResults
-            }
+            title={hits.length ? text.found(hits.length) : text.noResults}
           >
             {hits.length === 0 ? (
               <EmptyState
@@ -150,7 +143,8 @@ export default async function NewFollowupPage({
                       </p>
                       <p className="text-sm text-ink-muted">
                         {hit.lastProcedure} ·{" "}
-                        {formatDateTime(hit.lastProcedureAt, locale)} · {hit.ref}
+                        {formatDateTime(hit.lastProcedureAt, locale)} ·{" "}
+                        {hit.ref}
                       </p>
                     </div>
                     {hit.openFollowupId ? (

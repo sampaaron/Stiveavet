@@ -5,7 +5,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import type { AppointmentsService } from "@/domains/agenda/demandes";
-import { APPOINTMENT_KIND_LABELS } from "@/domains/agenda/rendez-vous";
 import type { FollowupClinical, FollowupView } from "@/domains/suivis/service";
 import type {
   FollowupContactView,
@@ -13,11 +12,15 @@ import type {
 } from "@/domains/suivis/record";
 import type { SynthesisAlert, SynthesisView } from "@/domains/suivis/synthese";
 import { daysSince } from "@/domains/suivis/calendrier";
+import type { ConversationView } from "@/domains/conversations/service";
 import { canBrowseProtocols } from "@/domains/protocoles/policies";
 import {
   canPrepareFollowup,
   canSteerFollowup,
 } from "@/domains/suivis/policies";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import type { MemberContext } from "@/server/authz";
 import { memberContext } from "@/server/authz";
 import { serverEnv } from "@/server/env";
@@ -35,37 +38,30 @@ import { ButtonLink } from "@/ui/button";
 import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
-import {
-  FOLLOWUP_STATUS_LABELS,
-  SPECIES_LABELS,
-  followupBadge,
-} from "../followup-labels";
+import { followupBadge } from "../followup-labels";
 import { AlertCard } from "../../alert-card";
+import { triageReasonText } from "../../triage-reason";
 import { TestMark } from "../test-mark";
 
 import { AccessPanel } from "./access-panel";
+import { OwnerLanguageForm } from "./conversation-controls";
 import { LiveConversation } from "./live-conversation";
 import { NextStepsCard } from "./programme-card";
 import { SteeringButtons } from "./steering";
 
 // Titre générique : le nom de l'animal n'apparaît qu'après contrôle d'accès, dans la page.
-export const metadata: Metadata = { title: "Dossier de suivi" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.dossier.title };
+}
 
-const DONE: Record<string, string> = {
-  lance:
-    "Suivi lancé : Numa enverra son premier message à l'heure prévue, au nom du cabinet.",
-  pause:
-    "Suivi mis en pause : aucune relance ne part tant qu'il n'est pas repris.",
-  reprise: "Suivi repris.",
-  arret: "Suivi arrêté : les envois et rappels prévus sont annulés.",
-  reactivation: "Suivi réactivé.",
-  "reprise-en-main":
-    "Message envoyé : vous avez repris la main, Numa est en pause jusqu'à « Reprendre Numa ».",
-  message: "Message envoyé depuis le WhatsApp du cabinet.",
-  numa: "Numa reprend la conversation.",
-  "alerte-recue": "Réception confirmée : l'escalade est annulée.",
-  "alerte-close": "Alerte close.",
-};
+type Done = keyof AppDictionary["dossier"]["done"];
+
+function doneKey(value: unknown, t: AppDictionary): Done | undefined {
+  return typeof value === "string" && Object.hasOwn(t.dossier.done, value)
+    ? (value as Done)
+    : undefined;
+}
 
 export default async function FollowupPage({
   params,
@@ -73,7 +69,9 @@ export default async function FollowupPage({
 }: PageProps<"/app/suivis/[id]">) {
   const { id } = await params;
   const { fait } = await searchParams;
-  const done = typeof fait === "string" ? DONE[fait] : undefined;
+  const { t, locale } = await appText();
+  const doneCode = doneKey(fait, t);
+  const done = doneCode ? t.dossier.done[doneCode] : undefined;
   const context = await memberContext();
   // Inexistant, autre cabinet ou non autorisé : même réponse 404, pour ne rien révéler.
   const opened = await services.followups().open(context, id);
@@ -83,6 +81,7 @@ export default async function FollowupPage({
   const protocolLink =
     followup.access === "clinical" && followup.protocol ? (
       <ProtocolLink
+        t={t}
         protocol={followup.protocol}
         linked={canBrowseProtocols(context)}
       />
@@ -103,7 +102,7 @@ export default async function FollowupPage({
       className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
     >
       <ArrowLeft aria-hidden="true" className="size-4" />
-      Suivis
+      {t.dossier.back}
     </Link>
   );
   const notice = done ? (
@@ -126,10 +125,12 @@ export default async function FollowupPage({
         {back}
         {notice}
         <BasicDossier
+          t={t}
+          locale={locale}
           followup={followup}
           accessPanel={accessPanel}
           protocolLink={protocolLink}
-          steering={<Steering context={context} followup={followup} />}
+          steering={<Steering t={t} context={context} followup={followup} />}
         />
       </>
     );
@@ -142,7 +143,10 @@ export default async function FollowupPage({
       services.media().readLinks(context, followup.id),
       services.alerts().ofFollowup(context, followup.id),
       services.launch().programme(context, followup.id),
-      services.synthesis().forFollowup(context, followup.id, { now }),
+      // Synthèse rédigée dans la langue de la personne qui la lit.
+      services
+        .synthesis()
+        .forFollowup(context, followup.id, { now, language: locale }),
       context.permissions.has("agenda.read")
         ? services.appointments().ofFollowup(context, followup.id, now)
         : Promise.resolve([]),
@@ -167,30 +171,31 @@ export default async function FollowupPage({
               {followup.animalName}
             </h1>
             <StatusBadge status={dossierStatus(followup, primary)} />
-            <PrivateMark isPrivate={followup.isPrivate} />
+            <PrivateMark t={t} isPrivate={followup.isPrivate} />
             {followup.isTest ? <TestMark /> : null}
           </div>
           <p className="mt-1 text-ink-muted">
             {[
-              SPECIES_LABELS[followup.species],
+              t.labels.species[followup.species],
               record.facts.animal.breed,
-              ageLabel(record.facts.animal.birthDate, now),
-              weightLabel(record.facts.animal.weightGrams),
+              ageLabel(t, record.facts.animal.birthDate, now),
+              weightLabel(locale, record.facts.animal.weightGrams),
             ]
               .filter(Boolean)
               .join(" · ")}
           </p>
           <p className="mt-0.5 text-sm text-ink-muted">
             {followup.procedure} ·{" "}
-            {formatRelativeDayTime(followup.procedureAt, now)} · J+
-            {daysSince(followup.procedureAt, now)} · Responsable :{" "}
+            {formatRelativeDayTime(followup.procedureAt, now, locale)} ·{" "}
+            {t.dossier.header.day(daysSince(followup.procedureAt, now))} ·{" "}
+            {t.dossier.header.responsible}{" "}
             <span className="font-semibold text-ink">
               {followup.responsibleName}
             </span>
           </p>
           {protocolLink ? (
             <p className="mt-0.5 text-sm text-ink-muted">
-              Protocole : {protocolLink}
+              {t.dossier.header.protocol} {protocolLink}
             </p>
           ) : null}
         </div>
@@ -199,7 +204,10 @@ export default async function FollowupPage({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           {openAlerts.length ? (
-            <section aria-label="Alertes du triage" className="grid gap-3">
+            <section
+              aria-label={t.dossier.alertsSection}
+              className="grid gap-3"
+            >
               {openAlerts.map((alert) => (
                 <AlertCard key={alert.id} alert={alert} from="dossier" />
               ))}
@@ -214,30 +222,37 @@ export default async function FollowupPage({
                 : null
             }
           />
-          <Steering context={context} followup={followup} />
+          <Steering t={t} context={context} followup={followup} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          <Synthesis synthesis={synthesis} />
-          <Contacts contacts={record.contacts} group={view.group} />
-          <Treatments treatments={record.facts.treatments} />
+          <Synthesis t={t} locale={locale} synthesis={synthesis} />
+          <Contacts
+            t={t}
+            followupId={followup.id}
+            contacts={record.contacts}
+            view={view}
+          />
+          <Treatments t={t} treatments={record.facts.treatments} />
           <NextStepsCard
+            t={t}
+            locale={locale}
             programme={programme}
             controlAppointmentAt={followup.controlAppointmentAt}
             now={now}
           />
           {appointments.length ? (
-            <Appointments appointments={appointments} />
+            <Appointments t={t} locale={locale} appointments={appointments} />
           ) : null}
           <SectionCard
-            title="Allergies et antécédents"
-            description="Résumé importé de dr.veto (simulé)."
+            title={t.dossier.imported.title}
+            description={t.dossier.imported.description}
           >
             {record.facts.imported ? (
-              <ImportedSummary imported={record.facts.imported} />
+              <ImportedSummary t={t} imported={record.facts.imported} />
             ) : (
               <p className="text-sm text-ink-muted">
-                Aucun résumé importé pour ce suivi.
+                {t.dossier.imported.none}
               </p>
             )}
           </SectionCard>
@@ -260,45 +275,60 @@ function dossierStatus(
   return "normal";
 }
 
-function ageLabel(birthDate: string | null, now: Date): string | null {
+function ageLabel(
+  t: AppDictionary,
+  birthDate: string | null,
+  now: Date,
+): string | null {
   if (!birthDate) return null;
   const [year = 0, month = 1, day = 1] = birthDate.split("-").map(Number);
   let months =
     (now.getUTCFullYear() - year) * 12 + (now.getUTCMonth() + 1 - month);
   if (now.getUTCDate() < day) months -= 1;
   if (months < 0) return null;
-  if (months < 12) return `${months} mois`;
-  const years = Math.floor(months / 12);
-  return `${years} an${years > 1 ? "s" : ""}`;
+  if (months < 12) return t.dossier.header.months(months);
+  return t.dossier.header.years(Math.floor(months / 12));
 }
 
-const weightFormat = new Intl.NumberFormat("fr-FR", {
-  maximumFractionDigits: 1,
-});
+const weightFormats: Record<Locale, Intl.NumberFormat> = {
+  fr: new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }),
+  en: new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }),
+};
 
-function weightLabel(grams: number | null): string | null {
-  return grams ? `${weightFormat.format(grams / 1000)} kg` : null;
+function weightLabel(locale: Locale, grams: number | null): string | null {
+  return grams ? `${weightFormats[locale].format(grams / 1000)} kg` : null;
 }
 
-function PrivateMark({ isPrivate }: { isPrivate: boolean }) {
+function PrivateMark({
+  t,
+  isPrivate,
+}: {
+  t: AppDictionary;
+  isPrivate: boolean;
+}) {
   if (!isPrivate) return null;
   return (
     <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted">
       <Lock aria-hidden="true" className="size-3.5" />
-      Dossier privé
+      {t.dossier.header.private}
     </span>
   );
 }
 
 /** Version de protocole avec laquelle le suivi a été lancé ; elle ne change plus. */
 function ProtocolLink({
+  t,
   protocol,
   linked,
 }: {
+  t: AppDictionary;
   protocol: { id: string; name: string; versionNumber: number };
   linked: boolean;
 }) {
-  const label = `${protocol.name}, version ${protocol.versionNumber}`;
+  const label = t.dossier.header.protocolVersion(
+    protocol.name,
+    protocol.versionNumber,
+  );
   return linked ? (
     <Link
       href={`/app/protocoles/${protocol.id}?version=${protocol.versionNumber}`}
@@ -313,31 +343,28 @@ function ProtocolLink({
 
 /** Fiche de lancement, modification, pause, arrêt et reprise, selon les droits. */
 function Steering({
+  t,
   context,
   followup,
 }: {
+  t: AppDictionary;
   context: MemberContext;
   followup: FollowupView;
 }) {
   if (!canPrepareFollowup(context, followup.access)) return null;
   const canSteer = canSteerFollowup(context, followup.access);
+  const text = t.dossier.steering;
   if (followup.status === "draft")
     return (
-      <SectionCard
-        title="Suivi en préparation"
-        description="Rien n'est envoyé au propriétaire avant le lancement par le vétérinaire responsable."
-      >
+      <SectionCard title={text.draftTitle} description={text.draftDescription}>
         <ButtonLink href={`/app/suivis/${followup.id}/lancement`}>
-          Ouvrir la fiche de lancement
+          {text.openLaunchSheet}
         </ButtonLink>
       </SectionCard>
     );
   if (!canSteer) return null;
   return (
-    <SectionCard
-      title="Pilotage du suivi"
-      description="Vous pouvez modifier, mettre en pause, arrêter ou reprendre ce suivi à tout moment."
-    >
+    <SectionCard title={text.title} description={text.description}>
       <div className="grid gap-4">
         {followup.status !== "ended" ? (
           <div>
@@ -346,7 +373,7 @@ function Steering({
               variant="secondary"
               size="sm"
             >
-              Modifier le suivi
+              {text.edit}
             </ButtonLink>
           </div>
         ) : null}
@@ -358,17 +385,22 @@ function Steering({
 
 /** Dossier d'organisation (sans données cliniques), ou suivi en préparation. */
 function BasicDossier({
+  t,
+  locale,
   followup,
   accessPanel,
   protocolLink,
   steering,
 }: {
+  t: AppDictionary;
+  locale: Locale;
   followup: FollowupView;
   accessPanel: ReactNode;
   protocolLink: ReactNode;
   steering: ReactNode;
 }) {
   const badge = followupBadge(followup);
+  const text = t.dossier.basic;
   return (
     <>
       <header className="mb-6 flex flex-wrap items-start gap-4">
@@ -384,11 +416,12 @@ function BasicDossier({
               {followup.animalName}
             </h1>
             {badge ? <StatusBadge status={badge} /> : null}
-            <PrivateMark isPrivate={followup.isPrivate} />
+            <PrivateMark t={t} isPrivate={followup.isPrivate} />
             {followup.isTest ? <TestMark /> : null}
           </div>
           <p className="mt-1 text-ink-muted">
-            {SPECIES_LABELS[followup.species]} · Responsable :{" "}
+            {t.labels.species[followup.species]} ·{" "}
+            {t.dossier.header.responsible}{" "}
             <span className="font-semibold text-ink">
               {followup.responsibleName}
             </span>
@@ -398,46 +431,50 @@ function BasicDossier({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
-          <SectionCard title="Organisation">
+          <SectionCard title={text.organization}>
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <Fact label="Propriétaire" value={followup.ownerName ?? "—"} />
+              <Fact label={text.owner} value={followup.ownerName ?? "—"} />
               <Fact
-                label="État du suivi"
-                value={FOLLOWUP_STATUS_LABELS[followup.status]}
+                label={text.status}
+                value={t.labels.followupStatus[followup.status]}
               />
               <Fact
-                label="Début du suivi"
+                label={text.start}
                 value={
-                  followup.startedAt ? formatDate(followup.startedAt) : "—"
+                  followup.startedAt
+                    ? formatDate(followup.startedAt, locale)
+                    : "—"
                 }
               />
               <Fact
-                label="Contrôle"
+                label={text.control}
                 value={
                   followup.controlAppointmentAt
-                    ? formatDate(followup.controlAppointmentAt)
-                    : "Non programmé"
+                    ? formatDate(followup.controlAppointmentAt, locale)
+                    : text.notScheduled
                 }
               />
             </dl>
           </SectionCard>
           {followup.access === "clinical" ? (
-            <SectionCard title="Intervention">
+            <SectionCard title={text.intervention}>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <Fact label="Acte" value={followup.procedure} />
-                <Fact label="Date" value={formatDate(followup.procedureAt)} />
+                <Fact label={text.procedure} value={followup.procedure} />
+                <Fact
+                  label={text.date}
+                  value={formatDate(followup.procedureAt, locale)}
+                />
                 {protocolLink ? (
                   <div className="sm:col-span-2">
-                    <dt className="text-ink-muted">Protocole</dt>
+                    <dt className="text-ink-muted">{text.protocol}</dt>
                     <dd>{protocolLink}</dd>
                   </div>
                 ) : null}
               </dl>
             </SectionCard>
           ) : (
-            <AlertBanner tone="info" title="Données cliniques réservées">
-              Conversation, photos, vocaux et synthèses ne sont visibles que par
-              les personnes autorisées à lire les données cliniques.
+            <AlertBanner tone="info" title={text.restrictedTitle}>
+              {text.restricted}
             </AlertBanner>
           )}
         </div>
@@ -459,87 +496,87 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-const ALERT_STATE: Record<
-  SynthesisAlert["status"],
-  (alert: SynthesisAlert) => string
-> = {
-  open: () => "sans accusé de réception",
-  escalated: () => "équipe prévenue, sans accusé de réception",
-  acknowledged: (alert) =>
-    `reçue par ${alert.acknowledgedBy ? shortPersonName(alert.acknowledgedBy) : "un vétérinaire"}`,
-  resolved: () => "close",
-};
-
-function alertLine(alert: SynthesisAlert): string {
-  return `${alert.level === "urgent" ? "Urgent" : "À surveiller"} · ${alert.reason} · ${formatDateTime(alert.createdAt)} · ${ALERT_STATE[alert.status](alert)}`;
+function alertState(t: AppDictionary, alert: SynthesisAlert): string {
+  const states = t.dossier.synthesis.alertState;
+  switch (alert.status) {
+    case "acknowledged":
+      return states.acknowledged(
+        alert.acknowledgedBy
+          ? shortPersonName(alert.acknowledgedBy)
+          : states.aVet,
+      );
+    default:
+      return states[alert.status];
+  }
 }
 
-function plural(count: number, singular: string, pluralForm: string): string {
-  return `${count} ${count > 1 ? pluralForm : singular}`;
+function alertLine(
+  t: AppDictionary,
+  locale: Locale,
+  alert: SynthesisAlert,
+): string {
+  return [
+    t.labels.triage[alert.level],
+    triageReasonText(t, alert.reason),
+    formatDateTime(alert.createdAt, locale),
+    alertState(t, alert),
+  ].join(" · ");
 }
 
 /** Synthèse pré-consultation (§9) : rédigée par l'IA (simulée), sous garde-fous. */
-function Synthesis({ synthesis }: { synthesis: SynthesisView | null }) {
+function Synthesis({
+  t,
+  locale,
+  synthesis,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  synthesis: SynthesisView | null;
+}) {
+  const text = t.dossier.synthesis;
   return (
-    <SectionCard
-      title="Synthèse pré-consultation"
-      description="Préparée par l'IA à partir des échanges (simulation). Elle ne remplace pas votre examen."
-    >
+    <SectionCard title={text.title} description={text.description}>
       {synthesis ? (
         <div className="grid gap-4 text-sm">
           <p className="text-ink-muted">
-            Échanges :{" "}
-            {plural(
+            {text.exchanges(
               synthesis.exchanges.ownerMessages,
-              "message du propriétaire",
-              "messages du propriétaire",
-            )}
-            , {plural(synthesis.exchanges.photos, "photo", "photos")},{" "}
-            {plural(
+              synthesis.exchanges.photos,
               synthesis.exchanges.voiceNotes,
-              "message vocal",
-              "messages vocaux",
             )}
-            .
           </p>
           <p>{synthesis.evolution}</p>
           <SignalList
-            title="Signaux rassurants"
+            title={text.positives}
             items={synthesis.positives}
             tone="brand"
           />
           <SignalList
-            title="Signaux préoccupants"
+            title={text.negatives}
             items={synthesis.negatives}
             tone="urgent"
           />
           <SignalList
-            title="Alertes"
-            items={synthesis.alerts.map(alertLine)}
+            title={text.alerts}
+            items={synthesis.alerts.map((alert) => alertLine(t, locale, alert))}
             tone="urgent"
           />
           <SignalList
-            title="Questions ouvertes"
+            title={text.openQuestions}
             items={synthesis.openQuestions}
             tone="neutral"
           />
           {synthesis.withheld > 0 ? (
             <p className="text-ink-muted">
-              {synthesis.withheld > 1
-                ? `${synthesis.withheld} éléments ont été écartés par les garde-fous`
-                : "Un élément a été écarté par les garde-fous"}{" "}
-              : lisez la conversation pour le détail.
+              {text.withheld(synthesis.withheld)}
             </p>
           ) : null}
           <p className="text-xs text-ink-muted">
-            Préparée le {formatDateTime(synthesis.generatedAt)}, sans diagnostic
-            ni conduite à tenir.
+            {text.generated(formatDateTime(synthesis.generatedAt, locale))}
           </p>
         </div>
       ) : (
-        <p className="text-sm text-ink-muted">
-          Pas encore assez d&apos;échanges pour une synthèse.
-        </p>
+        <p className="text-sm text-ink-muted">{text.empty}</p>
       )}
     </SectionCard>
   );
@@ -584,23 +621,33 @@ const CONSENT_STATUS = {
   withdrawn: "consent-stopped",
 } as const;
 
-/** Propriétaires et accord : jamais le numéro complet, seulement ses deux derniers chiffres. */
+/**
+ * Propriétaires et accord : jamais le numéro complet, seulement ses deux derniers chiffres.
+ * La langue de Numa avec chacun indique sa provenance ; un vétérinaire qui peut reprendre
+ * Numa peut la corriger (le service revérifie ce droit).
+ */
 function Contacts({
+  t,
+  followupId,
   contacts,
-  group,
+  view,
 }: {
+  t: AppDictionary;
+  followupId: string;
   contacts: FollowupContactView[];
-  group: boolean;
+  view: ConversationView;
 }) {
+  const text = t.dossier.contacts;
   const active = contacts.filter((contact) => contact.active);
+  const canCorrectLanguage = view.rights.canResume;
   return (
     <SectionCard
-      title="Propriétaires et accord"
+      title={text.title}
       description={
         active.length > 1
-          ? group
-            ? "Groupe WhatsApp ouvert avec les deux propriétaires et Numa. Chacun peut le quitter par STOP."
-            : "Un groupe WhatsApp sera créé quand les deux contacts auront accepté."
+          ? view.group
+            ? text.groupOpen
+            : text.groupLater
           : undefined
       }
     >
@@ -616,16 +663,18 @@ function Contacts({
                 <span className="font-normal text-ink-muted">
                   {" "}
                   ·{" "}
-                  {contact.role === "primary"
-                    ? "contact principal"
-                    : "second contact"}
+                  {contact.role === "primary" ? text.primary : text.secondary}
                 </span>
               </span>
               <span className="block text-ink-muted">
                 {contact.phoneEnding
-                  ? `WhatsApp se terminant par ${contact.phoneEnding}`
-                  : "WhatsApp"}{" "}
-                · {contact.language === "fr" ? "français" : "anglais"}
+                  ? text.phoneEnding(contact.phoneEnding)
+                  : text.whatsapp}{" "}
+                ·{" "}
+                {text.language(
+                  text.languageNames[contact.language],
+                  t.labels.languageSources[contact.languageSource],
+                )}
               </span>
             </span>
             <StatusBadge
@@ -635,6 +684,19 @@ function Contacts({
                   : "consent-pending"
               }
             />
+            {canCorrectLanguage ? (
+              <div className="w-full">
+                <OwnerLanguageForm
+                  followupId={followupId}
+                  role={contact.role}
+                  firstName={
+                    view.contacts.find((item) => item.role === contact.role)
+                      ?.firstName ?? contact.name
+                  }
+                  language={contact.language}
+                />
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -644,14 +706,19 @@ function Contacts({
 
 /** Rendez-vous à venir de ce suivi : proposés par Numa (à confirmer) ou confirmés. */
 function Appointments({
+  t,
+  locale,
   appointments,
 }: {
+  t: AppDictionary;
+  locale: Locale;
   appointments: Awaited<ReturnType<AppointmentsService["ofFollowup"]>>;
 }) {
+  const text = t.dossier.appointments;
   return (
     <SectionCard
-      title="Rendez-vous"
-      description="Numa ne propose que des créneaux libres du vétérinaire responsable ; le cabinet confirme."
+      title={text.title}
+      description={text.description}
       headingLevel={2}
     >
       <ul className="grid gap-3 text-sm">
@@ -662,11 +729,11 @@ function Appointments({
           >
             <span>
               <span className="block font-semibold">
-                {formatDateTime(item.startsAt)}
+                {formatDateTime(item.startsAt, locale)}
               </span>
               <span className="block text-ink-muted">
-                {APPOINTMENT_KIND_LABELS[item.kind]}
-                {item.source === "numa" ? " · choisi avec Numa" : ""}
+                {t.labels.appointmentKinds[item.kind]}
+                {item.source === "numa" ? ` · ${text.chosenWithNuma}` : ""}
               </span>
             </span>
             {item.status === "proposed" ? (
@@ -674,10 +741,12 @@ function Appointments({
                 href="/app/agenda"
                 className="font-semibold text-brand-ink underline-offset-2 hover:underline"
               >
-                À confirmer
+                {text.toConfirm}
               </Link>
             ) : (
-              <span className="font-semibold text-brand-ink">Confirmé</span>
+              <span className="font-semibold text-brand-ink">
+                {text.confirmed}
+              </span>
             )}
           </li>
         ))}
@@ -687,52 +756,58 @@ function Appointments({
 }
 
 /** Traitements validés ; ceux importés et pas encore validés ne sont jamais rappelés. */
-function Treatments({ treatments }: { treatments: TreatmentView[] }) {
+function Treatments({
+  t,
+  treatments,
+}: {
+  t: AppDictionary;
+  treatments: TreatmentView[];
+}) {
+  const text = t.dossier.treatments;
   const validated = treatments.filter((treatment) => treatment.validatedBy);
   const pending = treatments.length - validated.length;
   return (
-    <SectionCard title="Traitements validés" headingLevel={2}>
+    <SectionCard title={text.title} headingLevel={2}>
       {validated.length > 0 ? (
         <ul className="grid gap-3">
           {validated.map((treatment) => (
             <li key={treatment.id} className="text-sm">
               <p className="font-semibold">
                 {treatment.name}
-                {treatment.source === "drveto" ? " (importé de dr.veto)" : ""}
+                {treatment.source === "drveto"
+                  ? ` ${text.importedFromDrveto}`
+                  : ""}
               </p>
               <p className="text-ink-muted">
-                {treatment.instructions} · validé par{" "}
-                {shortPersonName(treatment.validatedBy ?? "")}
+                {treatment.instructions} ·{" "}
+                {text.validatedBy(shortPersonName(treatment.validatedBy ?? ""))}
               </p>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink-muted">Aucun traitement à rappeler.</p>
+        <p className="text-sm text-ink-muted">{text.none}</p>
       )}
       {pending > 0 ? (
         <p className="mt-3 text-sm font-medium text-watch">
-          {pending > 1
-            ? `${pending} traitements importés attendent votre validation`
-            : "Un traitement importé attend votre validation"}{" "}
-          : aucun rappel n&apos;en parle avant.
+          {text.pending(pending)}
         </p>
       ) : null}
-      <p className="mt-3 text-xs text-ink-muted">
-        Numa ne crée ni ne modifie jamais une posologie.
-      </p>
+      <p className="mt-3 text-xs text-ink-muted">{text.noDosage}</p>
     </SectionCard>
   );
 }
 
 function ImportedSummary({
+  t,
   imported,
 }: {
+  t: AppDictionary;
   imported: { allergies: string[]; antecedents: string[] };
 }) {
   const allergies = imported.allergies.length
     ? imported.allergies
-    : ["Aucune allergie connue"];
+    : [t.dossier.imported.noAllergy];
   return (
     <div className="grid gap-3 text-sm">
       <ul className="list-inside list-disc">
@@ -742,7 +817,9 @@ function ImportedSummary({
       </ul>
       {imported.antecedents.length ? (
         <div>
-          <h3 className="mb-1 font-semibold">Antécédents</h3>
+          <h3 className="mb-1 font-semibold">
+            {t.dossier.imported.antecedents}
+          </h3>
           <ul className="list-inside list-disc">
             {imported.antecedents.map((entry) => (
               <li key={entry}>{entry}</li>

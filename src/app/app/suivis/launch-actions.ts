@@ -97,7 +97,8 @@ function sheetIssueMessage(issue: z.core.$ZodIssue, t: AppDictionary): string {
     case "controlAppointmentAt":
       return v.invalidControl;
     case "steps":
-      if (!item) return big !== null ? v.tooManySteps(big) : t.common.invalidRequest;
+      if (!item)
+        return big !== null ? v.tooManySteps(big) : t.common.invalidRequest;
       if (leaf === "offsetHours") {
         if (small !== null) return v.stepNegative;
         if (big !== null) return v.stepMax;
@@ -117,7 +118,9 @@ function sheetIssueMessage(issue: z.core.$ZodIssue, t: AppDictionary): string {
       break;
     case "addTreatments":
       if (!item)
-        return big !== null ? v.tooManyTreatments(big) : t.common.invalidRequest;
+        return big !== null
+          ? v.tooManyTreatments(big)
+          : t.common.invalidRequest;
       if (leaf === "name" && small !== null) return v.treatmentShort(small);
       if (leaf === "name" && big !== null) return v.treatmentLong(big);
       if (leaf === "instructions" && small !== null)
