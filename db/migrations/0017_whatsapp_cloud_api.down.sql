@@ -11,7 +11,10 @@ DROP FUNCTION jobs.fail_after_success(uuid, text);
 DROP TABLE webhook_events;
 DROP TABLE whatsapp_accounts;
 
+-- Tous cabinets confondus : la RLS forcée est levée le temps de la suppression.
+ALTER TABLE integration_connections NO FORCE ROW LEVEL SECURITY;
 DELETE FROM integration_connections WHERE mode <> 'simulated';
+ALTER TABLE integration_connections FORCE ROW LEVEL SECURITY;
 ALTER TABLE integration_connections DROP CONSTRAINT integration_connections_mode_check;
 ALTER TABLE integration_connections
   ADD CONSTRAINT integration_connections_mode_check CHECK (mode = 'simulated');
@@ -32,7 +35,9 @@ ALTER TABLE messages
   DROP COLUMN template_key;
 
 -- Une valeur d'énumération ne se retire pas : le type est recréé sans elle.
+ALTER TABLE messages NO FORCE ROW LEVEL SECURITY;
 UPDATE messages SET delivery_status = 'queued' WHERE delivery_status = 'awaiting_reply';
+ALTER TABLE messages FORCE ROW LEVEL SECURITY;
 ALTER TYPE message_delivery RENAME TO message_delivery_0017;
 CREATE TYPE message_delivery AS ENUM ('queued', 'sent', 'delivered', 'read', 'failed');
 ALTER TABLE messages
