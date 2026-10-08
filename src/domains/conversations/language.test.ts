@@ -13,7 +13,17 @@ describe("langue d'un message du propriétaire", () => {
   });
 
   it("ne tranche pas sur un mot-clé, un message court ou un mélange", () => {
-    for (const text of ["OUI", "STOP", "YES", "Merci !", "ok", "2", "Filou"])
+    for (const text of [
+      "OUI",
+      "STOP",
+      "YES",
+      "Merci !",
+      "ok",
+      "2",
+      "Filou",
+      "Elle dort bien",
+      "She is fine",
+    ])
       expect(detectLanguage(text), text).toBeNull();
     expect(detectLanguage("Thanks, elle mange bien and she eats")).toBeNull();
   });

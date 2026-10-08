@@ -29,6 +29,8 @@ const ENGLISH = new Set(
 const SHARED = new Set([...FRENCH].filter((word) => ENGLISH.has(word)));
 
 const MIN_HITS = 3;
+/** En dessous, le message est trop court pour trancher (« Elle dort bien », « Merci docteur »). */
+const MIN_WORDS = 5;
 
 export function detectLanguage(text: string): "fr" | "en" | null {
   const words = text
@@ -36,6 +38,7 @@ export function detectLanguage(text: string): "fr" | "en" | null {
     .normalize("NFC")
     .split(/[^\p{L}]+/u)
     .filter(Boolean);
+  if (words.length < MIN_WORDS) return null;
   let french = 0;
   let english = 0;
   for (const word of words) {
