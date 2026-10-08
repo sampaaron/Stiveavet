@@ -1,0 +1,25 @@
+/** Cadre de l'espace cabinet : navigation, compte, bandeaux communs. */
+export const shell = {
+  skipToContent: "Aller au contenu",
+  openMenu: "Ouvrir le menu",
+  closeMenu: "Fermer le menu",
+  mainNavigation: "Navigation principale",
+  lock: "Verrouiller",
+  logout: "Déconnexion",
+  nav: {
+    today: "Aujourd'hui",
+    followups: "Suivis",
+    alerts: "Alertes",
+    agenda: "Agenda",
+    stive: "Stive",
+    practice: "Cabinet",
+    protocols: "Protocoles",
+    settings: "Numa, urgences et garde",
+    team: "Équipe et droits",
+    billing: "Facturation",
+    tasks: "Tâches en échec",
+    journal: "Journal d'activité",
+    help: "Centre d'aide",
+    onboarding: "Démarrage guidé",
+  },
+};

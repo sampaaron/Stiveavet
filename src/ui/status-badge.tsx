@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CircleAlert,
   CircleCheck,
@@ -8,6 +10,8 @@ import {
   OctagonX,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+import { useAppText } from "@/i18n/app/client";
 
 import { cn } from "./cn";
 
@@ -24,42 +28,32 @@ export type Status =
   | "consent-given"
   | "consent-stopped";
 
-const statuses: Record<
-  Status,
-  { label: string; icon: LucideIcon; className: string }
-> = {
+const statuses: Record<Status, { icon: LucideIcon; className: string }> = {
   normal: {
-    label: "Normal",
     icon: CircleDot,
     className: "bg-brand-soft text-brand-ink",
   },
   watch: {
-    label: "À surveiller",
     icon: Eye,
     className: "bg-watch-soft text-watch",
   },
   urgent: {
-    label: "Urgent",
     icon: CircleAlert,
     className: "bg-urgent-soft text-urgent",
   },
   paused: {
-    label: "En pause",
     icon: CirclePause,
     className: "bg-canvas-subtle text-ink-muted",
   },
   "consent-pending": {
-    label: "Accord en attente",
     icon: Clock,
     className: "bg-canvas-subtle text-ink-muted",
   },
   "consent-given": {
-    label: "Accord donné",
     icon: CircleCheck,
     className: "bg-brand-soft text-brand-ink",
   },
   "consent-stopped": {
-    label: "STOP reçu",
     icon: OctagonX,
     className: "bg-urgent-soft text-urgent",
   },
@@ -72,7 +66,8 @@ export function StatusBadge({
   status: Status;
   label?: string;
 }) {
-  const { label: defaultLabel, icon: Icon, className } = statuses[status];
+  const t = useAppText();
+  const { icon: Icon, className } = statuses[status];
   return (
     <span
       className={cn(
@@ -81,7 +76,7 @@ export function StatusBadge({
       )}
     >
       <Icon aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
-      {label ?? defaultLabel}
+      {label ?? t.ui.status[status]}
     </span>
   );
 }

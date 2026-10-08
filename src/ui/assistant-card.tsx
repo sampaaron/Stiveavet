@@ -1,5 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import type { ReactNode } from "react";
+
+import { useAppText } from "@/i18n/app/client";
+import type { AppDictionary } from "@/i18n/app/types";
 
 import { Card } from "./card";
 import { cn } from "./cn";
@@ -10,21 +15,15 @@ export type Assistant = "numa" | "stive";
  * Numa et Stive sont représentés par des portraits photoréalistes : la mention « IA »
  * les accompagne donc toujours (principe non négociable n° 3 du cahier des charges).
  */
-const assistants: Record<
-  Assistant,
-  { name: string; role: string; aiLabel: string }
-> = {
-  numa: {
-    name: "Numa",
-    role: "Échange avec les propriétaires sur WhatsApp",
-    aiLabel: "Assistante IA",
-  },
-  stive: {
-    name: "Stive",
-    role: "Aide l'équipe du cabinet dans Stivea",
-    aiLabel: "Assistant IA",
-  },
-};
+function assistantText(t: AppDictionary, assistant: Assistant) {
+  return assistant === "numa"
+    ? { name: "Numa", role: t.ui.assistants.numaRole, aiLabel: t.common.numaAi }
+    : {
+        name: "Stive",
+        role: t.ui.assistants.stiveRole,
+        aiLabel: t.common.stiveAi,
+      };
+}
 
 export function AssistantAvatar({
   assistant,
@@ -35,11 +34,12 @@ export function AssistantAvatar({
   size?: number;
   className?: string;
 }) {
-  const { name, aiLabel } = assistants[assistant];
+  const t = useAppText();
+  const { name, aiLabel } = assistantText(t, assistant);
   return (
     <Image
       src={`/assistants/${assistant}.webp`}
-      alt={`${name}, ${aiLabel.toLowerCase()}`}
+      alt={t.ui.assistants.avatarAlt(name, aiLabel)}
       width={size}
       height={size}
       className={cn(
@@ -51,9 +51,10 @@ export function AssistantAvatar({
 }
 
 export function AiBadge({ assistant }: { assistant: Assistant }) {
+  const t = useAppText();
   return (
     <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">
-      {assistants[assistant].aiLabel}
+      {assistantText(t, assistant).aiLabel}
     </span>
   );
 }
@@ -67,7 +68,8 @@ export function AssistantCard({
   children?: ReactNode;
   action?: ReactNode;
 }) {
-  const { name, role } = assistants[assistant];
+  const t = useAppText();
+  const { name, role } = assistantText(t, assistant);
   return (
     <Card className="flex flex-col gap-4 p-5">
       <div className="flex items-center gap-3">

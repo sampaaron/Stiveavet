@@ -76,6 +76,8 @@ import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { checkNumaReply, safeFallback } from "./guard";
 import { ownerKeyword } from "./keywords";
+import { detectLanguage } from "./language";
+import type { SystemNoteCode } from "./schema";
 import {
   CONSENT_WORDING_VERSION,
   PAIR_CONSENT_WORDING_VERSION,
@@ -128,7 +130,11 @@ export type ConversationMessage = {
   /** Prénom du propriétaire auteur (entrant) ou destinataire (sortant direct). */
   contactName: string | null;
   contactRole: ContactRole | null;
+  /** Trace d'un groupe (auteur « system »), affichée dans la langue du lecteur (lot 19). */
+  note: SystemNote | null;
 };
+
+export type SystemNote = { code: SystemNoteCode; names: string[] };
 
 export type MessageAttachment = {
   id: string;
@@ -151,7 +157,12 @@ export type ConversationContact = {
   leftGroupAt: Date | null;
   /** STOP écrit dans le groupe, réponse GROUPE ou TOUT attendue. */
   stopRequested: boolean;
+  /** Langue de Numa avec cette personne, et d'où elle vient (lot 19). */
+  language: "fr" | "en";
+  languageSource: LanguageSource;
 };
+
+export type LanguageSource = "import" | "detected" | "vet";
 
 export type ConversationView = {
   followupId: string;
@@ -164,8 +175,8 @@ export type ConversationView = {
   contacts: ConversationContact[];
   /** Groupe WhatsApp ouvert. */
   group: boolean;
-  /** Destinataires d'un message écrit maintenant (« Julien et Sophie »), ou null. */
-  recipients: string | null;
+  /** Prénoms des destinataires d'un message écrit maintenant, ou null. */
+  recipients: string[] | null;
   /** Un propriétaire a demandé l'arrêt du suivi entier. */
   stoppedByOwner: boolean;
   /** Terminé à la date de contrôle (et non arrêté par le vétérinaire). */
@@ -201,6 +212,11 @@ export const ownerMessageInput = z
   .max(MAX_BODY, "Message trop long.");
 
 export const contactRoleInput = z.enum(["primary", "secondary"]);
+
+export const ownerLanguageInput = z.object({
+  role: contactRoleInput,
+  language: z.enum(["fr", "en"]),
+});
 
 const uuid = z.uuid();
 
@@ -239,6 +255,7 @@ type Contact = {
   ownerFullName: string;
   phone: string;
   language: "fr" | "en";
+  languageSource: LanguageSource;
   leftGroupAt: Date | null;
   stopRequestedAt: Date | null;
 };
@@ -310,6 +327,7 @@ async function loadContext(
       ownerFullName: owners.fullName,
       phone: ownerContacts.value,
       language: followupContacts.language,
+      languageSource: followupContacts.languageSource,
       leftGroupAt: followupContacts.leftGroupAt,
       stopRequestedAt: followupContacts.stopRequestedAt,
     })
@@ -567,12 +585,28 @@ async function auditSystem(
   });
 }
 
+/** Texte d'origine d'une trace, gardé en français ; l'écran l'affiche par son code. */
+const NOTE_BODY: Record<SystemNoteCode, (names: string[]) => string> = {
+  group_created: (who) =>
+    `Groupe WhatsApp du suivi créé avec ${frenchList(who)} (simulé).`,
+  left_group: (who) => `${who[0] ?? ""} a quitté le groupe.`,
+  group_emptied: (who) =>
+    `${who[0] ?? ""} a quitté le groupe ; plus personne n'y reste, il est fermé.`,
+  group_stopped: (who) =>
+    `Groupe fermé : ${who[0] ?? ""} a demandé l'arrêt du suivi.`,
+};
+
+function frenchList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} et ${items.at(-1)}`;
+}
+
 /** Trace dans le groupe (création, départ, fermeture), visible de l'équipe. */
 async function systemNote(
   tx: TenantTransaction,
   ctx: ConversationContext,
   threadId: string,
-  body: string,
+  note: SystemNote,
 ) {
   await tx.insert(messages).values({
     organizationId: ctx.organizationId,
@@ -580,7 +614,9 @@ async function systemNote(
     threadId,
     direction: "internal",
     author: "system",
-    body,
+    body: NOTE_BODY[note.code](note.names),
+    noteCode: note.code,
+    noteNames: note.names,
     // Heure réelle (et non celle du début de la transaction) : l'ordre du fil est respecté.
     occurredAt: sql`clock_timestamp()`,
   });
@@ -749,12 +785,10 @@ export function conversationHandlers(deps: {
       .returning({ id: conversationThreads.id });
     if (!thread) throw new Error("Groupe non enregistré");
     const group = { id: thread.id, externalRef: groupRef };
-    await systemNote(
-      tx,
-      ctx,
-      group.id,
-      `Groupe WhatsApp du suivi créé avec ${names(members, "fr")} (simulé).`,
-    );
+    await systemNote(tx, ctx, group.id, {
+      code: "group_created",
+      names: members.map((member) => firstName(member.ownerFullName)),
+    });
     await auditSystem(
       tx,
       ctx.organizationId,
@@ -769,7 +803,7 @@ export function conversationHandlers(deps: {
     tx: TenantTransaction,
     ctx: ConversationContext,
     group: Group,
-    note: string,
+    note: SystemNote,
   ) {
     try {
       await whatsapp.closeGroup({
@@ -1346,30 +1380,24 @@ export function conversationHandlers(deps: {
           }
           const leaver = firstName(writer.ownerFullName);
           if (groupMembers(ctx).length === 0)
-            await closeGroup(
-              tx,
-              ctx,
-              ctx.group,
-              `${leaver} a quitté le groupe ; plus personne n'y reste, il est fermé.`,
-            );
+            await closeGroup(tx, ctx, ctx.group, {
+              code: "group_emptied",
+              names: [leaver],
+            });
           else
-            await systemNote(
-              tx,
-              ctx,
-              ctx.group.id,
-              `${leaver} a quitté le groupe.`,
-            );
+            await systemNote(tx, ctx, ctx.group.id, {
+              code: "left_group",
+              names: [leaver],
+            });
         }
         break;
       }
       case "stopped_all": {
         if (ctx.group)
-          await closeGroup(
-            tx,
-            ctx,
-            ctx.group,
-            `Groupe fermé : ${firstName(writer.ownerFullName)} a demandé l'arrêt du suivi.`,
-          );
+          await closeGroup(tx, ctx, ctx.group, {
+            code: "group_stopped",
+            names: [firstName(writer.ownerFullName)],
+          });
         // L'autre propriétaire est prévenu, s'il avait accepté le suivi.
         for (const other of ctx.contacts)
           if (
@@ -1538,6 +1566,34 @@ export async function recordInbound(
 }
 
 /**
+ * Langue reconnue dans un message du propriétaire (lot 19) : Numa lui répond désormais dans
+ * cette langue. Jamais quand le cabinet l'a choisie lui-même ; jamais sur un message ambigu.
+ */
+async function learnLanguage(
+  tx: TenantTransaction,
+  ctx: ConversationContext,
+  writer: Contact,
+  text: string,
+) {
+  if (writer.languageSource === "vet") return;
+  const detected = detectLanguage(text);
+  if (!detected || detected === writer.language) return;
+  await tx
+    .update(followupContacts)
+    .set({ language: detected, languageSource: "detected" })
+    .where(eq(followupContacts.id, writer.id));
+  writer.language = detected;
+  writer.languageSource = "detected";
+  await auditSystem(
+    tx,
+    ctx.organizationId,
+    "followup.owner_language_detected",
+    ctx.followupId,
+    { role: writer.role, language: detected },
+  );
+}
+
+/**
  * Accord en cours d'un contact (le principal par défaut) : l'analyse photo n'a lieu
  * qu'après l'accord de la personne qui l'a envoyée (lot 16). Un arrêt du suivi entier vaut
  * retrait pour tous.
@@ -1579,6 +1635,7 @@ export async function processInbound(
     );
   const writer = ctx.contacts.find((c) => c.id === source?.contactId);
   if (!writer) throw new DomainError("not_found");
+  await learnLanguage(tx, ctx, writer, text);
   const reach = await reachOf(tx, ctx);
   const consent = reach.consents.get(writer.id) ?? null;
   const keyword = ownerKeyword(text);
@@ -1815,12 +1872,13 @@ export function conversationsService(db: Database) {
     return parsed.data;
   }
 
-  function recipientsLabel(ctx: ConversationContext, targets: Target[]) {
+  function recipientNames(targets: Target[]): string[] | null {
     if (targets.length === 0) return null;
-    const people = targets.flatMap((target) =>
-      target.kind === "group" ? target.members : [target.contact],
-    );
-    return names(people, "fr");
+    return targets
+      .flatMap((target) =>
+        target.kind === "group" ? target.members : [target.contact],
+      )
+      .map((contact) => firstName(contact.ownerFullName));
   }
 
   return {
@@ -1845,6 +1903,8 @@ export function conversationsService(db: Database) {
             threadKind: conversationThreads.kind,
             contactName: owners.fullName,
             contactRole: followupContacts.role,
+            noteCode: messages.noteCode,
+            noteNames: messages.noteNames,
           })
           .from(messages)
           .innerJoin(
@@ -1886,21 +1946,26 @@ export function conversationsService(db: Database) {
             leftGroup: Boolean(contact.leftGroupAt),
             leftGroupAt: contact.leftGroupAt,
             stopRequested: Boolean(contact.stopRequestedAt),
+            language: contact.language,
+            languageSource: contact.languageSource,
           })),
           group: Boolean(ctx.group),
-          recipients: recipientsLabel(ctx, broadcastTargets(ctx, reach)),
+          recipients: recipientNames(broadcastTargets(ctx, reach)),
           stoppedByOwner: reach.stopped,
           endedAutomatically:
             followup.status === "ended" &&
             (await lastStatusReason(tx, followupId)) === AUTOMATIC_END_REASON,
           messages: rows
             .reverse()
-            .map(({ threadKind, contactName, ...row }) => ({
-              ...row,
-              channel: threadKind,
-              contactName: contactName ? firstName(contactName) : null,
-              attachment: media.get(row.id) ?? null,
-            })),
+            .map(
+              ({ threadKind, contactName, noteCode, noteNames, ...row }) => ({
+                ...row,
+                note: noteCode ? { code: noteCode, names: noteNames } : null,
+                channel: threadKind,
+                contactName: contactName ? firstName(contactName) : null,
+                attachment: media.get(row.id) ?? null,
+              }),
+            ),
           rights: {
             canWrite: canWriteToOwner(actor, followup.access),
             canResume: canResumeNuma(actor, followup.access),
@@ -1978,6 +2043,40 @@ export function conversationsService(db: Database) {
           messageId,
         });
         return { messageId, takeover };
+      });
+    },
+
+    /**
+     * Langue de Numa avec un propriétaire, corrigée par un vétérinaire (lot 19) : elle prime
+     * ensuite sur la détection. Chaque correction est journalisée.
+     */
+    async setOwnerLanguage(
+      actor: Actor,
+      followupId: string,
+      rawInput: unknown,
+    ): Promise<void> {
+      assertPermission(actor, "owner_messages.reply");
+      assertPermission(actor, "clinical.read");
+      const parsed = ownerLanguageInput.safeParse(rawInput);
+      if (!parsed.success) throw new DomainError("invalid_target");
+      const { role, language } = parsed.data;
+      await run(actor, async (tx) => {
+        const followup = await loadFollowup(tx, actor, followupId, true);
+        if (!canResumeNuma(actor, followup.access))
+          throw new DomainError("forbidden");
+        const ctx = await loadContext(tx, followupId, true);
+        const contact = ctx.contacts.find((c) => c.role === role);
+        if (!contact) throw new DomainError("invalid_target");
+        if (contact.language === language && contact.languageSource === "vet")
+          return;
+        await tx
+          .update(followupContacts)
+          .set({ language, languageSource: "vet" })
+          .where(eq(followupContacts.id, contact.id));
+        await audit(tx, actor, "followup.owner_language_changed", followupId, {
+          role,
+          language,
+        });
       });
     },
 

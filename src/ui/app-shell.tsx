@@ -2,6 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { appDictionary } from "@/i18n/app";
+import type { Locale } from "@/i18n/locales";
+
 import { SidebarNav } from "./sidebar-nav";
 
 type AppShellProps = {
@@ -11,6 +14,7 @@ type AppShellProps = {
   accountActions?: ReactNode;
   /** Permissions de la personne, pour n'afficher que les écrans autorisés. */
   permissions: readonly string[];
+  locale: Locale;
   children: ReactNode;
 };
 
@@ -20,6 +24,7 @@ export function AppShell({
   user,
   accountActions,
   permissions,
+  locale,
   children,
 }: AppShellProps) {
   return (
@@ -28,7 +33,7 @@ export function AppShell({
         href="#contenu"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2"
       >
-        Aller au contenu
+        {appDictionary(locale).shell.skipToContent}
       </a>
       <SidebarNav
         permissions={permissions}

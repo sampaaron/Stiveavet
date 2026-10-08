@@ -1,6 +1,10 @@
+"use client";
+
 import { FileX, ImageIcon, Mic, ScanEye } from "lucide-react";
 
 import type { Message } from "@/fixtures/types";
+import { useAppText } from "@/i18n/app/client";
+import type { AppDictionary } from "@/i18n/app/types";
 
 import { AssistantAvatar } from "./assistant-card";
 import { cn } from "./cn";
@@ -8,9 +12,10 @@ import { StatusBadge } from "./status-badge";
 
 /** Fil de conversation, groupé par jour. */
 export function ChatThread({ messages }: { messages: Message[] }) {
+  const t = useAppText();
   const days = groupByDay(messages);
   return (
-    <ol aria-label="Conversation WhatsApp" className="flex flex-col gap-3">
+    <ol aria-label={t.ui.chat.conversation} className="flex flex-col gap-3">
       {days.map(({ day, items }) => (
         <li key={day} className="flex flex-col gap-3">
           <p className="self-center rounded-full bg-canvas-subtle px-3 py-0.5 text-xs font-semibold text-ink-muted">
@@ -30,6 +35,7 @@ export function ChatThread({ messages }: { messages: Message[] }) {
 }
 
 export function ChatBubble({ message }: { message: Message }) {
+  const t = useAppText();
   if (message.author === "system") {
     return (
       <p className="mx-auto max-w-md text-center text-xs text-ink-muted">
@@ -60,7 +66,7 @@ export function ChatBubble({ message }: { message: Message }) {
         )}
       >
         <p className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-ink-muted">
-          {authorLabel(message)}
+          {authorLabel(message, t)}
           {message.triage && message.triage !== "normal" ? (
             <StatusBadge status={message.triage} />
           ) : null}
@@ -68,7 +74,7 @@ export function ChatBubble({ message }: { message: Message }) {
         {message.attachment ? (
           <AttachmentView
             attachment={message.attachment}
-            ownerName={message.authorName ?? "le propriétaire"}
+            ownerName={message.authorName ?? t.ui.chat.theOwner}
           />
         ) : null}
         {message.text ? (
@@ -80,14 +86,14 @@ export function ChatBubble({ message }: { message: Message }) {
   );
 }
 
-function authorLabel(message: Message): string {
+function authorLabel(message: Message, t: AppDictionary): string {
   switch (message.author) {
     case "numa":
-      return "Numa · assistante IA";
+      return t.ui.chat.numaAuthor;
     case "vet":
-      return `${message.authorName ?? "Vétérinaire"} · via WhatsApp du cabinet`;
+      return t.ui.chat.vetAuthor(message.authorName ?? null);
     default:
-      return message.authorName ?? "Propriétaire";
+      return message.authorName ?? t.ui.chat.owner;
   }
 }
 
@@ -98,6 +104,7 @@ function AttachmentView({
   attachment: NonNullable<Message["attachment"]>;
   ownerName: string;
 }) {
+  const t = useAppText().ui.chat;
   if (attachment.kind === "deleted")
     return (
       <p className="mb-1 flex items-center gap-2 rounded-xl bg-surface/70 p-2.5 text-sm text-ink-muted">
@@ -113,20 +120,20 @@ function AttachmentView({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={attachment.src}
-            alt={`Photo envoyée par ${ownerName}`}
+            alt={t.photoAlt(ownerName)}
             className="max-h-72 w-auto max-w-full rounded-xl border border-line bg-surface object-contain"
           />
         ) : (
           <div className="flex h-32 w-56 max-w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink-muted/40 bg-surface text-xs text-ink-muted">
             <ImageIcon aria-hidden="true" className="size-6" />
-            {attachment.label} (fictive)
+            {t.fictitious(attachment.label)}
           </div>
         )}
         {attachment.observations?.length ? (
           <figcaption className="mt-2 rounded-xl bg-surface/70 p-2.5 text-sm">
             <p className="flex items-center gap-1.5 font-semibold">
               <ScanEye aria-hidden="true" className="size-4 shrink-0" />
-              Observations de l&apos;IA, à vérifier (aucun diagnostic)
+              {t.observations}
             </p>
             <ul className="mt-1 list-disc pl-5">
               {attachment.observations.map((observation) => (
@@ -142,23 +149,23 @@ function AttachmentView({
     <div className="mb-1 rounded-xl bg-surface/70 p-2.5">
       <p className="flex items-center gap-2 text-sm font-medium">
         <Mic aria-hidden="true" className="size-4" />
-        Message vocal · {attachment.durationLabel}
+        {t.voice(attachment.durationLabel)}
       </p>
       {attachment.src ? (
         <audio
           controls
           preload="auto"
           src={attachment.src}
-          aria-label={`Message vocal de ${ownerName}`}
+          aria-label={t.voiceLabel(ownerName)}
           className="mt-2 w-full max-w-xs"
         />
       ) : null}
       <p className="mt-1 text-sm">
-        <span className="font-semibold">Transcription : </span>
+        <span className="font-semibold">{t.transcript}</span>
         {attachment.transcript === null ? (
-          <span className="text-ink-muted">en cours…</span>
+          <span className="text-ink-muted">{t.transcribing}</span>
         ) : (
-          <>« {attachment.transcript} »</>
+          t.quote(attachment.transcript)
         )}
       </p>
     </div>

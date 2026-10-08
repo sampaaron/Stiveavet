@@ -161,7 +161,7 @@ export default function DesignSystemPage() {
             />
           </SectionCard>
           <SectionCard title="Chargement" headingLevel={3}>
-            <LoadingState />
+            <LoadingState title="Chargement…" />
           </SectionCard>
           <SectionCard title="Erreur" headingLevel={3}>
             <ErrorState

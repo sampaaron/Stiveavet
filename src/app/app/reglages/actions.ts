@@ -15,13 +15,19 @@ import {
   messageWindowsInput,
   parisLocalToDate,
 } from "@/domains/reglages/content";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { attempt, domainFailure } from "../domain-messages";
 
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
+/** Requête altérée (identifiant, choix fermé) : message générique, sans détail. */
+async function invalid(): Promise<ActionState> {
+  const { t } = await appText();
+  return { error: t.common.invalidRequest };
+}
 
 const idInput = z.object({ id: z.uuid() });
 const periodInput = z.object({
@@ -35,7 +41,7 @@ const alertsInput = z.object({
   photoAnalysisEnabled: z.boolean(),
 });
 const onCallInput = z.object({
-  membershipId: z.uuid("Choisissez le vétérinaire de garde."),
+  membershipId: z.uuid("on_call_vet_required"),
   startsAt: z.string().max(16),
   endsAt: z.string().max(16),
 });
@@ -46,8 +52,35 @@ function text(form: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function firstIssue(error: z.ZodError): ActionState {
-  return { error: error.issues[0]?.message ?? INVALID.error };
+type ValidationCode = keyof AppDictionary["settings"]["validation"];
+
+/** Les schémas renvoient un code ; un message par défaut de Zod devient une phrase générique. */
+async function firstIssue(error: z.ZodError): Promise<ActionState> {
+  const { t } = await appText();
+  const code = error.issues[0]?.message ?? "";
+  const known = (value: string): value is ValidationCode =>
+    Object.hasOwn(t.settings.validation, value);
+  return {
+    error: known(code)
+      ? t.settings.validation[code]
+      : t.settings.errors.invalidInput,
+  };
+}
+
+/** Texte de confirmation, dans la langue de la personne. */
+async function notice(
+  pick: (n: AppDictionary["settings"]["notices"]) => string,
+): Promise<string> {
+  const { t } = await appText();
+  return pick(t.settings.notices);
+}
+
+/** Saisie refusée par l'action elle-même. */
+async function failure(
+  pick: (e: AppDictionary["settings"]["errors"]) => string,
+): Promise<ActionState> {
+  const { t } = await appText();
+  return { error: pick(t.settings.errors) };
 }
 
 /**
@@ -65,7 +98,7 @@ export async function applyDefaultsAction(): Promise<ActionState> {
   return finish(
     await attempt(
       () => services.settings().applyDefaults(context),
-      "Réglages de départ appliqués. Vous pouvez les adapter à tout moment.",
+      await notice((n) => n.defaultsApplied),
     ),
   );
 }
@@ -82,12 +115,12 @@ export async function saveMessageWindowsAction(
     }),
   );
   const parsed = messageWindowsInput.safeParse(windows);
-  if (!parsed.success) return firstIssue(parsed.error);
+  if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().saveMessageWindows(context, parsed.data),
-      "Horaires d'envoi enregistrés.",
+      await notice((n) => n.messageWindowsSaved),
     ),
   );
 }
@@ -104,12 +137,12 @@ export async function saveAppointmentWindowsAction(
     }),
   );
   const parsed = messageWindowsInput.safeParse(windows);
-  if (!parsed.success) return firstIssue(parsed.error);
+  if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().saveAppointmentWindows(context, parsed.data),
-      "Plages de rendez-vous enregistrées.",
+      await notice((n) => n.appointmentWindowsSaved),
     ),
   );
 }
@@ -128,12 +161,12 @@ export async function saveAppointmentDurationsAction(
     treatment_followup: minutes("treatment_followup"),
     other: minutes("other"),
   });
-  if (!parsed.success) return firstIssue(parsed.error);
+  if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().saveAppointmentDurations(context, parsed.data),
-      "Durées des rendez-vous enregistrées.",
+      await notice((n) => n.durationsSaved),
     ),
   );
 }
@@ -146,7 +179,7 @@ export async function saveInstructionsAction(
     period: text(form, "period"),
     instructions: text(form, "instructions"),
   });
-  if (!parsed.success) return firstIssue(parsed.error);
+  if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(
     await attempt(
@@ -158,7 +191,7 @@ export async function saveInstructionsAction(
             parsed.data.period,
             parsed.data.instructions,
           ),
-      "Consignes enregistrées.",
+      await notice((n) => n.instructionsSaved),
     ),
   );
 }
@@ -171,12 +204,12 @@ export async function addContactAction(
     label: text(form, "label"),
     phone: text(form, "phone"),
   });
-  if (!parsed.success) return firstIssue(parsed.error);
+  if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().addContact(context, parsed.data),
-      "Contact d'urgence ajouté.",
+      await notice((n) => n.contactAdded),
     ),
   );
 }
@@ -186,12 +219,12 @@ export async function removeContactAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return invalid();
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().removeContact(context, parsed.data.id),
-      "Contact retiré.",
+      await notice((n) => n.contactRemoved),
     ),
   );
 }
@@ -204,12 +237,12 @@ export async function saveAlertSettingsAction(
     escalationDelayMinutes: text(form, "escalationDelayMinutes"),
     photoAnalysisEnabled: form.get("photoAnalysisEnabled") === "on",
   });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return invalid();
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().saveAlertSettings(context, parsed.data),
-      "Règles d'alerte enregistrées.",
+      await notice((n) => n.alertsSaved),
     ),
   );
 }
@@ -223,17 +256,14 @@ export async function addOnCallAction(
     startsAt: text(form, "startsAt"),
     endsAt: text(form, "endsAt"),
   });
-  if (!parsed.success) return firstIssue(parsed.error);
+  if (!parsed.success) return await firstIssue(parsed.error);
   const startsAt = parisLocalToDate(parsed.data.startsAt);
   const endsAt = parisLocalToDate(parsed.data.endsAt);
-  if (!startsAt || !endsAt)
-    return { error: "Indiquez le début et la fin de la garde." };
-  if (endsAt <= startsAt)
-    return { error: "La fin de la garde doit suivre son début." };
-  if (endsAt.getTime() <= Date.now())
-    return { error: "Cette garde est déjà terminée." };
+  if (!startsAt || !endsAt) return failure((e) => e.onCallDates);
+  if (endsAt <= startsAt) return failure((e) => e.onCallOrder);
+  if (endsAt.getTime() <= Date.now()) return failure((e) => e.onCallEnded);
   if (endsAt.getTime() - startsAt.getTime() > 14 * 86_400_000)
-    return { error: "Une garde dure au plus 14 jours." };
+    return failure((e) => e.onCallTooLong);
   const context = await memberContext();
   return finish(
     await attempt(
@@ -243,7 +273,7 @@ export async function addOnCallAction(
           startsAt,
           endsAt,
         }),
-      "Garde ajoutée au planning.",
+      await notice((n) => n.onCallAdded),
     ),
   );
 }
@@ -253,12 +283,12 @@ export async function removeOnCallAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return invalid();
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().removeOnCall(context, parsed.data.id),
-      "Garde retirée du planning.",
+      await notice((n) => n.onCallRemoved),
     ),
   );
 }
@@ -268,21 +298,19 @@ export async function connectAction(
   form: FormData,
 ): Promise<ActionState> {
   const provider = providerInput.safeParse(text(form, "provider"));
-  if (!provider.success) return INVALID;
+  if (!provider.success) return invalid();
   const value = text(form, "value").slice(0, 64);
   if (provider.data === "whatsapp") {
     const phone = contactInput.shape.phone.safeParse(value);
-    if (!phone.success) return firstIssue(phone.error);
+    if (!phone.success) return await firstIssue(phone.error);
   }
   if (provider.data === "drveto" && !/^[A-Za-z0-9-]{3,32}$/.test(value.trim()))
-    return {
-      error: "Code du cabinet dr.veto : 3 à 32 lettres, chiffres ou tirets.",
-    };
+    return failure((e) => e.drvetoCode);
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().connect(context, provider.data, value),
-      "Connexion simulée enregistrée.",
+      await notice((n) => n.connected),
     ),
   );
 }
@@ -292,12 +320,12 @@ export async function disconnectAction(
   form: FormData,
 ): Promise<ActionState> {
   const provider = providerInput.safeParse(text(form, "provider"));
-  if (!provider.success) return INVALID;
+  if (!provider.success) return invalid();
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.settings().disconnect(context, provider.data),
-      "Connexion retirée.",
+      await notice((n) => n.disconnected),
     ),
   );
 }
@@ -307,7 +335,7 @@ export async function completeTeamStepAction(): Promise<ActionState> {
   return finish(
     await attempt(
       () => services.settings().completeStep(context, "team"),
-      "Étape équipe terminée.",
+      await notice((n) => n.teamDone),
     ),
   );
 }
@@ -318,7 +346,7 @@ export async function createTestFollowupAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "protocolId") });
-  if (!parsed.success) return { error: "Choisissez un protocole validé." };
+  if (!parsed.success) return failure((e) => e.chooseProtocol);
   const context = await memberContext();
   let followupId: string;
   try {
@@ -326,7 +354,7 @@ export async function createTestFollowupAction(
       .settings()
       .createTestFollowup(context, parsed.data.id);
   } catch (error) {
-    if (error instanceof DomainError) return domainFailure(error);
+    if (error instanceof DomainError) return await domainFailure(error);
     throw error;
   }
   revalidatePath("/app/demarrage");

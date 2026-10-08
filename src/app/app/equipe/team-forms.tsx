@@ -2,6 +2,7 @@
 
 import { useActionState, useId } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 import { TextField } from "@/ui/text-field";
 
@@ -25,18 +26,19 @@ export function InviteForm({ roles }: { roles: Option[] }) {
     initialActionState,
   );
   const id = useId();
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-4" noValidate>
       <div className="grid gap-4 md:grid-cols-3">
         <TextField
-          label="Nom"
+          label={t.team.invite.name}
           name="displayName"
           autoComplete="off"
           required
           maxLength={120}
         />
         <TextField
-          label="Adresse e-mail"
+          label={t.team.invite.email}
           name="email"
           type="email"
           autoComplete="off"
@@ -45,7 +47,7 @@ export function InviteForm({ roles }: { roles: Option[] }) {
         />
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-role`} className="text-sm font-semibold">
-            Rôle
+            {t.team.invite.role}
           </label>
           <select
             id={`${id}-role`}
@@ -64,7 +66,7 @@ export function InviteForm({ roles }: { roles: Option[] }) {
       <ActionMessage state={state} />
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          Envoyer l&apos;invitation
+          {t.team.invite.submit}
         </Button>
       </div>
     </form>
@@ -82,6 +84,7 @@ export function RevokeInvitationForm({
     revokeInvitationAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="flex flex-col items-end gap-1">
       <input type="hidden" name="id" value={id} />
@@ -90,9 +93,9 @@ export function RevokeInvitationForm({
         variant="quiet"
         size="sm"
         disabled={pending}
-        aria-label={`Annuler l'invitation de ${email}`}
+        aria-label={t.team.pending.cancelLabel(email)}
       >
-        Annuler
+        {t.team.pending.cancel}
       </Button>
       <ActionMessage state={state} />
     </form>
@@ -115,12 +118,13 @@ export function PermissionsForm({
     setPermissionsAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="membershipId" value={membershipId} />
       <fieldset className="grid gap-2">
         <legend className="mb-1 text-sm font-semibold">
-          Droits de {memberName}
+          {t.team.permissions.legend(memberName)}
         </legend>
         {options.map((option) => (
           <label
@@ -137,7 +141,10 @@ export function PermissionsForm({
             <span>
               {option.label}
               {option.fixed ? null : (
-                <span className="text-ink-muted"> · sur décision</span>
+                <span className="text-ink-muted">
+                  {" "}
+                  · {t.team.permissions.optional}
+                </span>
               )}
             </span>
           </label>
@@ -152,7 +159,7 @@ export function PermissionsForm({
           disabled={pending}
           aria-busy={pending}
         >
-          Enregistrer les droits
+          {t.team.permissions.submit}
         </Button>
       </div>
     </form>
@@ -175,11 +182,12 @@ export function RoleForm({
     initialActionState,
   );
   const id = useId();
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="membershipId" value={membershipId} />
       <label htmlFor={`${id}-role`} className="text-sm font-semibold">
-        Rôle de {memberName}
+        {t.team.role.label(memberName)}
       </label>
       <div className="flex flex-wrap gap-2">
         <select
@@ -200,7 +208,7 @@ export function RoleForm({
           disabled={pending}
           aria-busy={pending}
         >
-          Changer le rôle
+          {t.team.role.submit}
         </Button>
       </div>
       <ActionMessage state={state} />
@@ -224,15 +232,14 @@ export function DeactivateForm({
     initialActionState,
   );
   const id = useId();
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="membershipId" value={membershipId} />
       {activeFollowups > 0 ? (
         <>
           <label htmlFor={`${id}-reprise`} className="text-sm font-semibold">
-            {activeFollowups > 1
-              ? `Ses ${activeFollowups} suivis en cours passent à`
-              : "Son suivi en cours passe à"}
+            {t.team.deactivate.reassignLabel(activeFollowups)}
           </label>
           <select
             id={`${id}-reprise`}
@@ -241,7 +248,7 @@ export function DeactivateForm({
             defaultValue=""
           >
             <option value="" disabled>
-              Choisir un vétérinaire…
+              {t.team.deactivate.chooseVet}
             </option>
             {targets.map((target) => (
               <option key={target.value} value={target.value}>
@@ -261,9 +268,9 @@ export function DeactivateForm({
           size="sm"
           disabled={pending}
           aria-busy={pending}
-          aria-label={`Retirer l'accès de ${memberName}`}
+          aria-label={t.team.deactivate.submitLabel(memberName)}
         >
-          Retirer l&apos;accès
+          {t.team.deactivate.submit}
         </Button>
       </div>
     </form>
@@ -281,6 +288,7 @@ export function ReactivateForm({
     reactivateAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="id" value={membershipId} />
@@ -292,9 +300,9 @@ export function ReactivateForm({
           size="sm"
           disabled={pending}
           aria-busy={pending}
-          aria-label={`Rétablir l'accès de ${memberName}`}
+          aria-label={t.team.reactivate.submitLabel(memberName)}
         >
-          Rétablir l&apos;accès
+          {t.team.reactivate.submit}
         </Button>
       </div>
     </form>

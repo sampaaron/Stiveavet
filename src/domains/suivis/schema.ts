@@ -140,6 +140,13 @@ export const consentState = pgEnum("consent_state", [
 /** Migration 0014 : retrait pour la personne seule, ou pour le suivi entier. */
 export const consentScope = pgEnum("consent_scope", ["contact", "followup"]);
 
+/** Migration 0015 : d'où vient la langue d'un propriétaire pour ce suivi. */
+export const languageSource = pgEnum("language_source", [
+  "import",
+  "detected",
+  "vet",
+]);
+
 export const followupContacts = pgTable("followup_contacts", {
   id: uuid("id")
     .primaryKey()
@@ -151,6 +158,7 @@ export const followupContacts = pgTable("followup_contacts", {
   role: followupContactRole("role").notNull(),
   active: boolean("active").notNull().default(true),
   language: language("language").notNull().default("fr"),
+  languageSource: languageSource("language_source").notNull().default("import"),
   leftGroupAt: timestamp("left_group_at", { withTimezone: true }),
   /** Migration 0014 : STOP écrit dans le groupe, clarification en cours. */
   stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),

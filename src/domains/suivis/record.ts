@@ -1,15 +1,22 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
+  triageReason,
+  triageReasonColumns,
+  triageRuleJoin,
+} from "@/domains/urgences/reason";
+import type { TriageReason } from "@/domains/urgences/reason";
+import {
   acknowledgements,
   alerts,
   animals,
   attachments,
   consents,
+  followupAlertRules,
   followupContacts,
   followupImports,
-  followupTreatments,
   followups,
+  followupTreatments,
   memberships,
   messages,
   ownerContacts,
@@ -37,6 +44,8 @@ export type FollowupContactView = {
   role: "primary" | "secondary";
   active: boolean;
   language: "fr" | "en";
+  /** D'où vient la langue de Numa avec cette personne (lot 19). */
+  languageSource: "import" | "detected" | "vet";
   leftGroup: boolean;
   /** Dernier état connu ; null si l'accord n'a pas encore été demandé. */
   consent: ConsentStateView | null;
@@ -64,7 +73,7 @@ export type TriageEventView = {
   id: string;
   level: "normal" | "watch" | "urgent";
   source: "rule" | "ai" | "vet";
-  reason: string;
+  reason: TriageReason;
   messageId: string | null;
   at: Date;
 };
@@ -124,6 +133,7 @@ async function loadContacts(
       role: followupContacts.role,
       active: followupContacts.active,
       language: followupContacts.language,
+      languageSource: followupContacts.languageSource,
       leftGroupAt: followupContacts.leftGroupAt,
       phone: ownerContacts.value,
     })
@@ -154,6 +164,7 @@ async function loadContacts(
     role: row.role,
     active: row.active,
     language: row.language,
+    languageSource: row.languageSource,
     leftGroup: row.leftGroupAt !== null,
     consent: latest.get(row.id) ?? null,
   }));
@@ -241,18 +252,19 @@ async function loadTriage(
       id: triageEvents.id,
       level: triageEvents.level,
       source: triageEvents.source,
-      reason: triageEvents.reason,
+      ...triageReasonColumns,
       messageId: triageEvents.messageId,
       at: triageEvents.createdAt,
     })
     .from(triageEvents)
+    .leftJoin(followupAlertRules, triageRuleJoin)
     .where(eq(triageEvents.followupId, followupId))
     .orderBy(desc(triageEvents.createdAt), desc(triageEvents.id));
   return rows.map((row) => ({
     id: row.id,
     level: row.level,
     source: row.source,
-    reason: row.reason,
+    reason: triageReason(row),
     messageId: row.messageId,
     at: row.at,
   }));

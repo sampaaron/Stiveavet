@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE } from "@/i18n/locales";
+import type { Locale } from "@/i18n/locales";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -580,6 +582,7 @@ export function teamService(deps: {
             actorMembershipId: auditEvents.actorMembershipId,
             targetType: auditEvents.targetType,
             targetId: auditEvents.targetId,
+            metadata: auditEvents.metadata,
             occurredAt: auditEvents.occurredAt,
           })
           .from(auditEvents)
@@ -595,12 +598,14 @@ export function teamService(deps: {
           .from(loginEvents)
           .orderBy(desc(loginEvents.occurredAt))
           .limit(limit);
+        // Noms bruts : `null` quand l'auteur n'existe plus ou n'est pas un membre (système,
+        // connexion d'une adresse inconnue) ; l'écran le dit dans la langue de la personne.
         return {
           actions: actions.map((event) => ({
             ...event,
             actorName: event.actorMembershipId
-              ? (names.get(event.actorMembershipId) ?? "Membre retiré")
-              : "Système",
+              ? (names.get(event.actorMembershipId) ?? null)
+              : null,
             targetName:
               event.targetType === "membership" && event.targetId
                 ? (names.get(event.targetId) ?? null)
@@ -608,9 +613,7 @@ export function teamService(deps: {
           })),
           logins: logins.map((event) => ({
             ...event,
-            userName: event.userId
-              ? (names.get(event.userId) ?? "—")
-              : "Inconnu",
+            userName: event.userId ? (names.get(event.userId) ?? null) : null,
           })),
         };
       });
@@ -694,6 +697,8 @@ export async function acceptInvitation(
     token: string | undefined;
     displayName: string;
     passwordHash: string;
+    /** Langue de la page d'invitation, gardée pour l'interface (ADR 0022). */
+    uiLocale?: Locale;
   },
 ): Promise<"accepted" | "expired" | "email_registered" | "vet_limit"> {
   if (!isWellFormedToken(input.token)) return "expired";
@@ -734,6 +739,7 @@ export async function acceptInvitation(
           id: userId,
           email: invitation.email,
           displayName: input.displayName.trim() || invitation.display_name,
+          uiLocale: input.uiLocale ?? DEFAULT_LOCALE,
         });
         await tx.insert(memberships).values({
           id: membershipId,

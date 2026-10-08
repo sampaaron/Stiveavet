@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { useAppText } from "@/i18n/app/client";
+
 import { Button } from "./button";
 import { cn } from "./cn";
 
@@ -31,6 +33,7 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const close = useAppText().common.close;
 
   useEffect(() => {
     const dialog = ref.current;
@@ -62,7 +65,7 @@ export function Modal({
             className="-m-1 rounded-md p-1 text-ink-muted hover:bg-canvas-subtle"
           >
             <X aria-hidden="true" className="size-5" />
-            <span className="sr-only">Fermer</span>
+            <span className="sr-only">{close}</span>
           </button>
         </div>
         {description ? (
@@ -98,11 +101,12 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Annuler",
+  cancelLabel,
   onConfirm,
   tone = "default",
 }: ConfirmDialogProps) {
   const [open, setOpen] = useState(false);
+  const t = useAppText();
   return (
     <>
       <Button variant="secondary" onClick={() => setOpen(true)}>
@@ -116,7 +120,7 @@ export function ConfirmDialog({
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              {cancelLabel}
+              {cancelLabel ?? t.common.cancel}
             </Button>
             <Button
               className={cn(

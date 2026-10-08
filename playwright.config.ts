@@ -25,7 +25,9 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  use: { baseURL, trace: "retain-on-failure" },
+  // Navigateur en français : l'espace cabinet suit Accept-Language tant qu'aucune langue
+  // n'est choisie (ADR 0022) ; les parcours en anglais choisissent la langue eux-mêmes.
+  use: { baseURL, trace: "retain-on-failure", locale: "fr-FR" },
   projects: [
     // Connexion de Claire (vétérinaire, code via Mailpit) une seule fois, réutilisée ensuite.
     { name: "connexion", testMatch: /connexion\.setup\.ts/ },

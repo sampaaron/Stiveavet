@@ -256,7 +256,7 @@ describe("accord de chacun, puis groupe", () => {
     expect(groupCalls).toEqual([]);
     expect((await view(gaston)).group).toBe(false);
     // Chloé n'a pas encore accepté : seul Antoine reçoit les messages de l'équipe.
-    expect((await view(gaston)).recipients).toBe("Antoine");
+    expect((await view(gaston)).recipients).toEqual(["Antoine"]);
   });
 
   it("le second accord crée le groupe, où Numa souhaite la bienvenue aux deux", async () => {
@@ -269,7 +269,14 @@ describe("accord de chacun, puis groupe", () => {
     expect(welcome?.body).toContain("assistante IA");
     const current = await view(gaston);
     expect(current.group).toBe(true);
-    expect(current.recipients).toBe("Antoine et Chloé");
+    expect(current.recipients).toEqual(["Antoine", "Chloé"]);
+    // Trace codée, affichée dans la langue du lecteur ; le texte d'origine reste en français.
+    expect(
+      current.messages.find((message) => message.author === "system"),
+    ).toMatchObject({
+      note: { code: "group_created", names: ["Antoine", "Chloé"] },
+      body: "Groupe WhatsApp du suivi créé avec Antoine et Chloé (simulé).",
+    });
     expect(current.messages.at(-1)).toMatchObject({
       author: "numa",
       channel: "group",
@@ -320,7 +327,7 @@ describe("STOP dans le groupe", () => {
       consent: "given",
     });
     // En attendant sa réponse, l'équipe n'écrit plus qu'à Antoine, en direct.
-    expect(current.recipients).toBe("Antoine");
+    expect(current.recipients).toEqual(["Antoine"]);
     const leo = await actor(ids.vet);
     await conversations.writeToOwner(
       leo,
@@ -343,7 +350,11 @@ describe("STOP dans le groupe", () => {
     expect(sent.at(-1)?.body).toContain("vous avez quitté le groupe");
     const current = await view(gaston);
     expect(current.group).toBe(true);
-    expect(current.recipients).toBe("Antoine");
+    expect(current.recipients).toEqual(["Antoine"]);
+    expect(
+      current.messages.findLast((message) => message.author === "system")
+        ?.note,
+    ).toEqual({ code: "left_group", names: ["Chloé"] });
     expect(current.contacts.find((c) => c.role === "secondary")).toMatchObject({
       leftGroup: true,
       stopRequested: false,
@@ -375,6 +386,10 @@ describe("STOP dans le groupe", () => {
     expect(current.stoppedByOwner).toBe(true);
     expect(current.recipients).toBeNull();
     expect(current.group).toBe(false);
+    expect(
+      current.messages.findLast((message) => message.author === "system")
+        ?.note,
+    ).toEqual({ code: "group_stopped", names: ["Antoine"] });
     const { rows } = await admin.query(
       `SELECT state, scope FROM consents WHERE followup_id = $1
        ORDER BY recorded_at DESC LIMIT 1`,
@@ -400,7 +415,7 @@ describe("STOP dans le groupe", () => {
     const current = await view(gaston);
     expect(current.stoppedByOwner).toBe(false);
     expect(current.group).toBe(false);
-    expect(current.recipients).toBe("Antoine");
+    expect(current.recipients).toEqual(["Antoine"]);
     expect(groupCalls.filter((call) => call.startsWith("create"))).toHaveLength(
       1,
     );

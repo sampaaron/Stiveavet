@@ -76,7 +76,13 @@ export const messages = pgTable("messages", {
   readAt: at("read_at"),
   failedAt: at("failed_at"),
   errorCode: text("error_code"),
+  /** Migration 0015 : trace codée d'un groupe, affichée dans la langue du lecteur. */
+  noteCode: text("note_code").$type<SystemNoteCode>(),
+  noteNames: text("note_names").array().notNull().default([]),
 });
+
+export type SystemNoteCode =
+  "group_created" | "left_group" | "group_emptied" | "group_stopped";
 
 export const attachments = pgTable("attachments", {
   id: uuid("id")

@@ -2,6 +2,7 @@ import { ChevronRight, Lock, PawPrint } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { ButtonLink } from "@/ui/button";
@@ -12,10 +13,13 @@ import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 import { StatusBadge } from "@/ui/status-badge";
 
-import { FOLLOWUP_STATUS_LABELS, followupBadge } from "./followup-labels";
+import { followupBadge } from "./followup-labels";
 import { TestMark } from "./test-mark";
 
-export const metadata: Metadata = { title: "Suivis" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.followups.title };
+}
 
 export default async function FollowupsPage() {
   const context = await requirePermission(
@@ -25,15 +29,17 @@ export default async function FollowupsPage() {
   );
   const followups = await services.followups().list(context);
   const clinical = context.permissions.has("clinical.read");
+  const { t, locale } = await appText();
+  const text = t.followups.list;
 
   return (
     <>
       <PageHeader
-        title="Suivis"
+        title={t.followups.title}
         description={
           clinical
-            ? "Les suivis que vous pouvez consulter."
-            : "Vue d'organisation : animal, propriétaire, état et responsable. Les données cliniques sont réservées aux vétérinaires."
+            ? text.descriptionClinical
+            : text.descriptionSummary
         }
         actions={
           context.permissions.has("followups.launch") && clinical ? (
@@ -41,7 +47,7 @@ export default async function FollowupsPage() {
               href="/app/suivis/nouveau"
               icon={<PawPrint aria-hidden="true" className="size-4" />}
             >
-              Lancer un suivi
+              {text.launch}
             </ButtonLink>
           ) : null
         }
@@ -49,8 +55,8 @@ export default async function FollowupsPage() {
       <Card>
         {followups.length === 0 ? (
           <EmptyState
-            title="Aucun suivi à afficher"
-            description="Les suivis dont vous êtes responsable ou qui vous sont partagés apparaîtront ici."
+            title={text.emptyTitle}
+            description={text.emptyDescription}
           />
         ) : (
           <ul className="divide-y divide-line">
@@ -76,7 +82,7 @@ export default async function FollowupsPage() {
                         {followup.isPrivate ? (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted">
                             <Lock aria-hidden="true" className="size-3.5" />
-                            Privé
+                            {text.private}
                           </span>
                         ) : null}
                         {followup.isTest ? <TestMark /> : null}
@@ -87,7 +93,7 @@ export default async function FollowupsPage() {
                           followup.access === "clinical"
                             ? followup.procedure
                             : null,
-                          FOLLOWUP_STATUS_LABELS[followup.status],
+                          t.labels.followupStatus[followup.status],
                         ]
                           .filter(Boolean)
                           .join(" · ")}
@@ -97,8 +103,10 @@ export default async function FollowupsPage() {
                       <span className="block">{followup.responsibleName}</span>
                       <span className="block">
                         {followup.controlAppointmentAt
-                          ? `Contrôle le ${formatDate(followup.controlAppointmentAt)}`
-                          : "Contrôle non programmé"}
+                          ? text.controlOn(
+                              formatDate(followup.controlAppointmentAt, locale),
+                            )
+                          : text.controlNone}
                       </span>
                     </span>
                     <ChevronRight

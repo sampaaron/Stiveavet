@@ -127,6 +127,7 @@ export async function DemoSpacePage({
                     <AgendaEvent
                       event={event}
                       vetName={vetName(event.vetId)}
+                      locale={locale}
                       followupHref={hrefFor}
                     />
                   </li>

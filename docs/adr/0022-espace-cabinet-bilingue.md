@@ -1,0 +1,22 @@
+# 0022 — Espace cabinet en français et en anglais, langue de Numa corrigeable
+
+- Statut : accepté (8 octobre 2026)
+
+## Contexte
+
+Phase 2, lot 19. Cahier des charges §2 : l'interface existe en français et en anglais, et Numa écrit à chaque propriétaire dans sa langue. Le site public est bilingue depuis le lot 9 (ADR 0012) avec des dictionnaires typés ; l'espace cabinet et les pages de connexion étaient restés en français. Plan de la phase 2 : « dictionnaires typés pour l'espace cabinet (même méthode qu'au lot 9), langue de Numa détectée et corrigeable par le vétérinaire ; tous les écrans de l'espace cabinet en FR et EN, axe sans violation ».
+
+## Décision
+
+1. **Dictionnaires typés, par partie** : `src/i18n/app/fr/<partie>.ts` (référence) et `en/<partie>.ts`, dont le type est dérivé du français. Un texte à compléter est une fonction dont les paramètres sont vérifiés à la compilation dans les deux langues (pluriels compris). Tests : même structure et mêmes paramètres, aucun texte vide, chaque valeur reprise en anglais, Numa et Stive toujours « AI assistant », aucun texte anglais resté en français, aucun texte français écrit en dur dans les écrans (repère : caractères accentués hors commentaires). Le français des écrans est inchangé, mot pour mot.
+2. **Langue de la page** : le proxy pose `x-stivea-locale`, toujours réécrit et limité à `fr` ou `en` : sur le site, la langue de l'adresse ; ailleurs, le cookie de préférence, sinon `Accept-Language`, sinon le français. La mise en page racine en tire `<html lang>` et la transmet aux composants clients. Les composants serveur lisent `appText()`, les composants clients `useAppText()`.
+3. **Choix par personne** : `users.ui_locale` (migration 0015) garde la langue de chacun ; la base n'accepte que la modification de sa propre ligne (RLS). La bascule (cadre de l'espace cabinet et pages de connexion) l'enregistre si la personne est connectée et pose un cookie `httpOnly` (`__Host-` en HTTPS), puis revient à la même page, seulement vers une adresse de l'espace cabinet ou de connexion. À la connexion, le cookie reprend la langue du compte ; l'inscription et l'acceptation d'une invitation gardent la langue de la page. Simple préférence : aucun droit n'en dépend, elle n'est pas journalisée.
+4. **Formats** : dates et heures à l'heure de Paris, en anglais à la britannique (jour, mois, horloge sur 24 h) ; montants en euros selon la langue.
+5. **Ce que la base garde pour l'équipe est codé** (migration 0015) : le motif d'un triage automatique porte un code (`red_flag`, `rule`, `concern`, `none`, `after_end`), le signe d'alerte cité restant tel que le vétérinaire l'a écrit ; un triage écrit par un vétérinaire n'a pas de code (contrôle en base). Les traces d'un groupe (création, départ, fermeture) portent un code et les prénoms cités, réservés aux messages du système. Le texte d'origine reste conservé en français ; l'écran affiche le code dans la langue du lecteur. Les lignes existantes ont été reprises.
+6. **Langue de Numa** : la langue de chaque propriétaire vient du dossier importé (`import`). Un message clairement écrit dans l'autre langue (règle écrite, sans IA : au moins trois mots propres à une langue, deux fois plus que l'autre) la change (`detected`), journalisé sans contenu ; un mot-clé, un message court ou mêlé ne change rien. Un vétérinaire qui peut écrire au propriétaire la corrige depuis le dossier (`vet`), journalisé ; la détection ne remplace jamais ce choix. La synthèse pré-consultation est rédigée dans la langue du lecteur.
+
+## Conséquences
+
+- Tests unitaires : dictionnaires, formats dans les deux langues, langue d'une requête, détection de la langue. Tests d'intégration : langue de l'interface par personne (refus 42501 pour un collègue), détection, correction (droits, journal, priorité sur la détection), motifs et traces codés refusés hors de leur cas. Parcours de bout en bout : chaque écran de l'espace cabinet et de connexion en anglais, contrôlé par axe.
+- Restent en français, volontairement : les e-mails envoyés à l'équipe (codes, invitations, alertes), les factures émises (documents conservés), la bibliothèque de protocoles de départ et les consignes par défaut de Numa (contenus cliniques validés en français ; une version anglaise devra être validée par un vétérinaire, cahier des charges §19), les données fictives. Les contenus saisis (protocoles, notes, messages) ne sont jamais traduits.
+- Observations de l'analyse photo : dans la langue du propriétaire, comme aujourd'hui.

@@ -30,7 +30,8 @@ export function EmptyState(props: StateProps) {
   return <StateLayout icon={<Inbox className="size-5" />} {...props} />;
 }
 
-export function LoadingState({ title = "Chargement…" }: { title?: string }) {
+/** Le titre est fourni par la page, dans la langue de la personne. */
+export function LoadingState({ title }: { title: string }) {
   return (
     <div role="status" aria-live="polite">
       <StateLayout

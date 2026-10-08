@@ -8,12 +8,6 @@ import { appDatabase } from "@/server/db/client";
 import { organizations, users } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
-const roleLabels: Record<MemberRole, string> = {
-  admin_vet: "Vétérinaire administrateur",
-  vet: "Vétérinaire",
-  assistant: "Assistant vétérinaire",
-};
-
 /** Nom affiché, rôle et cabinet de la personne connectée (lu sous RLS). */
 type Who = {
   organizationId: string;
@@ -39,7 +33,6 @@ export const memberProfile = cache(async (session: Who) =>
         displayName: user.displayName,
         firstName: firstName(user.displayName),
         organizationName: organization.name,
-        roleLabel: roleLabels[session.role],
       };
     },
   ),

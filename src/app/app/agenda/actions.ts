@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
 import { MAX_CAPTURE_BYTES } from "@/domains/fichiers/media";
+import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
@@ -17,7 +18,10 @@ import { domainFailure } from "../domain-messages";
  * vétérinaire choisi et le type réel du fichier ; la capture est supprimée dès la lecture.
  */
 
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
+async function invalid(): Promise<ActionState> {
+  const { t } = await appText();
+  return { error: t.common.invalidRequest };
+}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -28,13 +32,14 @@ export async function importCaptureAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const vet = z.uuid().safeParse(text(form, "vetMembershipId"));
-  if (!vet.success) return { error: "Choisissez le vétérinaire concerné." };
+  if (!vet.success) return { error: t.agenda.validation.vet };
   const file = form.get("capture");
   if (!(file instanceof File) || file.size === 0)
-    return { error: "Choisissez une capture d'écran." };
+    return { error: t.agenda.validation.file };
   if (file.size > MAX_CAPTURE_BYTES)
-    return { error: "Capture trop lourde : 5 Mo au plus." };
+    return { error: t.agenda.validation.tooLarge };
   const bytes = new Uint8Array(await file.arrayBuffer());
   const context = await memberContext();
   let slotCount: number;
@@ -58,7 +63,7 @@ export async function removeSlotAction(
   form: FormData,
 ): Promise<ActionState> {
   const slot = z.uuid().safeParse(text(form, "slotId"));
-  if (!slot.success) return INVALID;
+  if (!slot.success) return invalid();
   const context = await memberContext();
   try {
     await services.agenda().removeSlot(context, slot.data);
@@ -84,7 +89,7 @@ export async function decideAppointmentAction(
     appointmentId: text(form, "appointmentId"),
     decision: text(form, "decision"),
   });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return invalid();
   const context = await memberContext();
   const { appointmentId, decision } = parsed.data;
   try {
@@ -111,7 +116,7 @@ export async function closeCallbackAction(
   form: FormData,
 ): Promise<ActionState> {
   const request = z.uuid().safeParse(text(form, "requestId"));
-  if (!request.success) return INVALID;
+  if (!request.success) return invalid();
   const context = await memberContext();
   try {
     await services.appointments().closeCallback(context, request.data);

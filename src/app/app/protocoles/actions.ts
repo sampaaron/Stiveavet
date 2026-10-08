@@ -6,13 +6,15 @@ import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
 import { protocolContentInput } from "@/domains/protocoles/content";
+import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { attempt, domainFailure } from "../domain-messages";
 
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
+import { protocolIssueMessage } from "./validation";
+
 const MAX_PAYLOAD = 100_000;
 
 const scope = z.enum(["cabinet", "personal"]);
@@ -28,7 +30,7 @@ const saveInput = z.discriminatedUnion("mode", [
     changeNote: z
       .string()
       .trim()
-      .max(500, "Note de version : 500 caractères maximum."),
+      .max(500, "change_note_long"),
     payload: z.string().max(MAX_PAYLOAD),
   }),
 ]);
@@ -52,6 +54,7 @@ export async function saveProtocolAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const parsed = saveInput.safeParse({
     mode: text(form, "mode"),
     scope: text(form, "scope") || undefined,
@@ -60,12 +63,20 @@ export async function saveProtocolAction(
     payload: text(form, "payload"),
   });
   if (!parsed.success)
-    return { error: parsed.error.issues[0]?.message ?? INVALID.error };
+    return {
+      // Seule la note de version est saisie ici ; le reste vient de la page elle-même.
+      error:
+        parsed.error.issues[0]?.message === "change_note_long"
+          ? t.protocols.validation.change_note_long
+          : t.common.invalidRequest,
+    };
   const content = protocolContentInput.safeParse(
     parseJson(parsed.data.payload),
   );
   if (!content.success)
-    return { error: content.error.issues[0]?.message ?? INVALID.error };
+    return {
+      error: protocolIssueMessage(t, content.error.issues[0]?.message),
+    };
 
   const context = await memberContext();
   const protocols = services.protocols();
@@ -87,7 +98,7 @@ export async function saveProtocolAction(
       );
     }
   } catch (error) {
-    if (error instanceof DomainError) return domainFailure(error);
+    if (error instanceof DomainError) return await domainFailure(error);
     throw error;
   }
   revalidatePath("/app/protocoles");
@@ -102,11 +113,12 @@ export async function installLibraryAction(
     .string()
     .regex(/^[a-z0-9-]{1,64}$/)
     .safeParse(text(form, "key"));
-  if (!key.success) return INVALID;
+  const { t } = await appText();
+  if (!key.success) return { error: t.common.invalidRequest };
   const context = await memberContext();
   const result = await attempt(
     () => services.protocols().installFromLibrary(context, key.data),
-    "Modèle ajouté. Il reste à valider par un vétérinaire.",
+    t.protocols.library.installed,
   );
   revalidatePath("/app/protocoles");
   return result;
@@ -116,12 +128,13 @@ export async function validateProtocolAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const parsed = idInput.safeParse({ protocolId: text(form, "protocolId") });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return { error: t.common.invalidRequest };
   const context = await memberContext();
   const result = await attempt(
     () => services.protocols().validate(context, parsed.data.protocolId),
-    "Protocole validé.",
+    t.protocols.actions.validated,
   );
   revalidatePath(`/app/protocoles/${parsed.data.protocolId}`);
   return result;
@@ -131,13 +144,14 @@ export async function archiveProtocolAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const parsed = idInput
     .extend({ archived: z.enum(["true", "false"]) })
     .safeParse({
       protocolId: text(form, "protocolId"),
       archived: text(form, "archived"),
     });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return { error: t.common.invalidRequest };
   const archived = parsed.data.archived === "true";
   const context = await memberContext();
   const result = await attempt(
@@ -145,7 +159,9 @@ export async function archiveProtocolAction(
       services
         .protocols()
         .setArchived(context, parsed.data.protocolId, archived),
-    archived ? "Protocole archivé." : "Protocole restauré.",
+    archived
+      ? t.protocols.actions.archivedNotice
+      : t.protocols.actions.restoredNotice,
   );
   revalidatePath(`/app/protocoles/${parsed.data.protocolId}`);
   revalidatePath("/app/protocoles");
@@ -157,11 +173,12 @@ export async function duplicateProtocolAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const parsed = idInput.extend({ scope }).safeParse({
     protocolId: text(form, "protocolId"),
     scope: text(form, "scope"),
   });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return { error: t.common.invalidRequest };
   const context = await memberContext();
   let copyId: string;
   try {
@@ -169,7 +186,7 @@ export async function duplicateProtocolAction(
       .protocols()
       .duplicate(context, parsed.data.protocolId, parsed.data.scope);
   } catch (error) {
-    if (error instanceof DomainError) return domainFailure(error);
+    if (error instanceof DomainError) return await domainFailure(error);
     throw error;
   }
   revalidatePath("/app/protocoles");

@@ -21,6 +21,9 @@ export const alertStatus = pgEnum("alert_status", [
   "resolved",
 ]);
 
+export type TriageReasonCode =
+  "red_flag" | "rule" | "concern" | "none" | "after_end";
+
 const at = (name: string) => timestamp(name, { withTimezone: true });
 
 /** Ajout seul ; `reason` est réservé aux personnes autorisées aux données cliniques. */
@@ -37,6 +40,8 @@ export const triageEvents = pgTable("triage_events", {
   /** Migration 0011 : signe d'alerte de la fiche du suivi reconnu par une règle. */
   followupAlertRuleId: uuid("followup_alert_rule_id"),
   reason: text("reason").notNull(),
+  /** Migration 0015 : motif codé d'un triage automatique, affiché dans la langue du lecteur. */
+  reasonCode: text("reason_code").$type<TriageReasonCode>(),
   createdByMembershipId: uuid("created_by_membership_id"),
   createdAt: at("created_at").notNull().defaultNow(),
 });

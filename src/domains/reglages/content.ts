@@ -1,15 +1,6 @@
 import { z } from "zod";
 
 export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
-export const WEEKDAY_LABELS: Record<(typeof WEEKDAYS)[number], string> = {
-  1: "Lundi",
-  2: "Mardi",
-  3: "Mercredi",
-  4: "Jeudi",
-  5: "Vendredi",
-  6: "Samedi",
-  7: "Dimanche",
-};
 
 export const EMERGENCY_PERIODS = [
   "day",
@@ -18,25 +9,14 @@ export const EMERGENCY_PERIODS = [
   "holiday",
 ] as const;
 export type EmergencyPeriod = (typeof EMERGENCY_PERIODS)[number];
-export const EMERGENCY_PERIOD_LABELS: Record<EmergencyPeriod, string> = {
-  day: "Pendant les horaires du cabinet",
-  night: "La nuit",
-  weekend: "Le week-end",
-  holiday: "Les jours fériés",
-};
 
 /** Le délai d'escalade se règle entre 3 et 5 heures (cahier des charges §7). */
 export const ESCALATION_CHOICES = [180, 210, 240, 270, 300] as const;
 
-export function escalationLabel(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} h ${rest}` : `${hours} h`;
-}
-
+// Les messages de validation sont des codes, traduits par les actions (`settings.validation`).
 const time = z
   .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Heure au format HH:MM.");
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "time_format");
 
 export const windowInput = z
   .object({
@@ -45,7 +25,7 @@ export const windowInput = z
     endsAt: time,
   })
   .refine((value) => value.endsAt > value.startsAt, {
-    message: "La fin doit suivre le début.",
+    message: "end_before_start",
   });
 export type WindowInput = z.infer<typeof windowInput>;
 
@@ -54,25 +34,25 @@ export const messageWindowsInput = z
   .max(14)
   .refine(
     (windows) => new Set(windows.map((w) => w.weekday)).size === windows.length,
-    { message: "Une seule plage par jour." },
+    { message: "one_window_per_day" },
   );
 
 export const instructionsInput = z
   .string()
   .trim()
-  .min(10, "Consignes : 10 caractères minimum.")
-  .max(1500, "Consignes : 1500 caractères maximum.");
+  .min(10, "instructions_short")
+  .max(1500, "instructions_long");
 
 export const contactInput = z.object({
   label: z
     .string()
     .trim()
-    .min(2, "Libellé : 2 caractères minimum.")
-    .max(80, "Libellé : 80 caractères maximum."),
+    .min(2, "contact_label_short")
+    .max(80, "contact_label_long"),
   phone: z
     .string()
     .trim()
-    .regex(/^\+?[0-9][0-9 .]{5,19}$/, "Numéro de téléphone invalide."),
+    .regex(/^\+?[0-9][0-9 .]{5,19}$/, "phone_invalid"),
 });
 
 export const alertSettingsInput = z.object({
@@ -101,10 +81,10 @@ export const DEFAULT_APPOINTMENT_WINDOWS: WindowInput[] = [1, 2, 3, 4, 5].map(
 );
 
 const appointmentMinutes = z
-  .int("Durée : un nombre de minutes entier.")
-  .min(5, "Durée : 5 minutes minimum.")
-  .max(120, "Durée : 120 minutes maximum.")
-  .refine((value) => value % 5 === 0, "Durée : par pas de 5 minutes.");
+  .int("duration_integer")
+  .min(5, "duration_min")
+  .max(120, "duration_max")
+  .refine((value) => value % 5 === 0, "duration_step");
 
 /** Durée de chaque type de rendez-vous proposé par Numa. */
 export const appointmentDurationsInput = z.object({

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { DomainError } from "@/domains/equipe/actor";
 import type { DrVetoSearchHit } from "@/domains/suivis/lancement";
+import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
@@ -15,11 +16,12 @@ import { formatDateTime } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 
-import { SPECIES_LABELS } from "../followup-labels";
-
 import { PrepareForm } from "./prepare-form";
 
-export const metadata: Metadata = { title: "Lancer un suivi" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.followups.create.title };
+}
 
 /** Recherche dr.veto : `null` si la connexion n'est pas faite. */
 async function searchDrVeto(
@@ -44,6 +46,8 @@ export default async function NewFollowupPage({
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim().slice(0, 80) : "";
   const hits = query.length >= 2 ? await searchDrVeto(context, query) : [];
+  const { t, locale } = await appText();
+  const text = t.followups.create;
 
   return (
     <>
@@ -52,11 +56,11 @@ export default async function NewFollowupPage({
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Suivis
+        {text.back}
       </Link>
       <PageHeader
-        title="Lancer un suivi"
-        description="Cherchez l'animal dans dr.veto. Stivea Vet importe en lecture seule le résumé utile, puis vous proposez une fiche de lancement à relire."
+        title={text.title}
+        description={text.description}
       />
 
       <div className="grid gap-6">
@@ -71,7 +75,7 @@ export default async function NewFollowupPage({
                 htmlFor="recherche-drveto"
                 className="text-sm font-semibold"
               >
-                Animal, propriétaire ou identifiant dr.veto
+                {text.searchLabel}
               </label>
               <input
                 id="recherche-drveto"
@@ -82,46 +86,43 @@ export default async function NewFollowupPage({
                 maxLength={80}
                 autoComplete="off"
                 className="h-11 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-[15px] text-ink placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
-                placeholder="Ex. Plume, Girard, DV-20481"
+                placeholder={text.searchPlaceholder}
               />
             </div>
             <Button
               type="submit"
               icon={<Search aria-hidden="true" className="size-4" />}
             >
-              Rechercher
+              {text.search}
             </Button>
           </form>
           <p className="mt-3 text-xs text-ink-muted">
-            dr.veto simulé : animaux et propriétaires fictifs, aucun appel au
-            vrai logiciel.
+            {text.simulatedNote}
           </p>
         </Card>
 
         {hits === null ? (
           <AlertBanner
             tone="watch"
-            title="dr.veto n'est pas encore connecté"
+            title={text.notConnectedTitle}
             action={
               <ButtonLink href="/app/reglages" variant="secondary" size="sm">
-                Ouvrir les réglages
+                {text.openSettings}
               </ButtonLink>
             }
           >
-            Connectez le logiciel du cabinet pour retrouver vos patients.
+            {text.notConnectedBody}
           </AlertBanner>
         ) : query.length >= 2 ? (
           <SectionCard
             title={
-              hits.length
-                ? `${hits.length} animal${hits.length > 1 ? "aux" : ""} trouvé${hits.length > 1 ? "s" : ""}`
-                : "Aucun résultat"
+              hits.length ? text.found(hits.length) : text.noResults
             }
           >
             {hits.length === 0 ? (
               <EmptyState
-                title="Aucun animal ne correspond"
-                description="Vérifiez l'orthographe ou cherchez par le nom du propriétaire."
+                title={text.noMatchTitle}
+                description={text.noMatchDescription}
               />
             ) : (
               <ul className="divide-y divide-line">
@@ -140,16 +141,16 @@ export default async function NewFollowupPage({
                         {hit.name}
                         <span className="font-normal text-ink-muted">
                           {" "}
-                          · {SPECIES_LABELS[hit.species]}
+                          · {t.labels.species[hit.species]}
                           {hit.breed ? ` · ${hit.breed}` : ""}
                         </span>
                       </p>
                       <p className="text-sm text-ink-muted">
-                        {hit.ownerNames.join(" et ")}
+                        {t.common.list(hit.ownerNames)}
                       </p>
                       <p className="text-sm text-ink-muted">
                         {hit.lastProcedure} ·{" "}
-                        {formatDateTime(hit.lastProcedureAt)} · {hit.ref}
+                        {formatDateTime(hit.lastProcedureAt, locale)} · {hit.ref}
                       </p>
                     </div>
                     {hit.openFollowupId ? (
@@ -157,9 +158,9 @@ export default async function NewFollowupPage({
                         href={`/app/suivis/${hit.openFollowupId}`}
                         variant="secondary"
                         size="sm"
-                        aria-label={`Ouvrir le suivi de ${hit.name}`}
+                        aria-label={text.openFollowupLabel(hit.name)}
                       >
-                        Suivi déjà ouvert
+                        {text.alreadyOpen}
                       </ButtonLink>
                     ) : (
                       <PrepareForm drVetoRef={hit.ref} animalName={hit.name} />

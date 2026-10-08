@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
@@ -16,13 +18,13 @@ const inviteInput = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .max(254, "Adresse trop longue.")
-    .pipe(z.email("Adresse e-mail invalide.")),
+    .max(254, "email_too_long")
+    .pipe(z.email("email_invalid")),
   displayName: z
     .string()
     .trim()
-    .min(2, "Indiquez le nom de la personne.")
-    .max(120, "Nom trop long."),
+    .min(2, "name_missing")
+    .max(120, "name_too_long"),
   role,
 });
 const idInput = z.object({ id: z.uuid() });
@@ -36,7 +38,24 @@ const deactivateInput = z.object({
   reassignTo: z.union([z.uuid(), z.literal("")]),
 });
 
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
+/** Refus d'une entrée mal formée (identifiant manipulé, page périmée). */
+async function invalid(): Promise<ActionState> {
+  const { t } = await appText();
+  return { error: t.common.invalidRequest };
+}
+
+type ValidationCode = Exclude<
+  keyof AppDictionary["team"]["validation"],
+  "fallback"
+>;
+
+/** Message d'un contrôle du formulaire d'invitation : code connu, sinon phrase générale. */
+function validationMessage(t: AppDictionary, code: string | undefined) {
+  const messages = t.team.validation;
+  return code && code !== "fallback" && Object.hasOwn(messages, code)
+    ? messages[code as ValidationCode]
+    : messages.fallback;
+}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -61,13 +80,16 @@ export async function inviteAction(
     displayName: text(form, "displayName"),
     role: text(form, "role"),
   });
+  const { t } = await appText();
   if (!parsed.success)
-    return { error: parsed.error.issues[0]?.message ?? INVALID.error };
+    return {
+      error: validationMessage(t, parsed.error.issues[0]?.message),
+    };
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.team().invite(context, parsed.data),
-      "Invitation envoyée. Le lien est valable 7 jours.",
+      t.team.notices.invited,
     ),
   );
 }
@@ -77,12 +99,12 @@ export async function revokeInvitationAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return INVALID;
-  const context = await memberContext();
+  if (!parsed.success) return invalid();
+  const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
       () => services.team().revokeInvitation(context, parsed.data.id),
-      "Invitation annulée.",
+      t.team.notices.invitationRevoked,
     ),
   );
 }
@@ -97,8 +119,8 @@ export async function setPermissionsAction(
       .getAll("permissions")
       .filter((value) => typeof value === "string"),
   });
-  if (!parsed.success) return INVALID;
-  const context = await memberContext();
+  if (!parsed.success) return invalid();
+  const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
       () =>
@@ -109,7 +131,7 @@ export async function setPermissionsAction(
             parsed.data.membershipId,
             parsed.data.permissions,
           ),
-      "Droits enregistrés.",
+      t.team.notices.permissionsSaved,
     ),
   );
 }
@@ -122,15 +144,15 @@ export async function changeRoleAction(
     membershipId: text(form, "membershipId"),
     role: text(form, "role"),
   });
-  if (!parsed.success) return INVALID;
-  const context = await memberContext();
+  if (!parsed.success) return invalid();
+  const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
       () =>
         services
           .team()
           .changeRole(context, parsed.data.membershipId, parsed.data.role),
-      "Rôle modifié. Les droits ont repris les valeurs par défaut du rôle.",
+      t.team.notices.roleChanged,
     ),
   );
 }
@@ -143,8 +165,8 @@ export async function deactivateAction(
     membershipId: text(form, "membershipId"),
     reassignTo: text(form, "reassignTo"),
   });
-  if (!parsed.success) return INVALID;
-  const context = await memberContext();
+  if (!parsed.success) return invalid();
+  const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
       () =>
@@ -155,7 +177,7 @@ export async function deactivateAction(
             parsed.data.membershipId,
             parsed.data.reassignTo || null,
           ),
-      "Accès retiré. Ses sessions sont fermées.",
+      t.team.notices.deactivated,
     ),
   );
 }
@@ -165,12 +187,12 @@ export async function reactivateAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return INVALID;
-  const context = await memberContext();
+  if (!parsed.success) return invalid();
+  const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
       () => services.team().reactivate(context, parsed.data.id),
-      "Accès rétabli.",
+      t.team.notices.reactivated,
     ),
   );
 }

@@ -1,16 +1,24 @@
 import { and, asc, desc, eq, gte, inArray, lt, ne } from "drizzle-orm";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
+import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
 import { followupActivity } from "@/domains/facturation/service";
 import { INCLUDED_ACTIVE_FOLLOWUPS } from "@/domains/facturation/rules";
 import type { Actor } from "@/domains/equipe/actor";
 import { parisLocalToDate } from "@/domains/reglages/content";
+import {
+  triageReason,
+  triageReasonColumns,
+  triageRuleJoin,
+} from "@/domains/urgences/reason";
+import type { TriageReason } from "@/domains/urgences/reason";
 import {
   alerts,
   animals,
   appointments,
   attachments,
   consents,
+  followupAlertRules,
   followupContacts,
   integrationConnections,
   memberships,
@@ -41,7 +49,7 @@ import type {
 export type DashboardSummary =
   | {
       kind: "alert";
-      reason: string;
+      reason: TriageReason;
       at: Date;
       /** Dernière nouvelle du propriétaire : plus parlante que le motif du triage. */
       owner: { text: string | null; media: "photo" | "voice" | null } | null;
@@ -78,7 +86,12 @@ export type DashboardAgendaItem = {
   id: string;
   startsAt: Date;
   endsAt: Date;
-  title: string;
+  /**
+   * Rendez-vous Stivea : son type et l'animal, mis en mots par l'écran dans la langue du
+   * lecteur ; agenda dr.veto : le titre tel que dr.veto le donne.
+   */
+  title:
+    { appointment: AppointmentKind; animalName: string } | { text: string };
   kind: "consultation" | "chirurgie" | "controle" | "urgence";
   vetName: string;
   /** Rendez-vous pris ou confirmé dans Stivea Vet (sinon lu dans l'agenda dr.veto). */
@@ -104,13 +117,6 @@ export type TodayView = {
 
 const ONGOING = new Set(["active", "paused", "human_takeover"]);
 const MAX_EXCERPT = 120;
-
-const APPOINTMENT_TITLES = {
-  post_op_control: "Contrôle post-opératoire",
-  emergency: "Urgence",
-  treatment_followup: "Suivi de traitement",
-  other: "Rendez-vous",
-} as const;
 
 const APPOINTMENT_KINDS = {
   post_op_control: "controle",
@@ -153,7 +159,7 @@ async function clinicalFacts(tx: TenantTransaction, ids: string[]) {
         string,
         { text: string; media: "photo" | "voice" | null; at: Date }
       >(),
-      openAlert: new Map<string, { reason: string; at: Date }>(),
+      openAlert: new Map<string, { reason: TriageReason; at: Date }>(),
       consent: new Map<string, "requested" | "given" | "withdrawn">(),
     };
 
@@ -200,11 +206,12 @@ async function clinicalFacts(tx: TenantTransaction, ids: string[]) {
   const open = await tx
     .selectDistinctOn([alerts.followupId], {
       followupId: alerts.followupId,
-      reason: triageEvents.reason,
+      ...triageReasonColumns,
       at: alerts.createdAt,
     })
     .from(alerts)
     .innerJoin(triageEvents, eq(triageEvents.id, alerts.triageEventId))
+    .leftJoin(followupAlertRules, triageRuleJoin)
     .where(and(inArray(alerts.followupId, ids), ne(alerts.status, "resolved")))
     .orderBy(alerts.followupId, desc(alerts.createdAt));
 
@@ -249,7 +256,10 @@ async function clinicalFacts(tx: TenantTransaction, ids: string[]) {
       }),
     ),
     openAlert: new Map(
-      open.map((row) => [row.followupId, { reason: row.reason, at: row.at }]),
+      open.map((row) => [
+        row.followupId,
+        { reason: triageReason(row), at: row.at },
+      ]),
     ),
     consent: new Map(primary.map((row) => [row.followupId, row.state])),
   };
@@ -376,7 +386,7 @@ export function todayService(deps: {
               id: row.id,
               startsAt: row.startsAt,
               endsAt: row.endsAt,
-              title: `${APPOINTMENT_TITLES[row.kind]} · ${row.animalName}`,
+              title: { appointment: row.kind, animalName: row.animalName },
               kind: APPOINTMENT_KINDS[row.kind],
               vetName: row.vetName,
               fromStivea: row.source !== "drveto",
@@ -400,7 +410,7 @@ export function todayService(deps: {
                   id: entry.ref,
                   startsAt: entry.startsAt,
                   endsAt: entry.endsAt,
-                  title: entry.title,
+                  title: { text: entry.title },
                   kind: DRVETO_KINDS[entry.kind],
                   vetName: entry.practitionerName,
                   fromStivea: false,

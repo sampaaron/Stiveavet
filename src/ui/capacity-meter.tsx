@@ -1,3 +1,9 @@
+"use client";
+
+import { LAUNCH_SURCHARGE_CENTS } from "@/domains/facturation/rules";
+import { useAppText, useLocale } from "@/i18n/app/client";
+import { formatPrice } from "@/i18n/locales";
+
 /** Compteur de suivis actifs simultanés par rapport aux places incluses dans l'abonnement. */
 export function CapacityMeter({
   used,
@@ -6,17 +12,19 @@ export function CapacityMeter({
   used: number;
   included: number;
 }) {
+  const t = useAppText().ui.capacity;
+  const locale = useLocale();
   const ratio = Math.min(used / included, 1);
   const remaining = Math.max(included - used, 0);
   return (
     <div>
       <div
         role="meter"
-        aria-label="Suivis actifs"
+        aria-label={t.label}
         aria-valuemin={0}
         aria-valuemax={included}
         aria-valuenow={used}
-        aria-valuetext={`${used} suivis actifs sur ${included} inclus`}
+        aria-valuetext={t.valueText(used, included)}
         className="h-2 overflow-hidden rounded-full bg-canvas-subtle"
       >
         <div
@@ -26,8 +34,8 @@ export function CapacityMeter({
       </div>
       <p className="mt-2 text-sm text-ink-muted">
         {remaining > 0
-          ? `${remaining} place${remaining > 1 ? "s" : ""} incluse${remaining > 1 ? "s" : ""} restante${remaining > 1 ? "s" : ""}`
-          : "Places incluses utilisées : chaque nouveau suivi est facturé 2,50 € HT"}
+          ? t.remaining(remaining)
+          : t.full(formatPrice(LAUNCH_SURCHARGE_CENTS, locale))}
       </p>
     </div>
   );

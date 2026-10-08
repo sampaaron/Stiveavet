@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "../../action-message";
@@ -16,6 +17,7 @@ export function PrepareForm({
   drVetoRef: string;
   animalName: string;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     prepareFollowupAction,
     initialActionState,
@@ -28,9 +30,9 @@ export function PrepareForm({
         size="sm"
         disabled={pending}
         aria-busy={pending}
-        aria-label={`Préparer la fiche de ${animalName}`}
+        aria-label={t.followups.create.prepareLabel(animalName)}
       >
-        Préparer la fiche
+        {t.followups.create.prepare}
       </Button>
       <ActionMessage state={state} />
     </form>

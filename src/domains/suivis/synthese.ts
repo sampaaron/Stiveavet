@@ -6,10 +6,17 @@ import type { AiGateway, SynthesisEvent } from "@/adapters/ai-gateway/types";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import {
+  triageReason,
+  triageReasonColumns,
+  triageRuleJoin,
+} from "@/domains/urgences/reason";
+import type { TriageReason } from "@/domains/urgences/reason";
+import {
   acknowledgements,
   alerts,
   attachments,
   auditEvents,
+  followupAlertRules,
   followupSyntheses,
   memberships,
   messages,
@@ -43,7 +50,7 @@ export type SynthesisAlert = {
   id: string;
   level: "watch" | "urgent";
   status: "open" | "acknowledged" | "escalated" | "resolved";
-  reason: string;
+  reason: TriageReason;
   createdAt: Date;
   acknowledgedBy: string | null;
 };
@@ -168,11 +175,12 @@ async function loadAlerts(
       id: alerts.id,
       level: alerts.level,
       status: alerts.status,
-      reason: triageEvents.reason,
+      ...triageReasonColumns,
       createdAt: alerts.createdAt,
     })
     .from(alerts)
     .innerJoin(triageEvents, eq(triageEvents.id, alerts.triageEventId))
+    .leftJoin(followupAlertRules, triageRuleJoin)
     .where(eq(alerts.followupId, followupId))
     .orderBy(desc(alerts.createdAt))
     .limit(5);
@@ -193,7 +201,7 @@ async function loadAlerts(
     id: row.id,
     level: row.level,
     status: row.status,
-    reason: row.reason,
+    reason: triageReason(row),
     createdAt: row.createdAt,
     acknowledgedBy: acks.find((ack) => ack.alertId === row.id)?.name ?? null,
   }));

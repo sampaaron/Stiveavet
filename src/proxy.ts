@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { localeOfPath } from "@/i18n/routes";
+import { UI_LOCALE_COOKIE } from "@/i18n/cookie";
+import { requestLocale } from "@/i18n/routes";
 import { buildContentSecurityPolicy, createNonce } from "@/server/security/csp";
 
 export function proxy(request: NextRequest) {
@@ -14,8 +15,16 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
-  // Langue de la page pour <html lang> ; toujours réécrite, jamais reprise du navigateur.
-  requestHeaders.set("x-stivea-locale", localeOfPath(request.nextUrl.pathname));
+  // Langue de la page ; toujours réécrite, limitée au français et à l'anglais (ADR 0022).
+  const secure = request.nextUrl.protocol === "https:";
+  requestHeaders.set(
+    "x-stivea-locale",
+    requestLocale(
+      request.nextUrl.pathname,
+      request.cookies.get(UI_LOCALE_COOKIE(secure))?.value,
+      request.headers.get("accept-language"),
+    ),
+  );
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
