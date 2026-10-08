@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, isLocale, preferredLocale } from "./locales";
 import type { Locale } from "./locales";
 
 /**
@@ -43,4 +44,24 @@ export function pageFor(
 /** Langue d'une adresse : /en et /en/… sont en anglais, tout le reste en français. */
 export function localeOfPath(pathname: string): Locale {
   return pathname === "/en" || pathname.startsWith("/en/") ? "en" : "fr";
+}
+
+/** Adresse du site public, dont la langue est fixée par l'adresse elle-même. */
+function isSitePath(pathname: string): boolean {
+  return /^\/(fr|en)(\/|$)/.test(pathname);
+}
+
+/**
+ * Langue d'une requête (ADR 0022) : celle de l'adresse sur le site public ; ailleurs (espace
+ * cabinet, connexion), le choix enregistré de la personne, sinon son navigateur, sinon le
+ * français. Une valeur inconnue est ignorée.
+ */
+export function requestLocale(
+  pathname: string,
+  chosen: string | undefined,
+  acceptLanguage: string | null,
+): Locale {
+  if (isSitePath(pathname)) return localeOfPath(pathname);
+  if (isLocale(chosen)) return chosen;
+  return preferredLocale(acceptLanguage) ?? DEFAULT_LOCALE;
 }

@@ -9,6 +9,15 @@ export function isLocale(value: unknown): value is Locale {
   );
 }
 
+/** Langue préférée d'après l'en-tête `Accept-Language` : la première, français ou anglais. */
+export function preferredLocale(acceptLanguage: string | null): Locale | null {
+  const found = (acceptLanguage ?? "")
+    .split(",")
+    .map((part) => part.trim().slice(0, 2).toLowerCase())
+    .find(isLocale);
+  return found ?? null;
+}
+
 /** Prix en euros : sans décimales s'il est rond (86 €), avec sinon (2,50 €). */
 export function formatPrice(cents: number, locale: Locale): string {
   const whole = cents % 100 === 0;

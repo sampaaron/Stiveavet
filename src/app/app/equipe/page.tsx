@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 
 import type { TeamMember } from "@/domains/equipe/service";
-import {
-  PERMISSIONS,
-  ROLE_LABELS,
-  ROLE_PERMISSIONS,
-  VET_ROLES,
-} from "@/domains/equipe/permissions";
+import { ROLE_PERMISSIONS, VET_ROLES } from "@/domains/equipe/permissions";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { Card, SectionCard } from "@/ui/card";
@@ -22,14 +19,24 @@ import {
   RoleForm,
 } from "./team-forms";
 
-export const metadata: Metadata = { title: "Équipe et droits" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.team.title };
+}
 
-const ROLE_OPTIONS = (["admin_vet", "vet", "assistant"] as const).map(
-  (role) => ({ value: role, label: ROLE_LABELS[role] }),
-);
+type Option = { value: string; label: string };
+
+function roleOptions(t: AppDictionary): Option[] {
+  return (["admin_vet", "vet", "assistant"] as const).map((role) => ({
+    value: role,
+    label: t.labels.roles[role],
+  }));
+}
 
 export default async function TeamPage() {
   const context = await requirePermission("team.manage");
+  const { t, locale } = await appText();
+  const roles = roleOptions(t);
   const team = services.team();
   const [members, invitations, limit] = await Promise.all([
     team.members(context),
@@ -46,19 +53,19 @@ export default async function TeamPage() {
   return (
     <>
       <PageHeader
-        title="Équipe et droits"
-        description={`${activeVets.length + pendingVets} vétérinaire(s) sur ${limit} avec votre formule, invitations en attente comprises. Les assistants ne sont pas limités.`}
+        title={t.team.title}
+        description={t.team.description(activeVets.length + pendingVets, limit)}
       />
       <div className="grid gap-6">
         <SectionCard
-          title="Inviter un membre"
-          description="La personne reçoit un lien par e-mail, valable 7 jours et utilisable une seule fois."
+          title={t.team.invite.title}
+          description={t.team.invite.description}
         >
-          <InviteForm roles={ROLE_OPTIONS} />
+          <InviteForm roles={roles} />
         </SectionCard>
 
         {invitations.length > 0 ? (
-          <SectionCard title="Invitations en attente">
+          <SectionCard title={t.team.pending.title}>
             <ul className="grid gap-3">
               {invitations.map((invitation) => (
                 <li
@@ -70,8 +77,10 @@ export default async function TeamPage() {
                       {invitation.displayName}
                     </span>
                     <span className="block text-ink-muted">
-                      {invitation.email} · {ROLE_LABELS[invitation.role]} ·
-                      jusqu&apos;au {formatDate(invitation.expiresAt)}
+                      {invitation.email} · {t.labels.roles[invitation.role]} ·{" "}
+                      {t.team.pending.until(
+                        formatDate(invitation.expiresAt, locale),
+                      )}
                     </span>
                   </span>
                   <RevokeInvitationForm
@@ -86,12 +95,14 @@ export default async function TeamPage() {
 
         <section aria-labelledby="membres" className="grid gap-4">
           <h2 id="membres" className="text-lg font-bold tracking-tight">
-            Membres
+            {t.team.members.title}
           </h2>
           {members.map((member) => (
             <MemberCard
               key={member.membershipId}
               member={member}
+              t={t}
+              roles={roles}
               reassignTargets={activeVets
                 .filter((vet) => vet.membershipId !== member.membershipId)
                 .map((vet) => ({ value: vet.membershipId, label: vet.name }))}
@@ -105,10 +116,14 @@ export default async function TeamPage() {
 
 function MemberCard({
   member,
+  t,
+  roles,
   reassignTargets,
 }: {
   member: TeamMember;
-  reassignTargets: { value: string; label: string }[];
+  t: AppDictionary;
+  roles: Option[];
+  reassignTargets: Option[];
 }) {
   const grants = ROLE_PERMISSIONS[member.role];
   const editable = !member.isSelf && member.active;
@@ -119,17 +134,20 @@ function MemberCard({
           <h3 className="font-bold">
             {member.name}
             {member.isSelf ? (
-              <span className="font-normal text-ink-muted"> · vous</span>
+              <span className="font-normal text-ink-muted">
+                {" "}
+                · {t.team.members.you}
+              </span>
             ) : null}
           </h3>
           <p className="text-sm text-ink-muted">
-            {member.email} · {ROLE_LABELS[member.role]}
+            {member.email} · {t.labels.roles[member.role]}
           </p>
         </div>
         <p className="text-sm text-ink-muted">
           {member.active
-            ? `${member.activeFollowups} suivi(s) en cours`
-            : "Accès retiré"}
+            ? t.team.members.activeFollowups(member.activeFollowups)
+            : t.team.members.accessRemoved}
         </p>
       </div>
 
@@ -137,8 +155,7 @@ function MemberCard({
         <div className="mt-5 grid gap-6 border-t border-line pt-5 lg:grid-cols-2">
           {member.role === "admin_vet" ? (
             <p className="text-sm text-ink-muted">
-              Un vétérinaire administrateur a tous les droits. Changez son rôle
-              pour les restreindre.
+              {t.team.members.adminHasAll}
             </p>
           ) : (
             <PermissionsForm
@@ -147,7 +164,7 @@ function MemberCard({
               granted={member.permissions}
               options={[...grants.defaults, ...grants.optional].map((key) => ({
                 value: key,
-                label: PERMISSIONS[key],
+                label: t.labels.permissions[key],
                 fixed: grants.defaults.includes(key),
               }))}
             />
@@ -157,7 +174,7 @@ function MemberCard({
               membershipId={member.membershipId}
               memberName={member.name}
               role={member.role}
-              roles={ROLE_OPTIONS}
+              roles={roles}
             />
             <DeactivateForm
               membershipId={member.membershipId}

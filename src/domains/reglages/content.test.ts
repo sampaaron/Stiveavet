@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  escalationLabel,
+  appointmentDurationsInput,
   messageWindowsInput,
   parisLocalToDate,
+  windowInput,
 } from "./content";
 
 describe("parisLocalToDate", () => {
@@ -23,17 +24,31 @@ describe("parisLocalToDate", () => {
 });
 
 describe("réglages", () => {
-  it("affiche le délai d'escalade en heures", () => {
-    expect(escalationLabel(240)).toBe("4 h");
-    expect(escalationLabel(210)).toBe("3 h 30");
+  it("refuse deux plages le même jour", () => {
+    const result = messageWindowsInput.safeParse([
+      { weekday: 1, startsAt: "08:00", endsAt: "12:00" },
+      { weekday: 1, startsAt: "14:00", endsAt: "18:00" },
+    ]);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("one_window_per_day");
   });
 
-  it("refuse deux plages le même jour", () => {
+  it("renvoie des codes de validation, traduits par les actions", () => {
+    const message = (input: unknown) =>
+      windowInput.safeParse(input).error?.issues[0]?.message;
+    expect(message({ weekday: 1, startsAt: "8h", endsAt: "12:00" })).toBe(
+      "time_format",
+    );
+    expect(message({ weekday: 1, startsAt: "12:00", endsAt: "08:00" })).toBe(
+      "end_before_start",
+    );
     expect(
-      messageWindowsInput.safeParse([
-        { weekday: 1, startsAt: "08:00", endsAt: "12:00" },
-        { weekday: 1, startsAt: "14:00", endsAt: "18:00" },
-      ]).success,
-    ).toBe(false);
+      appointmentDurationsInput.safeParse({
+        post_op_control: 7,
+        emergency: 15,
+        treatment_followup: 15,
+        other: 15,
+      }).error?.issues[0]?.message,
+    ).toBe("duration_step");
   });
 });

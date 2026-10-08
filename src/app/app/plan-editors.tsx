@@ -6,13 +6,12 @@ import type { Dispatch, SetStateAction } from "react";
 
 import {
   ALERT_LEVELS,
-  ALERT_LEVEL_LABELS,
   MAX_ALERTS,
   MAX_STEPS,
   STEP_KINDS,
-  STEP_KIND_LABELS,
 } from "@/domains/protocoles/content";
 import type { ProtocolContent } from "@/domains/protocoles/content";
+import { useAppText, useLocale } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 import { formatDateTime } from "@/ui/format";
 import { TextField } from "@/ui/text-field";
@@ -61,6 +60,9 @@ export function StepsEditor({
   locked?: ProtocolContent["steps"];
 }) {
   const id = useId();
+  const t = useAppText();
+  const locale = useLocale();
+  const text = t.protocols.planEditor;
   const total = locked.length + steps.length;
   const update = (key: number, patch: Partial<EditableStep>) =>
     setSteps((list) =>
@@ -68,7 +70,12 @@ export function StepsEditor({
     );
   const dueLabel = (offsetHours: number) =>
     procedureAt && Number.isFinite(offsetHours)
-      ? `Prévue le ${formatDateTime(new Date(procedureAt.getTime() + offsetHours * HOUR))}`
+      ? text.due(
+          formatDateTime(
+            new Date(procedureAt.getTime() + offsetHours * HOUR),
+            locale,
+          ),
+        )
       : null;
 
   return (
@@ -81,7 +88,7 @@ export function StepsEditor({
           >
             <span className="flex items-center gap-1.5 font-semibold">
               <Lock aria-hidden="true" className="size-3.5" />
-              Étape passée · {STEP_KIND_LABELS[step.kind]}
+              {text.pastStep(t.labels.stepKinds[step.kind])}
             </span>
             {dueLabel(step.offsetHours) ? (
               <span className="text-ink-muted">
@@ -102,7 +109,7 @@ export function StepsEditor({
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-semibold">
-                  Étape {number}
+                  {text.step(number)}
                   {due ? (
                     <span className="ml-2 font-normal text-ink-muted">
                       {due}
@@ -117,14 +124,14 @@ export function StepsEditor({
                     setSteps((list) => list.filter((s) => s.key !== step.key))
                   }
                   icon={<Trash2 aria-hidden="true" className="size-3.5" />}
-                  aria-label={`Retirer l'étape ${number}`}
+                  aria-label={text.removeStep(number)}
                 >
-                  Retirer
+                  {t.common.remove}
                 </Button>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <TextField
-                  label="Délai"
+                  label={text.delay}
                   type="number"
                   inputMode="numeric"
                   min={0}
@@ -141,7 +148,7 @@ export function StepsEditor({
                     htmlFor={`${id}-unite-${step.key}`}
                     className="text-sm font-semibold"
                   >
-                    Unité
+                    {text.unit}
                   </label>
                   <select
                     id={`${id}-unite-${step.key}`}
@@ -156,8 +163,8 @@ export function StepsEditor({
                       })
                     }
                   >
-                    <option value="hours">heures après</option>
-                    <option value="days">jours après</option>
+                    <option value="hours">{text.hoursAfter}</option>
+                    <option value="days">{text.daysAfter}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -165,7 +172,7 @@ export function StepsEditor({
                     htmlFor={`${id}-type-${step.key}`}
                     className="text-sm font-semibold"
                   >
-                    Type d&apos;étape
+                    {text.stepKind}
                   </label>
                   <select
                     id={`${id}-type-${step.key}`}
@@ -179,7 +186,7 @@ export function StepsEditor({
                   >
                     {STEP_KINDS.map((value) => (
                       <option key={value} value={value}>
-                        {STEP_KIND_LABELS[value]}
+                        {t.labels.stepKinds[value]}
                       </option>
                     ))}
                   </select>
@@ -190,7 +197,7 @@ export function StepsEditor({
                   htmlFor={`${id}-contenu-${step.key}`}
                   className="text-sm font-semibold"
                 >
-                  Contenu de l&apos;étape {number}
+                  {text.stepContent(number)}
                 </label>
                 <textarea
                   id={`${id}-contenu-${step.key}`}
@@ -226,7 +233,7 @@ export function StepsEditor({
           }
           icon={<Plus aria-hidden="true" className="size-3.5" />}
         >
-          Ajouter une étape
+          {text.addStep}
         </Button>
       </div>
     </>
@@ -241,6 +248,8 @@ export function AlertsEditor({
   setAlerts: Dispatch<SetStateAction<EditableAlert[]>>;
 }) {
   const id = useId();
+  const t = useAppText();
+  const text = t.protocols.planEditor;
   const update = (key: number, patch: Partial<EditableAlert>) =>
     setAlerts((list) =>
       list.map((alert) => (alert.key === key ? { ...alert, ...patch } : alert)),
@@ -258,7 +267,7 @@ export function AlertsEditor({
                 htmlFor={`${id}-niveau-${alert.key}`}
                 className="text-sm font-semibold"
               >
-                Niveau
+                {text.level}
               </label>
               <select
                 id={`${id}-niveau-${alert.key}`}
@@ -272,13 +281,13 @@ export function AlertsEditor({
               >
                 {ALERT_LEVELS.map((value) => (
                   <option key={value} value={value}>
-                    {ALERT_LEVEL_LABELS[value]}
+                    {t.labels.triage[value]}
                   </option>
                 ))}
               </select>
             </div>
             <TextField
-              label={`Signe d'alerte ${index + 1}`}
+              label={text.alert(index + 1)}
               value={alert.description}
               maxLength={300}
               onChange={(event) =>
@@ -294,9 +303,9 @@ export function AlertsEditor({
                 setAlerts((list) => list.filter((a) => a.key !== alert.key))
               }
               icon={<Trash2 aria-hidden="true" className="size-3.5" />}
-              aria-label={`Retirer le signe d'alerte ${index + 1}`}
+              aria-label={text.removeAlert(index + 1)}
             >
-              Retirer
+              {t.common.remove}
             </Button>
           </li>
         ))}
@@ -314,7 +323,7 @@ export function AlertsEditor({
           }
           icon={<Plus aria-hidden="true" className="size-3.5" />}
         >
-          Ajouter un signe d&apos;alerte
+          {text.addAlert}
         </Button>
       </div>
     </>

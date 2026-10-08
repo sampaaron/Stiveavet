@@ -15,14 +15,19 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import type { AppDictionary } from "@/i18n/app/types";
+
+type NavLabel = keyof AppDictionary["shell"]["nav"];
+
 export type NavItem = {
   href: string;
-  label: string;
+  /** Clé du libellé dans le dictionnaire (`shell.nav`), traduite à l'affichage. */
+  label: NavLabel;
   icon: LucideIcon;
   /** Visible si la personne a au moins une de ces permissions (aucune : visible de tous). */
   anyOf?: readonly string[];
 };
-export type NavSection = { label?: string; items: NavItem[] };
+export type NavSection = { label?: NavLabel; items: NavItem[] };
 
 /**
  * Navigation de l'espace cabinet. Une entrée n'apparaît que si la personne a le droit
@@ -31,10 +36,10 @@ export type NavSection = { label?: string; items: NavItem[] };
 export const appNavigation: NavSection[] = [
   {
     items: [
-      { href: "/app", label: "Aujourd'hui", icon: Sun },
+      { href: "/app", label: "today", icon: Sun },
       {
         href: "/app/suivis",
-        label: "Suivis",
+        label: "followups",
         icon: MessagesSquare,
         anyOf: [
           "followups.read_all",
@@ -44,60 +49,60 @@ export const appNavigation: NavSection[] = [
       },
       {
         href: "/app/alertes",
-        label: "Alertes",
+        label: "alerts",
         icon: BellRing,
         anyOf: ["clinical.read"],
       },
       {
         href: "/app/agenda",
-        label: "Agenda",
+        label: "agenda",
         icon: CalendarDays,
         anyOf: ["agenda.read"],
       },
       {
         href: "/app/stive",
-        label: "Stive",
+        label: "stive",
         icon: Sparkles,
         anyOf: ["stive.use"],
       },
     ],
   },
   {
-    label: "Cabinet",
+    label: "practice",
     items: [
       {
         href: "/app/protocoles",
-        label: "Protocoles",
+        label: "protocols",
         icon: ClipboardList,
         anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
       },
       {
         href: "/app/reglages",
-        label: "Numa, urgences et garde",
+        label: "settings",
         icon: Settings2,
         anyOf: ["organization.settings"],
       },
       {
         href: "/app/equipe",
-        label: "Équipe et droits",
+        label: "team",
         icon: Users,
         anyOf: ["team.manage"],
       },
       {
         href: "/app/facturation",
-        label: "Facturation",
+        label: "billing",
         icon: CreditCard,
         anyOf: ["billing.manage"],
       },
       {
         href: "/app/taches",
-        label: "Tâches en échec",
+        label: "tasks",
         icon: CircleAlert,
         anyOf: ["organization.settings"],
       },
       {
         href: "/app/journal",
-        label: "Journal d'activité",
+        label: "journal",
         icon: Activity,
         anyOf: ["activity_log.read"],
       },
@@ -105,10 +110,10 @@ export const appNavigation: NavSection[] = [
   },
   {
     items: [
-      { href: "/app/aide", label: "Centre d'aide", icon: LifeBuoy },
+      { href: "/app/aide", label: "help", icon: LifeBuoy },
       {
         href: "/app/demarrage",
-        label: "Démarrage guidé",
+        label: "onboarding",
         icon: BookOpen,
         anyOf: ["organization.settings"],
       },

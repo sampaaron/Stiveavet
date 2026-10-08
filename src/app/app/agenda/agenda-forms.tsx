@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useActionState, useId } from "react";
 
+import { useAppText } from "@/i18n/app/client";
+
 import { Button } from "@/ui/button";
 
 import { ActionMessage, selectClasses } from "../action-message";
@@ -32,12 +34,13 @@ export function CaptureForm({
     importCaptureAction,
     initialActionState,
   );
+  const t = useAppText();
   const id = useId();
   return (
     <form action={action} className="grid gap-3">
       <div className="grid gap-1.5">
         <label htmlFor={`${id}-vet`} className="text-sm font-semibold">
-          Agenda de
+          {t.agenda.capture.vetLabel}
         </label>
         <select
           id={`${id}-vet`}
@@ -55,7 +58,7 @@ export function CaptureForm({
       </div>
       <div className="grid gap-1.5">
         <label htmlFor={`${id}-file`} className="text-sm font-semibold">
-          Capture d&apos;écran de l&apos;agenda
+          {t.agenda.capture.fileLabel}
         </label>
         <input
           id={`${id}-file`}
@@ -67,7 +70,7 @@ export function CaptureForm({
           className="min-h-11 w-full min-w-0 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] file:mr-3 file:rounded-full file:border-0 file:bg-brand-soft file:px-3 file:py-1 file:text-sm file:font-semibold file:text-brand-ink"
         />
         <p id={`${id}-hint`} className="text-xs text-ink-muted">
-          JPEG, PNG ou WebP, 5 Mo au plus.
+          {t.agenda.capture.fileHint}
         </p>
       </div>
       <div>
@@ -77,7 +80,7 @@ export function CaptureForm({
           aria-busy={pending}
           icon={<ImageUp aria-hidden="true" className="size-4" />}
         >
-          Lire les créneaux libres
+          {t.agenda.capture.submit}
         </Button>
       </div>
       <ActionMessage state={state} />
@@ -85,6 +88,7 @@ export function CaptureForm({
   );
 }
 
+/** `label` : nom accessible déjà traduit par la page (jour, heures, vétérinaire). */
 export function RemoveSlotButton({
   slotId,
   label,
@@ -104,7 +108,7 @@ export function RemoveSlotButton({
         size="sm"
         variant="quiet"
         disabled={pending}
-        aria-label={`Retirer le créneau ${label}`}
+        aria-label={label}
         icon={<Trash2 aria-hidden="true" className="size-4" />}
       />
       <ActionMessage state={state} />
@@ -115,15 +119,18 @@ export function RemoveSlotButton({
 /** Confirmer ou refuser un rendez-vous choisi par le propriétaire ; Numa le prévient. */
 export function AppointmentDecision({
   appointmentId,
-  label,
+  animalName,
+  when,
 }: {
   appointmentId: string;
-  label: string;
+  animalName: string;
+  when: string;
 }) {
   const [state, action, pending] = useActionState(
     decideAppointmentAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="appointmentId" value={appointmentId} />
@@ -135,10 +142,10 @@ export function AppointmentDecision({
           size="sm"
           disabled={pending}
           aria-busy={pending}
-          aria-label={`Confirmer le rendez-vous ${label}`}
+          aria-label={t.agenda.pending.confirmLabel(animalName, when)}
           icon={<CalendarCheck aria-hidden="true" className="size-4" />}
         >
-          Confirmer
+          {t.agenda.pending.confirm}
         </Button>
         <Button
           type="submit"
@@ -147,10 +154,10 @@ export function AppointmentDecision({
           size="sm"
           variant="secondary"
           disabled={pending}
-          aria-label={`Refuser le rendez-vous ${label}`}
+          aria-label={t.agenda.pending.declineLabel(animalName, when)}
           icon={<CalendarX aria-hidden="true" className="size-4" />}
         >
-          Refuser
+          {t.agenda.pending.decline}
         </Button>
       </div>
       <ActionMessage state={state} />
@@ -160,15 +167,18 @@ export function AppointmentDecision({
 
 export function CallbackDoneButton({
   requestId,
-  label,
+  animalName,
+  requestedAt,
 }: {
   requestId: string;
-  label: string;
+  animalName: string;
+  requestedAt: string;
 }) {
   const [state, action, pending] = useActionState(
     closeCallbackAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="requestId" value={requestId} />
@@ -178,10 +188,10 @@ export function CallbackDoneButton({
           size="sm"
           variant="secondary"
           disabled={pending}
-          aria-label={`Marquer comme rappelé : ${label}`}
+          aria-label={t.agenda.callbacks.doneLabel(animalName, requestedAt)}
           icon={<PhoneCall aria-hidden="true" className="size-4" />}
         >
-          Rappelé
+          {t.agenda.callbacks.done}
         </Button>
       </div>
       <ActionMessage state={state} />

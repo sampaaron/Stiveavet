@@ -1,25 +1,8 @@
 /**
- * Catalogue des tâches et des codes d'erreur. Un code d'erreur est technique et court : jamais
- * le message brut d'une exception, qui pourrait contenir un numéro ou un contenu clinique.
+ * Codes d'erreur des tâches. Un code d'erreur est technique et court : jamais le message brut
+ * d'une exception, qui pourrait contenir un numéro ou un contenu clinique. Les libellés des
+ * tâches et des erreurs sont dans les dictionnaires de l'espace cabinet (`tasks`, ADR 0022).
  */
-
-/** Libellés des tâches connues ; les lots suivants en ajoutent (rappels, escalades…). */
-export const JOB_KIND_LABELS: Record<string, string> = {
-  "followup.reminder": "Rappel au propriétaire",
-  "followup.message": "Message de Numa",
-  "followup.end": "Fin du suivi automatisé",
-  "alert.escalate": "Escalade d'une alerte urgente",
-  "alert.notify": "Alerte au vétérinaire",
-  "media.transcribe": "Transcription d'un message vocal",
-  "media.observe": "Analyse d'une photo",
-  "attachment.purge": "Suppression d'un fichier",
-  "retention.sweep": "Recherche des données arrivées à échéance",
-  "followup.purge": "Effacement d'un suivi arrivé à échéance",
-};
-
-export function jobKindLabel(kind: string): string {
-  return JOB_KIND_LABELS[kind] ?? "Tâche technique";
-}
 
 export const JOB_ERROR_CODES = [
   "provider_unavailable",
@@ -31,20 +14,11 @@ export const JOB_ERROR_CODES = [
 ] as const;
 export type JobErrorCode = (typeof JOB_ERROR_CODES)[number];
 
-export const JOB_ERROR_LABELS: Record<JobErrorCode, string> = {
-  provider_unavailable: "Service d'envoi indisponible",
-  provider_rejected: "Envoi refusé par le service",
-  invalid_payload: "Données de la tâche invalides",
-  target_missing: "Dossier ou destinataire introuvable",
-  lease_expired: "Interrompue par un arrêt du worker",
-  unexpected_error: "Erreur inattendue",
-};
-
-export function jobErrorLabel(code: string | null): string {
-  if (!code) return JOB_ERROR_LABELS.unexpected_error;
-  return (JOB_ERROR_CODES as readonly string[]).includes(code)
-    ? JOB_ERROR_LABELS[code as JobErrorCode]
-    : JOB_ERROR_LABELS.unexpected_error;
+/** Code d'erreur affichable : un code inconnu ou absent devient `unexpected_error`. */
+export function jobErrorCode(code: string | null): JobErrorCode {
+  return code && (JOB_ERROR_CODES as readonly string[]).includes(code)
+    ? (code as JobErrorCode)
+    : "unexpected_error";
 }
 
 /** Échec voulu par un exécutant : seul le code est enregistré. */

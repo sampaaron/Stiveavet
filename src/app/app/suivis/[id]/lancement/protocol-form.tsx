@@ -2,6 +2,7 @@
 
 import { useActionState, useId } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage, selectClasses } from "../../../action-message";
@@ -18,6 +19,7 @@ export function ProtocolForm({
   currentProtocolId: string | null;
   options: { protocolId: string; name: string; versionNumber: number }[];
 }) {
+  const text = useAppText().followups.protocolForm;
   const [state, action, pending] = useActionState(
     applyProtocolAction,
     initialActionState,
@@ -28,7 +30,7 @@ export function ProtocolForm({
       <input type="hidden" name="followupId" value={followupId} />
       <div className="flex min-w-0 flex-col gap-1.5">
         <label htmlFor={`${id}-protocole`} className="text-sm font-semibold">
-          Protocole
+          {text.label}
         </label>
         <select
           id={`${id}-protocole`}
@@ -37,20 +39,16 @@ export function ProtocolForm({
           defaultValue={currentProtocolId ?? ""}
         >
           {currentProtocolId ? null : (
-            <option value="">Choisir un protocole validé</option>
+            <option value="">{text.placeholder}</option>
           )}
           {options.map((option) => (
             <option key={option.protocolId} value={option.protocolId}>
-              {option.name} (version {option.versionNumber})
+              {text.option(option.name, option.versionNumber)}
             </option>
           ))}
         </select>
       </div>
-      <p className="text-sm text-ink-muted">
-        Seuls les protocoles validés par un vétérinaire et adaptés à
-        l&apos;espèce sont proposés. Changer de protocole remplace les étapes et
-        les signes d&apos;alerte de la fiche.
-      </p>
+      <p className="text-sm text-ink-muted">{text.help}</p>
       <ActionMessage state={state} />
       <div>
         <Button
@@ -60,9 +58,7 @@ export function ProtocolForm({
           disabled={pending || options.length === 0}
           aria-busy={pending}
         >
-          {currentProtocolId
-            ? "Changer de protocole"
-            : "Appliquer ce protocole"}
+          {currentProtocolId ? text.change : text.apply}
         </Button>
       </div>
     </form>

@@ -1,5 +1,6 @@
 import type { Actor } from "@/domains/equipe/actor";
 import type { FollowupShareView } from "@/domains/suivis/service";
+import { appText } from "@/i18n/app/server";
 import { services } from "@/server/services";
 import { SectionCard } from "@/ui/card";
 import { formatDate } from "@/ui/format";
@@ -18,22 +19,20 @@ export async function AccessPanel({
   isPrivate: boolean;
   shares: FollowupShareView[];
 }) {
-  const candidates = await services
-    .followups()
-    .shareCandidates(context, followupId);
+  const [candidates, { t, locale }] = await Promise.all([
+    services.followups().shareCandidates(context, followupId),
+    appText(),
+  ]);
+  const text = t.dossier.access;
   return (
     <SectionCard
-      title="Accès au dossier"
-      description={
-        isPrivate
-          ? "Dossier privé : visible seulement par vous et les confrères avec qui vous le partagez."
-          : "Visible par les personnes du cabinet autorisées à voir tous les suivis."
-      }
+      title={text.title}
+      description={isPrivate ? text.privateDescription : text.publicDescription}
     >
       <div className="grid gap-5">
         <PrivacyForm followupId={followupId} isPrivate={isPrivate} />
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Partagé avec</h3>
+          <h3 className="mb-2 text-sm font-semibold">{text.sharedWith}</h3>
           {shares.length > 0 ? (
             <ul className="grid gap-2">
               {shares.map((share) => (
@@ -45,8 +44,8 @@ export async function AccessPanel({
                     <span className="block font-semibold">{share.name}</span>
                     <span className="block text-ink-muted">
                       {share.expiresAt
-                        ? `Jusqu'au ${formatDate(share.expiresAt)}`
-                        : "Jusqu'à retrait"}
+                        ? text.until(formatDate(share.expiresAt, locale))
+                        : text.untilRevoked}
                     </span>
                   </span>
                   <RevokeShareForm
@@ -58,15 +57,13 @@ export async function AccessPanel({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-ink-muted">Aucun partage.</p>
+            <p className="text-sm text-ink-muted">{text.noShares}</p>
           )}
         </div>
         {candidates.length > 0 ? (
           <ShareForm followupId={followupId} candidates={candidates} />
         ) : (
-          <p className="text-sm text-ink-muted">
-            Aucun autre vétérinaire actif à qui partager ce dossier.
-          </p>
+          <p className="text-sm text-ink-muted">{text.noCandidates}</p>
         )}
       </div>
     </SectionCard>

@@ -2,9 +2,11 @@ import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
 
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
+
+import { LocaleProvider } from "@/i18n/app/client";
+import { uiLocale } from "@/i18n/app/server";
 
 export const metadata: Metadata = {
   title: { default: "Stivea Vet", template: "%s · Stivea Vet" },
@@ -18,11 +20,13 @@ export default async function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   // Rendu à la requête pour toutes les pages : condition pour que Next.js applique le nonce CSP.
   await connection();
-  // Posée par le proxy d'après l'adresse : /en/… est en anglais, tout le reste en français.
-  const lang = (await headers()).get("x-stivea-locale") === "en" ? "en" : "fr";
+  // Posée par le proxy : langue de l'adresse sur le site, sinon choix de la personne (ADR 0022).
+  const lang = await uiLocale();
   return (
     <html lang={lang} className="h-full">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <LocaleProvider locale={lang}>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

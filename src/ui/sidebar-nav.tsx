@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { useAppText } from "@/i18n/app/client";
+
 import { cn } from "./cn";
 import { isNavItemActive, visibleNavigation } from "./navigation";
 
@@ -19,6 +21,7 @@ type SidebarNavProps = {
 export function SidebarNav({ brand, footer, permissions }: SidebarNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const t = useAppText().shell;
 
   return (
     <aside className="border-b border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0">
@@ -36,9 +39,7 @@ export function SidebarNav({ brand, footer, permissions }: SidebarNavProps) {
           ) : (
             <Menu aria-hidden="true" className="size-5" />
           )}
-          <span className="sr-only">
-            {open ? "Fermer le menu" : "Ouvrir le menu"}
-          </span>
+          <span className="sr-only">{open ? t.closeMenu : t.openMenu}</span>
         </button>
       </div>
       <div
@@ -48,12 +49,12 @@ export function SidebarNav({ brand, footer, permissions }: SidebarNavProps) {
           open ? "flex" : "hidden",
         )}
       >
-        <nav aria-label="Navigation principale" className="flex-1">
+        <nav aria-label={t.mainNavigation} className="flex-1">
           {visibleNavigation(new Set(permissions)).map((section, index) => (
             <div key={section.label ?? index} className="mb-4">
               {section.label ? (
                 <p className="px-3 pb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase">
-                  {section.label}
+                  {t.nav[section.label]}
                 </p>
               ) : null}
               <ul className="space-y-0.5">
@@ -74,7 +75,7 @@ export function SidebarNav({ brand, footer, permissions }: SidebarNavProps) {
                         )}
                       >
                         <Icon aria-hidden="true" className="size-[18px]" />
-                        {label}
+                        {t.nav[label]}
                       </Link>
                     </li>
                   );

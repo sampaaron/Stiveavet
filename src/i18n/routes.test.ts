@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { LOCALES } from "./locales";
-import { SITE_PAGES, localeOfPath, pageFor, pathFor } from "./routes";
+import {
+  SITE_PAGES,
+  localeOfPath,
+  pageFor,
+  pathFor,
+  requestLocale,
+} from "./routes";
 import type { SitePage } from "./routes";
 
 describe("adresses du site", () => {
@@ -36,5 +42,22 @@ describe("adresses du site", () => {
     expect(localeOfPath("/fr/tarifs")).toBe("fr");
     expect(localeOfPath("/app")).toBe("fr");
     expect(localeOfPath("/english")).toBe("fr");
+  });
+});
+
+describe("langue d'une requête", () => {
+  it("suit l'adresse sur le site public, quel que soit le choix enregistré", () => {
+    expect(requestLocale("/en/pricing", "fr", "fr-FR")).toBe("en");
+    expect(requestLocale("/fr", "en", "en-GB")).toBe("fr");
+  });
+
+  it("ailleurs, suit le choix de la personne, puis son navigateur, puis le français", () => {
+    expect(requestLocale("/app", "en", "fr-FR")).toBe("en");
+    expect(requestLocale("/connexion", undefined, "en-GB,fr;q=0.8")).toBe("en");
+    expect(requestLocale("/app/suivis", undefined, "de-DE,fr;q=0.5")).toBe(
+      "fr",
+    );
+    expect(requestLocale("/app", "de", null)).toBe("fr");
+    expect(requestLocale("/english", undefined, null)).toBe("fr");
   });
 });

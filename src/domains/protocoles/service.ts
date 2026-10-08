@@ -45,12 +45,28 @@ export type ProtocolSummary = {
   followupCount: number;
 };
 
+/**
+ * Notes de version écrites par l'application, enregistrées telles quelles en base (en
+ * français) ; l'écran affiche à leur place le texte de la langue de la personne.
+ */
+export const SYSTEM_CHANGE_NOTES = {
+  creation: "Création",
+  copy: "Copie",
+  library: "Ajouté depuis la bibliothèque de départ",
+} as const;
+
 export type ProtocolVersionEntry = {
   id: string;
   versionNumber: number;
   createdAt: Date;
-  createdByName: string;
+  /** Null : membre retiré du cabinet ; l'écran affiche un libellé dans la langue de la personne. */
+  createdByName: string | null;
+  /**
+   * Note écrite par le vétérinaire, ou note de l'application enregistrée en français
+   * (`SYSTEM_CHANGE_NOTES`), traduite par l'écran.
+   */
   changeNote: string;
+  /** Null si la version n'est pas validée (`validatedAt`) ou si son auteur a été retiré. */
   validatedByName: string | null;
   validatedAt: Date | null;
   followupCount: number;
@@ -384,11 +400,10 @@ export function protocolsService(db: Database) {
             id: row.id,
             versionNumber: row.versionNumber,
             createdAt: row.createdAt,
-            createdByName:
-              names.get(row.createdByMembershipId) ?? "Membre retiré",
+            createdByName: names.get(row.createdByMembershipId) ?? null,
             changeNote: row.changeNote,
             validatedByName: row.validatedByMembershipId
-              ? (names.get(row.validatedByMembershipId) ?? "Membre retiré")
+              ? (names.get(row.validatedByMembershipId) ?? null)
               : null,
             validatedAt: row.validatedAt,
             followupCount: counts.get(row.id) ?? 0,
@@ -440,7 +455,7 @@ export function protocolsService(db: Database) {
           validated: canValidateProtocol(actor, {
             ownerMembershipId: scope === "personal" ? actor.membershipId : null,
           }),
-          changeNote: "Création",
+          changeNote: SYSTEM_CHANGE_NOTES.creation,
         });
         await audit(tx, actor, "protocol.created", id, { scope });
         return id;
@@ -492,7 +507,7 @@ export function protocolsService(db: Database) {
           content: { ...content, name },
           duplicatedFromVersionId: source.currentVersionId,
           validated: false,
-          changeNote: "Copie",
+          changeNote: SYSTEM_CHANGE_NOTES.copy,
         });
         await audit(tx, actor, "protocol.duplicated", id, {
           scope,
@@ -569,7 +584,7 @@ export function protocolsService(db: Database) {
           content,
           libraryKey,
           validated: false,
-          changeNote: "Ajouté depuis la bibliothèque de départ",
+          changeNote: SYSTEM_CHANGE_NOTES.library,
         });
         await audit(tx, actor, "protocol.installed", id, { libraryKey });
         return id;

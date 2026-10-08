@@ -16,6 +16,8 @@ const CASES: Record<
     firstContactHours: string;
     intro: string;
     thanks: string;
+    /** Écrit dans la langue de la personne : un message dans l'autre langue ferait changer Numa (lot 19). */
+    news: string;
     ack: string;
   }
 > = {
@@ -25,6 +27,7 @@ const CASES: Record<
     firstContactHours: "4",
     intro: "je suis Numa, l'assistante IA",
     thanks: "Merci Margaux",
+    news: "Elle mange bien ce soir",
     ack: "Merci pour ces nouvelles de Plume",
   },
   "mobile-320": {
@@ -33,6 +36,7 @@ const CASES: Record<
     firstContactHours: "6",
     intro: "I'm Numa, the AI (artificial intelligence) assistant",
     thanks: "Thank you Emily",
+    news: "She is eating well tonight",
     ack: "Thank you for the news about Tango",
   },
 };
@@ -79,20 +83,22 @@ test("accord, échange, reprise en main puis « Reprendre Numa »", async ({
   // 3. Accord du propriétaire, puis un premier échange avec Numa.
   await page.getByRole("button", { name: "OUI", exact: true }).click();
   await expect(page).toHaveURL(/\?fait=envoye$/);
-  await expectLastBubble(page, story.thanks);
-  await page
-    .getByLabel(`Message de ${story.owner}`)
-    .fill("Elle mange bien ce soir");
+  // Selon l'heure, une étape du programme peut suivre aussitôt le remerciement.
+  await expect(async () => {
+    await page.reload();
+    await expect(phone(page)).toContainText(story.thanks, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await page.getByLabel(`Message de ${story.owner}`).fill(story.news);
   await page
     .getByRole("button", { name: "Envoyer en tant que propriétaire" })
     .click();
-  await expect(phone(page)).toContainText("Elle mange bien ce soir");
+  await expect(phone(page)).toContainText(story.news);
   await expectLastBubble(page, story.ack);
 
   // 4. La vétérinaire écrit : Numa se met en pause.
   await page.goto(dossier);
   await expect(conversation).toContainText("Numa suit la conversation.");
-  await expect(conversation).toContainText("Elle mange bien ce soir");
+  await expect(conversation).toContainText(story.news);
   await page
     .getByLabel(`Écrire à ${story.owner}`)
     .fill("Bonjour, ici Dr Fontaine. Je passe prendre des nouvelles.");
@@ -123,7 +129,8 @@ test("accord, échange, reprise en main puis « Reprendre Numa »", async ({
     "Merci docteur",
   );
 
-  // 6. « Reprendre Numa » : elle répond de nouveau au message suivant.
+  // 6. « Reprendre Numa » : elle répond de nouveau au message suivant, toujours dans la
+  // langue de la personne (un message court dans l'autre langue ne la change pas).
   await page.goto(dossier);
   await page.getByRole("button", { name: "Reprendre Numa" }).click();
   await expect(page).toHaveURL(/\?fait=numa#conversation$/);

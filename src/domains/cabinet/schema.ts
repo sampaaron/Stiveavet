@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+import { language } from "@/domains/suivis/schema";
+
 // Miroir typé de db/migrations (source de vérité) ; un test d'intégration vérifie la concordance.
 
 export const memberRole = pgEnum("member_role", [
@@ -33,6 +35,8 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   displayName: text("display_name").notNull(),
   disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  /** Migration 0015 : langue de l'interface choisie par la personne. */
+  uiLocale: language("ui_locale").notNull().default("fr"),
   ...timestamps,
 });
 

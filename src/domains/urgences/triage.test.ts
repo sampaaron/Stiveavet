@@ -25,7 +25,7 @@ describe("triage déterministe", () => {
     ).toMatchObject({ level: "urgent", ruleId: "r1" });
     expect(
       assessOwnerMessage("Il refuse toujours de manger ce matin", RULES),
-    ).toMatchObject({ level: "watch", ruleId: "r2" });
+    ).toMatchObject({ level: "watch", ruleId: "r2", code: "rule" });
     expect(
       assessOwnerMessage("Grosse abattement depuis hier", RULES),
     ).toMatchObject({ level: "urgent", ruleId: "r4" });
@@ -50,6 +50,7 @@ describe("triage déterministe", () => {
       expect(assessOwnerMessage(message, [])).toMatchObject({
         level: "urgent",
         ruleId: null,
+        code: "red_flag",
       });
   });
 
@@ -59,7 +60,10 @@ describe("triage déterministe", () => {
       "Est-ce grave s'il se lèche beaucoup ?",
       "I'm worried, he is limping",
     ])
-      expect(assessOwnerMessage(message, []).level).toBe("watch");
+      expect(assessOwnerMessage(message, [])).toMatchObject({
+        level: "watch",
+        code: "concern",
+      });
   });
 
   it("un message rassurant reste normal", () => {
@@ -69,6 +73,7 @@ describe("triage déterministe", () => {
       level: "normal",
       ruleId: null,
       reason: "Aucun signe d'alerte.",
+      code: "none",
     });
   });
 

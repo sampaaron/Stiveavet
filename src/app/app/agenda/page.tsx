@@ -4,7 +4,9 @@ import Link from "next/link";
 
 import type { FreeSlotView } from "@/domains/agenda/captures";
 import type { AppointmentDesk } from "@/domains/agenda/demandes";
-import { APPOINTMENT_KIND_LABELS } from "@/domains/agenda/rendez-vous";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
@@ -20,15 +22,16 @@ import {
   RemoveSlotButton,
 } from "./agenda-forms";
 
-export const metadata: Metadata = { title: "Agenda" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.agenda.title };
+}
 
-const DONE: Record<string, string> = {
-  retire: "Créneau retiré.",
-  confirme: "Rendez-vous confirmé. Numa prévient le propriétaire.",
-  refuse:
-    "Créneau refusé. Numa prévient le propriétaire que le cabinet le recontactera.",
-  rappele: "Demande marquée comme rappelée.",
-};
+/** Confirmations simples, par valeur de `?fait=` (la capture a son propre message). */
+const DONE_KEYS = ["retire", "confirme", "refuse", "rappele"] as const;
+type DoneKey = (typeof DONE_KEYS)[number];
+const isDoneKey = (value: unknown): value is DoneKey =>
+  DONE_KEYS.some((key) => key === value);
 
 /**
  * Agenda (cahier des charges §8) : en attendant les intégrations (dr.veto en phase 3), le
@@ -48,21 +51,21 @@ export default async function AgendaPage({
       ? services.agenda().recentCaptures(context)
       : Promise.resolve([]),
   ]);
+  const { t, locale } = await appText();
   const { fait, creneaux } = await searchParams;
   const done =
     fait === "capture" &&
     typeof creneaux === "string" &&
     /^\d{1,2}$/.test(creneaux)
-      ? `Capture lue : ${creneaux} créneaux libres enregistrés. Le fichier a été supprimé.`
-      : (DONE[typeof fait === "string" ? fait : ""] ?? undefined);
-  const days = groupByDay(slots);
+      ? t.agenda.done.capture(Number(creneaux))
+      : isDoneKey(fait)
+        ? t.agenda.done[fait]
+        : undefined;
+  const days = groupByDay(slots, locale);
 
   return (
     <>
-      <PageHeader
-        title="Agenda"
-        description="Créneaux libres que Numa pourra proposer aux propriétaires. Chaque rendez-vous reste confirmé par le cabinet."
-      />
+      <PageHeader title={t.agenda.title} description={t.agenda.description} />
       {done ? (
         <p
           role="status"
@@ -72,17 +75,17 @@ export default async function AgendaPage({
         </p>
       ) : null}
 
-      <AppointmentRequests desk={desk} />
+      <AppointmentRequests desk={desk} t={t} locale={locale} />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <SectionCard
-          title="Créneaux libres à venir"
-          description="Lus sur les captures d'agenda. Lecture simulée dans cette version."
+          title={t.agenda.slots.title}
+          description={t.agenda.slots.description}
         >
           {days.length === 0 ? (
             <EmptyState
-              title="Aucun créneau libre enregistré"
-              description="Envoyez une capture d'écran de l'agenda : ses créneaux libres apparaîtront ici."
+              title={t.agenda.slots.emptyTitle}
+              description={t.agenda.slots.emptyDescription}
             />
           ) : (
             <div className="grid gap-5">
@@ -93,10 +96,11 @@ export default async function AgendaPage({
                   </h3>
                   <ul
                     className="grid gap-2"
-                    aria-label={`Créneaux libres du ${day}`}
+                    aria-label={t.agenda.slots.dayListLabel(day)}
                   >
                     {items.map((slot) => {
-                      const label = `${formatTime(slot.startsAt)} à ${formatTime(slot.endsAt)}, ${slot.vetName}`;
+                      const start = formatTime(slot.startsAt, locale);
+                      const end = formatTime(slot.endsAt, locale);
                       return (
                         <li
                           key={slot.id}
@@ -108,8 +112,7 @@ export default async function AgendaPage({
                               className="size-4 shrink-0 text-brand"
                             />
                             <span className="font-semibold">
-                              {formatTime(slot.startsAt)} –{" "}
-                              {formatTime(slot.endsAt)}
+                              {start} – {end}
                             </span>
                             <span className="truncate text-ink-muted">
                               {slot.vetName}
@@ -118,7 +121,12 @@ export default async function AgendaPage({
                           {canCapture ? (
                             <RemoveSlotButton
                               slotId={slot.id}
-                              label={`du ${day}, ${label}`}
+                              label={t.agenda.slots.removeLabel(
+                                day,
+                                start,
+                                end,
+                                slot.vetName,
+                              )}
                             />
                           ) : null}
                         </li>
@@ -134,18 +142,16 @@ export default async function AgendaPage({
         {canCapture ? (
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
             <SectionCard
-              title="Envoyer une capture d'agenda"
-              description="En attendant la connexion directe à l'agenda (dr.veto)."
+              title={t.agenda.capture.title}
+              description={t.agenda.capture.description}
             >
-              <AlertBanner tone="info" title="Avant d'envoyer">
+              <AlertBanner tone="info" title={t.agenda.capture.beforeTitle}>
                 <span className="flex items-start gap-2">
                   <EyeOff
                     aria-hidden="true"
                     className="mt-0.5 size-4 shrink-0"
                   />
-                  Masquez les noms, motifs et toute information inutile : ne
-                  laissez visibles que les créneaux libres. La capture est
-                  supprimée dès la lecture des créneaux.
+                  {t.agenda.capture.beforeText}
                 </span>
               </AlertBanner>
               <div className="mt-4">
@@ -161,13 +167,13 @@ export default async function AgendaPage({
             </SectionCard>
             {captures.length ? (
               <SectionCard
-                title="Dernières captures"
-                description="Aucune capture n'est gardée : seule la trace de sa suppression reste."
+                title={t.agenda.recentCaptures.title}
+                description={t.agenda.recentCaptures.description}
                 headingLevel={2}
               >
                 <ul
                   className="grid gap-2 text-sm"
-                  aria-label="Dernières captures"
+                  aria-label={t.agenda.recentCaptures.title}
                 >
                   {captures.map((capture) => (
                     <li
@@ -179,10 +185,14 @@ export default async function AgendaPage({
                         className="mt-0.5 size-4 shrink-0 text-ink-muted"
                       />
                       <span>
-                        Reçue le {formatDateTime(capture.createdAt)}
+                        {t.agenda.recentCaptures.received(
+                          formatDateTime(capture.createdAt, locale),
+                        )}
                         {capture.deletedAt
-                          ? `, supprimée le ${formatDateTime(capture.deletedAt)}`
-                          : ", suppression en cours"}
+                          ? t.agenda.recentCaptures.deleted(
+                              formatDateTime(capture.deletedAt, locale),
+                            )
+                          : t.agenda.recentCaptures.deleting}
                       </span>
                     </li>
                   ))}
@@ -197,26 +207,32 @@ export default async function AgendaPage({
 }
 
 /** Demandes faites à Numa : créneaux choisis à confirmer, demandes sans créneau à rappeler. */
-function AppointmentRequests({ desk }: { desk: AppointmentDesk }) {
+function AppointmentRequests({
+  desk,
+  t,
+  locale,
+}: {
+  desk: AppointmentDesk;
+  t: AppDictionary;
+  locale: Locale;
+}) {
   if (desk.pending.length === 0 && desk.callbacks.length === 0) return null;
   return (
     <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
       <SectionCard
-        title="Rendez-vous à confirmer"
+        title={t.agenda.pending.title}
         description={
           desk.canConfirm
-            ? "Créneaux choisis par les propriétaires parmi ceux proposés par Numa. Numa leur annonce votre décision."
-            : "Créneaux choisis par les propriétaires. Un vétérinaire, ou un assistant autorisé par l'administrateur, les confirme."
+            ? t.agenda.pending.descriptionCanConfirm
+            : t.agenda.pending.descriptionReadOnly
         }
       >
         {desk.pending.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            Aucun rendez-vous en attente.
-          </p>
+          <p className="text-sm text-ink-muted">{t.agenda.pending.empty}</p>
         ) : (
-          <ul className="grid gap-3" aria-label="Rendez-vous à confirmer">
+          <ul className="grid gap-3" aria-label={t.agenda.pending.title}>
             {desk.pending.map((item) => {
-              const label = `de ${item.animalName}, ${formatDateTime(item.startsAt)}`;
+              const when = formatDateTime(item.startsAt, locale);
               return (
                 <li
                   key={item.id}
@@ -229,16 +245,17 @@ function AppointmentRequests({ desk }: { desk: AppointmentDesk }) {
                     >
                       {item.animalName}
                     </Link>{" "}
-                    · {APPOINTMENT_KIND_LABELS[item.kind]}
+                    · {t.labels.appointmentKinds[item.kind]}
                     <span className="block text-ink-muted">
-                      {formatDateTime(item.startsAt)} –{" "}
-                      {formatTime(item.endsAt)} avec {item.vetName}
+                      {when} – {formatTime(item.endsAt, locale)}{" "}
+                      {t.agenda.pending.withVet(item.vetName)}
                     </span>
                   </span>
                   {desk.canConfirm ? (
                     <AppointmentDecision
                       appointmentId={item.id}
-                      label={label}
+                      animalName={item.animalName}
+                      when={when}
                     />
                   ) : null}
                 </li>
@@ -248,39 +265,43 @@ function AppointmentRequests({ desk }: { desk: AppointmentDesk }) {
         )}
       </SectionCard>
       <SectionCard
-        title="Demandes à rappeler"
-        description="Numa n'avait pas de créneau adapté avec le vétérinaire responsable : elle a annoncé que le cabinet rappellerait."
+        title={t.agenda.callbacks.title}
+        description={t.agenda.callbacks.description}
       >
         {desk.callbacks.length === 0 ? (
-          <p className="text-sm text-ink-muted">Aucune demande à rappeler.</p>
+          <p className="text-sm text-ink-muted">{t.agenda.callbacks.empty}</p>
         ) : (
-          <ul className="grid gap-3" aria-label="Demandes à rappeler">
-            {desk.callbacks.map((item) => (
-              <li
-                key={item.id}
-                className="grid gap-2 rounded-[var(--radius-control)] border border-line p-3 text-sm"
-              >
-                <span>
-                  <Link
-                    href={`/app/suivis/${item.followupId}`}
-                    className="font-semibold text-brand-ink underline-offset-2 hover:underline"
-                  >
-                    {item.animalName}
-                  </Link>{" "}
-                  · {APPOINTMENT_KIND_LABELS[item.kind]}
-                  <span className="block text-ink-muted">
-                    Demandé le {formatDateTime(item.requestedAt)} ·{" "}
-                    {item.vetName}
+          <ul className="grid gap-3" aria-label={t.agenda.callbacks.title}>
+            {desk.callbacks.map((item) => {
+              const requestedAt = formatDateTime(item.requestedAt, locale);
+              return (
+                <li
+                  key={item.id}
+                  className="grid gap-2 rounded-[var(--radius-control)] border border-line p-3 text-sm"
+                >
+                  <span>
+                    <Link
+                      href={`/app/suivis/${item.followupId}`}
+                      className="font-semibold text-brand-ink underline-offset-2 hover:underline"
+                    >
+                      {item.animalName}
+                    </Link>{" "}
+                    · {t.labels.appointmentKinds[item.kind]}
+                    <span className="block text-ink-muted">
+                      {t.agenda.callbacks.requested(requestedAt)} ·{" "}
+                      {item.vetName}
+                    </span>
                   </span>
-                </span>
-                {desk.canConfirm ? (
-                  <CallbackDoneButton
-                    requestId={item.id}
-                    label={`${item.animalName}, demande du ${formatDateTime(item.requestedAt)}`}
-                  />
-                ) : null}
-              </li>
-            ))}
+                  {desk.canConfirm ? (
+                    <CallbackDoneButton
+                      requestId={item.id}
+                      animalName={item.animalName}
+                      requestedAt={requestedAt}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </SectionCard>
@@ -290,10 +311,11 @@ function AppointmentRequests({ desk }: { desk: AppointmentDesk }) {
 
 function groupByDay(
   slots: FreeSlotView[],
+  locale: Locale,
 ): { day: string; items: FreeSlotView[] }[] {
   const days: { day: string; items: FreeSlotView[] }[] = [];
   for (const slot of slots) {
-    const day = formatDate(slot.startsAt);
+    const day = formatDate(slot.startsAt, locale);
     const last = days.at(-1);
     if (last?.day === day) last.items.push(slot);
     else days.push({ day, items: [slot] });

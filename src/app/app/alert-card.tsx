@@ -1,38 +1,62 @@
 import Link from "next/link";
 
 import type { AlertView } from "@/domains/urgences/service";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { AlertBanner } from "@/ui/alert-banner";
 import { formatDateTime, formatTime } from "@/ui/format";
 
 import { AlertButtons } from "./alert-buttons";
+import { triageReasonText } from "./triage-reason";
 
-const STATUS_LINE: Record<AlertView["status"], (alert: AlertView) => string> = {
-  open: (alert) =>
-    alert.level === "urgent" && alert.escalateAt
-      ? `Prévenu : ${alert.targetName}. Sans accusé de réception, toute l'équipe vétérinaire sera alertée à ${formatTime(alert.escalateAt)}.`
-      : `Prévenu : ${alert.targetName}.`,
-  escalated: (alert) =>
-    `Sans accusé de réception, toute l'équipe vétérinaire a été alertée${alert.escalatedAt ? ` à ${formatTime(alert.escalatedAt)}` : ""}.`,
-  acknowledged: (alert) =>
-    `Réception confirmée par ${alert.acknowledgedBy ?? "un vétérinaire"}${alert.acknowledgedAt ? ` à ${formatTime(alert.acknowledgedAt)}` : ""}. L'escalade est annulée.`,
-  resolved: () => "Alerte close.",
-};
+/** État de l'alerte : qui est prévenu, l'escalade, l'accusé de réception. */
+function statusLine(
+  t: AppDictionary,
+  locale: Locale,
+  alert: AlertView,
+): string {
+  const text = t.alerts.status;
+  const time = (value: Date | null | undefined) =>
+    value ? formatTime(value, locale) : null;
+  switch (alert.status) {
+    case "open":
+      return alert.level === "urgent" && alert.escalateAt
+        ? text.openEscalating(
+            alert.targetName,
+            formatTime(alert.escalateAt, locale),
+          )
+        : text.open(alert.targetName);
+    case "escalated":
+      return text.escalated(time(alert.escalatedAt));
+    case "acknowledged":
+      return text.acknowledged(
+        alert.acknowledgedBy ?? null,
+        time(alert.acknowledgedAt),
+      );
+    case "resolved":
+      return text.resolved;
+  }
+}
 
 /** Une alerte du triage : niveau, raison (accès clinique), état et actions de vétérinaire. */
-export function AlertCard({
+export async function AlertCard({
   alert,
   from,
 }: {
   alert: AlertView;
   from: "alertes" | "dossier";
 }) {
+  const { t, locale } = await appText();
+  const text = t.alerts.card;
   const urgent = alert.level === "urgent";
   const pending = alert.status === "open" || alert.status === "escalated";
+  const createdAt = formatTime(alert.createdAt, locale);
   const title = urgent
     ? pending
-      ? `Urgence signalée à ${formatTime(alert.createdAt)}, sans accusé de réception`
-      : `Urgence signalée à ${formatTime(alert.createdAt)}`
-    : `À surveiller depuis ${formatTime(alert.createdAt)}`;
+      ? text.urgentPending(createdAt)
+      : text.urgent(createdAt)
+    : text.watch(createdAt);
   return (
     <AlertBanner
       tone={pending ? (urgent ? "urgent" : "watch") : "success"}
@@ -47,15 +71,18 @@ export function AlertCard({
         ) : undefined
       }
     >
-      <span className="block">{alert.reason}</span>
-      <span className="mt-1 block">{STATUS_LINE[alert.status](alert)}</span>
+      <span className="block">{triageReasonText(t, alert.reason)}</span>
+      <span className="mt-1 block">{statusLine(t, locale, alert)}</span>
       {from === "alertes" ? (
         <Link
           href={`/app/suivis/${alert.followupId}#conversation`}
           className="mt-1 inline-block font-semibold text-brand-ink underline-offset-2 hover:underline"
         >
-          Ouvrir le dossier de {alert.animalName}
-          <span className="sr-only"> ({formatDateTime(alert.createdAt)})</span>
+          {text.openFile(alert.animalName)}
+          <span className="sr-only">
+            {" "}
+            ({formatDateTime(alert.createdAt, locale)})
+          </span>
         </Link>
       ) : null}
     </AlertBanner>

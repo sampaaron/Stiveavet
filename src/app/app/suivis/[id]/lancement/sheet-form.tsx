@@ -6,6 +6,7 @@ import { useActionState, useId, useState } from "react";
 import type { LaunchSheet } from "@/domains/suivis/lancement";
 import { MAX_FIRST_CONTACT_HOURS } from "@/domains/suivis/plan";
 import type { SheetInput } from "@/domains/suivis/plan";
+import { useAppText, useLocale } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 import { SectionCard } from "@/ui/card";
 import { formatDateTime } from "@/ui/format";
@@ -45,6 +46,9 @@ export function SheetForm({
     initialActionState,
   );
   const id = useId();
+  const t = useAppText();
+  const locale = useLocale();
+  const text = t.followups.form;
 
   const [responsible, setResponsible] = useState(
     followup.responsibleMembershipId,
@@ -115,12 +119,12 @@ export function SheetForm({
 
       {draft ? (
         <SectionCard
-          title="Premier message de Numa"
-          description="Numa se présente comme l'assistante IA du cabinet et demande l'accord du propriétaire avant tout suivi clinique."
+          title={text.firstMessageTitle}
+          description={text.firstMessageDescription}
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
-              label="Heures après l'intervention"
+              label={text.hoursLabel}
               type="number"
               inputMode="numeric"
               min={0}
@@ -129,8 +133,12 @@ export function SheetForm({
               onChange={(event) => setFirstHours(Number(event.target.value))}
               hint={
                 firstContact
-                  ? `Suggestion courante : 3 à 4 h. Ici : ${formatDateTime(firstContact)}${firstContact.getTime() < sheet.generatedAt.getTime() ? ", donc dès le lancement" : ""}.`
-                  : "Suggestion courante : 3 à 4 h, à adapter librement."
+                  ? (firstContact.getTime() < sheet.generatedAt.getTime()
+                      ? text.firstContactAtLaunch
+                      : text.firstContactAt)(
+                      formatDateTime(firstContact, locale),
+                    )
+                  : text.firstContactDefault
               }
             />
             <div className="flex min-w-0 flex-col gap-1.5">
@@ -138,7 +146,7 @@ export function SheetForm({
                 htmlFor={`${id}-responsable`}
                 className="text-sm font-semibold"
               >
-                Vétérinaire responsable
+                {text.responsibleLabel}
               </label>
               <select
                 id={`${id}-responsable`}
@@ -152,10 +160,7 @@ export function SheetForm({
                   </option>
                 ))}
               </select>
-              <p className="text-sm text-ink-muted">
-                Numa écrit en son nom ; c&apos;est lui ou elle qui lance le
-                suivi.
-              </p>
+              <p className="text-sm text-ink-muted">{text.responsibleHint}</p>
             </div>
           </div>
           {second ? (
@@ -168,13 +173,9 @@ export function SheetForm({
               />
               <span>
                 <span className="font-semibold">
-                  Inclure {second.name}, second propriétaire
+                  {text.includeSecond(second.name)}
                 </span>
-                <span className="block text-ink-muted">
-                  Numa lui demande aussi son accord. Dès que les deux ont
-                  accepté, un groupe WhatsApp réunit les propriétaires et Numa ;
-                  chacun peut le quitter par STOP.
-                </span>
+                <span className="block text-ink-muted">{text.secondHint}</span>
               </span>
             </label>
           ) : null}
@@ -182,12 +183,8 @@ export function SheetForm({
       ) : null}
 
       <SectionCard
-        title="Étapes et questions de Numa"
-        description={
-          draft
-            ? "Reprises du protocole. Modifiez-les pour cet animal : le protocole du cabinet ne change pas."
-            : "Les étapes passées restent telles quelles ; les étapes à venir remplacent les précédentes."
-        }
+        title={text.stepsTitle}
+        description={draft ? text.stepsDraft : text.stepsLive}
       >
         <StepsEditor
           steps={steps}
@@ -199,18 +196,18 @@ export function SheetForm({
       </SectionCard>
 
       <SectionCard
-        title="Signes d'alerte"
-        description="Validés par le vétérinaire. Numa ne pose jamais de diagnostic : elle signale et, en cas de doute, escalade."
+        title={text.alertsTitle}
+        description={text.alertsDescription}
       >
         <AlertsEditor alerts={alerts} setAlerts={setAlerts} />
       </SectionCard>
 
       <SectionCard
-        title="Traitements"
-        description="Un traitement importé de dr.veto n'est rappelé au propriétaire qu'après validation par un vétérinaire. Numa ne modifie jamais une posologie."
+        title={text.treatmentsTitle}
+        description={text.treatmentsDescription}
       >
         {sheet.treatments.length === 0 && added.length === 0 ? (
-          <p className="text-sm text-ink-muted">Aucun traitement en cours.</p>
+          <p className="text-sm text-ink-muted">{text.noTreatments}</p>
         ) : null}
         <ul className="grid gap-3">
           {sheet.treatments.map((treatment) => {
@@ -223,7 +220,7 @@ export function SheetForm({
                 <div className={isRemoved ? "opacity-60" : undefined}>
                   <p className="font-semibold">
                     {treatment.name}
-                    {isRemoved ? " (retiré à l'enregistrement)" : ""}
+                    {isRemoved ? text.removedSuffix : ""}
                   </p>
                   <p className="text-sm text-ink-muted">
                     {treatment.instructions}
@@ -232,11 +229,11 @@ export function SheetForm({
                     {treatment.validatedAt ? (
                       <span className="inline-flex items-center gap-1 font-medium text-brand-ink">
                         <ShieldCheck aria-hidden="true" className="size-4" />
-                        Validé par {treatment.validatedBy}
+                        {text.validatedBy(treatment.validatedBy ?? "")}
                       </span>
                     ) : (
                       <span className="font-medium text-watch">
-                        Importé de dr.veto, à valider
+                        {text.toValidate}
                       </span>
                     )}
                   </p>
@@ -250,7 +247,7 @@ export function SheetForm({
                           toggleValidated(treatment.id, event.target.checked)
                         }
                       />
-                      Je valide ce traitement : {treatment.name}
+                      {text.validateTreatment(treatment.name)}
                     </label>
                   ) : null}
                 </div>
@@ -264,9 +261,11 @@ export function SheetForm({
                         <Trash2 aria-hidden="true" className="size-3.5" />
                       )
                     }
-                    aria-label={`${isRemoved ? "Garder" : "Retirer"} le traitement ${treatment.name}`}
+                    aria-label={(isRemoved
+                      ? text.keepTreatmentLabel
+                      : text.removeTreatmentLabel)(treatment.name)}
                   >
-                    {isRemoved ? "Garder" : "Retirer"}
+                    {isRemoved ? text.keep : text.remove}
                   </Button>
                 ) : null}
               </li>
@@ -279,7 +278,7 @@ export function SheetForm({
             >
               <div className="grid gap-3 sm:grid-cols-2">
                 <TextField
-                  label={`Nouveau traitement ${index + 1}`}
+                  label={text.newTreatment(index + 1)}
                   value={treatment.name}
                   maxLength={120}
                   onChange={(event) =>
@@ -293,7 +292,7 @@ export function SheetForm({
                   }
                 />
                 <TextField
-                  label={`Posologie du traitement ${index + 1}`}
+                  label={text.newInstructions(index + 1)}
                   value={treatment.instructions}
                   maxLength={300}
                   onChange={(event) =>
@@ -308,9 +307,7 @@ export function SheetForm({
                 />
               </div>
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm text-ink-muted">
-                  Validé par vous à l&apos;enregistrement.
-                </p>
+                <p className="text-sm text-ink-muted">{text.newValidated}</p>
                 <Button
                   variant="quiet"
                   size="sm"
@@ -320,9 +317,9 @@ export function SheetForm({
                     )
                   }
                   icon={<Trash2 aria-hidden="true" className="size-3.5" />}
-                  aria-label={`Retirer le nouveau traitement ${index + 1}`}
+                  aria-label={text.removeNewLabel(index + 1)}
                 >
-                  Retirer
+                  {text.remove}
                 </Button>
               </div>
             </li>
@@ -341,28 +338,26 @@ export function SheetForm({
               }
               icon={<Plus aria-hidden="true" className="size-3.5" />}
             >
-              Ajouter un traitement
+              {text.addTreatment}
             </Button>
           </div>
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Rendez-vous de contrôle">
+      <SectionCard title={text.controlTitle}>
         <TextField
-          label="Date et heure du contrôle"
+          label={text.controlLabel}
           type="datetime-local"
           value={control}
           onChange={(event) => setControl(event.target.value)}
-          hint="Le suivi automatisé s'arrêtera à cette date ; la discussion restera ouverte. Laissez vide si aucun contrôle n'est prévu."
+          hint={text.controlHint}
         />
       </SectionCard>
 
       <ActionMessage state={state} />
       {draft && pendingTreatments > 0 ? (
         <p className="text-sm text-ink-muted">
-          {pendingTreatments === 1
-            ? "1 traitement importé n'est pas encore validé : il ne sera pas rappelé."
-            : `${pendingTreatments} traitements importés ne sont pas encore validés : ils ne seront pas rappelés.`}
+          {text.pendingTreatments(pendingTreatments)}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -376,7 +371,7 @@ export function SheetForm({
             disabled={pending}
             aria-busy={pending}
           >
-            Lancer le suivi
+            {text.launch}
           </Button>
         ) : null}
         <Button
@@ -387,13 +382,12 @@ export function SheetForm({
           disabled={pending}
           aria-busy={pending}
         >
-          {draft ? "Enregistrer le brouillon" : "Enregistrer les modifications"}
+          {draft ? text.saveDraft : text.saveChanges}
         </Button>
       </div>
       {draft && !rights.canLaunch ? (
         <p className="text-sm text-ink-muted">
-          Le suivi sera lancé par {followup.responsibleName}, vétérinaire
-          responsable.
+          {text.launchedBy(followup.responsibleName)}
         </p>
       ) : null}
     </form>

@@ -1,22 +1,17 @@
 import type { Metadata } from "next";
 
-import {
-  APPOINTMENT_KINDS,
-  APPOINTMENT_KIND_LABELS,
-} from "@/domains/agenda/rendez-vous";
+import { APPOINTMENT_KINDS } from "@/domains/agenda/rendez-vous";
 import {
   EMERGENCY_PERIODS,
-  EMERGENCY_PERIOD_LABELS,
   ESCALATION_CHOICES,
   WEEKDAYS,
-  WEEKDAY_LABELS,
-  escalationLabel,
 } from "@/domains/reglages/content";
+import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
-import { formatDateTime, toDateTimeInput } from "@/ui/format";
+import { formatDateTime, formatMinutes, toDateTimeInput } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 
 import { IntegrationList } from "./integrations";
@@ -32,11 +27,16 @@ import {
   RemoveOnCallForm,
 } from "./settings-forms";
 
-export const metadata: Metadata = { title: "Numa, urgences et garde" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.settings.title };
+}
 
 export default async function SettingsPage() {
   const context = await requirePermission("organization.settings");
   const settings = await services.settings().get(context);
+  const { t, locale } = await appText();
+  const text = t.settings;
 
   const windows = new Map(
     settings.messageWindows.map((window) => [window.weekday, window]),
@@ -53,35 +53,28 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Numa, urgences et garde"
-        description="Ce que Numa, assistante IA, applique à tous les suivis du cabinet. Numa ne prend jamais de décision médicale : elle transmet vos consignes et vous alerte."
-      />
+      <PageHeader title={text.title} description={text.description} />
       <div className="grid gap-6">
         {unconfigured ? (
           <AlertBanner
             tone="watch"
-            title="Ces réglages ne sont pas encore définis."
-            action={
-              <ApplyDefaultsForm label="Appliquer les réglages de départ" />
-            }
+            title={text.unconfigured.title}
+            action={<ApplyDefaultsForm label={text.applyDefaults} />}
           >
-            Les réglages de départ (envois du lundi au samedi de 8 h à 20 h,
-            rendez-vous en semaine de 9 h à 18 h, consignes d&apos;urgence
-            génériques) se modifient ensuite ici.
+            {text.unconfigured.body}
           </AlertBanner>
         ) : null}
 
         <SectionCard
-          title="Horaires d'envoi des messages"
-          description="Numa n'envoie ses messages programmés aux propriétaires que pendant ces plages (heure de Paris). Une réponse du propriétaire est toujours reçue."
+          title={text.messageWindows.title}
+          description={text.messageWindows.description}
         >
           <MessageWindowsForm
             days={WEEKDAYS.map((weekday) => {
               const window = windows.get(weekday);
               return {
                 weekday,
-                label: WEEKDAY_LABELS[weekday],
+                label: t.labels.weekdays[weekday],
                 enabled: Boolean(window),
                 startsAt: window?.startsAt ?? "08:00",
                 endsAt: window?.endsAt ?? "20:00",
@@ -91,8 +84,8 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Rendez-vous proposés par Numa"
-          description="Quand un propriétaire demande un rendez-vous, Numa propose jusqu'à trois créneaux libres de l'agenda du vétérinaire responsable, dans ces plages seulement (heure de Paris). Sans créneau adapté, elle annonce que le cabinet rappellera. Chaque rendez-vous attend la confirmation de l'équipe."
+          title={text.appointments.title}
+          description={text.appointments.description}
         >
           <div className="grid gap-8 lg:grid-cols-2">
             <MessageWindowsForm
@@ -101,7 +94,7 @@ export default async function SettingsPage() {
                 const window = appointmentWindows.get(weekday);
                 return {
                   weekday,
-                  label: WEEKDAY_LABELS[weekday],
+                  label: t.labels.weekdays[weekday],
                   enabled: Boolean(window),
                   startsAt: window?.startsAt ?? "09:00",
                   endsAt: window?.endsAt ?? "18:00",
@@ -111,7 +104,7 @@ export default async function SettingsPage() {
             <AppointmentDurationsForm
               kinds={APPOINTMENT_KINDS.map((kind) => ({
                 kind,
-                label: APPOINTMENT_KIND_LABELS[kind],
+                label: t.labels.appointmentKinds[kind],
                 minutes: settings.appointmentMinutes[kind],
               }))}
             />
@@ -119,15 +112,15 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Consignes d'urgence"
-          description="Transmises telles quelles au propriétaire quand Numa détecte un signe d'urgence, selon le moment. Rédigez-les vous-même : Numa n'y ajoute aucun conseil médical."
+          title={text.instructions.title}
+          description={text.instructions.description}
         >
           <div className="grid gap-6 lg:grid-cols-2">
             {EMERGENCY_PERIODS.map((period) => (
               <InstructionsForm
                 key={period}
                 period={period}
-                label={EMERGENCY_PERIOD_LABELS[period]}
+                label={t.labels.emergencyPeriods[period]}
                 value={settings.instructions[period] ?? ""}
               />
             ))}
@@ -135,8 +128,8 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Contacts d'urgence"
-          description="Numéros communiqués au propriétaire avec les consignes (6 au plus)."
+          title={text.contacts.title}
+          description={text.contacts.description}
         >
           {settings.contacts.length > 0 ? (
             <ul className="mb-5 grid gap-3">
@@ -156,35 +149,34 @@ export default async function SettingsPage() {
               ))}
             </ul>
           ) : (
-            <p className="mb-5 text-sm text-ink-muted">
-              Aucun contact d&apos;urgence pour l&apos;instant.
-            </p>
+            <p className="mb-5 text-sm text-ink-muted">{text.contacts.empty}</p>
           )}
           {settings.contacts.length < 6 ? <ContactForm /> : null}
         </SectionCard>
 
         <SectionCard
-          title="Règles d'alerte"
-          description="Le délai d'escalade se règle entre 3 et 5 heures."
+          title={text.alerts.title}
+          description={text.alerts.description}
         >
           <AlertSettingsForm
             escalationDelayMinutes={settings.escalationDelayMinutes}
             photoAnalysisEnabled={settings.photoAnalysisEnabled}
             choices={ESCALATION_CHOICES.map((minutes) => ({
               value: String(minutes),
-              label: escalationLabel(minutes),
+              label: formatMinutes(minutes, locale),
             }))}
           />
         </SectionCard>
 
         <SectionCard
-          title="Planning de garde"
-          description="Une alerte urgente va d'abord au vétérinaire responsable du suivi ou au vétérinaire de garde. Une garde dure au plus 14 jours et ne chevauche pas une autre."
+          title={text.onCall.title}
+          description={text.onCall.description}
         >
           {settings.onCall.length > 0 ? (
             <ul className="mb-5 grid gap-3">
               {settings.onCall.map((shift) => {
-                const label = `de ${shift.name}, du ${formatDateTime(shift.startsAt)} au ${formatDateTime(shift.endsAt)}`;
+                const start = formatDateTime(shift.startsAt, locale);
+                const end = formatDateTime(shift.endsAt, locale);
                 return (
                   <li
                     key={shift.id}
@@ -193,20 +185,19 @@ export default async function SettingsPage() {
                     <span>
                       <span className="block font-semibold">{shift.name}</span>
                       <span className="block text-ink-muted">
-                        Du {formatDateTime(shift.startsAt)} au{" "}
-                        {formatDateTime(shift.endsAt)}
+                        {text.onCall.period(start, end)}
                       </span>
                     </span>
-                    <RemoveOnCallForm id={shift.id} label={label} />
+                    <RemoveOnCallForm
+                      id={shift.id}
+                      label={text.onCall.removeLabel(shift.name, start, end)}
+                    />
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <p className="mb-5 text-sm text-ink-muted">
-              Aucune garde prévue : les alertes urgentes vont au vétérinaire
-              responsable du suivi.
-            </p>
+            <p className="mb-5 text-sm text-ink-muted">{text.onCall.empty}</p>
           )}
           <OnCallForm
             candidates={settings.onCallCandidates.map((candidate) => ({
@@ -221,8 +212,8 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Connexions"
-          description="Simulées pendant cette phase : aucun numéro WhatsApp, cabinet dr.veto ou compte bancaire réel n'est contacté."
+          title={text.integrations.title}
+          description={text.integrations.description}
         >
           <IntegrationList integrations={settings.integrations} />
         </SectionCard>

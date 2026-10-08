@@ -18,7 +18,17 @@ describe("politique de mot de passe", () => {
         email: "claire.fontaine@tilleuls.test",
         displayName: "Dr Claire Fontaine",
       }),
-    ).toContain("Il ne doit pas contenir votre nom ou votre e-mail.");
+    ).toContainEqual({ code: "personal" });
+  });
+
+  it("renvoie des codes stables avec leurs valeurs", () => {
+    expect(passwordProblems("aaaa")).toEqual([
+      { code: "too_short", min: 12 },
+      { code: "repetitive" },
+    ]);
+    expect(passwordProblems(`${"une phrase ".repeat(12)}trop longue`)).toEqual([
+      { code: "too_long", max: 128 },
+    ]);
   });
 
   it("accepte une phrase de passe", () => {

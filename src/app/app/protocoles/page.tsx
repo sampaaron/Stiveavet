@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { CATEGORY_LABELS, SPECIES_LABELS } from "@/domains/protocoles/content";
-import { LIBRARY_NOTICE } from "@/domains/protocoles/library";
 import {
   canBrowseProtocols,
   canCreateProtocol,
 } from "@/domains/protocoles/policies";
 import type { ProtocolSummary } from "@/domains/protocoles/service";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 import { ButtonLink } from "@/ui/button";
@@ -20,9 +20,14 @@ import { EmptyState } from "@/ui/states";
 import { ValidationBadge } from "./protocol-badges";
 import { InstallLibraryForm } from "./protocol-forms";
 
-export const metadata: Metadata = { title: "Protocoles" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.protocols.title };
+}
 
 export default async function ProtocolsPage() {
+  const { t } = await appText();
+  const text = t.protocols;
   const context = await memberContext();
   if (!canBrowseProtocols(context)) notFound();
   const { protocols, library } = await services.protocols().list(context);
@@ -45,36 +50,39 @@ export default async function ProtocolsPage() {
   return (
     <>
       <PageHeader
-        title="Protocoles"
-        description="Chaque modification crée une nouvelle version : un suivi déjà lancé garde toujours la sienne."
+        title={text.title}
+        description={text.description}
         actions={
           canCreate ? (
             <ButtonLink
               href="/app/protocoles/nouveau"
               icon={<Plus aria-hidden="true" className="size-4" />}
             >
-              Nouveau protocole
+              {text.newProtocol}
             </ButtonLink>
           ) : null
         }
       />
       <div className="grid gap-6">
         <ProtocolList
-          title="Protocoles du cabinet"
+          t={t}
+          title={text.lists.cabinet}
           protocols={cabinet}
-          empty="Aucun protocole du cabinet pour l'instant."
+          empty={text.lists.cabinetEmpty}
         />
         {canCreateProtocol(context, "personal") || mine.length > 0 ? (
           <ProtocolList
-            title="Mes protocoles"
-            description="Visibles par vous seul, et par les personnes qui gèrent les protocoles du cabinet."
+            t={t}
+            title={text.lists.mine}
+            description={text.lists.mineDescription}
             protocols={mine}
-            empty="Vous n'avez pas encore de protocole personnel. Dupliquez un protocole du cabinet pour l'adapter."
+            empty={text.lists.mineEmpty}
           />
         ) : null}
         {colleagues.length > 0 ? (
           <ProtocolList
-            title="Protocoles personnels des confrères"
+            t={t}
+            title={text.lists.colleagues}
             protocols={colleagues}
             showOwner
             empty=""
@@ -82,8 +90,8 @@ export default async function ProtocolsPage() {
         ) : null}
         {library.length > 0 ? (
           <SectionCard
-            title="Bibliothèque de départ"
-            description={LIBRARY_NOTICE}
+            title={text.library.title}
+            description={text.library.notice}
           >
             <ul className="grid gap-4">
               {library.map((entry) => (
@@ -94,8 +102,8 @@ export default async function ProtocolsPage() {
                   <span className="min-w-0">
                     <span className="block font-semibold">{entry.name}</span>
                     <span className="block text-ink-muted">
-                      {CATEGORY_LABELS[entry.category]} ·{" "}
-                      {SPECIES_LABELS[entry.species]} · {entry.description}
+                      {t.labels.protocolCategories[entry.category]} ·{" "}
+                      {t.labels.species[entry.species]} · {entry.description}
                     </span>
                   </span>
                   <InstallLibraryForm
@@ -109,7 +117,8 @@ export default async function ProtocolsPage() {
         ) : null}
         {archived.length > 0 ? (
           <ProtocolList
-            title="Archivés"
+            t={t}
+            title={text.lists.archived}
             protocols={archived}
             showOwner
             empty=""
@@ -121,12 +130,14 @@ export default async function ProtocolsPage() {
 }
 
 function ProtocolList({
+  t,
   title,
   description,
   protocols,
   empty,
   showOwner = false,
 }: {
+  t: AppDictionary;
   title: string;
   description?: string;
   protocols: ProtocolSummary[];
@@ -165,14 +176,14 @@ function ProtocolList({
                     </span>
                     <span className="mt-0.5 block text-sm text-ink-muted">
                       {[
-                        CATEGORY_LABELS[protocol.category],
-                        SPECIES_LABELS[protocol.species],
-                        `version ${protocol.versionNumber}`,
+                        t.labels.protocolCategories[protocol.category],
+                        t.labels.species[protocol.species],
+                        t.protocols.lists.version(protocol.versionNumber),
                         showOwner && protocol.ownerName
-                          ? `de ${protocol.ownerName}`
+                          ? t.protocols.lists.owner(protocol.ownerName)
                           : null,
                         protocol.followupCount > 0
-                          ? `${protocol.followupCount} suivi(s)`
+                          ? t.protocols.lists.followups(protocol.followupCount)
                           : null,
                       ]
                         .filter(Boolean)

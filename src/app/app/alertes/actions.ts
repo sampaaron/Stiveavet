@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
+import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
@@ -15,8 +16,6 @@ import { domainFailure } from "../domain-messages";
  * Accusé de réception et clôture d'une alerte (ADR 0017). Le service vérifie l'accès
  * clinique au dossier et le rôle de vétérinaire ; chaque décision est journalisée.
  */
-
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
 
 const input = z.object({
   alertId: z.uuid(),
@@ -39,7 +38,10 @@ export async function alertAction(
     intent: text(form, "intent"),
     from: text(form, "from"),
   });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) {
+    const { t } = await appText();
+    return { error: t.common.invalidRequest };
+  }
   const { alertId, intent, from } = parsed.data;
   const context = await memberContext();
   let followupId: string;

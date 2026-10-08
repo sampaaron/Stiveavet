@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "../action-message";
@@ -39,11 +40,12 @@ export function SettleForm() {
     settleAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          Relancer le prélèvement (simulé)
+          {t.billing.settle}
         </Button>
       </div>
       <ActionMessage state={state} />
@@ -62,10 +64,11 @@ export function PlanForm({
     changePlanAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-4">
       <fieldset className="grid gap-2 sm:grid-cols-2">
-        <legend className="sr-only">Formule</legend>
+        <legend className="sr-only">{t.billing.changePlan.legend}</legend>
         {options.map((option) => (
           <label
             key={option.value}
@@ -94,7 +97,7 @@ export function PlanForm({
           disabled={pending}
           aria-busy={pending}
         >
-          Changer de formule
+          {t.billing.changePlan.submit}
         </Button>
       </div>
     </form>
@@ -106,17 +109,15 @@ export function CommitAnnualForm({ priceLabel }: { priceLabel: string }) {
     chooseCycleAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="cycle" value="annual" />
-      <ConfirmBox>
-        Je m&apos;engage pour 12 mois à {priceLabel} HT par mois, prélevés
-        chaque mois.
-      </ConfirmBox>
+      <ConfirmBox>{t.billing.annual.confirm(priceLabel)}</ConfirmBox>
       <ActionMessage state={state} />
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          Passer à l&apos;engagement annuel
+          {t.billing.annual.submit}
         </Button>
       </div>
     </form>
@@ -128,6 +129,7 @@ export function StayMonthlyForm() {
     chooseCycleAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="cycle" value="monthly" />
@@ -138,7 +140,7 @@ export function StayMonthlyForm() {
           disabled={pending}
           aria-busy={pending}
         >
-          Rester au mois
+          {t.billing.annual.stayMonthly}
         </Button>
       </div>
       <ActionMessage state={state} />
@@ -151,11 +153,10 @@ export function CancelForm({ effectiveLabel }: { effectiveLabel: string }) {
     cancelAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="grid gap-3">
-      <ConfirmBox>
-        Je confirme la résiliation, effective le {effectiveLabel}.
-      </ConfirmBox>
+      <ConfirmBox>{t.billing.cancel.confirm(effectiveLabel)}</ConfirmBox>
       <ActionMessage state={state} />
       <div>
         <Button
@@ -164,7 +165,7 @@ export function CancelForm({ effectiveLabel }: { effectiveLabel: string }) {
           disabled={pending}
           aria-busy={pending}
         >
-          Résilier l&apos;abonnement
+          {t.billing.cancel.submit}
         </Button>
       </div>
     </form>

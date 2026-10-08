@@ -3,6 +3,8 @@ import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { DEFAULT_MESSAGE_WINDOWS } from "@/domains/reglages/content";
 import type { SendWindow } from "@/domains/suivis/envoi";
 
+import type { TriageReasonCode } from "./schema";
+
 /**
  * Triage déterministe (cahier des charges §7) : trois niveaux, normal, à surveiller, urgent.
  * Aucune IA ici : des règles écrites, testées, qui ne posent aucun diagnostic. Elles
@@ -24,6 +26,8 @@ export type Assessment = {
   ruleId: string | null;
   /** Explication courte (contenu clinique : jamais journalisée). */
   reason: string;
+  /** Même motif, codé pour être affiché dans la langue du lecteur (ADR 0022). */
+  code: TriageReasonCode;
 };
 
 const RANK: Record<TriageLevel, number> = { normal: 0, watch: 1, urgent: 2 };
@@ -120,12 +124,14 @@ export function assessOwnerMessage(
       level: "urgent",
       ruleId: matched?.id ?? null,
       reason: "Signal d'urgence reconnu dans le message du propriétaire.",
+      code: "red_flag",
     };
   if (matched)
     return {
       level: matched.level,
       ruleId: matched.id,
       reason: `Signe d'alerte du suivi : ${matched.description}`.slice(0, 300),
+      code: "rule",
     };
   if (CONCERN.test(text))
     return {
@@ -133,8 +139,14 @@ export function assessOwnerMessage(
       ruleId: null,
       reason:
         "Inquiétude ou signe à vérifier, sans signe d'alerte reconnu : escaladé par prudence.",
+      code: "concern",
     };
-  return { level: "normal", ruleId: null, reason: "Aucun signe d'alerte." };
+  return {
+    level: "normal",
+    ruleId: null,
+    reason: "Aucun signe d'alerte.",
+    code: "none",
+  };
 }
 
 // Jours fériés et périodes ----------------------------------------------------------

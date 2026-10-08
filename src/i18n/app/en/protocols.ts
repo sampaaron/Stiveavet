@@ -1,0 +1,152 @@
+import type { AppDictionary } from "../types";
+
+export const protocols: AppDictionary["protocols"] = {
+  title: "Protocols",
+  description:
+    "Every change creates a new version: a follow-up that has already been launched always keeps its own.",
+  newProtocol: "New protocol",
+  lists: {
+    cabinet: "Practice protocols",
+    cabinetEmpty: "No practice protocols yet.",
+    mine: "My protocols",
+    mineDescription:
+      "Visible only to you and to the people who manage the practice's protocols.",
+    mineEmpty:
+      "You don't have a personal protocol yet. Duplicate a practice protocol to adapt it.",
+    colleagues: "Colleagues' personal protocols",
+    archived: "Archived",
+    version: (versionNumber) => `version ${versionNumber}`,
+    owner: (name) => `by ${name}`,
+    followups: (count) => (count === 1 ? "1 follow-up" : `${count} follow-ups`),
+  },
+  library: {
+    title: "Starter library",
+    notice:
+      "Fictitious demonstration content, to be validated by a vet before any use.",
+    install: "Add to the practice",
+    installLabel: (name) => `Add “${name}” to the practice`,
+    installed: "Template added. It still needs to be validated by a vet.",
+  },
+  validationBadge: {
+    validated: "Validated",
+    toValidate: "To be validated by a vet",
+  },
+  detail: {
+    metaTitle: "Protocol",
+    archived: "Archived",
+    days: (count) => (count === 1 ? "1 day" : `${count} days`),
+    version: (versionNumber) => `version ${versionNumber}`,
+    personal: (name) => `personal protocol of ${name}`,
+    cabinet: "practice protocol",
+    readOnly: (versionNumber) => `Version ${versionNumber}, read-only`,
+    seeCurrent: "See the current version",
+    readOnlyBody:
+      "Follow-ups launched with this version keep it exactly as it is.",
+    description: "Description",
+    steps: "Steps",
+    stepsDescription:
+      "Numa asks these questions and sends these messages; she never takes any medical decision.",
+    alerts: "Warning signs",
+    alertsDescription: "When in doubt, Numa escalates to the vet.",
+    offsetHours: (hours) => `${hours} h after`,
+    offsetDays: (days) => `Day ${days}`,
+    offsetDaysHours: (days, hours) => `Day ${days}, ${hours} h`,
+  },
+  actions: {
+    title: "Actions",
+    duplicatePersonal: "Duplicate into my protocols",
+    duplicateCabinet: "Duplicate for the practice",
+    validateIntro:
+      "By validating, you confirm that you have reviewed the steps and warning signs of this version.",
+    validate: "Validate this protocol",
+    validated: "Protocol validated.",
+    archive: "Archive the protocol",
+    restore: "Restore the protocol",
+    archivedNotice: "Protocol archived.",
+    restoredNotice: "Protocol restored.",
+  },
+  versions: {
+    title: "Version history",
+    description: "A saved version never changes again.",
+    version: (versionNumber) => `Version ${versionNumber}`,
+    validatedBy: (name) => `Validated by ${name}`,
+    notValidated: "Not validated",
+    followups: (count) =>
+      count === 1
+        ? " · 1 follow-up launched with it"
+        : ` · ${count} follow-ups launched with it`,
+    removedMember: "Former member",
+    systemNotes: {
+      creation: "Created",
+      copy: "Copy",
+      library: "Added from the starter library",
+    },
+  },
+  editor: {
+    newDescription:
+      "By saving it, you validate its content: steps and warning signs.",
+    editMetaTitle: "Edit a protocol",
+    editTitle: "Edit the protocol",
+    editDescription: (nextVersion) =>
+      `Saving creates version ${nextVersion}. Follow-ups already launched keep theirs.`,
+    scopeCabinet: "The practice",
+    scopePersonal: "Just me (personal protocol)",
+    descriptionSection: "Description",
+    scope: "Protocol intended for",
+    name: "Protocol name",
+    category: "Type",
+    species: "Species",
+    duration: "Follow-up duration (days)",
+    description: "Description",
+    steps: "Steps",
+    stepsDescription:
+      "What Numa sends or asks, and when. They will be sorted in chronological order.",
+    alerts: "Warning signs",
+    alertsDescription:
+      "Validated by the vet. Numa never makes a diagnosis: she flags and, when in doubt, escalates.",
+    changeNote: "What changes in this version",
+    changeNoteHint:
+      "Visible in the history. Follow-ups already launched keep their version.",
+    saveVersion: "Save a new version",
+    create: "Create the protocol",
+  },
+  planEditor: {
+    due: (date) => `Due on ${date}`,
+    pastStep: (kind) => `Past step · ${kind}`,
+    step: (number) => `Step ${number}`,
+    removeStep: (number) => `Remove step ${number}`,
+    delay: "Delay",
+    unit: "Unit",
+    hoursAfter: "hours after",
+    daysAfter: "days after",
+    stepKind: "Step type",
+    stepContent: (number) => `Content of step ${number}`,
+    addStep: "Add a step",
+    level: "Level",
+    alert: (number) => `Warning sign ${number}`,
+    removeAlert: (number) => `Remove warning sign ${number}`,
+    addAlert: "Add a warning sign",
+  },
+  validation: {
+    name_short: "Name: 2 characters minimum.",
+    name_long: "Name: 120 characters maximum.",
+    description_long: "Description: 2,000 characters maximum.",
+    duration_integer: "Duration in whole days.",
+    duration_min: "Duration of at least 1 day.",
+    duration_max: "Duration of 90 days maximum.",
+    steps_min: "Add at least one step.",
+    steps_max: "30 steps maximum.",
+    alerts_min: "Add at least one warning sign.",
+    alerts_max: "20 warning signs maximum.",
+    step_offset_integer: "Delay in whole hours.",
+    step_offset_negative: "The delay cannot be negative.",
+    step_offset_max: "Delay of 90 days maximum.",
+    step_content_short: "Step: 2 characters minimum.",
+    step_content_long: "Step: 1,000 characters maximum.",
+    alert_description_short: "Warning sign: 2 characters minimum.",
+    alert_description_long: "Warning sign: 300 characters maximum.",
+    step_after_end: "A step falls after the end of the follow-up.",
+    change_note_long: "Version note: 500 characters maximum.",
+  },
+  invalidContent: "Check the protocol content, then save.",
+};

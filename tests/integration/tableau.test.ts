@@ -94,7 +94,11 @@ describe("tableau de bord « Aujourd'hui »", () => {
     expect(first?.id).toBe(caramel);
     expect(first?.summary).toMatchObject({
       kind: "alert",
-      reason: "Signal d'urgence reconnu dans le message du propriétaire.",
+      reason: {
+        code: "red_flag",
+        text: "Signal d'urgence reconnu dans le message du propriétaire.",
+        rule: null,
+      },
       owner: {
         text: "Elle se lèche beaucoup et le pansement est rouge, je suis inquiet.",
         media: "voice",
@@ -135,7 +139,10 @@ describe("tableau de bord « Aujourd'hui »", () => {
     expect(view.includedFollowups).toBe(10);
     const agenda = view.agenda ?? [];
     const control = agenda.find(
-      (item) => item.title === "Contrôle post-opératoire · Moka",
+      (item) =>
+        "appointment" in item.title &&
+        item.title.appointment === "post_op_control" &&
+        item.title.animalName === "Moka",
     );
     expect(control).toMatchObject({
       fromStivea: true,
@@ -143,7 +150,11 @@ describe("tableau de bord « Aujourd'hui »", () => {
       followupId: moka,
       vetName: "Dr Claire Fontaine",
     });
-    expect(agenda.find((item) => item.title.includes("Gaïa"))).toMatchObject({
+    expect(
+      agenda.find(
+        (item) => "text" in item.title && item.title.text.includes("Gaïa"),
+      ),
+    ).toMatchObject({
       fromStivea: false,
       kind: "consultation",
       followupId: null,
@@ -160,7 +171,10 @@ describe("tableau de bord « Aujourd'hui »", () => {
       "Nala",
     ]);
     const control = view.agenda?.find(
-      (item) => item.title === "Contrôle post-opératoire · Moka",
+      (item) =>
+        "appointment" in item.title &&
+        item.title.appointment === "post_op_control" &&
+        item.title.animalName === "Moka",
     );
     expect(control?.followupId).toBeNull();
     // Le compteur reste le total du cabinet, sans détail.
@@ -179,9 +193,11 @@ describe("tableau de bord « Aujourd'hui »", () => {
   it("un autre cabinet ne voit que ses suivis, sans agenda dr.veto s'il n'est pas connecté", async () => {
     const view = await today.today(paul);
     expect(view.followups.map((row) => row.animalName)).toEqual(["Sushi"]);
-    expect(view.agenda?.some((item) => item.title.includes("Gaïa"))).toBe(
-      false,
-    );
+    expect(
+      view.agenda?.some(
+        (item) => "text" in item.title && item.title.text.includes("Gaïa"),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -204,7 +220,11 @@ describe("synthèse pré-consultation", () => {
     expect(synthesis?.evolution).toMatch(/^Jour 1 du suivi \(Ovariectomie\)\./);
     expect(synthesis?.alerts[0]).toMatchObject({
       level: "urgent",
-      reason: "Signal d'urgence reconnu dans le message du propriétaire.",
+      reason: {
+        code: "red_flag",
+        text: "Signal d'urgence reconnu dans le message du propriétaire.",
+        rule: null,
+      },
     });
     expect(synthesis?.withheld).toBe(0);
     expect(synthesis?.simulated).toBe(true);

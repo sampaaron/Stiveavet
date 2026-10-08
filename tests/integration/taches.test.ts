@@ -482,8 +482,8 @@ describe("tâches en échec", () => {
     expect(failures).toEqual([
       expect.objectContaining({
         id,
-        label: "Tâche technique",
-        errorLabel: "Service d'envoi indisponible",
+        kind: "essai.mort",
+        errorCode: "provider_unavailable",
         attempts: 5,
       }),
     ]);

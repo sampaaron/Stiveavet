@@ -43,29 +43,40 @@ function normalizedRoot(password: string): string {
     .replace(/^[\d\W_]+/u, "");
 }
 
-/** Raisons de refus, affichées telles quelles sous le champ. */
+/**
+ * Raison de refus d'un mot de passe : un code stable, avec la valeur utile à son message.
+ * L'écran la traduit dans la langue de la personne (ADR 0022).
+ */
+export type PasswordProblem =
+  | { code: "too_short"; min: number }
+  | { code: "too_long"; max: number }
+  | { code: "repetitive" }
+  | { code: "common" }
+  | { code: "personal" };
+
+/** Raisons de refus, dans l'ordre où l'écran les affiche sous le champ. */
 export function passwordProblems(
   password: string,
   context: { email?: string; displayName?: string } = {},
-): string[] {
-  const problems: string[] = [];
+): PasswordProblem[] {
+  const problems: PasswordProblem[] = [];
   const { minLength, maxLength } = AUTH_POLICY.password;
   if (password.length < minLength)
-    problems.push(`Au moins ${minLength} caractères.`);
+    problems.push({ code: "too_short", min: minLength });
   if (password.length > maxLength)
-    problems.push(`Au plus ${maxLength} caractères.`);
-  if (new Set(password).size < 5) problems.push("Trop de caractères répétés.");
+    problems.push({ code: "too_long", max: maxLength });
+  if (new Set(password).size < 5) problems.push({ code: "repetitive" });
 
   const lowered = password.toLowerCase();
   const root = normalizedRoot(password);
   if (COMMON_PASSWORD_ROOTS.has(lowered) || COMMON_PASSWORD_ROOTS.has(root))
-    problems.push("Ce mot de passe figure parmi les plus utilisés.");
+    problems.push({ code: "common" });
 
   const personal = [
     context.email?.split("@")[0],
     ...(context.displayName?.split(/\s+/) ?? []),
   ].filter((part): part is string => !!part && part.length >= 4);
   if (personal.some((part) => lowered.includes(part.toLowerCase())))
-    problems.push("Il ne doit pas contenir votre nom ou votre e-mail.");
+    problems.push({ code: "personal" });
   return problems;
 }

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "../action-message";
@@ -21,6 +22,7 @@ export function InstallLibraryForm({
   libraryKey: string;
   name: string;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     installLibraryAction,
     initialActionState,
@@ -33,9 +35,9 @@ export function InstallLibraryForm({
         variant="secondary"
         size="sm"
         disabled={pending}
-        aria-label={`Ajouter « ${name} » au cabinet`}
+        aria-label={t.protocols.library.installLabel(name)}
       >
-        Ajouter au cabinet
+        {t.protocols.library.install}
       </Button>
       <ActionMessage state={state} />
     </form>
@@ -43,6 +45,7 @@ export function InstallLibraryForm({
 }
 
 export function ValidateProtocolForm({ protocolId }: { protocolId: string }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     validateProtocolAction,
     initialActionState,
@@ -51,13 +54,12 @@ export function ValidateProtocolForm({ protocolId }: { protocolId: string }) {
     <form action={action} className="grid gap-2">
       <input type="hidden" name="protocolId" value={protocolId} />
       <p className="text-sm text-ink-muted">
-        En validant, vous confirmez avoir relu les étapes et les signes
-        d&apos;alerte de cette version.
+        {t.protocols.actions.validateIntro}
       </p>
       <ActionMessage state={state} />
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          Valider ce protocole
+          {t.protocols.actions.validate}
         </Button>
       </div>
     </form>
@@ -102,6 +104,7 @@ export function ArchiveProtocolForm({
   protocolId: string;
   archived: boolean;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     archiveProtocolAction,
     initialActionState,
@@ -117,7 +120,7 @@ export function ArchiveProtocolForm({
         disabled={pending}
         aria-busy={pending}
       >
-        {archived ? "Restaurer le protocole" : "Archiver le protocole"}
+        {archived ? t.protocols.actions.restore : t.protocols.actions.archive}
       </Button>
       <ActionMessage state={state} />
     </form>

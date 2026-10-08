@@ -2,6 +2,7 @@
 
 import { useActionState, useId } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage, selectClasses } from "../../action-message";
@@ -25,13 +26,14 @@ export function ShareForm({
     initialActionState,
   );
   const id = useId();
+  const text = useAppText().dossier.access;
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="followupId" value={followupId} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-confrere`} className="text-sm font-semibold">
-            Vétérinaire
+            {text.vet}
           </label>
           <select
             id={`${id}-confrere`}
@@ -40,7 +42,7 @@ export function ShareForm({
             defaultValue=""
           >
             <option value="" disabled>
-              Choisir…
+              {text.choose}
             </option>
             {candidates.map((candidate) => (
               <option
@@ -54,7 +56,7 @@ export function ShareForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-duree`} className="text-sm font-semibold">
-            Durée
+            {text.duration}
           </label>
           <select
             id={`${id}-duree`}
@@ -62,9 +64,9 @@ export function ShareForm({
             className={selectClasses}
             defaultValue="illimite"
           >
-            <option value="illimite">Jusqu&apos;à retrait</option>
-            <option value="7">7 jours</option>
-            <option value="30">30 jours</option>
+            <option value="illimite">{text.untilRevoked}</option>
+            <option value="7">{text.days(7)}</option>
+            <option value="30">{text.days(30)}</option>
           </select>
         </div>
       </div>
@@ -75,7 +77,7 @@ export function ShareForm({
         disabled={pending}
         aria-busy={pending}
       >
-        Partager le dossier
+        {text.share}
       </Button>
     </form>
   );
@@ -94,6 +96,7 @@ export function RevokeShareForm({
     revokeShareAction,
     initialActionState,
   );
+  const t = useAppText();
   return (
     <form action={action} className="flex flex-col items-end gap-1">
       <input type="hidden" name="followupId" value={followupId} />
@@ -103,9 +106,9 @@ export function RevokeShareForm({
         variant="quiet"
         size="sm"
         disabled={pending}
-        aria-label={`Retirer le partage avec ${name}`}
+        aria-label={t.dossier.access.revokeLabel(name)}
       >
-        Retirer
+        {t.common.remove}
       </Button>
       <ActionMessage state={state} />
     </form>
@@ -123,6 +126,7 @@ export function PrivacyForm({
     setPrivateAction,
     initialActionState,
   );
+  const text = useAppText().dossier.access;
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="followupId" value={followupId} />
@@ -133,7 +137,7 @@ export function PrivacyForm({
         disabled={pending}
         aria-busy={pending}
       >
-        {isPrivate ? "Rendre visible au cabinet" : "Rendre le dossier privé"}
+        {isPrivate ? text.makePublic : text.makePrivate}
       </Button>
       <ActionMessage state={state} />
     </form>

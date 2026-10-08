@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE } from "@/i18n/locales";
+import type { Locale } from "@/i18n/locales";
 import { randomUUID } from "node:crypto";
 
 import type { EmailSender } from "@/adapters/email/types";
@@ -20,6 +22,7 @@ import {
   securityCodeEmail,
 } from "./emails";
 import { hashPassword, passwordProblems, verifyPassword } from "./password";
+import type { PasswordProblem } from "./password";
 import { AUTH_POLICY, RATE_LIMITS, TERMS_VERSION } from "./policy";
 import type { RateLimitName } from "./policy";
 import { authRepository } from "./repository";
@@ -62,7 +65,7 @@ export type CodeResult =
 
 export type RegisterResult =
   | { status: "code_required"; challengeToken: string }
-  | { status: "invalid_password"; problems: string[] }
+  | { status: "invalid_password"; problems: PasswordProblem[] }
   | { status: "rate_limited" };
 
 const VET_ROLES: ReadonlySet<MemberRole> = new Set(["admin_vet", "vet"]);
@@ -365,7 +368,7 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
     ): Promise<
       | { status: "done" }
       | { status: "expired" }
-      | { status: "invalid_password"; problems: string[] }
+      | { status: "invalid_password"; problems: PasswordProblem[] }
     > {
       if (!isWellFormedToken(input.token)) return { status: "expired" };
       const problems = passwordProblems(input.password);
@@ -400,6 +403,8 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         /** Conditions acceptées et pouvoir de souscrire confirmé : obligatoires (cahier §14). */
         acceptTerms: true;
         authorized: true;
+        /** Langue de la page d'inscription, gardée pour l'interface (ADR 0022). */
+        uiLocale?: Locale;
       },
       origin: RequestOrigin,
     ): Promise<RegisterResult> {
@@ -441,6 +446,7 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
             id: userId,
             email: address,
             displayName: input.displayName.trim(),
+            uiLocale: input.uiLocale ?? DEFAULT_LOCALE,
           });
           await tx.insert(memberships).values({
             id: membershipId,

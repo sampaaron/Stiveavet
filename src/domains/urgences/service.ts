@@ -49,6 +49,8 @@ import {
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
+import { triageReason, triageReasonColumns, triageRuleJoin } from "./reason";
+import type { TriageReason } from "./reason";
 import {
   assessOwnerMessage,
   emergencyPeriod,
@@ -79,7 +81,7 @@ export type AlertView = {
   level: AlertLevel;
   status: AlertStatus;
   /** Contenu clinique : réservé à l'accès clinique. */
-  reason: string;
+  reason: TriageReason;
   targetName: string;
   createdAt: Date;
   escalateAt: Date | null;
@@ -212,6 +214,7 @@ export async function triageOwnerMessage(
         level: "watch",
         ruleId: null,
         reason: "Le propriétaire a réécrit après la fin du suivi automatisé.",
+        code: "after_end",
       };
   }
   const [event] = await tx
@@ -224,6 +227,7 @@ export async function triageOwnerMessage(
       source: "rule",
       followupAlertRuleId: assessment.ruleId,
       reason: assessment.reason,
+      reasonCode: assessment.code,
       createdAt: now,
     })
     .returning({ id: triageEvents.id });
@@ -547,7 +551,7 @@ export function alertsService(db: Database) {
         animalName: animals.name,
         level: alerts.level,
         status: alerts.status,
-        reason: triageEvents.reason,
+        ...triageReasonColumns,
         targetName: users.displayName,
         createdAt: alerts.createdAt,
         escalateAt: alerts.escalateAt,
@@ -557,6 +561,7 @@ export function alertsService(db: Database) {
       })
       .from(alerts)
       .innerJoin(triageEvents, eq(triageEvents.id, alerts.triageEventId))
+      .leftJoin(followupAlertRules, triageRuleJoin)
       .innerJoin(followups, eq(followups.id, alerts.followupId))
       .innerJoin(animals, eq(animals.id, followups.animalId))
       .innerJoin(memberships, eq(memberships.id, alerts.targetMembershipId))
@@ -628,7 +633,7 @@ export function alertsService(db: Database) {
           animalName: row.animalName,
           level: row.level,
           status: row.status,
-          reason: row.reason,
+          reason: triageReason(row),
           targetName: row.targetName,
           createdAt: row.createdAt,
           escalateAt: row.escalateAt,

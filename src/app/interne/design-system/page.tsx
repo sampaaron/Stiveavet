@@ -36,6 +36,7 @@ export default function DesignSystemPage() {
         roleLabel: "Vétérinaire administratrice",
       }}
       permissions={PERMISSION_KEYS}
+      locale="fr"
     >
       <PageHeader
         title="Design system"
@@ -161,7 +162,7 @@ export default function DesignSystemPage() {
             />
           </SectionCard>
           <SectionCard title="Chargement" headingLevel={3}>
-            <LoadingState />
+            <LoadingState title="Chargement…" />
           </SectionCard>
           <SectionCard title="Erreur" headingLevel={3}>
             <ErrorState

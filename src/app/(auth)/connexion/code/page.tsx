@@ -1,20 +1,26 @@
 import type { Metadata } from "next";
 
+import { appText } from "@/i18n/app/server";
+
 import { AuthHeading } from "../../auth-heading";
 import { CodeForm } from "../../auth-forms";
 
-export const metadata: Metadata = { title: "Code de sécurité" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.auth.code.title };
+}
 
 export default async function CodePage({
   searchParams,
 }: PageProps<"/connexion/code">) {
+  const { t } = await appText();
   const { origine } = await searchParams;
   return (
     <>
-      <AuthHeading title="Vérifions qu'il s'agit bien de vous">
+      <AuthHeading title={t.auth.code.heading}>
         {origine === "inscription"
-          ? "Pour confirmer votre adresse, saisissez le code à 6 chiffres que nous venons de vous envoyer par e-mail."
-          : "Cet appareil n'est pas encore reconnu. Saisissez le code à 6 chiffres envoyé à votre adresse e-mail."}
+          ? t.auth.code.introSignup
+          : t.auth.code.introDevice}
       </AuthHeading>
       <CodeForm afterSignup={origine === "inscription"} />
     </>

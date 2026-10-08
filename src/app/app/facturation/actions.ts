@@ -5,17 +5,13 @@ import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
 import { PLANS } from "@/domains/facturation/rules";
+import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 import { formatDate } from "@/ui/format";
 
 import type { ActionState } from "../action-state";
 import { attempt, domainFailure } from "../domain-messages";
-
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
-const CONFIRM_REQUIRED: ActionState = {
-  error: "Cochez la case de confirmation pour continuer.",
-};
 
 const planInput = z.object({ plan: z.enum(PLANS) });
 const cycleInput = z.object({
@@ -41,13 +37,14 @@ export async function changePlanAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const parsed = planInput.safeParse({ plan: text(form, "plan") });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return { error: t.common.invalidRequest };
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.billing().changePlan(context, parsed.data.plan),
-      "Formule modifiée. Elle s'applique à la prochaine échéance.",
+      t.billing.notices.planChanged,
     ),
   );
 }
@@ -56,20 +53,21 @@ export async function chooseCycleAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
+  const { t } = await appText();
   const parsed = cycleInput.safeParse({
     cycle: text(form, "cycle"),
     confirmed: form.get("confirmed") === "on",
   });
-  if (!parsed.success) return INVALID;
+  if (!parsed.success) return { error: t.common.invalidRequest };
   if (parsed.data.cycle === "annual" && !parsed.data.confirmed)
-    return CONFIRM_REQUIRED;
+    return { error: t.billing.notices.confirmRequired };
   const context = await memberContext();
   return finish(
     await attempt(
       () => services.billing().chooseCycle(context, parsed.data.cycle),
       parsed.data.cycle === "annual"
-        ? "Engagement annuel enregistré. Le tarif annuel s'applique à la prochaine échéance."
-        : "C'est noté : vous restez au mois, sans engagement.",
+        ? t.billing.notices.annualCommitted
+        : t.billing.notices.stayMonthly,
     ),
   );
 }
@@ -78,33 +76,33 @@ export async function cancelAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
-  if (form.get("confirmed") !== "on") return CONFIRM_REQUIRED;
+  const { t, locale } = await appText();
+  if (form.get("confirmed") !== "on")
+    return { error: t.billing.notices.confirmRequired };
   const context = await memberContext();
   try {
     const endsAt = await services.billing().cancel(context);
     return finish({
-      notice: `Résiliation enregistrée. Elle prend effet le ${formatDate(endsAt)} ; vos suivis en cours continuent jusqu'à leur fin.`,
+      notice: t.billing.notices.cancelled(formatDate(endsAt, locale)),
     });
   } catch (error) {
-    if (error instanceof DomainError) return finish(domainFailure(error));
+    if (error instanceof DomainError) return finish(await domainFailure(error));
     throw error;
   }
 }
 
 export async function settleAction(): Promise<ActionState> {
   const context = await memberContext();
+  const { t } = await appText();
   try {
     const settled = await services.billing().settle(context);
     return finish(
       settled
-        ? { notice: "Prélèvement réussi (simulé). Merci, tout est en ordre." }
-        : {
-            error:
-              "Le prélèvement a de nouveau échoué. Vérifiez le mandat ou contactez le support.",
-          },
+        ? { notice: t.billing.notices.settled }
+        : { error: t.billing.notices.settleFailed },
     );
   } catch (error) {
-    if (error instanceof DomainError) return finish(domainFailure(error));
+    if (error instanceof DomainError) return finish(await domainFailure(error));
     throw error;
   }
 }

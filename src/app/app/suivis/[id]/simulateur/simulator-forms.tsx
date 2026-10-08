@@ -3,6 +3,7 @@
 import { FastForward, ImagePlus, Mic, Send } from "lucide-react";
 import { useActionState, useId } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "../../../action-message";
@@ -14,6 +15,7 @@ import {
   simulateOwnerVoiceAction,
 } from "../../conversation-actions";
 
+/** Mots-clés WhatsApp tapés par le propriétaire : des données, jamais traduits. */
 const QUICK_REPLIES = ["OUI", "STOP", "REPRENDRE"] as const;
 /** Réponses à la question de Numa après un STOP écrit dans le groupe (lot 18). */
 const GROUP_REPLIES = ["GROUPE", "TOUT"] as const;
@@ -35,10 +37,11 @@ export function OwnerSimulatorForm({
     initialActionState,
   );
   const id = useId();
+  const text = useAppText().dossier.simulator;
 
   return (
     <div className="grid gap-3">
-      <div className="flex flex-wrap gap-2" aria-label="Réponses rapides">
+      <div className="flex flex-wrap gap-2" aria-label={text.quickReplies}>
         {[...QUICK_REPLIES, ...GROUP_REPLIES].map((reply) => (
           <form key={reply} action={action}>
             <input type="hidden" name="followupId" value={followupId} />
@@ -59,7 +62,7 @@ export function OwnerSimulatorForm({
         <input type="hidden" name="followupId" value={followupId} />
         <input type="hidden" name="from" value={from} />
         <label htmlFor={id} className="text-sm font-semibold">
-          Message de {ownerFirstName}
+          {text.messageOf(ownerFirstName)}
         </label>
         <div className="flex items-end gap-2">
           <textarea
@@ -68,13 +71,13 @@ export function OwnerSimulatorForm({
             rows={2}
             maxLength={4096}
             className="min-h-11 min-w-0 flex-1 resize-y rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] placeholder:text-ink-muted"
-            placeholder="Écrire comme le propriétaire"
+            placeholder={text.placeholder}
           />
           <Button
             type="submit"
             disabled={pending}
             aria-busy={pending}
-            aria-label="Envoyer en tant que propriétaire"
+            aria-label={text.sendAsOwner}
             icon={<Send aria-hidden="true" className="size-4" />}
           />
         </div>
@@ -90,6 +93,7 @@ export function RunDueNowForm({ followupId }: { followupId: string }) {
     runDueNowAction,
     initialActionState,
   );
+  const text = useAppText().dossier.simulator;
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="followupId" value={followupId} />
@@ -101,7 +105,7 @@ export function RunDueNowForm({ followupId }: { followupId: string }) {
         aria-busy={pending}
         icon={<FastForward aria-hidden="true" className="size-4" />}
       >
-        Avancer jusqu&apos;au prochain envoi prévu
+        {text.runDue}
       </Button>
       <ActionMessage state={state} />
     </form>
@@ -126,12 +130,13 @@ export function OwnerPhotoForm({
     initialActionState,
   );
   const id = useId();
+  const text = useAppText().dossier.simulator;
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="followupId" value={followupId} />
       <input type="hidden" name="from" value={from} />
       <label htmlFor={`${id}-file`} className="text-sm font-semibold">
-        Photo envoyée par {ownerFirstName}
+        {text.photoOf(ownerFirstName)}
       </label>
       <input
         id={`${id}-file`}
@@ -142,7 +147,7 @@ export function OwnerPhotoForm({
         className={`${FIELD} w-full file:mr-3 file:rounded-full file:border-0 file:bg-brand-soft file:px-3 file:py-1 file:text-sm file:font-semibold file:text-brand-ink`}
       />
       <label htmlFor={`${id}-caption`} className="text-sm font-semibold">
-        Légende (facultative)
+        {text.caption}
       </label>
       <input
         id={`${id}-caption`}
@@ -151,9 +156,7 @@ export function OwnerPhotoForm({
         maxLength={1024}
         className={FIELD}
       />
-      <p className="text-xs text-ink-muted">
-        JPEG, PNG ou WebP, 5 Mo au plus. Utilisez une image sans donnée réelle.
-      </p>
+      <p className="text-xs text-ink-muted">{text.photoHelp}</p>
       <Button
         type="submit"
         size="sm"
@@ -162,7 +165,7 @@ export function OwnerPhotoForm({
         aria-busy={pending}
         icon={<ImagePlus aria-hidden="true" className="size-4" />}
       >
-        Envoyer la photo
+        {text.sendPhoto}
       </Button>
       <ActionMessage state={state} />
     </form>
@@ -184,12 +187,13 @@ export function OwnerVoiceForm({
     initialActionState,
   );
   const id = useId();
+  const text = useAppText().dossier.simulator;
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="followupId" value={followupId} />
       <input type="hidden" name="from" value={from} />
       <label htmlFor={id} className="text-sm font-semibold">
-        Ce que dit le message vocal de {ownerFirstName}
+        {text.voiceOf(ownerFirstName)}
       </label>
       <textarea
         id={id}
@@ -198,11 +202,9 @@ export function OwnerVoiceForm({
         required
         maxLength={1000}
         className={`${FIELD} resize-y`}
-        placeholder="Par exemple : elle mange bien depuis ce matin"
+        placeholder={text.voicePlaceholder}
       />
-      <p className="text-xs text-ink-muted">
-        Un vrai fichier son est créé ; la transcription simulée relit ce texte.
-      </p>
+      <p className="text-xs text-ink-muted">{text.voiceHelp}</p>
       <Button
         type="submit"
         size="sm"
@@ -211,7 +213,7 @@ export function OwnerVoiceForm({
         aria-busy={pending}
         icon={<Mic aria-hidden="true" className="size-4" />}
       >
-        Envoyer le vocal
+        {text.sendVoice}
       </Button>
       <ActionMessage state={state} />
     </form>

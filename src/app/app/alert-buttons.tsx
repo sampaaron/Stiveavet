@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "./action-message";
@@ -19,6 +20,7 @@ export function AlertButtons({
   /** Urgence ou alerte encore sans accusé de réception. */
   canAcknowledge: boolean;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     alertAction,
     initialActionState,
@@ -37,7 +39,7 @@ export function AlertButtons({
             disabled={pending}
             aria-busy={pending}
           >
-            Accuser réception
+            {t.alerts.buttons.acknowledge}
           </Button>
         ) : null}
         <Button
@@ -49,7 +51,7 @@ export function AlertButtons({
           disabled={pending}
           aria-busy={pending}
         >
-          Clore l&apos;alerte
+          {t.alerts.buttons.resolve}
         </Button>
       </div>
       <ActionMessage state={state} />

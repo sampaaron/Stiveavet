@@ -32,52 +32,64 @@ import {
   formatTime,
   shortPersonName,
 } from "@/ui/format";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
-import { FOLLOWUP_STATUS_LABELS } from "./suivis/followup-labels";
+import { triageReasonText } from "./triage-reason";
 
-export const metadata: Metadata = { title: "Aujourd'hui" };
-
-/** Ligne d'un suivi : ce qui a changé en dernier, en une phrase. */
-/** Propos du propriétaire, cités, avec la pièce jointe éventuelle. */
-function ownerLine(owner: {
-  text: string | null;
-  media: "photo" | "voice" | null;
-}): string {
-  const media =
-    owner.media === "photo"
-      ? "photo reçue"
-      : owner.media === "voice"
-        ? "message vocal reçu"
-        : null;
-  if (!owner.text)
-    return media
-      ? media.charAt(0).toUpperCase() + media.slice(1)
-      : "Message reçu";
-  return media ? `« ${owner.text} », ${media}` : `« ${owner.text} »`;
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.dashboard.title };
 }
 
-function summaryLine(summary: DashboardSummary): string {
+/** Propos du propriétaire, cités, avec la pièce jointe éventuelle. */
+function ownerLine(
+  t: AppDictionary,
+  owner: { text: string | null; media: "photo" | "voice" | null },
+): string {
+  const words = t.dashboard.owner;
+  if (!owner.text)
+    return owner.media === "photo"
+      ? words.photoOnly
+      : owner.media === "voice"
+        ? words.voiceOnly
+        : words.messageOnly;
+  const media =
+    owner.media === "photo"
+      ? words.photo
+      : owner.media === "voice"
+        ? words.voice
+        : null;
+  return media ? words.quoteWith(owner.text, media) : words.quote(owner.text);
+}
+
+/** Ligne d'un suivi : ce qui a changé en dernier, en une phrase. */
+function summaryLine(t: AppDictionary, summary: DashboardSummary): string {
+  const lines = t.dashboard.summary;
   switch (summary.kind) {
     case "alert":
-      return summary.owner ? ownerLine(summary.owner) : summary.reason;
+      return summary.owner
+        ? ownerLine(t, summary.owner)
+        : triageReasonText(t, summary.reason);
     case "paused":
-      return "Suivi en pause : aucune relance n'est envoyée";
+      return lines.paused;
     case "human_takeover":
-      return "L'équipe a repris la conversation : Numa est en pause";
+      return lines.humanTakeover;
     case "consent_withdrawn":
-      return "Le propriétaire a écrit STOP : plus aucun message ne part";
+      return lines.consentWithdrawn;
     case "consent_requested":
-      return "Premier message envoyé, accord en attente";
+      return lines.consentRequested;
     case "not_started":
-      return "Premier message de Numa à venir";
+      return lines.notStarted;
     case "owner":
-      return ownerLine(summary);
+      return ownerLine(t, summary);
     default:
-      return "Aucune nouvelle du propriétaire pour l'instant";
+      return lines.quiet;
   }
 }
 
@@ -90,28 +102,46 @@ function cardStatus(followup: DashboardFollowup): Status {
   return "normal";
 }
 
-function toCard(followup: DashboardFollowup, now: Date): FollowupCardData {
+function toCard(
+  t: AppDictionary,
+  locale: Locale,
+  followup: DashboardFollowup,
+  now: Date,
+): FollowupCardData {
   return {
     id: followup.id,
     animalName: followup.animalName,
     species: followup.species === "cat" ? "chat" : "chien",
     status: cardStatus(followup),
-    summaryLine: summaryLine(followup.summary),
+    summaryLine: summaryLine(t, followup.summary),
     procedure: followup.procedure,
-    dayLabel: `J+${daysSince(followup.procedureAt, now)}`,
+    dayLabel: t.dashboard.dayLabel(daysSince(followup.procedureAt, now)),
     vetName: shortPersonName(followup.responsibleName),
     lastActivity: followup.lastActivityAt
-      ? formatRelativeMoment(followup.lastActivityAt, now)
+      ? formatRelativeMoment(followup.lastActivityAt, now, locale)
       : "—",
   };
 }
 
-function toAgendaEvent(item: DashboardAgendaItem): AgendaEventData {
+function toAgendaEvent(
+  t: AppDictionary,
+  locale: Locale,
+  item: DashboardAgendaItem,
+): AgendaEventData {
   return {
     id: item.id,
-    time: formatTime(item.startsAt),
-    duration: formatDuration(item.startsAt, item.endsAt),
-    title: item.title,
+    time: formatTime(item.startsAt, locale),
+    duration: formatDuration(item.startsAt, item.endsAt, locale),
+    // Le titre d'un rendez-vous dr.veto est affiché tel que dr.veto le donne.
+    title:
+      "appointment" in item.title
+        ? t.dashboard.agenda.appointment(
+            item.title.appointment === "other"
+              ? t.dashboard.agenda.otherAppointment
+              : t.labels.appointmentKinds[item.title.appointment],
+            item.title.animalName,
+          )
+        : item.title.text,
     vetId: item.vetName,
     kind: item.kind,
     fromStivea: item.fromStivea,
@@ -125,6 +155,8 @@ export default async function TodayPage() {
   const can = (permission: PermissionKey) =>
     context.permissions.has(permission);
   const profile = await memberProfile(context);
+  const { t, locale } = await appText();
+  const text = t.dashboard;
   const now = new Date();
   // Suivis visibles selon les droits ; le détail clinique seulement avec l'accès clinique.
   const today = await services.today().today(context, now);
@@ -133,21 +165,21 @@ export default async function TodayPage() {
     return (
       <>
         <PageHeader
-          title={`Bonjour ${profile.firstName}`}
+          title={text.greeting(profile.firstName)}
           description={profile.organizationName}
         />
         <Card>
           <EmptyState
-            title="Aucun suivi pour l'instant"
+            title={text.empty.title}
             description={
               can("organization.settings")
-                ? "Votre cabinet est créé. Le démarrage guidé vous accompagne : WhatsApp, dr.veto, urgences, équipe, protocoles et suivi test. Vos suivis apparaîtront ici."
-                : "Vos suivis apparaîtront ici."
+                ? text.empty.admin
+                : text.empty.member
             }
             action={
               can("organization.settings") ? (
                 <ButtonLink href="/app/demarrage">
-                  Ouvrir le démarrage guidé
+                  {text.empty.guidedSetup}
                 </ButtonLink>
               ) : null
             }
@@ -161,16 +193,17 @@ export default async function TodayPage() {
   const urgent = visible.filter((followup) => followup.triage === "urgent");
   const watch = visible.filter((followup) => followup.triage === "watch");
   const others = visible.filter((followup) => followup.triage === "normal");
-  const todayLabel = formatDayTitle(now);
-  const agenda = today.agenda?.map(toAgendaEvent) ?? [];
+  const todayLabel = formatDayTitle(now, locale);
+  const agenda =
+    today.agenda?.map((item) => toAgendaEvent(t, locale, item)) ?? [];
 
   return (
     <>
       <PageHeader
-        title={`Bonjour ${profile.firstName}`}
+        title={text.greeting(profile.firstName)}
         description={
           clinical
-            ? `${todayLabel} · ${plural(urgent.length, "urgence")} et ${plural(watch.length, "cas à surveiller", "cas à surveiller")}`
+            ? text.headline(todayLabel, urgent.length, watch.length)
             : todayLabel
         }
         actions={
@@ -181,7 +214,7 @@ export default async function TodayPage() {
                 variant="secondary"
                 icon={<FolderOpen aria-hidden="true" className="size-4" />}
               >
-                Ouvrir un dossier
+                {text.actions.openAFile}
               </ButtonLink>
             ) : null}
             {can("followups.launch") ? (
@@ -189,7 +222,7 @@ export default async function TodayPage() {
                 href="/app/suivis/nouveau"
                 icon={<PawPrint aria-hidden="true" className="size-4" />}
               >
-                Lancer un suivi
+                {text.actions.launch}
               </ButtonLink>
             ) : null}
           </>
@@ -198,19 +231,22 @@ export default async function TodayPage() {
 
       <div className="grid gap-6">
         {urgent.map((followup) => {
-          const card = toCard(followup, now);
+          const card = toCard(t, locale, followup, now);
           return (
             <AlertBanner
               key={followup.id}
               tone="urgent"
               title={
                 followup.summary.kind === "alert"
-                  ? `${followup.animalName} : urgence signalée à ${formatTime(followup.summary.at)}`
-                  : `${followup.animalName} : urgence en cours`
+                  ? text.urgentReportedAt(
+                      followup.animalName,
+                      formatTime(followup.summary.at, locale),
+                    )
+                  : text.urgentOngoing(followup.animalName)
               }
               action={
                 <ButtonLink href={`/app/suivis/${followup.id}`} size="sm">
-                  Ouvrir le dossier
+                  {text.actions.openFile}
                 </ButtonLink>
               }
             >
@@ -224,21 +260,23 @@ export default async function TodayPage() {
           {clinical ? (
             <>
               <StatCard
-                label="Urgences"
+                label={text.stats.urgent}
                 value={urgent.length}
                 tone="urgent"
-                hint="À traiter maintenant"
+                hint={text.stats.urgentHint}
               />
               <StatCard
-                label="À surveiller"
+                label={text.stats.watch}
                 value={watch.length}
                 tone="watch"
-                hint="Signalés par Numa"
+                hint={text.stats.watchHint}
               />
             </>
           ) : null}
           <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">Suivis actifs</p>
+            <p className="text-sm font-medium text-ink-muted">
+              {text.stats.active}
+            </p>
             <p className="mt-2 text-3xl font-bold tracking-tight text-brand-ink tabular-nums">
               {today.activeFollowups} / {today.includedFollowups}
             </p>
@@ -250,9 +288,9 @@ export default async function TodayPage() {
             </div>
           </Card>
           <StatCard
-            label="Rendez-vous Stivea"
+            label={text.stats.appointments}
             value={today.stiveaAppointments}
-            hint="Aujourd'hui, confirmés par le cabinet"
+            hint={text.stats.appointmentsHint}
           />
         </div>
 
@@ -261,30 +299,32 @@ export default async function TodayPage() {
             {clinical ? (
               <>
                 <SectionCard
-                  title="Priorités"
-                  description="Urgences et cas à surveiller, du plus grave au plus récent."
+                  title={text.priorities.title}
+                  description={text.priorities.description}
                 >
                   {urgent.length + watch.length > 0 ? (
                     <ul className="-mx-3">
                       {[...urgent, ...watch].map((followup) => (
                         <li key={followup.id}>
-                          <FollowupCard followup={toCard(followup, now)} />
+                          <FollowupCard
+                            followup={toCard(t, locale, followup, now)}
+                          />
                         </li>
                       ))}
                     </ul>
                   ) : (
                     <EmptyState
-                      title="Aucune priorité"
-                      description="Tous les suivis évoluent normalement."
+                      title={text.priorities.emptyTitle}
+                      description={text.priorities.emptyDescription}
                     />
                   )}
                 </SectionCard>
 
                 <SectionCard
-                  title="Autres suivis actifs"
+                  title={text.others.title}
                   action={
                     <ButtonLink href="/app/suivis" variant="quiet" size="sm">
-                      Tous les suivis
+                      {text.actions.allFollowups}
                       <ArrowRight aria-hidden="true" className="size-4" />
                     </ButtonLink>
                   }
@@ -292,22 +332,24 @@ export default async function TodayPage() {
                   <ul className="-mx-3">
                     {others.map((followup) => (
                       <li key={followup.id}>
-                        <FollowupCard followup={toCard(followup, now)} />
+                        <FollowupCard
+                          followup={toCard(t, locale, followup, now)}
+                        />
                       </li>
                     ))}
                   </ul>
                   {others.length === 0 ? (
-                    <EmptyState title="Aucun autre suivi actif" />
+                    <EmptyState title={text.others.empty} />
                   ) : null}
                 </SectionCard>
               </>
             ) : (
               <SectionCard
-                title="Suivis du cabinet"
-                description="Vue d'organisation. Les données cliniques sont réservées aux personnes autorisées."
+                title={text.organization.title}
+                description={text.organization.description}
                 action={
                   <ButtonLink href="/app/suivis" variant="quiet" size="sm">
-                    Tous les suivis
+                    {text.actions.allFollowups}
                     <ArrowRight aria-hidden="true" className="size-4" />
                   </ButtonLink>
                 }
@@ -332,14 +374,14 @@ export default async function TodayPage() {
                           <StatusBadge status="paused" />
                         ) : (
                           <span className="text-ink-muted">
-                            {FOLLOWUP_STATUS_LABELS[view.status]}
+                            {t.labels.followupStatus[view.status]}
                           </span>
                         )}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <EmptyState title="Aucun suivi à afficher" />
+                  <EmptyState title={text.organization.empty} />
                 )}
               </SectionCard>
             )}
@@ -348,11 +390,11 @@ export default async function TodayPage() {
           <div className="flex min-w-0 flex-col gap-6">
             {today.agenda ? (
               <SectionCard
-                title="Agenda du jour"
-                description="Agenda dr.veto complet (simulé) ; rendez-vous Stivea identifiés."
+                title={text.agenda.title}
+                description={text.agenda.description}
                 action={
                   <ButtonLink href="/app/agenda" variant="quiet" size="sm">
-                    Agenda
+                    {text.actions.agenda}
                     <ArrowRight aria-hidden="true" className="size-4" />
                   </ButtonLink>
                 }
@@ -364,20 +406,21 @@ export default async function TodayPage() {
                         <AgendaEvent
                           event={event}
                           vetName={shortPersonName(event.vetId)}
+                          locale={locale}
                         />
                       </li>
                     ))}
                   </ol>
                 ) : (
                   <EmptyState
-                    title="Aucun rendez-vous aujourd'hui"
-                    description="Connectez dr.veto dans les réglages pour voir l'agenda complet."
+                    title={text.agenda.emptyTitle}
+                    description={text.agenda.emptyDescription}
                   />
                 )}
               </SectionCard>
             ) : null}
 
-            <SectionCard title="Actions rapides">
+            <SectionCard title={text.quickActions}>
               <div className="grid gap-2">
                 {can("followups.launch") ? (
                   <ButtonLink
@@ -386,7 +429,7 @@ export default async function TodayPage() {
                     className="justify-start"
                   >
                     <PawPrint aria-hidden="true" className="size-4" />
-                    Lancer un suivi
+                    {text.actions.launch}
                   </ButtonLink>
                 ) : null}
                 {views.length > 0 ? (
@@ -396,7 +439,7 @@ export default async function TodayPage() {
                     className="justify-start"
                   >
                     <FolderOpen aria-hidden="true" className="size-4" />
-                    Ouvrir un dossier
+                    {text.actions.openAFile}
                   </ButtonLink>
                 ) : null}
                 {can("owner_messages.reply") && visible[0] ? (
@@ -406,34 +449,21 @@ export default async function TodayPage() {
                     className="justify-start"
                   >
                     <MessageSquareText aria-hidden="true" className="size-4" />
-                    Écrire au propriétaire
+                    {text.actions.writeToOwner}
                   </ButtonLink>
                 ) : null}
               </div>
             </SectionCard>
 
             <AssistantCard assistant="numa">
-              Suit {plural(today.activeFollowups, "animal", "animaux")} pour la
-              clinique. Elle ne pose jamais de diagnostic et escalade en cas de
-              doute.
+              {text.numa(today.activeFollowups)}
             </AssistantCard>
             {can("stive.use") ? (
-              <AssistantCard assistant="stive">
-                Votre point du jour sera prêt ici. Toute action réelle attendra
-                votre confirmation.
-              </AssistantCard>
+              <AssistantCard assistant="stive">{text.stive}</AssistantCard>
             ) : null}
           </div>
         </div>
       </div>
     </>
   );
-}
-
-function plural(
-  count: number,
-  singular: string,
-  pluralForm = `${singular}s`,
-): string {
-  return `${count} ${count > 1 ? pluralForm : singular}`;
 }

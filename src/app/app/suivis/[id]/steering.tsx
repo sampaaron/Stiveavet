@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "../../action-message";
@@ -23,6 +24,8 @@ export function SteeringButtons({
     initialActionState,
   );
   const [confirmStop, setConfirmStop] = useState(false);
+  const t = useAppText();
+  const text = t.dossier.steering;
 
   const submit = (change: string, label: string, primary = false) => (
     <Button
@@ -43,12 +46,10 @@ export function SteeringButtons({
       <input type="hidden" name="followupId" value={followupId} />
       <div className="flex flex-wrap gap-2">
         {status === "active" || status === "human_takeover"
-          ? submit("pause", "Mettre en pause")
+          ? submit("pause", text.pause)
           : null}
-        {status === "paused"
-          ? submit("resume", "Reprendre le suivi", true)
-          : null}
-        {status === "ended" ? submit("reactivate", "Réactiver le suivi") : null}
+        {status === "paused" ? submit("resume", text.resume, true) : null}
+        {status === "ended" ? submit("reactivate", text.reactivate) : null}
         {status !== "ended" && !confirmStop ? (
           <Button
             variant="quiet"
@@ -56,24 +57,21 @@ export function SteeringButtons({
             onClick={() => setConfirmStop(true)}
             disabled={pending}
           >
-            Arrêter le suivi
+            {text.stop}
           </Button>
         ) : null}
       </div>
       {confirmStop && status !== "ended" ? (
         <div className="grid gap-2 rounded-[var(--radius-control)] border border-urgent/25 bg-urgent-soft p-3 text-sm">
-          <p>
-            Numa n&apos;enverra plus rien pour ce suivi : messages et rappels
-            prévus sont annulés. La discussion reste consultable.
-          </p>
+          <p>{text.stopWarning}</p>
           <div className="flex flex-wrap gap-2">
-            {submit("stop", "Confirmer l'arrêt", true)}
+            {submit("stop", text.confirmStop, true)}
             <Button
               variant="secondary"
               size="sm"
               onClick={() => setConfirmStop(false)}
             >
-              Annuler
+              {t.common.cancel}
             </Button>
           </div>
         </div>

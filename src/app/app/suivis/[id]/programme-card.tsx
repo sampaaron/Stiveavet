@@ -1,22 +1,42 @@
-import { STEP_KIND_LABELS } from "@/domains/protocoles/content";
 import type {
   ProgrammeStepState,
   ProgrammeView,
 } from "@/domains/suivis/rappels";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { SectionCard } from "@/ui/card";
 import { cn } from "@/ui/cn";
 import { formatDate, formatDateTime, formatRelativeDayTime } from "@/ui/format";
 
-const STATE_LABELS: Record<ProgrammeStepState, (at: Date | null) => string> = {
-  sent: (at) => (at ? `Envoyé le ${formatDateTime(at)}` : "Envoyé"),
-  sending: () => "Envoi en cours",
-  failed: () => "Envoi en échec (voir les tâches en échec)",
-  scheduled: (at) => (at ? `Prévu le ${formatDateTime(at)}` : "Prévu"),
-  waiting_consent: () => "Après l'accord du propriétaire",
-  on_hold: () => "En attente : Numa n'a pas la main",
-  not_sent: () => "Non envoyé",
-  after_end: () => "Après la fin du suivi : ne partira pas",
-};
+type Text = AppDictionary["dossier"]["programme"];
+
+function stateLabel(
+  text: Text,
+  locale: Locale,
+  state: ProgrammeStepState,
+  at: Date | null,
+): string {
+  const states = text.states;
+  const when = at ? formatDateTime(at, locale) : null;
+  switch (state) {
+    case "sent":
+      return when ? states.sentAt(when) : states.sent;
+    case "scheduled":
+      return when ? states.scheduledAt(when) : states.scheduled;
+    case "sending":
+      return states.sending;
+    case "failed":
+      return states.failed;
+    case "waiting_consent":
+      return states.waitingConsent;
+    case "on_hold":
+      return states.onHold;
+    case "not_sent":
+      return states.notSent;
+    case "after_end":
+      return states.afterEnd;
+  }
+}
 
 const STATE_TONES: Record<ProgrammeStepState, string> = {
   sent: "text-brand-ink",
@@ -29,31 +49,48 @@ const STATE_TONES: Record<ProgrammeStepState, string> = {
   after_end: "text-ink-muted",
 };
 
-function endLine(programme: ProgrammeView): string {
-  if (programme.ended)
+function endLine(text: Text, locale: Locale, programme: ProgrammeView): string {
+  if (programme.ended) {
+    const at = programme.ended.at
+      ? formatDate(programme.ended.at, locale)
+      : null;
     return programme.ended.automatic
-      ? `Suivi automatisé terminé${programme.ended.at ? ` le ${formatDate(programme.ended.at)}` : ""}, à la date de contrôle. La conversation reste ouverte : Numa répond si le propriétaire écrit, et vous êtes prévenu.`
-      : `Suivi arrêté${programme.ended.at ? ` le ${formatDate(programme.ended.at)}` : ""} : plus aucun rappel ne part.`;
-  if (programme.plannedEndAt)
-    return `Fin du suivi automatisé le ${formatDateTime(programme.plannedEndAt)}${programme.endsAtControl ? ", date du contrôle" : ", un jour après la dernière étape"}. La conversation restera ouverte.`;
-  return "Aucune fin automatique prévue : arrêtez le suivi vous-même, ou fixez un rendez-vous de contrôle.";
+      ? text.endedAutomatically(at)
+      : text.stopped(at);
+  }
+  if (programme.plannedEndAt) {
+    const at = formatDateTime(programme.plannedEndAt, locale);
+    return programme.endsAtControl
+      ? text.plannedEndAtControl(at)
+      : text.plannedEndAfterLastStep(at);
+  }
+  return text.noEnd;
 }
 
-function ProgrammeSteps({ programme }: { programme: ProgrammeView }) {
+function ProgrammeSteps({
+  t,
+  locale,
+  programme,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  programme: ProgrammeView;
+}) {
+  const text = t.dossier.programme;
   return programme.steps.length ? (
-    <ol className="grid gap-3" aria-label="Étapes du suivi">
+    <ol className="grid gap-3" aria-label={text.stepsLabel}>
       {programme.steps.map((step) => (
         <li key={step.id} className="grid gap-0.5 text-sm">
-          <p className="font-semibold">{STEP_KIND_LABELS[step.kind]}</p>
+          <p className="font-semibold">{t.labels.stepKinds[step.kind]}</p>
           <p className="text-ink-muted">{step.content}</p>
           <p className={cn("font-medium", STATE_TONES[step.state])}>
-            {STATE_LABELS[step.state](step.at)}
+            {stateLabel(text, locale, step.state, step.at)}
           </p>
         </li>
       ))}
     </ol>
   ) : (
-    <p className="text-sm text-ink-muted">Aucune étape programmée.</p>
+    <p className="text-sm text-ink-muted">{text.noSteps}</p>
   );
 }
 
@@ -62,10 +99,14 @@ const UPCOMING: ReadonlySet<ProgrammeStepState> = new Set([
   "waiting_consent",
   "on_hold",
 ]);
-const UPCOMING_NOTE: Partial<Record<ProgrammeStepState, string>> = {
-  waiting_consent: "après l'accord du propriétaire",
-  on_hold: "en attente : Numa n'a pas la main",
-};
+function upcomingNote(
+  text: Text,
+  state: ProgrammeStepState,
+): string | undefined {
+  if (state === "waiting_consent") return text.upcomingNotes.waitingConsent;
+  if (state === "on_hold") return text.upcomingNotes.onHold;
+  return undefined;
+}
 const MAX_UPCOMING = 4;
 
 /**
@@ -73,14 +114,19 @@ const MAX_UPCOMING = 4;
  * contrôle, puis le programme complet sur demande.
  */
 export function NextStepsCard({
+  t,
+  locale,
   programme,
   controlAppointmentAt,
   now,
 }: {
+  t: AppDictionary;
+  locale: Locale;
   programme: ProgrammeView;
   controlAppointmentAt: Date | null;
   now: Date;
 }) {
+  const text = t.dossier.programme;
   const upcoming = programme.steps
     .filter(
       (step) =>
@@ -89,27 +135,28 @@ export function NextStepsCard({
     )
     .slice(0, MAX_UPCOMING)
     .map((step) => {
-      const note = UPCOMING_NOTE[step.state];
+      const note = upcomingNote(text, step.state);
+      const kind = t.labels.stepKinds[step.kind];
       return {
         key: step.id,
-        at: formatRelativeDayTime(step.at ?? step.dueAt, now),
-        label: `${STEP_KIND_LABELS[step.kind]}${note ? ` (${note})` : ""}`,
+        at: formatRelativeDayTime(step.at ?? step.dueAt, now, locale),
+        label: note ? `${kind} (${note})` : kind,
       };
     });
   if (controlAppointmentAt && controlAppointmentAt.getTime() >= now.getTime())
     upcoming.push({
       key: "controle",
-      at: formatRelativeDayTime(controlAppointmentAt, now),
-      label: "Contrôle post-opératoire",
+      at: formatRelativeDayTime(controlAppointmentAt, now, locale),
+      label: t.labels.appointmentKinds.post_op_control,
     });
   return (
     <SectionCard
-      title="Prochaines étapes"
-      description={`Contrôle : ${
+      title={text.title}
+      description={text.control(
         controlAppointmentAt
-          ? formatRelativeDayTime(controlAppointmentAt, now)
-          : "non programmé"
-      }`}
+          ? formatRelativeDayTime(controlAppointmentAt, now, locale)
+          : text.notScheduled,
+      )}
     >
       {upcoming.length > 0 ? (
         <ol className="grid gap-2">
@@ -121,17 +168,18 @@ export function NextStepsCard({
           ))}
         </ol>
       ) : (
-        <p className="text-sm text-ink-muted">Aucune étape programmée.</p>
+        <p className="text-sm text-ink-muted">{text.noSteps}</p>
       )}
-      <p className="mt-3 text-xs text-ink-muted">{endLine(programme)}</p>
+      <p className="mt-3 text-xs text-ink-muted">
+        {endLine(text, locale, programme)}
+      </p>
       {programme.steps.length > 0 ? (
         <details className="mt-3 border-t border-line pt-3">
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">
-            Programme complet ({programme.steps.length}{" "}
-            {programme.steps.length > 1 ? "étapes" : "étape"})
+            {text.full(programme.steps.length)}
           </summary>
           <div className="mt-3">
-            <ProgrammeSteps programme={programme} />
+            <ProgrammeSteps t={t} locale={locale} programme={programme} />
           </div>
         </details>
       ) : null}
