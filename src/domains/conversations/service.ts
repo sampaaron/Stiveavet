@@ -1100,10 +1100,18 @@ export function conversationHandlers(deps: {
         ownerMessage: source.body,
       }));
     } catch {
-      throw new JobError("provider_unavailable");
+      // Fournisseur en panne ou réponse hors format : le propriétaire n'attend pas, il est
+      // renvoyé vers l'équipe (ADR 0026). Le message reste lu par le vétérinaire.
+      await auditSystem(
+        tx,
+        ctx.organizationId,
+        "numa.ai_unavailable",
+        ctx.followupId,
+      );
+      text = "";
     }
-    const verdict = checkNumaReply(text);
-    if (!verdict.ok)
+    const verdict = text ? checkNumaReply(text) : null;
+    if (verdict && !verdict.ok)
       await auditSystem(
         tx,
         ctx.organizationId,
@@ -1111,7 +1119,7 @@ export function conversationHandlers(deps: {
         ctx.followupId,
         { reason: verdict.reason },
       );
-    const body = verdict.ok ? text : safeFallback(language, ctx.practiceName);
+    const body = verdict?.ok ? text : safeFallback(language, ctx.practiceName);
     await sendNuma(tx, ctx, target, key, body);
   }
 
@@ -1517,7 +1525,15 @@ export function conversationHandlers(deps: {
           controlAppointmentAt: step.controlAppointmentAt,
         }));
       } catch {
-        throw new JobError("provider_unavailable");
+        // Fournisseur en panne : la prise de nouvelles fixe part à la place (ADR 0026).
+        await auditSystem(
+          tx,
+          ctx.organizationId,
+          "numa.ai_unavailable",
+          ctx.followupId,
+        );
+        drafts.set(wording.language, null);
+        continue;
       }
       const verdict = checkNumaReply(text);
       if (!verdict.ok)

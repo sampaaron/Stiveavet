@@ -10,6 +10,7 @@ import { hostname } from "node:os";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { aiConfig, aiGatewayFor } from "../src/adapters/ai-gateway";
 import {
   JOB_PLANNERS,
   OUTBOX_ROUTES,
@@ -36,6 +37,7 @@ let registry: ReturnType<typeof jobRegistry>;
 try {
   registry = jobRegistry({
     whatsapp: providerFor(whatsappConfig(process.env)),
+    ai: aiGatewayFor(aiConfig(process.env)),
   });
 } catch (error) {
   // Le message ne cite que des noms de variables, jamais leurs valeurs.

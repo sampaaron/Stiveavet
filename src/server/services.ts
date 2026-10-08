@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
-import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
+import { configuredAiGateway } from "@/adapters/ai-gateway";
 import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { emailSender, marketingEmailSender } from "@/adapters/email";
@@ -147,7 +147,7 @@ export const services = {
     agenda ??= agendaService({
       db: appDatabase(),
       storage: lazyObjectStorage,
-      ai: fakeAiGateway,
+      ai: configuredAiGateway(),
     });
     return agenda;
   },
@@ -158,7 +158,10 @@ export const services = {
   },
   /** Synthèse pré-consultation, rédaction simulée sous garde-fous (ADR 0020). */
   synthesis(): SynthesisService {
-    synthesis ??= synthesisService({ db: appDatabase(), ai: fakeAiGateway });
+    synthesis ??= synthesisService({
+      db: appDatabase(),
+      ai: configuredAiGateway(),
+    });
     return synthesis;
   },
   /** Tableau de bord « Aujourd'hui », lu dans la base ; agenda dr.veto simulé (ADR 0020). */
@@ -177,6 +180,7 @@ export const services = {
   simulatorWorker() {
     const registry = jobRegistry({
       whatsapp: providerFor(configuredWhatsApp()),
+      ai: configuredAiGateway(),
     });
     simulatorWorker ??= createWorker({
       db: appDatabase(),
