@@ -72,6 +72,7 @@ const ai: AiGateway = {
       ? { text: aiOverride, intent: "ack" }
       : fakeAiGateway.numaReply(input);
   },
+  numaStep: fakeAiGateway.numaStep,
 };
 const handlers = conversationHandlers({ whatsapp, ai });
 // Base partagée : les tâches laissées par les autres fichiers de test ne sont pas exécutées.

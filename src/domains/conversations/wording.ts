@@ -15,7 +15,13 @@ export type WordingContext = {
 };
 
 export type FixedStep =
-  "intro" | "consent_given" | "consent_reminder" | "stopped" | "resumed";
+  | "intro"
+  | "consent_given"
+  | "consent_reminder"
+  | "stopped"
+  | "resumed"
+  | "closing"
+  | "check_in";
 
 const FR: Record<FixedStep, (c: WordingContext) => string> = {
   intro: (c) =>
@@ -28,6 +34,10 @@ const FR: Record<FixedStep, (c: WordingContext) => string> = {
     `C'est noté : vous ne recevrez plus de messages de suivi pour ${c.animalName}. Écrivez REPRENDRE si vous changez d'avis. Pour toute question, contactez directement ${c.practiceName}.`,
   resumed: (c) =>
     `Bonne nouvelle, le suivi de ${c.animalName} reprend avec l'équipe de ${c.practiceName}. Écrivez STOP à tout moment pour l'arrêter.`,
+  check_in: (c) =>
+    `Comment va ${c.animalName} ? Vous pouvez me répondre ici : l'équipe de ${c.practiceName} lira votre message. En cas d'urgence, appelez directement le cabinet.`,
+  closing: (c) =>
+    `Le suivi de ${c.animalName} prévu par ${c.practiceName} se termine aujourd'hui, date du rendez-vous de contrôle. Je ne vous enverrai plus de message de suivi. Cette conversation reste ouverte : si vous m'écrivez, je transmets votre message à l'équipe. En cas d'urgence, appelez directement le cabinet.`,
 };
 
 const EN: Record<FixedStep, (c: WordingContext) => string> = {
@@ -41,6 +51,10 @@ const EN: Record<FixedStep, (c: WordingContext) => string> = {
     `Noted: you will no longer receive follow-up messages about ${c.animalName}. Write REPRENDRE (resume) if you change your mind. For any question, contact ${c.practiceName} directly.`,
   resumed: (c) =>
     `Good news, the follow-up of ${c.animalName} resumes with the ${c.practiceName} team. Write STOP at any time to end it.`,
+  check_in: (c) =>
+    `How is ${c.animalName} doing? You can reply here: the ${c.practiceName} team will read your message. In an emergency, call the clinic directly.`,
+  closing: (c) =>
+    `The follow-up of ${c.animalName} planned by ${c.practiceName} ends today, the date of the check-up. I won't send you any more follow-up messages. This conversation stays open: if you write to me, I'll pass your message on to the team. In an emergency, call the clinic directly.`,
 };
 
 export function fixedMessage(step: FixedStep, context: WordingContext): string {

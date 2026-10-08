@@ -17,7 +17,6 @@ import {
   animalOwners,
   animals,
   auditEvents,
-  availabilityWindows,
   consents,
   followupAlertRules,
   followupContacts,
@@ -40,6 +39,13 @@ import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { nextSendTime } from "./envoi";
+import {
+  messageWindows,
+  programmeOf,
+  scheduleAutomaticEnd,
+  scheduleReminders,
+} from "./rappels";
+import type { ProgrammeView } from "./rappels";
 import {
   FIRST_CONTACT_SUGGESTION_HOURS,
   MAX_TREATMENTS,
@@ -527,14 +533,6 @@ async function scheduleIntro(
     .where(eq(consents.followupId, followup.id))
     .limit(1);
   if (sent) return;
-  const windows = await tx
-    .select({
-      weekday: availabilityWindows.weekday,
-      startsAt: availabilityWindows.startsAt,
-      endsAt: availabilityWindows.endsAt,
-    })
-    .from(availabilityWindows)
-    .where(eq(availabilityWindows.kind, "messages"));
   const wanted =
     followup.firstContactAt && followup.firstContactAt.getTime() > now.getTime()
       ? followup.firstContactAt
@@ -545,14 +543,7 @@ async function scheduleIntro(
     idempotencyKey: attempt
       ? `followup:${followup.id}:intro:${attempt}`
       : `followup:${followup.id}:intro`,
-    runAt: nextSendTime(
-      windows.map((window) => ({
-        weekday: window.weekday,
-        startsAt: window.startsAt.slice(0, 5),
-        endsAt: window.endsAt.slice(0, 5),
-      })),
-      wanted,
-    ),
+    runAt: nextSendTime(await messageWindows(tx), wanted),
     followupId: followup.id,
     payload: { step: "intro" },
   });
@@ -619,6 +610,8 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
       // Premier message de Numa, au nom du cabinet et du vétérinaire responsable.
       await scheduleIntro(tx, actor.organizationId, followup, now);
     }
+    // Fin du suivi automatisé à la date de contrôle ; les rappels attendent l'accord.
+    await scheduleAutomaticEnd(tx, followupId, now);
     await emit(tx, {
       organizationId: actor.organizationId,
       topic: "followup.launched",
@@ -1220,6 +1213,11 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           .update(followups)
           .set({ ...changes, planRevision: revision })
           .where(eq(followups.id, followupId));
+        if (!draft) {
+          // Les rappels à venir suivent la nouvelle fiche ; ceux déjà partis ne changent pas.
+          await scheduleReminders(tx, followupId, now);
+          await scheduleAutomaticEnd(tx, followupId, now);
+        }
         await audit(tx, actor, "followup.plan_updated", followupId, {
           revision,
           status: followup.status,
@@ -1233,6 +1231,17 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             count: toValidate.length,
           });
         if (options.launch) await launchInTx(tx, actor, followupId, now);
+      });
+    },
+
+    /** Programme du suivi lancé (étapes et fin automatique), réservé à l'accès clinique. */
+    async programme(actor: Actor, followupId: string): Promise<ProgrammeView> {
+      assertPermission(actor, "clinical.read");
+      return run(actor, async (tx) => {
+        const followup = await loadFollowup(tx, actor, followupId);
+        if (followup.access !== "clinical" || followup.status === "draft")
+          throw new DomainError("not_found");
+        return programmeOf(tx, followupId);
       });
     },
 
@@ -1280,6 +1289,11 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             now,
             randomUUID(),
           );
+        // Rappels à venir et fin du suivi automatisé : ceux passés entre-temps ne partent pas.
+        if (transition.to === "active") {
+          await scheduleReminders(tx, followupId, now);
+          await scheduleAutomaticEnd(tx, followupId, now);
+        }
         if (change === "reactivate" && !followup.isTest)
           await recordUsage(
             tx,

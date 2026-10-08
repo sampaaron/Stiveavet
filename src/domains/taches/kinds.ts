@@ -7,6 +7,7 @@
 export const JOB_KIND_LABELS: Record<string, string> = {
   "followup.reminder": "Rappel au propriétaire",
   "followup.message": "Message de Numa",
+  "followup.end": "Fin du suivi automatisé",
   "alert.escalate": "Escalade d'une alerte urgente",
   "alert.notify": "Alerte au vétérinaire",
 };

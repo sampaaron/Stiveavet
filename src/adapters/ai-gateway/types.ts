@@ -18,7 +18,20 @@ export type NumaIntent =
 
 export type NumaReply = { text: string; intent: NumaIntent };
 
+/** Étape programmée de la fiche du suivi (lot 15), rédigée par Numa pour le propriétaire. */
+export type NumaStepInput = {
+  language: "fr" | "en";
+  animalName: string;
+  practiceName: string;
+  kind: "message" | "question" | "photo_request" | "reminder" | "control";
+  /** Consigne de l'étape, validée par le vétérinaire : Numa la suit sans rien y ajouter. */
+  instruction: string;
+  /** Rendez-vous de contrôle, pour l'étape « contrôle ». */
+  controlAppointmentAt: Date | null;
+};
+
 export type AiGateway = {
   readonly simulated: boolean;
   numaReply(input: NumaReplyInput): Promise<NumaReply>;
+  numaStep(input: NumaStepInput): Promise<{ text: string }>;
 };

@@ -49,7 +49,9 @@ function stateLabel(view: ConversationView): string {
     case "paused":
       return "Suivi en pause : Numa n'envoie rien.";
     case "ended":
-      return "Suivi arrêté : la conversation reste consultable.";
+      return view.endedAutomatically
+        ? "Suivi automatisé terminé à la date de contrôle : Numa répond encore si le propriétaire écrit, et vous êtes prévenu."
+        : "Suivi arrêté : la conversation reste consultable.";
     default:
       return "Numa suit la conversation.";
   }
