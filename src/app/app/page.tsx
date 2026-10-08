@@ -115,6 +115,7 @@ function toAgendaEvent(item: DashboardAgendaItem): AgendaEventData {
     vetId: item.vetName,
     kind: item.kind,
     fromStivea: item.fromStivea,
+    pending: item.pending,
     followupId: item.followupId ?? undefined,
   };
 }

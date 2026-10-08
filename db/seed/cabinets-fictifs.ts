@@ -10,6 +10,7 @@ import {
 import { SEED } from "../../src/fixtures/seed-ids";
 import type { Followup } from "../../src/fixtures/types";
 import {
+  agendaFreeSlots,
   animalOwners,
   animals,
   auditEvents,
@@ -32,6 +33,7 @@ import {
   billingService,
   startSubscription,
 } from "../../src/domains/facturation/service";
+import { simulatedAgendaReading } from "../../src/adapters/ai-gateway/fake";
 import { fakeBillingProvider } from "../../src/adapters/billing-provider/fake";
 import { fakeDrVeto } from "../../src/adapters/drveto/fake";
 import { fakePaymentMandate } from "../../src/adapters/payments/fake";
@@ -328,6 +330,24 @@ async function seedSettings(
     startsAt: at(24),
     endsAt: at(48),
   });
+  // Créneaux libres de Claire, comme lus sur une capture d'agenda (lot 16) : Numa peut les
+  // proposer aux propriétaires dès la démonstration (lot 18).
+  const { slots } = simulatedAgendaReading({
+    image: new Uint8Array(),
+    contentType: "image/png",
+    now: new Date(),
+  });
+  await withTenant(db, { organizationId: claire.organizationId }, (tx) =>
+    tx.insert(agendaFreeSlots).values(
+      slots.map((slot) => ({
+        organizationId: claire.organizationId,
+        membershipId: claire.membershipId,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        createdByMembershipId: claire.membershipId,
+      })),
+    ),
+  );
 }
 
 /**

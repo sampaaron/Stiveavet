@@ -54,6 +54,8 @@ export const TENANT_TABLES = [
   "photo_observations",
   "agenda_free_slots",
   "followup_syntheses",
+  "appointment_durations",
+  "appointment_requests",
 ] as const;
 
 export function pools() {

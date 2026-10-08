@@ -15,14 +15,20 @@ import {
 } from "../../conversation-actions";
 
 const QUICK_REPLIES = ["OUI", "STOP", "REPRENDRE"] as const;
+/** Réponses à la question de Numa après un STOP écrit dans le groupe (lot 18). */
+const GROUP_REPLIES = ["GROUPE", "TOUT"] as const;
+
+type Role = "primary" | "secondary";
 
 /** Ce que le propriétaire écrit depuis « son » WhatsApp (simulé). */
 export function OwnerSimulatorForm({
   followupId,
   ownerFirstName,
+  from,
 }: {
   followupId: string;
   ownerFirstName: string;
+  from: Role;
 }) {
   const [state, action, pending] = useActionState(
     simulateOwnerAction,
@@ -33,9 +39,10 @@ export function OwnerSimulatorForm({
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap gap-2" aria-label="Réponses rapides">
-        {QUICK_REPLIES.map((reply) => (
+        {[...QUICK_REPLIES, ...GROUP_REPLIES].map((reply) => (
           <form key={reply} action={action}>
             <input type="hidden" name="followupId" value={followupId} />
+            <input type="hidden" name="from" value={from} />
             <input type="hidden" name="body" value={reply} />
             <Button
               type="submit"
@@ -50,6 +57,7 @@ export function OwnerSimulatorForm({
       </div>
       <form action={action} className="grid gap-2">
         <input type="hidden" name="followupId" value={followupId} />
+        <input type="hidden" name="from" value={from} />
         <label htmlFor={id} className="text-sm font-semibold">
           Message de {ownerFirstName}
         </label>
@@ -107,9 +115,11 @@ const FIELD =
 export function OwnerPhotoForm({
   followupId,
   ownerFirstName,
+  from,
 }: {
   followupId: string;
   ownerFirstName: string;
+  from: Role;
 }) {
   const [state, action, pending] = useActionState(
     simulateOwnerPhotoAction,
@@ -119,6 +129,7 @@ export function OwnerPhotoForm({
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="followupId" value={followupId} />
+      <input type="hidden" name="from" value={from} />
       <label htmlFor={`${id}-file`} className="text-sm font-semibold">
         Photo envoyée par {ownerFirstName}
       </label>
@@ -162,9 +173,11 @@ export function OwnerPhotoForm({
 export function OwnerVoiceForm({
   followupId,
   ownerFirstName,
+  from,
 }: {
   followupId: string;
   ownerFirstName: string;
+  from: Role;
 }) {
   const [state, action, pending] = useActionState(
     simulateOwnerVoiceAction,
@@ -174,6 +187,7 @@ export function OwnerVoiceForm({
   return (
     <form action={action} className="grid gap-2">
       <input type="hidden" name="followupId" value={followupId} />
+      <input type="hidden" name="from" value={from} />
       <label htmlFor={id} className="text-sm font-semibold">
         Ce que dit le message vocal de {ownerFirstName}
       </label>

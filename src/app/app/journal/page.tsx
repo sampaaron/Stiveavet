@@ -81,6 +81,26 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     "Un suivi arrivé à un an de conservation a été effacé ; seules des statistiques anonymes restent",
   "followup.ended_automatically": () =>
     "Fin du suivi automatisé à la date de contrôle (la conversation reste ouverte)",
+  "conversation.group_created": () =>
+    "Les deux propriétaires ont accepté : groupe WhatsApp créé avec Numa (simulé)",
+  "conversation.left_group": () =>
+    "Un propriétaire a quitté le groupe WhatsApp du suivi",
+  "conversation.owner_stopped_all": () =>
+    "Un propriétaire a demandé l'arrêt du suivi : plus aucun message automatique",
+  "appointment.requested": () =>
+    "Un propriétaire a demandé un rendez-vous à Numa",
+  "appointment.proposed": () =>
+    "Un propriétaire a choisi un créneau proposé par Numa (à confirmer)",
+  "appointment.confirmed": ({ actorName }) =>
+    `${actorName} a confirmé un rendez-vous choisi avec Numa`,
+  "appointment.declined": ({ actorName }) =>
+    `${actorName} a refusé un créneau choisi avec Numa`,
+  "appointment.callback_done": ({ actorName }) =>
+    `${actorName} a rappelé un propriétaire qui demandait un rendez-vous`,
+  "settings.appointment_windows_changed": ({ actorName }) =>
+    `${actorName} a modifié les plages de rendez-vous de Numa`,
+  "settings.appointment_durations_changed": ({ actorName }) =>
+    `${actorName} a modifié la durée des rendez-vous`,
   "alert.raised": () =>
     "Triage : un message de propriétaire a ouvert une alerte",
   "alert.escalated": () =>

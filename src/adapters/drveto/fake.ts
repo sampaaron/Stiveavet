@@ -267,6 +267,45 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  // Deux propriétaires et rendez-vous (e2e du lot 18).
+  {
+    ref: "DV-20697",
+    animal: {
+      name: "Filou",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2024-02-03",
+      weightGrams: 3300,
+    },
+    owners: [
+      { fullName: "Nathalie Lefèvre", phone: "+33639980115", language: "fr" },
+      { fullName: "Marc Lefèvre", phone: "+33639980116", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20704",
+    animal: {
+      name: "Pepper",
+      species: "cat",
+      breed: "Ragdoll",
+      birthDate: "2023-09-21",
+      weightGrams: 4000,
+    },
+    owners: [
+      { fullName: "Sarah Wilson", phone: "+33639980117", language: "en" },
+      { fullName: "Tom Wilson", phone: "+33639980118", language: "en" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

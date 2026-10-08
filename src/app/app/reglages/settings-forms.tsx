@@ -19,6 +19,8 @@ import {
   removeContactAction,
   removeOnCallAction,
   saveAlertSettingsAction,
+  saveAppointmentDurationsAction,
+  saveAppointmentWindowsAction,
   saveInstructionsAction,
   saveMessageWindowsAction,
 } from "./actions";
@@ -74,8 +76,22 @@ export function ApplyDefaultsForm({ label }: { label: string }) {
   );
 }
 
+const WINDOW_FORMS = {
+  messages: {
+    save: saveMessageWindowsAction,
+    legend: "Jours et heures d'envoi",
+    submit: "Enregistrer les horaires",
+  },
+  appointments: {
+    save: saveAppointmentWindowsAction,
+    legend: "Jours et heures des rendez-vous proposés",
+    submit: "Enregistrer les plages",
+  },
+} as const;
+
 export function MessageWindowsForm({
   days,
+  kind = "messages",
 }: {
   days: {
     weekday: number;
@@ -84,15 +100,17 @@ export function MessageWindowsForm({
     startsAt: string;
     endsAt: string;
   }[];
+  kind?: keyof typeof WINDOW_FORMS;
 }) {
+  const settings = WINDOW_FORMS[kind];
   const [state, action, pending] = useActionState(
-    saveMessageWindowsAction,
+    settings.save,
     initialActionState,
   );
   return (
     <form action={action} className="grid gap-4">
       <fieldset className="grid gap-2">
-        <legend className="sr-only">Jours et heures d&apos;envoi</legend>
+        <legend className="sr-only">{settings.legend}</legend>
         {days.map((day) => (
           <div
             key={day.weekday}
@@ -132,7 +150,42 @@ export function MessageWindowsForm({
       </fieldset>
       <ActionMessage state={state} />
       <div>
-        <SubmitButton pending={pending}>Enregistrer les horaires</SubmitButton>
+        <SubmitButton pending={pending}>{settings.submit}</SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+export function AppointmentDurationsForm({
+  kinds,
+}: {
+  kinds: { kind: string; label: string; minutes: number }[];
+}) {
+  const [state, action, pending] = useActionState(
+    saveAppointmentDurationsAction,
+    initialActionState,
+  );
+  return (
+    <form action={action} className="grid gap-4" noValidate>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {kinds.map((item) => (
+          <TextField
+            key={item.kind}
+            label={`${item.label} (minutes)`}
+            name={item.kind}
+            type="number"
+            inputMode="numeric"
+            min={5}
+            max={120}
+            step={5}
+            defaultValue={item.minutes}
+            required
+          />
+        ))}
+      </div>
+      <ActionMessage state={state} />
+      <div>
+        <SubmitButton pending={pending}>Enregistrer les durées</SubmitButton>
       </div>
     </form>
   );

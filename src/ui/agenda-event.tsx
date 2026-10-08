@@ -42,7 +42,11 @@ export function AgendaEvent({
           {kindLabel[event.kind]} · {event.duration} · {vetName}
         </span>
       </span>
-      {event.fromStivea ? (
+      {event.pending ? (
+        <span className="shrink-0 rounded-full bg-watch-soft px-2 py-0.5 text-xs font-semibold text-watch">
+          À confirmer
+        </span>
+      ) : event.fromStivea ? (
         <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-ink">
           Stivea
         </span>

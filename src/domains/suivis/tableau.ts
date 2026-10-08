@@ -83,6 +83,8 @@ export type DashboardAgendaItem = {
   vetName: string;
   /** Rendez-vous pris ou confirmé dans Stivea Vet (sinon lu dans l'agenda dr.veto). */
   fromStivea: boolean;
+  /** Créneau choisi avec Numa, que le cabinet n'a pas encore confirmé. */
+  pending: boolean;
   /** Suivi lié, seulement si la personne peut ouvrir son dossier. */
   followupId: string | null;
 };
@@ -378,6 +380,7 @@ export function todayService(deps: {
               kind: APPOINTMENT_KINDS[row.kind],
               vetName: row.vetName,
               fromStivea: row.source !== "drveto",
+              pending: row.status === "proposed",
               followupId:
                 row.followupId && readable.has(row.followupId)
                   ? row.followupId
@@ -401,6 +404,7 @@ export function todayService(deps: {
                   kind: DRVETO_KINDS[entry.kind],
                   vetName: entry.practitionerName,
                   fromStivea: false,
+                  pending: false,
                   followupId: null,
                 });
             agenda = items.sort(

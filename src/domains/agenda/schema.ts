@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 // Miroir typé de db/migrations/0008 (source de vérité) ; un test vérifie la concordance.
 
@@ -55,4 +62,47 @@ export const agendaFreeSlots = pgTable("agenda_free_slots", {
   source: text("source").notNull().default("capture"),
   createdByMembershipId: uuid("created_by_membership_id").notNull(),
   createdAt: at("created_at").notNull().defaultNow(),
+});
+
+/** Migration 0014 : durée de chaque type de rendez-vous, réglée par le cabinet. */
+export const appointmentDurations = pgTable("appointment_durations", {
+  organizationId: uuid("organization_id").notNull(),
+  kind: appointmentKind("kind").notNull(),
+  minutes: integer("minutes").notNull(),
+  updatedByMembershipId: uuid("updated_by_membership_id"),
+  updatedAt: at("updated_at").notNull().defaultNow(),
+});
+
+export const appointmentRequestStatus = pgEnum("appointment_request_status", [
+  "offered",
+  "chosen",
+  "callback",
+  "closed",
+]);
+
+/** Migration 0014 : demande de rendez-vous faite à Numa, et créneaux proposés. */
+export const appointmentRequests = pgTable("appointment_requests", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").notNull(),
+  followupId: uuid("followup_id").notNull(),
+  followupContactId: uuid("followup_contact_id").notNull(),
+  threadId: uuid("thread_id").notNull(),
+  requestMessageId: uuid("request_message_id").notNull(),
+  membershipId: uuid("membership_id").notNull(),
+  kind: appointmentKind("kind").notNull(),
+  minutes: integer("minutes").notNull(),
+  slotStarts: at("slot_starts")
+    .array()
+    .notNull()
+    .default(sql`'{}'`),
+  status: appointmentRequestStatus("status").notNull(),
+  appointmentId: uuid("appointment_id"),
+  createdAt: at("created_at").notNull().defaultNow(),
+  expiresAt: at("expires_at")
+    .notNull()
+    .default(sql`now() + interval '48 hours'`),
+  closedAt: at("closed_at"),
+  closedByMembershipId: uuid("closed_by_membership_id"),
 });

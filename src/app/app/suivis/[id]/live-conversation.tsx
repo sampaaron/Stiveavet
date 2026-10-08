@@ -2,6 +2,7 @@ import { FlaskConical, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import type {
+  ConsentState,
   ConversationMessage,
   ConversationView,
   MessageAttachment,
@@ -51,21 +52,36 @@ function toAttachment(
       };
 }
 
+/** Avec deux propriétaires : dans le groupe, ou à qui le message a été écrit en direct. */
+function channelNote(
+  message: ConversationMessage,
+  twoOwners: boolean,
+): string | undefined {
+  if (!twoOwners) return undefined;
+  if (message.channel === "group") return "groupe";
+  if (message.author !== "owner" && message.contactName)
+    return `à ${message.contactName}`;
+  return undefined;
+}
+
 function toBubble(
   message: ConversationMessage,
   links: Record<string, SignedLink>,
   ownerFirstName: string | null,
+  twoOwners: boolean,
 ): Message {
-  const note = message.delivery ? DELIVERY_NOTE[message.delivery] : undefined;
+  const notes = [
+    channelNote(message, twoOwners),
+    message.delivery ? DELIVERY_NOTE[message.delivery] : undefined,
+  ].filter(Boolean);
   return {
     id: message.id,
     author: message.author,
     authorName:
-      (message.author === "owner" ? ownerFirstName : message.authorName) ??
-      undefined,
-    at: note
-      ? `${formatTime(message.occurredAt)} · ${note}`
-      : formatTime(message.occurredAt),
+      (message.author === "owner"
+        ? (message.contactName ?? ownerFirstName)
+        : message.authorName) ?? undefined,
+    at: [formatTime(message.occurredAt), ...notes].join(" · "),
     dayLabel: formatDate(message.occurredAt),
     text: message.body,
     triage: message.triage ?? undefined,
@@ -75,14 +91,46 @@ function toBubble(
   };
 }
 
+const CONSENT_LABEL: Record<ConsentState, string> = {
+  requested: "accord demandé",
+  given: "accord donné",
+  withdrawn: "STOP",
+};
+
+/** Avec deux propriétaires : l'état de chacun et du groupe, en une ligne. */
+function contactsLine(view: ConversationView): string | null {
+  if (view.contacts.length < 2) return null;
+  const people = view.contacts.map((contact) => {
+    const state = contact.stopRequested
+      ? "STOP dans le groupe, réponse attendue"
+      : contact.leftGroup
+        ? "a quitté le groupe"
+        : contact.consent
+          ? CONSENT_LABEL[contact.consent]
+          : "pas encore contacté";
+    return `${contact.firstName} : ${state}`;
+  });
+  const group = view.group
+    ? "Groupe WhatsApp ouvert"
+    : "Groupe créé quand les deux auront accepté";
+  return [...people, group].join(" · ");
+}
+
 /** État de la conversation, en une phrase : accord du propriétaire d'abord, puis le suivi. */
 function stateLabel(view: ConversationView): string {
+  if (view.stoppedByOwner)
+    return "Un propriétaire a demandé l'arrêt du suivi : plus aucun message automatique n'est envoyé.";
+  if (view.contacts.length > 1 && view.recipients) return followupLabel(view);
   if (view.consent === null)
     return "Numa n'a pas encore écrit : son premier message part à l'heure prévue.";
   if (view.consent === "requested")
     return "En attente de l'accord du propriétaire : aucun contenu de suivi avant son OUI.";
   if (view.consent === "withdrawn")
     return "Le propriétaire a écrit STOP : plus aucun message ne lui est envoyé.";
+  return followupLabel(view);
+}
+
+function followupLabel(view: ConversationView): string {
   switch (view.status) {
     case "human_takeover":
       return "Vous avez repris la main : Numa est en pause.";
@@ -109,9 +157,12 @@ export function LiveConversation({
   /** Lien vers le simulateur du propriétaire, en local seulement. */
   simulatorHref: string | null;
 }) {
+  // Écrire n'est possible que vers un propriétaire qui a donné son accord.
   const canCompose =
-    view.rights.canWrite && view.consent === "given" && !view.isTest;
+    view.rights.canWrite && view.recipients !== null && !view.isTest;
   const ownerFirstName = view.ownerFirstName ?? "le propriétaire";
+  const twoOwners = view.contacts.length > 1;
+  const contacts = contactsLine(view);
 
   return (
     <Card className="flex flex-col" id="conversation">
@@ -119,6 +170,9 @@ export function LiveConversation({
         <div className="min-w-0">
           <h2 className="font-bold">Conversation WhatsApp</h2>
           <p className="text-sm text-ink-muted">{stateLabel(view)}</p>
+          {contacts ? (
+            <p className="mt-0.5 text-sm text-ink-muted">{contacts}</p>
+          ) : null}
         </div>
         {view.rights.canResume && view.status === "human_takeover" ? (
           <ResumeNumaButton followupId={view.followupId} />
@@ -140,7 +194,7 @@ export function LiveConversation({
         {view.messages.length > 0 ? (
           <ChatThread
             messages={view.messages.map((message) =>
-              toBubble(message, links, view.ownerFirstName),
+              toBubble(message, links, view.ownerFirstName, twoOwners),
             )}
           />
         ) : (
@@ -158,7 +212,7 @@ export function LiveConversation({
       {canCompose ? (
         <OwnerComposer
           followupId={view.followupId}
-          ownerFirstName={ownerFirstName}
+          ownerFirstName={view.recipients ?? ownerFirstName}
           animalName={view.animalName}
           pausesNuma={view.status === "active"}
         />

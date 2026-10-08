@@ -1079,6 +1079,20 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
               followup.procedureAt,
               data.firstContactHours,
             );
+          if (data.secondContactActive !== undefined) {
+            const updated = await tx
+              .update(followupContacts)
+              .set({ active: data.secondContactActive })
+              .where(
+                and(
+                  eq(followupContacts.followupId, followupId),
+                  eq(followupContacts.role, "secondary"),
+                ),
+              )
+              .returning({ id: followupContacts.id });
+            if (data.secondContactActive && !updated.length)
+              throw new DomainError("invalid_target");
+          }
         }
 
         // Traitements : décisions de vétérinaire.

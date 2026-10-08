@@ -6,6 +6,8 @@ export async function launchFollowup(
   page: Page,
   animal: string,
   hours: string,
+  /** Prénom et nom du second propriétaire à inclure (lot 18). */
+  secondOwner?: string,
 ) {
   await page.goto("/app/suivis/nouveau");
   await page
@@ -31,6 +33,12 @@ export async function launchFollowup(
     await expect(page).toHaveURL(/\?fait=protocole$/);
   }
   await page.getByLabel("Heures après l'intervention").fill(hours);
+  if (secondOwner)
+    await page
+      .getByRole("checkbox", {
+        name: new RegExp(`^Inclure ${secondOwner}, second propriétaire`),
+      })
+      .check();
   await page.getByRole("button", { name: "Lancer le suivi" }).click();
   await expect(page).toHaveURL(/\/app\/suivis\/[0-9a-f-]+\?fait=lance$/);
   return page.url().replace(/\?.*$/, "");

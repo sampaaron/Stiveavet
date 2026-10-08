@@ -91,6 +91,29 @@ export const DEFAULT_MESSAGE_WINDOWS: WindowInput[] = [1, 2, 3, 4, 5, 6].map(
   }),
 );
 
+/** Plages où Numa peut proposer un rendez-vous (lot 18) : en semaine, aux heures de consultation. */
+export const DEFAULT_APPOINTMENT_WINDOWS: WindowInput[] = [1, 2, 3, 4, 5].map(
+  (weekday) => ({
+    weekday: weekday as WindowInput["weekday"],
+    startsAt: "09:00",
+    endsAt: "18:00",
+  }),
+);
+
+const appointmentMinutes = z
+  .int("Durée : un nombre de minutes entier.")
+  .min(5, "Durée : 5 minutes minimum.")
+  .max(120, "Durée : 120 minutes maximum.")
+  .refine((value) => value % 5 === 0, "Durée : par pas de 5 minutes.");
+
+/** Durée de chaque type de rendez-vous proposé par Numa. */
+export const appointmentDurationsInput = z.object({
+  post_op_control: appointmentMinutes,
+  emergency: appointmentMinutes,
+  treatment_followup: appointmentMinutes,
+  other: appointmentMinutes,
+});
+
 export const DEFAULT_INSTRUCTIONS: Record<EmergencyPeriod, string> = {
   day: "Appelez le cabinet sans attendre au numéro d'urgence indiqué ci-dessous. Si personne ne répond, rappelez dans quelques minutes.",
   night:

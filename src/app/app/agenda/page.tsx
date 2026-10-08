@@ -1,7 +1,10 @@
 import { CalendarClock, EyeOff, Trash2 } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import type { FreeSlotView } from "@/domains/agenda/captures";
+import type { AppointmentDesk } from "@/domains/agenda/demandes";
+import { APPOINTMENT_KIND_LABELS } from "@/domains/agenda/rendez-vous";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
@@ -10,9 +13,22 @@ import { formatDate, formatDateTime, formatTime } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 
-import { CaptureForm, RemoveSlotButton } from "./agenda-forms";
+import {
+  AppointmentDecision,
+  CallbackDoneButton,
+  CaptureForm,
+  RemoveSlotButton,
+} from "./agenda-forms";
 
 export const metadata: Metadata = { title: "Agenda" };
+
+const DONE: Record<string, string> = {
+  retire: "Créneau retiré.",
+  confirme: "Rendez-vous confirmé. Numa prévient le propriétaire.",
+  refuse:
+    "Créneau refusé. Numa prévient le propriétaire que le cabinet le recontactera.",
+  rappele: "Demande marquée comme rappelée.",
+};
 
 /**
  * Agenda (cahier des charges §8) : en attendant les intégrations (dr.veto en phase 3), le
@@ -24,7 +40,8 @@ export default async function AgendaPage({
 }: PageProps<"/app/agenda">) {
   const context = await requirePermission("agenda.read");
   const canCapture = context.permissions.has("agenda.capture");
-  const [slots, vets, captures] = await Promise.all([
+  const [desk, slots, vets, captures] = await Promise.all([
+    services.appointments().desk(context),
     services.agenda().freeSlots(context),
     canCapture ? services.agenda().vets(context) : Promise.resolve([]),
     canCapture
@@ -37,9 +54,7 @@ export default async function AgendaPage({
     typeof creneaux === "string" &&
     /^\d{1,2}$/.test(creneaux)
       ? `Capture lue : ${creneaux} créneaux libres enregistrés. Le fichier a été supprimé.`
-      : fait === "retire"
-        ? "Créneau retiré."
-        : undefined;
+      : (DONE[typeof fait === "string" ? fait : ""] ?? undefined);
   const days = groupByDay(slots);
 
   return (
@@ -56,6 +71,8 @@ export default async function AgendaPage({
           {done}
         </p>
       ) : null}
+
+      <AppointmentRequests desk={desk} />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <SectionCard
@@ -176,6 +193,98 @@ export default async function AgendaPage({
         ) : null}
       </div>
     </>
+  );
+}
+
+/** Demandes faites à Numa : créneaux choisis à confirmer, demandes sans créneau à rappeler. */
+function AppointmentRequests({ desk }: { desk: AppointmentDesk }) {
+  if (desk.pending.length === 0 && desk.callbacks.length === 0) return null;
+  return (
+    <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
+      <SectionCard
+        title="Rendez-vous à confirmer"
+        description={
+          desk.canConfirm
+            ? "Créneaux choisis par les propriétaires parmi ceux proposés par Numa. Numa leur annonce votre décision."
+            : "Créneaux choisis par les propriétaires. Un vétérinaire, ou un assistant autorisé par l'administrateur, les confirme."
+        }
+      >
+        {desk.pending.length === 0 ? (
+          <p className="text-sm text-ink-muted">
+            Aucun rendez-vous en attente.
+          </p>
+        ) : (
+          <ul className="grid gap-3" aria-label="Rendez-vous à confirmer">
+            {desk.pending.map((item) => {
+              const label = `de ${item.animalName}, ${formatDateTime(item.startsAt)}`;
+              return (
+                <li
+                  key={item.id}
+                  className="grid gap-2 rounded-[var(--radius-control)] border border-line p-3 text-sm"
+                >
+                  <span>
+                    <Link
+                      href={`/app/suivis/${item.followupId}`}
+                      className="font-semibold text-brand-ink underline-offset-2 hover:underline"
+                    >
+                      {item.animalName}
+                    </Link>{" "}
+                    · {APPOINTMENT_KIND_LABELS[item.kind]}
+                    <span className="block text-ink-muted">
+                      {formatDateTime(item.startsAt)} –{" "}
+                      {formatTime(item.endsAt)} avec {item.vetName}
+                    </span>
+                  </span>
+                  {desk.canConfirm ? (
+                    <AppointmentDecision
+                      appointmentId={item.id}
+                      label={label}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </SectionCard>
+      <SectionCard
+        title="Demandes à rappeler"
+        description="Numa n'avait pas de créneau adapté avec le vétérinaire responsable : elle a annoncé que le cabinet rappellerait."
+      >
+        {desk.callbacks.length === 0 ? (
+          <p className="text-sm text-ink-muted">Aucune demande à rappeler.</p>
+        ) : (
+          <ul className="grid gap-3" aria-label="Demandes à rappeler">
+            {desk.callbacks.map((item) => (
+              <li
+                key={item.id}
+                className="grid gap-2 rounded-[var(--radius-control)] border border-line p-3 text-sm"
+              >
+                <span>
+                  <Link
+                    href={`/app/suivis/${item.followupId}`}
+                    className="font-semibold text-brand-ink underline-offset-2 hover:underline"
+                  >
+                    {item.animalName}
+                  </Link>{" "}
+                  · {APPOINTMENT_KIND_LABELS[item.kind]}
+                  <span className="block text-ink-muted">
+                    Demandé le {formatDateTime(item.requestedAt)} ·{" "}
+                    {item.vetName}
+                  </span>
+                </span>
+                {desk.canConfirm ? (
+                  <CallbackDoneButton
+                    requestId={item.id}
+                    label={`${item.animalName}, demande du ${formatDateTime(item.requestedAt)}`}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+    </div>
   );
 }
 

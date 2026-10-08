@@ -91,5 +91,7 @@ export type AgendaEvent = {
   kind: "consultation" | "chirurgie" | "controle" | "urgence";
   /** Rendez-vous proposé ou confirmé via Stivea (sinon issu de l'agenda dr.veto). */
   fromStivea: boolean;
+  /** Créneau choisi avec Numa, en attente de la confirmation du cabinet (lot 18). */
+  pending?: boolean;
   followupId?: string;
 };

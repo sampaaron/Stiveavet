@@ -43,6 +43,11 @@ export const sheetInput = z.object({
       `Premier message : ${MAX_FIRST_CONTACT_HOURS} heures maximum après l'intervention.`,
     )
     .optional(),
+  /**
+   * Brouillon seulement : le second propriétaire importé participe-t-il ? Numa lui demande
+   * alors aussi son accord ; le groupe se crée quand les deux ont accepté (lot 18).
+   */
+  secondContactActive: z.boolean().optional(),
   controlAppointmentAt: z.date().nullable(),
   /** Étapes à venir (les étapes passées d'un suivi en cours ne sont jamais renvoyées). */
   steps: z.array(stepInput).max(MAX_STEPS, `${MAX_STEPS} étapes au maximum.`),

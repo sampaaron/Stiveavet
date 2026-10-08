@@ -1,13 +1,24 @@
 "use client";
 
-import { ImageUp, Trash2 } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarX,
+  ImageUp,
+  PhoneCall,
+  Trash2,
+} from "lucide-react";
 import { useActionState, useId } from "react";
 
 import { Button } from "@/ui/button";
 
 import { ActionMessage, selectClasses } from "../action-message";
 import { initialActionState } from "../action-state";
-import { importCaptureAction, removeSlotAction } from "./actions";
+import {
+  closeCallbackAction,
+  decideAppointmentAction,
+  importCaptureAction,
+  removeSlotAction,
+} from "./actions";
 
 /** Envoi d'une capture d'agenda : un vétérinaire, une image, rien d'autre. */
 export function CaptureForm({
@@ -96,6 +107,83 @@ export function RemoveSlotButton({
         aria-label={`Retirer le créneau ${label}`}
         icon={<Trash2 aria-hidden="true" className="size-4" />}
       />
+      <ActionMessage state={state} />
+    </form>
+  );
+}
+
+/** Confirmer ou refuser un rendez-vous choisi par le propriétaire ; Numa le prévient. */
+export function AppointmentDecision({
+  appointmentId,
+  label,
+}: {
+  appointmentId: string;
+  label: string;
+}) {
+  const [state, action, pending] = useActionState(
+    decideAppointmentAction,
+    initialActionState,
+  );
+  return (
+    <form action={action} className="grid gap-2">
+      <input type="hidden" name="appointmentId" value={appointmentId} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="submit"
+          name="decision"
+          value="confirm"
+          size="sm"
+          disabled={pending}
+          aria-busy={pending}
+          aria-label={`Confirmer le rendez-vous ${label}`}
+          icon={<CalendarCheck aria-hidden="true" className="size-4" />}
+        >
+          Confirmer
+        </Button>
+        <Button
+          type="submit"
+          name="decision"
+          value="decline"
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          aria-label={`Refuser le rendez-vous ${label}`}
+          icon={<CalendarX aria-hidden="true" className="size-4" />}
+        >
+          Refuser
+        </Button>
+      </div>
+      <ActionMessage state={state} />
+    </form>
+  );
+}
+
+export function CallbackDoneButton({
+  requestId,
+  label,
+}: {
+  requestId: string;
+  label: string;
+}) {
+  const [state, action, pending] = useActionState(
+    closeCallbackAction,
+    initialActionState,
+  );
+  return (
+    <form action={action} className="grid gap-2">
+      <input type="hidden" name="requestId" value={requestId} />
+      <div>
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          aria-label={`Marquer comme rappelé : ${label}`}
+          icon={<PhoneCall aria-hidden="true" className="size-4" />}
+        >
+          Rappelé
+        </Button>
+      </div>
       <ActionMessage state={state} />
     </form>
   );
