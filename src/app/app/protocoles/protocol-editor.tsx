@@ -202,17 +202,11 @@ export function ProtocolEditor(props: EditorProps) {
         </div>
       </SectionCard>
 
-      <SectionCard
-        title={text.steps}
-        description={text.stepsDescription}
-      >
+      <SectionCard title={text.steps} description={text.stepsDescription}>
         <StepsEditor steps={steps} setSteps={setSteps} />
       </SectionCard>
 
-      <SectionCard
-        title={text.alerts}
-        description={text.alertsDescription}
-      >
+      <SectionCard title={text.alerts} description={text.alertsDescription}>
         <AlertsEditor alerts={alerts} setAlerts={setAlerts} />
       </SectionCard>
 

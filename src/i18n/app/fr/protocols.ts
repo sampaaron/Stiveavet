@@ -43,7 +43,8 @@ export const protocols = {
     readOnly: (versionNumber: number) =>
       `Version ${versionNumber}, en lecture seule`,
     seeCurrent: "Voir la version actuelle",
-    readOnlyBody: "Les suivis lancés avec cette version la gardent telle quelle.",
+    readOnlyBody:
+      "Les suivis lancés avec cette version la gardent telle quelle.",
     description: "Description",
     steps: "Étapes",
     stepsDescription:

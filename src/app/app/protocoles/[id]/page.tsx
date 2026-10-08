@@ -122,10 +122,7 @@ export default async function ProtocolPage({
               </p>
             </SectionCard>
           ) : null}
-          <SectionCard
-            title={text.steps}
-            description={text.stepsDescription}
-          >
+          <SectionCard title={text.steps} description={text.stepsDescription}>
             <ol className="grid gap-3">
               {content.steps.map((step, index) => (
                 <li key={index} className="flex gap-3 text-sm">
@@ -142,10 +139,7 @@ export default async function ProtocolPage({
               ))}
             </ol>
           </SectionCard>
-          <SectionCard
-            title={text.alerts}
-            description={text.alertsDescription}
-          >
+          <SectionCard title={text.alerts} description={text.alertsDescription}>
             <ul className="grid gap-2">
               {content.alerts.map((alert, index) => (
                 <li

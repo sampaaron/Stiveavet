@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
 import { ActionMessage } from "../action-message";
@@ -19,6 +20,7 @@ export function JobActions({ id, label }: { id: string; label: string }) {
     initialActionState,
   );
   const pending = retrying || cancelling;
+  const t = useAppText();
   return (
     <div className="grid gap-2 sm:justify-items-end">
       <div className="flex flex-wrap gap-2">
@@ -30,9 +32,9 @@ export function JobActions({ id, label }: { id: string; label: string }) {
             size="sm"
             disabled={pending}
             aria-busy={retrying}
-            aria-label={`Relancer : ${label}`}
+            aria-label={t.tasks.retryLabel(label)}
           >
-            Relancer
+            {t.tasks.retry}
           </Button>
         </form>
         <form action={cancel}>
@@ -43,9 +45,9 @@ export function JobActions({ id, label }: { id: string; label: string }) {
             size="sm"
             disabled={pending}
             aria-busy={cancelling}
-            aria-label={`Abandonner : ${label}`}
+            aria-label={t.tasks.cancelLabel(label)}
           >
-            Abandonner
+            {t.tasks.cancel}
           </Button>
         </form>
       </div>

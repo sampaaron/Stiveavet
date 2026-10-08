@@ -214,6 +214,8 @@ export default async function FollowupPage({
             </section>
           ) : null}
           <LiveConversation
+            t={t}
+            locale={locale}
             view={view}
             links={links}
             simulatorHref={

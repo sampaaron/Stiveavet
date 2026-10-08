@@ -19,18 +19,10 @@ export const STEP_KINDS = [
 export const ALERT_LEVELS = ["watch", "urgent"] as const;
 
 /**
- * Libellés français historiques, encore lus par d'autres écrans pendant le lot 19. Les écrans
- * des protocoles affichent `labels.species` / `labels.stepKinds` dans la langue de la personne.
+ * Libellés français historiques, encore lus par un écran des suivis pendant le lot 19 ; les
+ * écrans des protocoles affichent `labels.stepKinds` dans la langue de la personne.
  * @deprecated Utiliser le dictionnaire de l'espace cabinet (ADR 0022).
  */
-export const SPECIES_LABELS: Record<(typeof PROTOCOL_SPECIES)[number], string> =
-  {
-    dog: "Chien",
-    cat: "Chat",
-    both: "Chien et chat",
-  };
-
-/** @deprecated Utiliser `labels.stepKinds` du dictionnaire de l'espace cabinet (ADR 0022). */
 export const STEP_KIND_LABELS: Record<(typeof STEP_KINDS)[number], string> = {
   message: "Message",
   question: "Question",
@@ -47,11 +39,7 @@ export const MAX_ALERTS = 20;
  * par l'écran (`protocols.validation`, ADR 0022) ; jamais de texte affiché ici.
  */
 const text = (min: number, max: number, field: string) =>
-  z
-    .string()
-    .trim()
-    .min(min, `${field}_short`)
-    .max(max, `${field}_long`);
+  z.string().trim().min(min, `${field}_short`).max(max, `${field}_long`);
 
 export const stepInput = z.object({
   offsetHours: z
@@ -73,19 +61,13 @@ export const protocolContentInput = z
     name: text(2, 120, "name"),
     category: z.enum(PROTOCOL_CATEGORIES),
     species: z.enum(PROTOCOL_SPECIES),
-    description: z
-      .string()
-      .trim()
-      .max(2000, "description_long"),
+    description: z.string().trim().max(2000, "description_long"),
     durationDays: z
       .number()
       .int("duration_integer")
       .min(1, "duration_min")
       .max(90, "duration_max"),
-    steps: z
-      .array(stepInput)
-      .min(1, "steps_min")
-      .max(MAX_STEPS, "steps_max"),
+    steps: z.array(stepInput).min(1, "steps_min").max(MAX_STEPS, "steps_max"),
     alerts: z
       .array(alertInput)
       .min(1, "alerts_min")

@@ -17,8 +17,7 @@ export const protocols: AppDictionary["protocols"] = {
     archived: "Archived",
     version: (versionNumber) => `version ${versionNumber}`,
     owner: (name) => `by ${name}`,
-    followups: (count) =>
-      count === 1 ? "1 follow-up" : `${count} follow-ups`,
+    followups: (count) => (count === 1 ? "1 follow-up" : `${count} follow-ups`),
   },
   library: {
     title: "Starter library",

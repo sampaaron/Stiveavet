@@ -3,6 +3,7 @@ import { LockKeyhole } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { logoutAction } from "../actions";
+import { appText } from "@/i18n/app/server";
 import { currentSession } from "@/server/auth";
 import { memberProfile } from "@/server/auth/profile";
 import { Button } from "@/ui/button";
@@ -10,13 +11,19 @@ import { Button } from "@/ui/button";
 import { AuthHeading } from "../auth-heading";
 import { UnlockForm } from "../auth-forms";
 
-export const metadata: Metadata = { title: "Session verrouillée" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.auth.lock.title };
+}
 
 export default async function LockPage() {
   const session = await currentSession();
   if (!session) redirect("/connexion");
   if (!session.locked) redirect("/app");
-  const profile = await memberProfile(session);
+  const [profile, { t }] = await Promise.all([
+    memberProfile(session),
+    appText(),
+  ]);
 
   return (
     <>
@@ -26,14 +33,13 @@ export default async function LockPage() {
       >
         <LockKeyhole className="size-5" />
       </span>
-      <AuthHeading title="Session verrouillée">
-        {profile.displayName}, Stivea Vet s&apos;est verrouillé après 40 minutes
-        sans activité. Saisissez votre mot de passe pour reprendre.
+      <AuthHeading title={t.auth.lock.title}>
+        {t.auth.lock.intro(profile.displayName)}
       </AuthHeading>
       <UnlockForm />
       <form action={logoutAction} className="mt-4">
         <Button type="submit" variant="quiet" className="w-full">
-          Ce n&apos;est pas moi : se déconnecter
+          {t.auth.lock.notMe}
         </Button>
       </form>
     </>

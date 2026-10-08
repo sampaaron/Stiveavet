@@ -1,17 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { appText } from "@/i18n/app/server";
+
 import { AuthHeading } from "../auth-heading";
 import { ResetRequestForm } from "../auth-forms";
 
-export const metadata: Metadata = { title: "Mot de passe oublié" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.auth.forgot.title };
+}
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
+  const { t } = await appText();
   return (
     <>
-      <AuthHeading title="Mot de passe oublié">
-        Indiquez votre adresse : vous recevrez un lien valable 30 minutes,
-        utilisable une seule fois.
+      <AuthHeading title={t.auth.forgot.title}>
+        {t.auth.forgot.intro}
       </AuthHeading>
       <ResetRequestForm />
       <p className="mt-6 text-center text-sm">
@@ -19,7 +24,7 @@ export default function ForgotPasswordPage() {
           href="/connexion"
           className="font-semibold text-brand-ink underline-offset-2 hover:underline"
         >
-          Retour à la connexion
+          {t.auth.forgot.backToLogin}
         </Link>
       </p>
     </>

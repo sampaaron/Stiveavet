@@ -27,10 +27,7 @@ const saveInput = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("update"),
     protocolId: z.uuid(),
-    changeNote: z
-      .string()
-      .trim()
-      .max(500, "change_note_long"),
+    changeNote: z.string().trim().max(500, "change_note_long"),
     payload: z.string().max(MAX_PAYLOAD),
   }),
 ]);
