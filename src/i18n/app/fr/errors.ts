@@ -36,5 +36,11 @@ export const errors = {
       "Fichier refusé : envoyez une image JPEG, PNG ou WebP de 5 Mo au plus (ou un message vocal).",
     capture_unreadable:
       "Aucun créneau libre n'a pu être lu sur cette capture. Elle a été supprimée ; réessayez avec une capture plus nette.",
+    whatsapp_signup_failed:
+      "Meta n'a pas confirmé la connexion du numéro. Recommencez depuis le bouton ; vérifiez le code PIN si le numéro en avait déjà un.",
+    whatsapp_number_taken:
+      "Ce numéro WhatsApp est déjà relié à un autre cabinet sur Stivea Vet.",
+    optin_missing:
+      "Cochez l'accord du propriétaire pour WhatsApp, recueilli au cabinet, avant de lancer le suivi.",
   },
 };

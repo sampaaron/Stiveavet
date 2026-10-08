@@ -1,33 +1,49 @@
-/** Connexion du numéro WhatsApp Business du cabinet (prestataire à décider, ADR 0004). */
+import type { TemplateKey, TemplateLanguage } from "@/domains/whatsapp/modeles";
+
+/**
+ * Connecteur WhatsApp Business d'un cabinet (architecture §9, ADR 0024) : simulé en local,
+ * WhatsApp Cloud API de Meta en staging et en production. Le reste de Stivea Vet ne connaît
+ * que ce contrat. Ni les numéros ni les textes ne sont journalisés.
+ */
+
+/** Ce qui part : un texte libre (fenêtre de 24 h ouverte) ou un modèle approuvé. */
+export type OutboundContent =
+  | { kind: "text"; body: string }
+  | {
+      kind: "template";
+      key: TemplateKey;
+      language: TemplateLanguage;
+      /** Valeurs dans l'ordre du catalogue. */
+      params: readonly string[];
+    };
+
+export type Recipient =
+  { kind: "phone"; phone: string } | { kind: "group"; groupRef: string };
+
 export type WhatsAppConnector = {
   readonly simulated: boolean;
-  /** Vérifie et associe le numéro professionnel ; renvoie un libellé déjà masqué. */
-  connectBusinessNumber(phone: string): Promise<{ displayLabel: string }>;
   /**
-   * Envoie un message depuis le numéro du cabinet. La clé d'idempotence est transmise au
-   * prestataire : un envoi rejoué avec la même clé ne produit jamais de second message.
-   * Ni le numéro ni le texte ne sont journalisés.
+   * Groupes dédiés à un suivi (cahier des charges §6). Chez Meta, ils sont réservés aux
+   * comptes officiels (badge vérifié) et se rejoignent par lien d'invitation : le connecteur
+   * réel ne les propose pas, et chaque propriétaire a alors sa propre conversation.
    */
-  sendMessage(input: {
-    to: string;
-    body: string;
-    idempotencyKey: string;
+  readonly groups: boolean;
+  /**
+   * Envoie un message depuis le numéro du cabinet. `reference` (identifiant interne du
+   * message, jamais une donnée personnelle) revient avec les accusés de Meta. Meta n'offre
+   * pas de clé d'idempotence : l'appelant n'envoie qu'une fois chaque message (une tâche par
+   * envoi) et ne réessaie qu'après un échec qui garantit que rien n'est parti.
+   */
+  send(input: {
+    to: Recipient;
+    content: OutboundContent;
+    reference: string;
   }): Promise<{ externalRef: string }>;
-  /**
-   * Groupe dédié à un suivi (cahier des charges §6), créé et géré par l'API professionnelle
-   * du cabinet : Stivea Vet ne lit jamais un groupe personnel existant. À valider avec le
-   * prestataire en phase 3 ; simulé en phase 2. Mêmes règles d'idempotence que les envois.
-   */
   createGroup(input: {
     name: string;
     members: readonly string[];
     idempotencyKey: string;
   }): Promise<{ groupRef: string }>;
-  sendGroupMessage(input: {
-    groupRef: string;
-    body: string;
-    idempotencyKey: string;
-  }): Promise<{ externalRef: string }>;
   removeFromGroup(input: {
     groupRef: string;
     member: string;
@@ -37,14 +53,31 @@ export type WhatsAppConnector = {
     groupRef: string;
     idempotencyKey: string;
   }): Promise<void>;
-  /**
-   * Alerte WhatsApp à un vétérinaire (urgence, escalade). Le texte ne contient aucun contenu
-   * clinique : il invite à ouvrir Stivea Vet. Le numéro du vétérinaire est résolu par le
-   * prestataire (phase 3) ; il n'est jamais journalisé.
-   */
-  sendStaffAlert(input: {
-    membershipId: string;
-    kind: "urgent" | "escalation";
-    idempotencyKey: string;
-  }): Promise<{ externalRef: string }>;
 };
+
+/**
+ * Échec d'envoi, classé pour décider de la suite (codes de Meta, ADR 0024) :
+ * - `retry` : rien n'est parti (limite de débit, indisponibilité) ; nouvelle tentative ;
+ * - `window_closed` : fenêtre de 24 h fermée ; passer par un modèle ;
+ * - `unreachable` : numéro injoignable sur WhatsApp ; ne pas réessayer ;
+ * - `rejected` : message refusé (modèle absent ou en pause, paramètre) ; à corriger ;
+ * - `account` : compte du cabinet à reconnecter ou bloqué ; toute la file attend ;
+ * - `unknown` : réponse perdue, l'envoi a pu partir ; ne pas renvoyer à l'aveugle.
+ * `code` est le code technique (jamais un message brut, qui pourrait contenir un numéro).
+ */
+export type SendFailure =
+  | "retry"
+  | "window_closed"
+  | "unreachable"
+  | "rejected"
+  | "account"
+  | "unknown";
+
+export class WhatsAppSendError extends Error {
+  constructor(
+    readonly failure: SendFailure,
+    readonly code: string,
+  ) {
+    super(`whatsapp:${failure}:${code}`);
+  }
+}

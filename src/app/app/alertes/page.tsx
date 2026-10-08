@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { VET_ROLES } from "@/domains/equipe/permissions";
 import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
@@ -8,6 +9,8 @@ import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 
 import { AlertCard } from "../alert-card";
+
+import { AlertPhoneForm } from "./alert-phone-form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await appText();
@@ -23,6 +26,10 @@ export default async function AlertsPage({
 }: PageProps<"/app/alertes">) {
   const context = await requirePermission("clinical.read");
   const alerts = await services.alerts().open(context);
+  const isVet = VET_ROLES.has(context.role);
+  const alertPhone = isVet
+    ? await services.alerts().myAlertPhone(context)
+    : null;
   const { fait } = await searchParams;
   const { t } = await appText();
   const text = t.alerts;
@@ -75,6 +82,19 @@ export default async function AlertsPage({
             ))}
         </div>
       )}
+      {isVet ? (
+        <div className="mt-6">
+          <SectionCard
+            title={text.phone.title}
+            description={text.phone.description}
+          >
+            <p className="mb-3 text-sm">
+              {alertPhone ? text.phone.current(alertPhone) : text.phone.none}
+            </p>
+            <AlertPhoneForm />
+          </SectionCard>
+        </div>
+      ) : null}
     </>
   );
 }

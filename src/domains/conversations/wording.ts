@@ -4,9 +4,22 @@
  * sont versionnés, et la version montrée est gardée avec chaque consentement.
  * Contenu à faire valider (juriste, cahier des charges §19) avant la mise en production.
  */
-export const CONSENT_WORDING_VERSION = "consentement-v1";
+import { renderTemplate } from "@/domains/whatsapp/modeles";
+import type { RenderedTemplate, TemplateKey } from "@/domains/whatsapp/modeles";
+
+/** v2 (lot 21) : le premier message est un modèle WhatsApp et rappelle l'accord pris au cabinet. */
+export const CONSENT_WORDING_VERSION = "consentement-v2";
 /** Demande d'accord à deux propriétaires : le groupe partagé est expliqué avant l'accord (§6). */
-export const PAIR_CONSENT_WORDING_VERSION = "consentement-groupe-v1";
+export const PAIR_CONSENT_WORDING_VERSION = "consentement-groupe-v2";
+/** Deux propriétaires sans groupe (WhatsApp réel) : chacun dans sa conversation (ADR 0024). */
+export const SEPARATE_CONSENT_WORDING_VERSION = "consentement-deux-v1";
+
+/** Version du texte d'accord montré, d'après le modèle du premier message. */
+export const CONSENT_VERSION_OF: Partial<Record<TemplateKey, string>> = {
+  suivi_premier_message: CONSENT_WORDING_VERSION,
+  suivi_premier_message_groupe: PAIR_CONSENT_WORDING_VERSION,
+  suivi_premier_message_deux: SEPARATE_CONSENT_WORDING_VERSION,
+};
 
 export type WordingContext = {
   language: "fr" | "en";
@@ -18,26 +31,32 @@ export type WordingContext = {
   otherFirstName?: string;
 };
 
-export type FixedStep =
+/** Étapes envoyées comme modèles WhatsApp : elles peuvent partir hors de la fenêtre de 24 h. */
+type TemplatedStep =
   | "intro"
+  | "intro_pair"
+  | "intro_separate"
+  | "check_in"
+  | "closing"
+  | "stopped_by_other";
+
+export type FixedStep =
+  | TemplatedStep
   | "consent_given"
   | "consent_reminder"
   | "stopped"
   | "resumed"
-  | "closing"
-  | "check_in"
   | "photo_received"
-  | "intro_pair"
   | "consent_given_waiting"
   | "group_welcome"
   | "stop_clarify"
   | "left_group"
-  | "stopped_all"
-  | "stopped_by_other";
+  | "stopped_all";
 
-const FR: Record<FixedStep, (c: WordingContext) => string> = {
-  intro: (c) =>
-    `Bonjour ${c.ownerFirstName}, je suis Numa, l'assistante IA (intelligence artificielle) de ${c.practiceName}. ${c.vetName} m'a demandé de prendre des nouvelles de ${c.animalName} après son passage au cabinet.\n\nJe ne pose pas de diagnostic et je ne modifie aucun traitement : toute décision médicale reste au vétérinaire, qui lit nos échanges.\n\nRépondez OUI pour accepter ce suivi sur WhatsApp. Vous pourrez écrire STOP à tout moment pour l'arrêter.`,
+const FR: Record<
+  Exclude<FixedStep, TemplatedStep>,
+  (c: WordingContext) => string
+> = {
   consent_given: (c) =>
     `Merci ${c.ownerFirstName} ! C'est noté : je suivrai ${c.animalName} avec l'équipe de ${c.practiceName}. Vous pouvez m'écrire à tout moment, et en cas d'urgence appelez directement le cabinet. Écrivez STOP pour arrêter le suivi.`,
   consent_reminder: (c) =>
@@ -46,14 +65,8 @@ const FR: Record<FixedStep, (c: WordingContext) => string> = {
     `C'est noté : vous ne recevrez plus de messages de suivi pour ${c.animalName}. Écrivez REPRENDRE si vous changez d'avis. Pour toute question, contactez directement ${c.practiceName}.`,
   resumed: (c) =>
     `Bonne nouvelle, le suivi de ${c.animalName} reprend avec l'équipe de ${c.practiceName}. Écrivez STOP à tout moment pour l'arrêter.`,
-  check_in: (c) =>
-    `Comment va ${c.animalName} ? Vous pouvez me répondre ici : l'équipe de ${c.practiceName} lira votre message. En cas d'urgence, appelez directement le cabinet.`,
   photo_received: (c) =>
     `Merci ${c.ownerFirstName}, la photo de ${c.animalName} est bien arrivée. Je la transmets à l'équipe de ${c.practiceName} : seul le vétérinaire peut l'interpréter. En cas d'urgence, appelez directement le cabinet.`,
-  closing: (c) =>
-    `Le suivi de ${c.animalName} prévu par ${c.practiceName} se termine aujourd'hui, date du rendez-vous de contrôle. Je ne vous enverrai plus de message de suivi. Cette conversation reste ouverte : si vous m'écrivez, je transmets votre message à l'équipe. En cas d'urgence, appelez directement le cabinet.`,
-  intro_pair: (c) =>
-    `${FR.intro(c).split("\n\nRépondez OUI")[0]}\n\nCe suivi est proposé aussi à ${c.otherFirstName ?? "l'autre propriétaire"}. Si vous l'acceptez tous les deux, je créerai un groupe WhatsApp dédié au suivi de ${c.animalName} : vous y verrez tous les deux les messages, les vôtres comme les miens.\n\nRépondez OUI pour accepter ce suivi sur WhatsApp. Vous pourrez écrire STOP à tout moment pour l'arrêter.`,
   consent_given_waiting: (c) =>
     `Merci ${c.ownerFirstName} ! C'est noté. Dès que ${c.otherFirstName ?? "l'autre propriétaire"} aura accepté aussi, je créerai le groupe dédié au suivi de ${c.animalName}. En attendant, je vous écris ici. En cas d'urgence, appelez directement le cabinet.`,
   group_welcome: (c) =>
@@ -64,13 +77,12 @@ const FR: Record<FixedStep, (c: WordingContext) => string> = {
     `C'est noté, vous avez quitté le groupe du suivi de ${c.animalName} : je ne vous enverrai plus de message de suivi. ${c.otherFirstName ?? "L'autre propriétaire"} continue avec l'équipe de ${c.practiceName}. Vous pouvez toujours m'écrire ici ; en cas d'urgence, appelez directement le cabinet.`,
   stopped_all: (c) =>
     `C'est noté : le suivi de ${c.animalName} s'arrête, je n'enverrai plus de message de suivi. Écrivez REPRENDRE si vous changez d'avis. Pour toute question, contactez directement ${c.practiceName}.`,
-  stopped_by_other: (c) =>
-    `${c.otherFirstName ?? "L'autre propriétaire"} a demandé l'arrêt du suivi de ${c.animalName} : je n'enverrai plus de message de suivi. Vous pouvez toujours écrire ici, votre message sera transmis à l'équipe de ${c.practiceName}. En cas d'urgence, appelez directement le cabinet.`,
 };
 
-const EN: Record<FixedStep, (c: WordingContext) => string> = {
-  intro: (c) =>
-    `Hello ${c.ownerFirstName}, I'm Numa, the AI (artificial intelligence) assistant of ${c.practiceName}. ${c.vetName} asked me to check on ${c.animalName} after the visit to the clinic.\n\nI do not make diagnoses or change any treatment: every medical decision stays with the vet, who reads our messages.\n\nReply YES to accept this follow-up on WhatsApp. You can write STOP at any time to end it.`,
+const EN: Record<
+  Exclude<FixedStep, TemplatedStep>,
+  (c: WordingContext) => string
+> = {
   consent_given: (c) =>
     `Thank you ${c.ownerFirstName}! I will follow ${c.animalName} with the ${c.practiceName} team. You can write to me at any time; in an emergency, call the clinic directly. Write STOP to end the follow-up.`,
   consent_reminder: (c) =>
@@ -79,14 +91,8 @@ const EN: Record<FixedStep, (c: WordingContext) => string> = {
     `Noted: you will no longer receive follow-up messages about ${c.animalName}. Write RESUME if you change your mind. For any question, contact ${c.practiceName} directly.`,
   resumed: (c) =>
     `Good news, the follow-up of ${c.animalName} resumes with the ${c.practiceName} team. Write STOP at any time to end it.`,
-  check_in: (c) =>
-    `How is ${c.animalName} doing? You can reply here: the ${c.practiceName} team will read your message. In an emergency, call the clinic directly.`,
   photo_received: (c) =>
     `Thank you ${c.ownerFirstName}, the photo of ${c.animalName} has arrived. I'm passing it on to the ${c.practiceName} team: only the vet can interpret it. In an emergency, call the clinic directly.`,
-  closing: (c) =>
-    `The follow-up of ${c.animalName} planned by ${c.practiceName} ends today, the date of the check-up. I won't send you any more follow-up messages. This conversation stays open: if you write to me, I'll pass your message on to the team. In an emergency, call the clinic directly.`,
-  intro_pair: (c) =>
-    `${EN.intro(c).split("\n\nReply YES")[0]}\n\nThis follow-up is also offered to ${c.otherFirstName ?? "the other owner"}. If you both accept, I will create a WhatsApp group dedicated to ${c.animalName}'s follow-up: you will both see all messages there, yours and mine.\n\nReply YES to accept this follow-up on WhatsApp. You can write STOP at any time to end it.`,
   consent_given_waiting: (c) =>
     `Thank you ${c.ownerFirstName}! As soon as ${c.otherFirstName ?? "the other owner"} accepts too, I will create the group for ${c.animalName}'s follow-up. Until then, I'll write to you here. In an emergency, call the clinic directly.`,
   group_welcome: (c) =>
@@ -97,12 +103,78 @@ const EN: Record<FixedStep, (c: WordingContext) => string> = {
     `Noted, you have left the group for ${c.animalName}'s follow-up: I won't send you any more follow-up messages. ${c.otherFirstName ?? "The other owner"} continues with the ${c.practiceName} team. You can still write to me here; in an emergency, call the clinic directly.`,
   stopped_all: (c) =>
     `Noted: ${c.animalName}'s follow-up stops, I won't send any more follow-up messages. Write RESUME if you change your mind. For any question, contact ${c.practiceName} directly.`,
-  stopped_by_other: (c) =>
-    `${c.otherFirstName ?? "The other owner"} asked to stop ${c.animalName}'s follow-up: I won't send any more follow-up messages. You can still write here, your message will be passed on to the ${c.practiceName} team. In an emergency, call the clinic directly.`,
 };
 
-export function fixedMessage(step: FixedStep, context: WordingContext): string {
+function otherName(c: WordingContext): string {
+  return (
+    c.otherFirstName ??
+    (c.language === "en" ? "the other owner" : "l'autre propriétaire")
+  );
+}
+
+const TEMPLATED: Record<
+  TemplatedStep,
+  (c: WordingContext) => RenderedTemplate
+> = {
+  intro: (c) =>
+    renderTemplate("suivi_premier_message", c.language, {
+      first_name: c.ownerFirstName,
+      practice: c.practiceName,
+      vet: c.vetName,
+      animal: c.animalName,
+    }),
+  intro_pair: (c) =>
+    renderTemplate("suivi_premier_message_groupe", c.language, {
+      first_name: c.ownerFirstName,
+      practice: c.practiceName,
+      vet: c.vetName,
+      animal: c.animalName,
+      other_first_name: otherName(c),
+    }),
+  intro_separate: (c) =>
+    renderTemplate("suivi_premier_message_deux", c.language, {
+      first_name: c.ownerFirstName,
+      practice: c.practiceName,
+      vet: c.vetName,
+      animal: c.animalName,
+      other_first_name: otherName(c),
+    }),
+  check_in: (c) =>
+    renderTemplate("suivi_nouvelles", c.language, {
+      animal: c.animalName,
+      practice: c.practiceName,
+    }),
+  closing: (c) =>
+    renderTemplate("suivi_cloture", c.language, {
+      animal: c.animalName,
+      practice: c.practiceName,
+    }),
+  stopped_by_other: (c) =>
+    renderTemplate("suivi_arret_autre", c.language, {
+      other_first_name: otherName(c),
+      animal: c.animalName,
+      practice: c.practiceName,
+    }),
+};
+
+function isTemplated(step: FixedStep): step is TemplatedStep {
+  return Object.hasOwn(TEMPLATED, step);
+}
+
+/** Message de Numa : texte libre, ou modèle WhatsApp (texte rendu, clé et paramètres). */
+export type NumaContent = string | RenderedTemplate;
+
+export function fixedContent(
+  step: FixedStep,
+  context: WordingContext,
+): NumaContent {
+  if (isTemplated(step)) return TEMPLATED[step](context);
   return (context.language === "en" ? EN : FR)[step](context);
+}
+
+export function fixedMessage(step: FixedStep, context: WordingContext): string {
+  const content = fixedContent(step, context);
+  return typeof content === "string" ? content : content.body;
 }
 
 export function firstName(fullName: string): string {

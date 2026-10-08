@@ -1,8 +1,10 @@
 import type { Integration, SettingsView } from "@/domains/reglages/service";
 import { appText } from "@/i18n/app/server";
+import { services } from "@/server/services";
 import { formatDate } from "@/ui/format";
 
 import { ConnectForm, DisconnectForm } from "./settings-forms";
+import { WhatsAppSignup } from "./whatsapp-signup";
 
 /** Champ à saisir pour chaque connexion simulée ; aucun pour le mandat. */
 const FIELD_TYPES: Record<Integration, "tel" | "text" | null> = {
@@ -40,12 +42,17 @@ export async function IntegrationPanel({
       ? { label: copy.field, type: fieldType, hint: copy.hint }
       : undefined;
   const Heading = headingLevel === 2 ? "h2" : "h3";
+  // WhatsApp réel (ADR 0024) : connexion par l'inscription intégrée de Meta.
+  const signup =
+    provider === "whatsapp" ? services.settings().whatsappSignup() : null;
+  const simulated = connection ? !connection.live : !signup;
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Heading className="flex items-center gap-2 font-semibold">
-            {copy.title} <SimulatedBadge label={text.simulated} />
+            {copy.title}{" "}
+            {simulated ? <SimulatedBadge label={text.simulated} /> : null}
           </Heading>
           <p className="text-sm text-ink-muted">{copy.description}</p>
         </div>
@@ -61,6 +68,8 @@ export async function IntegrationPanel({
             formatDate(connection.connectedAt, locale),
           )}
         </p>
+      ) : signup ? (
+        <WhatsAppSignup appId={signup.appId} configId={signup.configId} />
       ) : (
         <ConnectForm
           provider={provider}

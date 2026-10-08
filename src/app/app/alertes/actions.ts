@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
+import { alertPhoneInput } from "@/domains/whatsapp/numero";
 import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
@@ -27,6 +28,26 @@ const input = z.object({
 function text(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === "string" ? value : "";
+}
+
+/** Numéro d'alerte WhatsApp du vétérinaire connecté (vide : retiré). */
+export async function alertPhoneAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { t } = await appText();
+  const phone = text(form, "phone").slice(0, 30);
+  if (!alertPhoneInput.safeParse(phone).success)
+    return { error: t.alerts.phone.invalid };
+  const context = await memberContext();
+  try {
+    await services.alerts().setAlertPhone(context, phone);
+  } catch (error) {
+    if (error instanceof DomainError) return domainFailure(error);
+    throw error;
+  }
+  revalidatePath("/app/alertes");
+  return { notice: t.alerts.phone.saved };
 }
 
 export async function alertAction(

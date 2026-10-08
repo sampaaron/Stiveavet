@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
 import type { PaymentMandateProvider } from "@/adapters/payments/types";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
+import { simulatedNumberLabel } from "@/adapters/whatsapp/fake";
+import { SignupError, signupInput } from "@/adapters/whatsapp/inscription";
 import {
   APPOINTMENT_KINDS,
   DEFAULT_APPOINTMENT_MINUTES,
@@ -16,6 +17,9 @@ import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { canReadProtocol } from "@/domains/protocoles/policies";
+import { tokenContext } from "@/domains/whatsapp/connexion";
+import { maskPhone } from "@/domains/whatsapp/numero";
+import type { WhatsAppSetup } from "@/domains/whatsapp/connexion";
 import {
   animalOwners,
   animals,
@@ -35,6 +39,7 @@ import {
   protocolVersions,
   protocols,
   users,
+  whatsappAccounts,
 } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
@@ -84,7 +89,10 @@ export type SettingsView = {
   }[];
   onCallCandidates: { membershipId: string; name: string }[];
   integrations: Partial<
-    Record<Integration, { displayLabel: string; connectedAt: Date }>
+    Record<
+      Integration,
+      { displayLabel: string; connectedAt: Date; live: boolean }
+    >
   >;
 };
 
@@ -126,7 +134,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 
 export function settingsService(deps: {
   db: Database;
-  whatsapp: WhatsAppConnector;
+  whatsapp: WhatsAppSetup;
   drveto: DrVetoConnector;
   payments: PaymentMandateProvider;
 }) {
@@ -282,7 +290,11 @@ export function settingsService(deps: {
           integrations: Object.fromEntries(
             integrations.map((row) => [
               row.provider,
-              { displayLabel: row.displayLabel, connectedAt: row.connectedAt },
+              {
+                displayLabel: row.displayLabel,
+                connectedAt: row.connectedAt,
+                live: row.mode === "live",
+              },
             ]),
           ),
         };
@@ -596,9 +608,11 @@ export function settingsService(deps: {
     async connect(actor: Actor, provider: Integration, input: string) {
       let displayLabel: string;
       if (provider === "whatsapp") {
-        const phone = parse(contactInput.shape.phone, input);
-        displayLabel = (await deps.whatsapp.connectBusinessNumber(phone))
-          .displayLabel;
+        // WhatsApp réel : le numéro se connecte par l'inscription intégrée de Meta.
+        if (deps.whatsapp.live) throw new DomainError("invalid_target");
+        displayLabel = simulatedNumberLabel(
+          parse(contactInput.shape.phone, input),
+        );
       } else if (provider === "drveto") {
         const code = parse(
           z
@@ -629,8 +643,87 @@ export function settingsService(deps: {
       });
     },
 
+    /** Identifiants publics du bouton d'inscription de Meta, si WhatsApp est réel. */
+    whatsappSignup(): { appId: string; configId: string } | null {
+      const setup = deps.whatsapp;
+      return setup.live
+        ? { appId: setup.appId, configId: setup.configId }
+        : null;
+    },
+
+    /**
+     * Numéro WhatsApp réel du cabinet, par l'inscription intégrée de Meta (ADR 0024) : le
+     * code reçu dans le navigateur est échangé ici, le jeton du cabinet est chiffré avant
+     * d'être enregistré, et seul un libellé masqué est affiché. Le PIN n'est jamais gardé.
+     */
+    async connectWhatsApp(actor: Actor, raw: unknown) {
+      assertPermission(actor, "organization.settings");
+      const setup = deps.whatsapp;
+      if (!setup.live) throw new DomainError("invalid_target");
+      const input = parse(signupInput, raw);
+      let result: { accessToken: string; displayPhone: string };
+      try {
+        // Appels à Meta hors de toute transaction.
+        result = await setup.signup.complete(input);
+      } catch (error) {
+        if (error instanceof SignupError)
+          throw new DomainError("whatsapp_signup_failed");
+        throw error;
+      }
+      const sealed = setup.box.seal(
+        result.accessToken,
+        tokenContext(actor.organizationId),
+      );
+      await run(actor, async (tx) => {
+        // Un numéro ne sert qu'à un cabinet : la base le garantit (index unique).
+        const taken = await tx.execute<{ org: string | null }>(
+          sql`SELECT app.whatsapp_organization(${input.phoneNumberId}) AS org`,
+        );
+        const owner = taken.rows[0]?.org ?? null;
+        if (owner && owner !== actor.organizationId)
+          throw new DomainError("whatsapp_number_taken");
+        const account = {
+          wabaId: input.wabaId,
+          phoneNumberId: input.phoneNumberId,
+          accessTokenSealed: sealed,
+          connectedByMembershipId: actor.membershipId,
+          connectedAt: new Date(),
+        };
+        await tx
+          .insert(whatsappAccounts)
+          .values({ organizationId: actor.organizationId, ...account })
+          .onConflictDoUpdate({
+            target: whatsappAccounts.organizationId,
+            set: account,
+          });
+        const displayLabel = maskPhone(result.displayPhone);
+        await tx
+          .insert(integrationConnections)
+          .values({
+            organizationId: actor.organizationId,
+            provider: "whatsapp",
+            mode: "live",
+            displayLabel,
+            connectedByMembershipId: actor.membershipId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              integrationConnections.organizationId,
+              integrationConnections.provider,
+            ],
+            set: { mode: "live", displayLabel },
+          });
+        await audit(tx, actor, "integration.connected", {
+          provider: "whatsapp",
+          simulated: false,
+        });
+      });
+    },
+
     async disconnect(actor: Actor, provider: Integration) {
       await run(actor, async (tx) => {
+        // Le jeton chiffré du cabinet est effacé avec la connexion.
+        if (provider === "whatsapp") await tx.delete(whatsappAccounts);
         await tx
           .delete(integrationConnections)
           .where(eq(integrationConnections.provider, provider));

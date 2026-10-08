@@ -7,14 +7,9 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
 import { appointmentsService } from "@/domains/agenda/demandes";
 import { slotLabel } from "@/domains/agenda/rendez-vous";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
@@ -22,9 +17,9 @@ import { protocolsService } from "@/domains/protocoles/service";
 import { WEEKDAYS, parisLocalToDate } from "@/domains/reglages/content";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import { createWorker } from "@/domains/taches/worker";
 
 import { asApp, errorCode, pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Rendez-vous proposés par Numa (lot 18, cahier des charges §8) : créneaux libres du seul
@@ -47,30 +42,20 @@ const conversations = conversationsService(appDb);
 const appointments = appointmentsService(appDb);
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
 const protocols = protocolsService(appDb);
 
-const sent: { to: string; body: string }[] = [];
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  async sendMessage(input) {
-    sent.push({ to: input.to, body: input.body });
-    return fakeWhatsApp.sendMessage(input);
-  },
-};
-const handlers = conversationHandlers({ whatsapp, ai: fakeAiGateway });
-const worker = createWorker({
+const whatsapp = recordingWhatsApp();
+const { sent } = whatsapp;
+const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-rendez-vous",
-  handlers: {
-    "followup.message": async (context) => {
-      const handler = handlers["followup.message"];
-      if (handler && context.job.organizationId === org) await handler(context);
-    },
-  },
+  organizationId: () => org,
+  whatsapp,
+  ai: fakeAiGateway,
 });
 
 const org = randomUUID();
@@ -152,6 +137,7 @@ async function launchAndAccept(ref: string): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );

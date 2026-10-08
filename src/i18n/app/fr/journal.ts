@@ -48,6 +48,8 @@ export const journal = {
       `${actor} a modifié la fiche d'un suivi`,
     "followup.treatments_validated": (actor: string) =>
       `${actor} a validé des traitements importés`,
+    "followup.whatsapp_optin": (actor: string) =>
+      `${actor} a noté l'accord du propriétaire pour WhatsApp`,
     "followup.launched": (actor: string) => `${actor} a lancé un suivi`,
     "followup.paused": (actor: string) => `${actor} a mis un suivi en pause`,
     "followup.resumed": (actor: string) => `${actor} a repris un suivi`,
@@ -117,6 +119,8 @@ export const journal = {
       `${actor} a retiré une garde`,
     "integration.connected": (actor: string) =>
       `${actor} a connecté un service (WhatsApp, dr.veto ou prélèvement)`,
+    "alert_phone.changed": (actor: string) =>
+      `${actor} a modifié son numéro d'alerte WhatsApp`,
     "integration.disconnected": (actor: string) =>
       `${actor} a déconnecté un service (WhatsApp, dr.veto ou prélèvement)`,
     "onboarding.step_completed": (actor: string) =>

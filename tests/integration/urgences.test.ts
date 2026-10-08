@@ -6,12 +6,7 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
@@ -19,8 +14,6 @@ import { protocolsService } from "@/domains/protocoles/service";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import type { JobHandler } from "@/domains/taches/worker";
-import { createWorker } from "@/domains/taches/worker";
 import {
   alertHandlers,
   alertsService,
@@ -29,6 +22,7 @@ import {
 import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Lot 14 : triage, alertes et garde (ADR 0017). Tests horodatés : l'escalade part à l'heure
@@ -48,34 +42,26 @@ const conversations = conversationsService(appDb);
 const alertsApi = alertsService(appDb);
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
 const protocols = protocolsService(appDb);
 
 /** WhatsApp simulé qui garde les messages au propriétaire et les alertes à l'équipe. */
-type Sent = { to: string; body: string; at: Date };
-type StaffAlert = { membershipId: string; kind: string; at: Date };
-const sent: Sent[] = [];
-const staffAlerts: StaffAlert[] = [];
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  simulated: true,
-  connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
-  async sendMessage(input) {
-    sent.push({ to: input.to, body: input.body, at: new Date() });
-    return fakeWhatsApp.sendMessage(input);
-  },
-  async sendStaffAlert(input) {
-    staffAlerts.push({
-      membershipId: input.membershipId,
-      kind: input.kind,
-      at: new Date(),
-    });
-    return fakeWhatsApp.sendStaffAlert(input);
-  },
-};
+const whatsapp = recordingWhatsApp();
+const { sent } = whatsapp;
+/** Numéro d'alerte de chaque vétérinaire (réglé dans « Alertes »), vers son identifiant. */
+const alertPhones = new Map<string, string>();
+const isStaff = (entry: (typeof sent)[number]) =>
+  entry.template === "alerte_urgente" || entry.template === "alerte_escalade";
+const staffAlerts = () =>
+  sent.filter(isStaff).map((entry) => ({
+    membershipId: alertPhones.get(entry.to),
+    kind: entry.template === "alerte_urgente" ? "urgent" : "escalation",
+    at: entry.at,
+  }));
+const ownerSent = () => sent.filter((entry) => !isStaff(entry));
 
 const org = randomUUID();
 const other = randomUUID();
@@ -88,22 +74,13 @@ let ids: {
   outsider: string;
 };
 
-const allHandlers: Record<string, JobHandler> = {
-  ...conversationHandlers({ whatsapp, ai: fakeAiGateway }),
-  ...alertHandlers({ whatsapp }),
-};
 // Base partagée : seules les tâches de ce cabinet sont exécutées ici.
-const worker = createWorker({
+const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-urgences",
-  handlers: Object.fromEntries(
-    Object.entries(allHandlers).map(([kind, handler]) => [
-      kind,
-      (async (context) => {
-        if (context.job.organizationId === org) await handler(context);
-      }) satisfies JobHandler,
-    ]),
-  ),
+  organizationId: () => org,
+  whatsapp,
+  ai: fakeAiGateway,
 });
 
 async function drain() {
@@ -173,6 +150,7 @@ async function launchWithConsent(ref: string): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );
@@ -237,9 +215,10 @@ async function jobsOf(alertId: string) {
 
 /** Exécute l'escalade d'une alerte comme le worker, avec une horloge choisie. */
 async function escalateAt(alertId: string, clock: Date) {
-  const handler = alertHandlers({ whatsapp, clock: () => clock })[
-    "alert.escalate"
-  ];
+  const handler = alertHandlers({
+    whatsapp: whatsapp.provider,
+    clock: () => clock,
+  }).handlers["alert.escalate"];
   if (!handler) throw new Error("exécutant manquant");
   await withTenant(appDb, { organizationId: org }, (tx) =>
     handler({
@@ -255,6 +234,8 @@ async function escalateAt(alertId: string, clock: Date) {
       },
     }),
   );
+  // Chaque alerte part par sa propre tâche d'envoi.
+  await drain();
 }
 
 /** Évalue à nouveau un message du propriétaire, à une heure choisie. */
@@ -307,6 +288,14 @@ beforeAll(async () => {
   const lou = await actor(adminId);
   await settings.connect(lou, "drveto", "ESSAI-03");
   await settings.connect(lou, "whatsapp", "06 39 98 00 02");
+  for (const [membershipId, phone] of [
+    [adminId, "+33639981001"],
+    [vet, "+33639981002"],
+    [vet2, "+33639981003"],
+  ] as const) {
+    await alertsApi.setAlertPhone(await actor(membershipId), phone);
+    alertPhones.set(phone, membershipId);
+  }
   for (const key of ["sterilisation-chatte", "sterilisation-chienne"]) {
     const id = await protocols.installFromLibrary(lou, key);
     await protocols.validate(lou, id);
@@ -320,7 +309,7 @@ let firstAlert: AlertRow;
 describe("urgence : consignes tout de suite, escalade à l'heure réglée", () => {
   it("un message urgent : consignes au propriétaire et alerte au responsable dans le même passage", async () => {
     plume = await launchWithConsent("DV-20481");
-    const ownerMessagesBefore = sent.length;
+    const ownerMessagesBefore = ownerSent().length;
     const received = await conversations.receiveOwnerMessage(
       org,
       plume,
@@ -351,7 +340,7 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
 
     await drain();
     // Les consignes partent au propriétaire, sans attendre l'escalade.
-    const toOwner = sent.slice(ownerMessagesBefore);
+    const toOwner = ownerSent().slice(ownerMessagesBefore);
     const instructions = toOwner.find((message) =>
       message.body.includes("Consignes du cabinet"),
     );
@@ -368,7 +357,7 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
     // Numa poursuit ensuite la discussion (elle a la main et l'accord).
     expect(toOwner.at(-1)?.body).not.toContain("Consignes du cabinet");
     // Le responsable est alerté par WhatsApp ; personne d'autre.
-    expect(staffAlerts).toEqual([
+    expect(staffAlerts()).toEqual([
       expect.objectContaining({ membershipId: ids.vet, kind: "urgent" }),
     ]);
     expect((await alertById(alert.id)).status).toBe("open");
@@ -377,9 +366,9 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
   it("rien ne part avant l'heure : la tâche attend, et une exécution trop tôt se replanifie", async () => {
     await drain();
     expect((await alertById(firstAlert.id)).status).toBe("open");
-    expect(staffAlerts.filter((entry) => entry.kind === "escalation")).toEqual(
-      [],
-    );
+    expect(
+      staffAlerts().filter((entry) => entry.kind === "escalation"),
+    ).toEqual([]);
 
     const due = firstAlert.escalate_at;
     if (!due) throw new Error("escalade non prévue");
@@ -396,7 +385,7 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
     const escalated = await alertById(firstAlert.id);
     expect(escalated.status).toBe("escalated");
     expect(escalated.escalated_at?.getTime()).toBe(due.getTime());
-    const escalations = staffAlerts.filter(
+    const escalations = staffAlerts().filter(
       (entry) => entry.kind === "escalation",
     );
     expect(escalations.map((entry) => entry.membershipId).sort()).toEqual(
@@ -405,7 +394,7 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
     // Rejouée, l'escalade ne renvoie rien.
     await escalateAt(firstAlert.id, new Date(due.getTime() + MINUTE));
     expect(
-      staffAlerts.filter((entry) => entry.kind === "escalation"),
+      staffAlerts().filter((entry) => entry.kind === "escalation"),
     ).toHaveLength(2);
   });
 
@@ -448,12 +437,14 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
         .map((job) => job.status),
     ).toEqual(["cancelled"]);
 
-    const before = staffAlerts.length;
+    const before = staffAlerts().length;
     await escalateAt(alert.id, new Date(alert.escalate_at.getTime() + MINUTE));
     await drain();
     expect((await alertById(alert.id)).status).toBe("acknowledged");
     expect(
-      staffAlerts.slice(before).filter((entry) => entry.kind === "escalation"),
+      staffAlerts()
+        .slice(before)
+        .filter((entry) => entry.kind === "escalation"),
     ).toEqual([]);
     expect(
       await domainError(alertsApi.acknowledge(await actor(ids.vet), alert.id)),
@@ -507,7 +498,7 @@ describe("urgence : consignes tout de suite, escalade à l'heure réglée", () =
 
 describe("à surveiller et garde", () => {
   it("à surveiller : notification sur l'ordinateur du responsable, sans WhatsApp ni escalade", async () => {
-    const before = staffAlerts.length;
+    const before = staffAlerts().length;
     const received = await conversations.receiveOwnerMessage(
       org,
       plume,
@@ -522,7 +513,7 @@ describe("à surveiller et garde", () => {
       escalate_at: null,
     });
     await drain();
-    expect(staffAlerts.length).toBe(before);
+    expect(staffAlerts().length).toBe(before);
     const { rows } = await admin.query(
       `SELECT channel, status, recipient_membership_id FROM notification_deliveries
        WHERE alert_id = $1`,
@@ -638,7 +629,7 @@ describe("droits, isolation et garde-fous de la base", () => {
       (await conversations.receiveOwnerMessage(org, plume, "STOP")).outcome,
     ).toBe("stopped");
     await drain();
-    const before = sent.length;
+    const before = ownerSent().length;
     const received = await conversations.receiveOwnerMessage(
       org,
       plume,
@@ -646,7 +637,7 @@ describe("droits, isolation et garde-fous de la base", () => {
     );
     expect(received).toMatchObject({ outcome: "stored", triage: "urgent" });
     await drain();
-    expect(sent.length).toBe(before);
+    expect(ownerSent().length).toBe(before);
     expect(await alertOfMessage(received.messageId)).toMatchObject({
       level: "urgent",
       status: "open",

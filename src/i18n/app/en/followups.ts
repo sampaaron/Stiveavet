@@ -103,7 +103,13 @@ export const followups: AppDictionary["followups"] = {
       "Numa writes on their behalf; they are the one who launches the follow-up.",
     includeSecond: (name: string) => `Include ${name}, second owner`,
     secondHint:
-      "Numa also asks for their consent. Once both have accepted, a WhatsApp group brings the owners and Numa together; anyone can leave it by sending STOP.",
+      "Numa also asks for their consent. Each owner talks with Numa (in a shared group if the practice number allows it) and can stop everything by sending STOP; the team reads everything.",
+    optInLabel: (count: number) =>
+      count > 1
+        ? "The owners agreed at the practice to be contacted on WhatsApp"
+        : "The owner agreed at the practice to be contacted on WhatsApp",
+    optInHint:
+      "Required to launch: WhatsApp forbids messaging anyone who has not agreed to it. Numa will then ask for consent to the follow-up itself.",
     stepsTitle: "Numa's steps and questions",
     stepsDraft:
       "Taken from the protocol. Adjust them for this animal: the practice's protocol stays unchanged.",

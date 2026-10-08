@@ -37,5 +37,11 @@ export const errors: AppDictionary["errors"] = {
       "File rejected: send a JPEG, PNG or WebP image of 5 MB at most (or a voice note).",
     capture_unreadable:
       "No free slot could be read from this screenshot. It has been deleted; try again with a sharper screenshot.",
+    whatsapp_signup_failed:
+      "Meta did not confirm the number connection. Start again from the button; check the PIN if the number already had one.",
+    whatsapp_number_taken:
+      "This WhatsApp number is already linked to another practice on Stivea Vet.",
+    optin_missing:
+      "Tick the owner's WhatsApp agreement, collected at the practice, before launching the follow-up.",
   },
 };

@@ -90,6 +90,20 @@ export const settings: AppDictionary["settings"] = {
       submit: "Connect the number (simulated)",
       field: "WhatsApp Business number",
       hint: "Only the last two digits are kept.",
+      live: {
+        description:
+          "Connect the practice's WhatsApp Business number with your Meta account. Numa will write from this number; Stivea Vet never sees your password.",
+        pin: "Two-step verification PIN",
+        pinHint:
+          "6 digits. If the number already has one, enter it; otherwise choose one and keep it safe. Stivea Vet does not store it.",
+        submit: "Connect with Meta",
+        waiting: "Meta window open: follow the steps, then come back here.",
+        finishing: "Connecting the number…",
+        cancelled:
+          "Connection interrupted in the Meta window. You can start again.",
+        unavailable:
+          "The Meta window could not open. Allow pop-ups for this site, then try again.",
+      },
     },
     drveto: {
       title: "dr.veto",
@@ -128,6 +142,7 @@ export const settings: AppDictionary["settings"] = {
     onCallEnded: "This on-call shift has already ended.",
     onCallTooLong: "An on-call shift lasts 14 days at most.",
     drvetoCode: "dr.veto practice code: 3 to 32 letters, digits or hyphens.",
+    whatsappPin: "The PIN has exactly 6 digits.",
     chooseProtocol: "Choose a validated protocol.",
     invalidInput: "Check the values entered.",
   },

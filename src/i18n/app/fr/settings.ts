@@ -91,6 +91,21 @@ export const settings = {
       submit: "Connecter le numéro (simulé)",
       field: "Numéro WhatsApp Business",
       hint: "Seuls les deux derniers chiffres sont conservés.",
+      live: {
+        description:
+          "Connectez le numéro WhatsApp Business du cabinet avec votre compte Meta. Numa écrira depuis ce numéro ; Stivea Vet ne voit jamais votre mot de passe.",
+        pin: "Code PIN de vérification en deux étapes",
+        pinHint:
+          "6 chiffres. Si le numéro en a déjà un, saisissez-le ; sinon, choisissez-le et gardez-le précieusement. Il n'est pas conservé par Stivea Vet.",
+        submit: "Connecter avec Meta",
+        waiting:
+          "Fenêtre de Meta ouverte : suivez les étapes, puis revenez ici.",
+        finishing: "Connexion du numéro en cours…",
+        cancelled:
+          "Connexion interrompue dans la fenêtre de Meta. Vous pouvez recommencer.",
+        unavailable:
+          "La fenêtre de Meta n'a pas pu s'ouvrir. Autorisez les fenêtres de ce site, puis réessayez.",
+      },
     },
     drveto: {
       title: "dr.veto",
@@ -129,6 +144,7 @@ export const settings = {
     onCallEnded: "Cette garde est déjà terminée.",
     onCallTooLong: "Une garde dure au plus 14 jours.",
     drvetoCode: "Code du cabinet dr.veto : 3 à 32 lettres, chiffres ou tirets.",
+    whatsappPin: "Le code PIN compte exactement 6 chiffres.",
     chooseProtocol: "Choisissez un protocole validé.",
     /** Saisie refusée sans code connu (message par défaut de la validation). */
     invalidInput: "Vérifiez les valeurs saisies.",

@@ -113,7 +113,13 @@ export const followups = {
       "Numa écrit en son nom ; c'est lui ou elle qui lance le suivi.",
     includeSecond: (name: string) => `Inclure ${name}, second propriétaire`,
     secondHint:
-      "Numa lui demande aussi son accord. Dès que les deux ont accepté, un groupe WhatsApp réunit les propriétaires et Numa ; chacun peut le quitter par STOP.",
+      "Numa lui demande aussi son accord. Chacun échange avec Numa (dans un groupe commun si le numéro du cabinet le permet) et peut tout arrêter par STOP ; l'équipe lit tout.",
+    optInLabel: (count: number) =>
+      count > 1
+        ? "Les propriétaires ont accepté au cabinet d'être contactés sur WhatsApp"
+        : "Le propriétaire a accepté au cabinet d'être contacté sur WhatsApp",
+    optInHint:
+      "Obligatoire pour lancer : WhatsApp interdit d'écrire à quelqu'un qui ne l'a pas accepté. Numa demandera ensuite l'accord au suivi lui-même.",
     stepsTitle: "Étapes et questions de Numa",
     stepsDraft:
       "Reprises du protocole. Modifiez-les pour cet animal : le protocole du cabinet ne change pas.",

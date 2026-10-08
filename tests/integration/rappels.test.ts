@@ -6,12 +6,7 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway, simulatedNumaStep } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
@@ -24,12 +19,10 @@ import {
   messageWindows,
   scheduleReminders,
 } from "@/domains/suivis/rappels";
-import type { JobHandler } from "@/domains/taches/worker";
-import { createWorker } from "@/domains/taches/worker";
-import { alertHandlers } from "@/domains/urgences/service";
 import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Lot 15 : rappels planifiés et fin du suivi automatisé (ADR 0018). Les heures d'envoi sont
@@ -50,45 +43,26 @@ const launches = launchService({ db: appDb, drveto });
 const conversations = conversationsService(appDb);
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
 const protocols = protocolsService(appDb);
 
-type Sent = { to: string; body: string; idempotencyKey: string };
-const sent: Sent[] = [];
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  simulated: true,
-  connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
-  sendStaffAlert: fakeWhatsApp.sendStaffAlert,
-  async sendMessage(input) {
-    sent.push(input);
-    return fakeWhatsApp.sendMessage(input);
-  },
-};
+const whatsapp = recordingWhatsApp();
+const { sent } = whatsapp;
 
 const org = randomUUID();
 const tag = org.slice(0, 8);
 let ids: { admin: string; vet: string };
 
-const allHandlers: Record<string, JobHandler> = {
-  ...conversationHandlers({ whatsapp, ai: fakeAiGateway }),
-  ...alertHandlers({ whatsapp }),
-  ...followupEndHandlers(),
-};
-const worker = createWorker({
+const { worker, handlers: allHandlers } = conversationWorker({
   db: appDb,
   workerId: "test-rappels",
-  handlers: Object.fromEntries(
-    Object.entries(allHandlers).map(([kind, handler]) => [
-      kind,
-      (async (context) => {
-        if (context.job.organizationId === org) await handler(context);
-      }) satisfies JobHandler,
-    ]),
-  ),
+  organizationId: () => org,
+  whatsapp,
+  ai: fakeAiGateway,
+  extra: followupEndHandlers(),
 });
 
 async function drain() {
@@ -145,6 +119,7 @@ async function launch(ref: string): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );
@@ -393,6 +368,7 @@ describe("rappels planifiés", () => {
         validateTreatmentIds: [],
         removeTreatmentIds: [],
         addTreatments: [],
+        whatsappOptIn: true,
       },
       { launch: false },
     );

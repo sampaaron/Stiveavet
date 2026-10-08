@@ -12,6 +12,7 @@ import { recordUsage } from "@/domains/facturation/service";
 import { canReadProtocol } from "@/domains/protocoles/policies";
 import { MAX_STEPS } from "@/domains/protocoles/content";
 import { emit, enqueue } from "@/domains/taches/queue";
+import { maskPhone } from "@/domains/whatsapp/numero";
 import {
   alertRules,
   animalOwners,
@@ -53,7 +54,6 @@ import {
   firstContactHours,
   fitsSpecies,
   isPastStep,
-  maskedPhone,
   sheetInput,
   stepDueAt,
   suggestProtocol,
@@ -134,6 +134,8 @@ export type LaunchSheet = {
     active: boolean;
     phone: string;
     language: "fr" | "en";
+    /** Accord pour WhatsApp recueilli au cabinet (ADR 0024). */
+    optedIn: boolean;
   }[];
   treatments: SheetTreatment[];
   protocol: {
@@ -594,6 +596,21 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     // Un suivi test n'envoie rien : il ne demande ni WhatsApp ni facturation.
     if (!followup.isTest && !(await isConnected(tx, "whatsapp")))
       throw new DomainError("integration_missing");
+    // Pas de premier message sans l'accord pour WhatsApp, recueilli au cabinet.
+    if (!followup.isTest) {
+      const [missing] = await tx
+        .select({ id: followupContacts.id })
+        .from(followupContacts)
+        .where(
+          and(
+            eq(followupContacts.followupId, followupId),
+            eq(followupContacts.active, true),
+            isNull(followupContacts.whatsappOptinAt),
+          ),
+        )
+        .limit(1);
+      if (missing) throw new DomainError("optin_missing");
+    }
 
     await setStatusReason(tx, "launched");
     await tx
@@ -828,6 +845,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             active: followupContacts.active,
             phone: ownerContacts.value,
             language: followupContacts.language,
+            optinAt: followupContacts.whatsappOptinAt,
           })
           .from(followupContacts)
           .innerJoin(owners, eq(owners.id, followupContacts.ownerId))
@@ -959,8 +977,9 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             name: contact.name,
             role: contact.role,
             active: contact.active,
-            phone: maskedPhone(contact.phone),
+            phone: maskPhone(contact.phone),
             language: contact.language,
+            optedIn: contact.optinAt !== null,
           })),
           treatments: treatments.map((treatment) => ({
             ...treatment,
@@ -1093,6 +1112,33 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             if (data.secondContactActive && !updated.length)
               throw new DomainError("invalid_target");
           }
+          if (data.whatsappOptIn !== undefined)
+            await tx
+              .update(followupContacts)
+              .set(
+                data.whatsappOptIn
+                  ? {
+                      whatsappOptinAt: now,
+                      whatsappOptinByMembershipId: actor.membershipId,
+                    }
+                  : {
+                      whatsappOptinAt: null,
+                      whatsappOptinByMembershipId: null,
+                    },
+              )
+              .where(
+                and(
+                  eq(followupContacts.followupId, followupId),
+                  // Accord déjà noté : sa date et son auteur restent ceux d'origine.
+                  data.whatsappOptIn
+                    ? isNull(followupContacts.whatsappOptinAt)
+                    : sql`true`,
+                ),
+              );
+          if (data.whatsappOptIn !== undefined)
+            await audit(tx, actor, "followup.whatsapp_optin", followupId, {
+              given: data.whatsappOptIn,
+            });
         }
 
         // Traitements : décisions de vétérinaire.
