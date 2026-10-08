@@ -63,6 +63,13 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
   "simulator.owner_message": ({ actorName }) =>
     `${actorName} a simulé un message de propriétaire (local)`,
+  "alert.raised": () =>
+    "Triage : un message de propriétaire a ouvert une alerte",
+  "alert.escalated": () =>
+    "Urgence sans accusé de réception : toute l'équipe vétérinaire a été alertée",
+  "alert.acknowledged": ({ actorName }) =>
+    `${actorName} a accusé réception d'une alerte`,
+  "alert.resolved": ({ actorName }) => `${actorName} a clos une alerte`,
   "job.retried": ({ actorName }) => `${actorName} a relancé une tâche en échec`,
   "job.cancelled": ({ actorName }) =>
     `${actorName} a abandonné une tâche en échec`,

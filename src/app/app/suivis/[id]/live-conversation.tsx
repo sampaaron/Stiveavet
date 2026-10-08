@@ -31,6 +31,7 @@ function toBubble(message: ConversationMessage): Message {
       : formatTime(message.occurredAt),
     dayLabel: formatDate(message.occurredAt),
     text: message.body,
+    triage: message.triage ?? undefined,
   };
 }
 

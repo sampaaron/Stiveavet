@@ -4,11 +4,13 @@ import type { ReactNode } from "react";
 import { AUTH_POLICY } from "@/domains/auth/policy";
 import { memberProfile } from "@/server/auth/profile";
 import { memberContext } from "@/server/authz";
+import { services } from "@/server/services";
 import { AppShell } from "@/ui/app-shell";
 import { Button } from "@/ui/button";
 
 import { lockAction, logoutAction } from "../(auth)/actions";
 
+import { AlertsNotice } from "./alerts-notice";
 import { BillingNotice } from "./billing-notice";
 import { IdleLock } from "./idle-lock";
 
@@ -21,7 +23,10 @@ export default async function CabinetLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const context = await memberContext();
-  const profile = await memberProfile(context);
+  const [profile, alerts] = await Promise.all([
+    memberProfile(context),
+    services.alerts().open(context),
+  ]);
 
   return (
     <AppShell
@@ -60,6 +65,7 @@ export default async function CabinetLayout({
         access={context.billing}
         canManage={context.permissions.has("billing.manage")}
       />
+      <AlertsNotice alerts={alerts} />
       {children}
     </AppShell>
   );

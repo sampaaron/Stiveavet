@@ -152,6 +152,42 @@ const ANIMALS: readonly FakeAnimal[] = [
       },
     ],
   },
+  {
+    ref: "DV-20612",
+    animal: {
+      name: "Nougat",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2023-02-14",
+      weightGrams: 3600,
+    },
+    owners: [
+      { fullName: "Inès Marchal", phone: "+33639980109", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20627",
+    animal: {
+      name: "Olive",
+      species: "cat",
+      breed: "Chartreux",
+      birthDate: "2022-06-01",
+      weightGrams: 3900,
+    },
+    owners: [
+      { fullName: "Oliver Hughes", phone: "+33639980110", language: "en" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

@@ -51,6 +51,7 @@ let failNext = 0;
 const whatsapp: WhatsAppConnector = {
   simulated: true,
   connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
+  sendStaffAlert: fakeWhatsApp.sendStaffAlert,
   async sendMessage(input) {
     if (failNext > 0) {
       failNext -= 1;

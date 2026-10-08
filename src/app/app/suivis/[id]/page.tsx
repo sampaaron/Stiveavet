@@ -29,6 +29,7 @@ import {
   SPECIES_LABELS,
   followupBadge,
 } from "../followup-labels";
+import { AlertCard } from "../../alert-card";
 import { TestMark } from "../test-mark";
 
 import { AccessPanel } from "./access-panel";
@@ -51,6 +52,8 @@ const DONE: Record<string, string> = {
     "Message envoyé : vous avez repris la main, Numa est en pause jusqu'à « Reprendre Numa ».",
   message: "Message envoyé depuis le WhatsApp du cabinet.",
   numa: "Numa reprend la conversation.",
+  "alerte-recue": "Réception confirmée : l'escalade est annulée.",
+  "alerte-close": "Alerte close.",
 };
 
 export default async function FollowupPage({
@@ -96,6 +99,21 @@ export default async function FollowupPage({
       />
     ) : null;
 
+  // Alertes du triage non closes, au-dessus de la conversation (accès clinique seulement).
+  const alerts =
+    !fixture && followup.access === "clinical" && followup.status !== "draft"
+      ? (await services.alerts().ofFollowup(context, followup.id)).filter(
+          (alert) => alert.status !== "resolved",
+        )
+      : [];
+  const alertCards = alerts.length ? (
+    <section aria-label="Alertes du triage" className="grid gap-3">
+      {alerts.map((alert) => (
+        <AlertCard key={alert.id} alert={alert} from="dossier" />
+      ))}
+    </section>
+  ) : null;
+
   const accessPanel = opened.canManageAccess ? (
     <AccessPanel
       context={context}
@@ -138,6 +156,7 @@ export default async function FollowupPage({
           accessPanel={accessPanel}
           protocolLink={protocolLink}
           steering={<Steering context={context} followup={followup} />}
+          alerts={alertCards}
           conversation={conversation}
         />
       )}
@@ -227,12 +246,14 @@ function BasicDossier({
   accessPanel,
   protocolLink,
   steering,
+  alerts,
   conversation,
 }: {
   followup: FollowupView;
   accessPanel: ReactNode;
   protocolLink: ReactNode;
   steering: ReactNode;
+  alerts: ReactNode;
   conversation: ReactNode;
 }) {
   const badge = followupBadge(followup);
@@ -265,6 +286,7 @@ function BasicDossier({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
+          {alerts}
           {conversation}
           <SectionCard title="Organisation">
             <dl className="grid gap-3 text-sm sm:grid-cols-2">

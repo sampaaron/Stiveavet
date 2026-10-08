@@ -11,6 +11,11 @@ import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup, setStatusReason } from "@/domains/suivis/lancement";
 import { canResumeNuma, canWriteToOwner } from "@/domains/suivis/policies";
 import { JobError } from "@/domains/taches/kinds";
+import {
+  emergencyGuidance,
+  triageOwnerMessage,
+} from "@/domains/urgences/service";
+import type { TriageLevel } from "@/domains/urgences/triage";
 import { emit, enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
 import {
@@ -26,6 +31,7 @@ import {
   ownerContacts,
   owners,
   scheduledJobs,
+  triageEvents,
   users,
 } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
@@ -33,7 +39,12 @@ import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { checkNumaReply, safeFallback } from "./guard";
 import { ownerKeyword } from "./keywords";
-import { CONSENT_WORDING_VERSION, firstName, fixedMessage } from "./wording";
+import {
+  CONSENT_WORDING_VERSION,
+  emergencyMessage,
+  firstName,
+  fixedMessage,
+} from "./wording";
 import type { FixedStep, WordingContext } from "./wording";
 
 /**
@@ -61,6 +72,8 @@ export type ConversationMessage = {
   body: string;
   occurredAt: Date;
   delivery: "queued" | "sent" | "delivered" | "read" | "failed" | null;
+  /** Niveau du triage d'un message du propriétaire, s'il a été évalué. */
+  triage: TriageLevel | null;
 };
 
 export type ConversationView = {
@@ -81,6 +94,7 @@ export type InboundOutcome =
   | "stopped"
   | "resumed"
   | "reply"
+  | "urgent"
   | "stored";
 
 const MAX_BODY = 4096;
@@ -103,6 +117,7 @@ const jobPayload = z.discriminatedUnion("step", [
       "stopped",
       "resumed",
       "reply",
+      "urgent",
       "deliver",
     ]),
     messageId: z.uuid(),
@@ -124,6 +139,7 @@ type ConversationContext = {
   animalName: string;
   practiceName: string;
   vetName: string;
+  responsibleMembershipId: string;
   firstContactAt: Date | null;
   contact: Contact | null;
 };
@@ -147,6 +163,7 @@ async function loadContext(
       status: followups.status,
       isTest: followups.isTest,
       firstContactAt: followups.firstContactAt,
+      responsibleMembershipId: followups.responsibleMembershipId,
       animalName: animals.name,
       practiceName: organizations.name,
       vetName: users.displayName,
@@ -459,34 +476,35 @@ export function conversationHandlers(deps: {
       throw new JobError("target_missing");
     const key = `${payload.step}:${source.id}`;
 
+    if (payload.step === "urgent") {
+      const consent = await latestConsent(tx, contact.id);
+      // Après un STOP, rien ne part ; l'équipe a déjà été alertée.
+      if (consent?.state === "withdrawn") return;
+      const guidance = await emergencyGuidance(tx);
+      await sendNuma(
+        tx,
+        ctx,
+        contact,
+        key,
+        emergencyMessage({
+          ...guidance,
+          language: contact.language,
+          ownerFirstName: firstName(contact.ownerFullName),
+          animalName: ctx.animalName,
+          practiceName: ctx.practiceName,
+        }),
+      );
+      // Puis Numa poursuit la discussion, si elle a la main et l'accord du propriétaire.
+      if (ctx.status === "active" && consent?.state === "given")
+        await reply(tx, ctx, contact, source);
+      return;
+    }
+
     if (payload.step === "reply") {
       const consent = await latestConsent(tx, contact.id);
       // Reprise en main, pause, arrêt ou accord retiré depuis l'arrivée du message.
       if (ctx.status !== "active" || consent?.state !== "given") return;
-      let text: string;
-      try {
-        ({ text } = await ai.numaReply({
-          language: contact.language,
-          animalName: ctx.animalName,
-          practiceName: ctx.practiceName,
-          ownerMessage: source.body,
-        }));
-      } catch {
-        throw new JobError("provider_unavailable");
-      }
-      const verdict = checkNumaReply(text);
-      if (!verdict.ok)
-        await auditSystem(
-          tx,
-          ctx.organizationId,
-          "numa.reply_blocked",
-          ctx.followupId,
-          { reason: verdict.reason },
-        );
-      const body = verdict.ok
-        ? text
-        : safeFallback(contact.language, ctx.practiceName);
-      await sendNuma(tx, ctx, contact, key, body);
+      await reply(tx, ctx, contact, source);
       return;
     }
 
@@ -504,18 +522,56 @@ export function conversationHandlers(deps: {
     );
   };
 
+  /** Réponse de Numa par la passerelle IA, filtrée par les garde-fous. */
+  async function reply(
+    tx: TenantTransaction,
+    ctx: ConversationContext,
+    contact: Contact,
+    source: { id: string; body: string },
+  ) {
+    const key = `reply:${source.id}`;
+    let text: string;
+    try {
+      ({ text } = await ai.numaReply({
+        language: contact.language,
+        animalName: ctx.animalName,
+        practiceName: ctx.practiceName,
+        ownerMessage: source.body,
+      }));
+    } catch {
+      throw new JobError("provider_unavailable");
+    }
+    const verdict = checkNumaReply(text);
+    if (!verdict.ok)
+      await auditSystem(
+        tx,
+        ctx.organizationId,
+        "numa.reply_blocked",
+        ctx.followupId,
+        { reason: verdict.reason },
+      );
+    const body = verdict.ok
+      ? text
+      : safeFallback(contact.language, ctx.practiceName);
+    await sendNuma(tx, ctx, contact, key, body);
+  }
+
   return { "followup.message": handler };
 }
 
 /**
  * Message du propriétaire, reçu par WhatsApp (simulé en phase 2). Il est toujours conservé ;
- * ce qu'il déclenche dépend de l'accord en cours et de l'état du suivi.
+ * ce qu'il déclenche dépend de l'accord en cours, du triage et de l'état du suivi.
  */
 async function receiveInTx(
   tx: TenantTransaction,
   followupId: string,
   body: string,
-): Promise<{ messageId: string; outcome: InboundOutcome }> {
+): Promise<{
+  messageId: string;
+  outcome: InboundOutcome;
+  triage: TriageLevel;
+}> {
   const ctx = await loadContext(tx, followupId, true);
   if (ctx.status === "draft" || ctx.isTest)
     throw new DomainError("invalid_transition");
@@ -542,6 +598,8 @@ async function receiveInTx(
   const consent = await latestConsent(tx, contact.id);
   let outcome: InboundOutcome = "stored";
 
+  let triage: TriageLevel = "normal";
+
   if (keyword === "stop" && consent?.state !== "withdrawn") {
     await recordConsent(tx, ctx, contact.id, "withdrawn", messageId);
     await enqueueMessageJob(tx, ctx, "stopped", messageId);
@@ -557,15 +615,37 @@ async function receiveInTx(
     await recordConsent(tx, ctx, contact.id, "given", messageId);
     await enqueueMessageJob(tx, ctx, "resumed", messageId);
     outcome = "resumed";
-  } else if (consent?.state === "requested") {
-    // Une seule relance par demande d'accord : la clé de tâche dérive de la demande.
-    await enqueueMessageJob(tx, ctx, "consent_reminder", messageId, consent.id);
-    outcome = "consent_reminder";
-  } else if (consent?.state === "given" && ctx.status === "active") {
-    await enqueueMessageJob(tx, ctx, "reply", messageId);
-    outcome = "reply";
+  } else {
+    // Un message de contenu est toujours évalué, même repris en main ou en pause : l'équipe
+    // est alertée dans tous les cas.
+    ({ level: triage } = await triageOwnerMessage(tx, {
+      organizationId: ctx.organizationId,
+      followupId,
+      responsibleMembershipId: ctx.responsibleMembershipId,
+      messageId,
+      body,
+    }));
+    if (triage === "urgent" && consent?.state !== "withdrawn") {
+      // Consignes d'urgence tout de suite, même avant l'accord : ce sont les numéros du
+      // cabinet, pas un contenu de suivi. Numa poursuit ensuite si elle a la main.
+      await enqueueMessageJob(tx, ctx, "urgent", messageId);
+      outcome = "urgent";
+    } else if (consent?.state === "requested") {
+      // Une seule relance par demande d'accord : la clé de tâche dérive de la demande.
+      await enqueueMessageJob(
+        tx,
+        ctx,
+        "consent_reminder",
+        messageId,
+        consent.id,
+      );
+      outcome = "consent_reminder";
+    } else if (consent?.state === "given" && ctx.status === "active") {
+      await enqueueMessageJob(tx, ctx, "reply", messageId);
+      outcome = "reply";
+    }
+    // Sinon (repris en main, en pause, terminé, accord retiré) : conservé pour l'équipe.
   }
-  // Sinon (repris en main, en pause, terminé, accord retiré) : conservé pour l'équipe.
 
   await emit(tx, {
     organizationId: ctx.organizationId,
@@ -573,7 +653,7 @@ async function receiveInTx(
     aggregateType: "message",
     aggregateId: messageId,
   });
-  return { messageId, outcome };
+  return { messageId, outcome, triage };
 }
 
 export function conversationsService(db: Database) {
@@ -626,8 +706,10 @@ export function conversationsService(db: Database) {
             body: messages.body,
             occurredAt: messages.occurredAt,
             delivery: messages.deliveryStatus,
+            triage: triageEvents.level,
           })
           .from(messages)
+          .leftJoin(triageEvents, eq(triageEvents.messageId, messages.id))
           .leftJoin(
             memberships,
             eq(memberships.id, messages.authorMembershipId),

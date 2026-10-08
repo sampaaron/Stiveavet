@@ -1,5 +1,6 @@
 import {
   Activity,
+  BellRing,
   BookOpen,
   CircleAlert,
   CalendarDays,
@@ -40,6 +41,12 @@ export const appNavigation: NavSection[] = [
           "followups.read_own",
           "followups.read_summary",
         ],
+      },
+      {
+        href: "/app/alertes",
+        label: "Alertes",
+        icon: BellRing,
+        anyOf: ["clinical.read"],
       },
       {
         href: "/app/agenda",

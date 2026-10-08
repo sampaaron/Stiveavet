@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
 
 import { expectAccessible } from "./support/flows";
+import { expectLastBubble, launchFollowup, phone } from "./support/suivis";
 
 /**
  * Numa simulée et conversation (lot 13) : lancement, accord du propriétaire dans le
@@ -38,53 +38,6 @@ const CASES: Record<
 };
 
 test.describe.configure({ retries: 0 });
-
-async function launchFollowup(page: Page, animal: string, hours: string) {
-  await page.goto("/app/suivis/nouveau");
-  await page
-    .getByLabel("Animal, propriétaire ou identifiant dr.veto")
-    .fill(animal);
-  await page.getByRole("button", { name: "Rechercher" }).click();
-  await page
-    .getByRole("button", { name: `Préparer la fiche de ${animal}` })
-    .click();
-  await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: `Fiche de lancement de ${animal}`,
-    }),
-  ).toBeVisible();
-  // Aucun protocole proposé pour l'intervention importée : la vétérinaire en choisit un.
-  const choose = page.getByRole("button", { name: "Appliquer ce protocole" });
-  if (await choose.isVisible()) {
-    await page
-      .getByLabel("Protocole", { exact: true })
-      .selectOption({ label: "Stérilisation de la chatte (version 1)" });
-    await choose.click();
-    await expect(page).toHaveURL(/\?fait=protocole$/);
-  }
-  await page.getByLabel("Heures après l'intervention").fill(hours);
-  await page.getByRole("button", { name: "Lancer le suivi" }).click();
-  await expect(page).toHaveURL(/\/app\/suivis\/[0-9a-f-]+\?fait=lance$/);
-  return page.url().replace(/\?.*$/, "");
-}
-
-/** Bulles du téléphone simulé, dans l'ordre. */
-const phone = (page: Page) =>
-  page.getByRole("list", { name: "Messages reçus et envoyés" });
-
-/**
- * Dernière bulle du téléphone. Un autre test peut exécuter la tâche d'envoi en même temps
- * (worker partagé) : la réponse arrive alors un instant plus tard, on recharge la page.
- */
-async function expectLastBubble(page: Page, text: string) {
-  await expect(async () => {
-    await page.reload();
-    await expect(phone(page).getByRole("listitem").last()).toContainText(text, {
-      timeout: 1_000,
-    });
-  }).toPass({ timeout: 15_000 });
-}
 
 test("accord, échange, reprise en main puis « Reprendre Numa »", async ({
   page,
