@@ -12,7 +12,7 @@ export const CONSENT_WORDING_VERSION = "consentement-v2";
 /** Demande d'accord à deux propriétaires : le groupe partagé est expliqué avant l'accord (§6). */
 export const PAIR_CONSENT_WORDING_VERSION = "consentement-groupe-v2";
 /** Deux propriétaires sans groupe (WhatsApp réel) : chacun dans sa conversation (ADR 0024). */
-export const SEPARATE_CONSENT_WORDING_VERSION = "consentement-deux-v1";
+const SEPARATE_CONSENT_WORDING_VERSION = "consentement-deux-v1";
 
 /** Version du texte d'accord montré, d'après le modèle du premier message. */
 export const CONSENT_VERSION_OF: Partial<Record<TemplateKey, string>> = {

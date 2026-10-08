@@ -19,7 +19,7 @@ export function SpeciesIcon({
 }
 
 /** Statut principal d'un suivi : la gravité prime, puis l'état du suivi. */
-export function followupStatus(followup: Followup): Status {
+function followupStatus(followup: Followup): Status {
   if (followup.triage !== "normal") return followup.triage;
   if (followup.state === "paused") return "paused";
   if (

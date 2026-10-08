@@ -31,7 +31,6 @@ import {
   wantsAppointment,
 } from "@/domains/agenda/rendez-vous";
 import type { AppointmentWording } from "@/domains/agenda/rendez-vous";
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup, setStatusReason } from "@/domains/suivis/lancement";
@@ -68,7 +67,6 @@ import {
   appointmentRequests,
   appointments,
   attachments,
-  auditEvents,
   consents,
   conversationThreads,
   followupContacts,
@@ -85,8 +83,9 @@ import {
   users,
   voiceTranscripts,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditFollowup as audit, systemAuthor } from "@/domains/audit/journal";
 
 import { checkNumaReply, safeFallback } from "./guard";
 import { ownerKeyword } from "./keywords";
@@ -241,7 +240,7 @@ export const ownerMessageInput = z
 
 export const contactRoleInput = z.enum(["primary", "secondary"]);
 
-export const ownerLanguageInput = z.object({
+const ownerLanguageInput = z.object({
   role: contactRoleInput,
   language: z.enum(["fr", "en"]),
 });
@@ -606,23 +605,6 @@ async function ensureThread(
   return thread.id;
 }
 
-async function auditSystem(
-  tx: TenantTransaction,
-  organizationId: string,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId,
-    actorMembershipId: null,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
-}
-
 /** Texte d'origine d'une trace, gardé en français ; l'écran l'affiche par son code. */
 const NOTE_BODY: Record<SystemNoteCode, (names: string[]) => string> = {
   group_created: (who) =>
@@ -819,9 +801,9 @@ export function conversationHandlers(deps: {
       code: "group_created",
       names: members.map((member) => firstName(member.ownerFullName)),
     });
-    await auditSystem(
+    await audit(
       tx,
-      ctx.organizationId,
+      systemAuthor(ctx.organizationId),
       "conversation.group_created",
       ctx.followupId,
       { members: members.length },
@@ -941,9 +923,9 @@ export function conversationHandlers(deps: {
         appointmentWording(ctx, target),
       ),
     );
-    await auditSystem(
+    await audit(
       tx,
-      ctx.organizationId,
+      systemAuthor(ctx.organizationId),
       "appointment.requested",
       ctx.followupId,
       { slots: slots.length, kind },
@@ -1026,9 +1008,9 @@ export function conversationHandlers(deps: {
         appointmentWording(ctx, target),
       ),
     );
-    await auditSystem(
+    await audit(
       tx,
-      ctx.organizationId,
+      systemAuthor(ctx.organizationId),
       "appointment.proposed",
       ctx.followupId,
       { appointmentId: appointment.id },
@@ -1102,9 +1084,9 @@ export function conversationHandlers(deps: {
     } catch {
       // Fournisseur en panne ou réponse hors format : le propriétaire n'attend pas, il est
       // renvoyé vers l'équipe (ADR 0026). Le message reste lu par le vétérinaire.
-      await auditSystem(
+      await audit(
         tx,
-        ctx.organizationId,
+        systemAuthor(ctx.organizationId),
         "numa.ai_unavailable",
         ctx.followupId,
       );
@@ -1112,9 +1094,9 @@ export function conversationHandlers(deps: {
     }
     const verdict = text ? checkNumaReply(text) : null;
     if (verdict && !verdict.ok)
-      await auditSystem(
+      await audit(
         tx,
-        ctx.organizationId,
+        systemAuthor(ctx.organizationId),
         "numa.reply_blocked",
         ctx.followupId,
         { reason: verdict.reason },
@@ -1526,9 +1508,9 @@ export function conversationHandlers(deps: {
         }));
       } catch {
         // Fournisseur en panne : la prise de nouvelles fixe part à la place (ADR 0026).
-        await auditSystem(
+        await audit(
           tx,
-          ctx.organizationId,
+          systemAuthor(ctx.organizationId),
           "numa.ai_unavailable",
           ctx.followupId,
         );
@@ -1537,9 +1519,9 @@ export function conversationHandlers(deps: {
       }
       const verdict = checkNumaReply(text);
       if (!verdict.ok)
-        await auditSystem(
+        await audit(
           tx,
-          ctx.organizationId,
+          systemAuthor(ctx.organizationId),
           "numa.reply_blocked",
           ctx.followupId,
           { reason: verdict.reason },
@@ -1665,9 +1647,9 @@ async function learnLanguage(
     .where(eq(followupContacts.id, writer.id));
   writer.language = detected;
   writer.languageSource = "detected";
-  await auditSystem(
+  await audit(
     tx,
-    ctx.organizationId,
+    systemAuthor(ctx.organizationId),
     "followup.owner_language_detected",
     ctx.followupId,
     { role: writer.role, language: detected },
@@ -1746,9 +1728,9 @@ export async function processInbound(
     if (keyword === "leave_group") {
       await setContact({ leftGroupAt: now, stopRequestedAt: null });
       await enqueueMessageJob(tx, ctx, "left_group", messageId);
-      await auditSystem(
+      await audit(
         tx,
-        ctx.organizationId,
+        systemAuthor(ctx.organizationId),
         "conversation.left_group",
         followupId,
       );
@@ -1765,9 +1747,9 @@ export async function processInbound(
         "followup",
       );
       await enqueueMessageJob(tx, ctx, "stopped_all", messageId);
-      await auditSystem(
+      await audit(
         tx,
-        ctx.organizationId,
+        systemAuthor(ctx.organizationId),
         "conversation.owner_stopped_all",
         followupId,
       );
@@ -1931,29 +1913,7 @@ async function attachmentsOf(
 }
 
 export function conversationsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
-
-  async function audit(
-    tx: TenantTransaction,
-    actor: Actor,
-    action: string,
-    followupId: string,
-    metadata: AuditMetadata = {},
-  ) {
-    await tx.insert(auditEvents).values({
-      organizationId: actor.organizationId,
-      actorMembershipId: actor.membershipId,
-      action,
-      targetType: "followup",
-      targetId: followupId,
-      metadata,
-    });
-  }
+  const run = tenantRunner(db);
 
   function parseBody(body: unknown): string {
     const parsed = ownerMessageInput.safeParse(body);

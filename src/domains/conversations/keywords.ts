@@ -22,7 +22,7 @@ const KEYWORDS: Record<Exclude<OwnerKeyword, null>, readonly string[]> = {
   stop_all: ["tout", "tout arreter", "arreter tout", "all", "stop all"],
 };
 
-export function normalizeKeyword(body: string): string {
+function normalizeKeyword(body: string): string {
   return body
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")

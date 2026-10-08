@@ -4,7 +4,6 @@ import { and, asc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoAnimalHit, DrVetoConnector } from "@/adapters/drveto/types";
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
@@ -17,7 +16,6 @@ import {
   alertRules,
   animalOwners,
   animals,
-  auditEvents,
   consents,
   followupAlertRules,
   followupContacts,
@@ -36,8 +34,9 @@ import {
   scheduledJobs,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditFollowup as audit } from "@/domains/audit/journal";
 
 import { nextSendTime } from "./envoi";
 import {
@@ -198,23 +197,6 @@ const TRANSITIONS: Record<
     action: "followup.reactivated",
   },
 };
-
-async function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
-}
 
 async function isConnected(
   tx: TenantTransaction,
@@ -553,12 +535,7 @@ async function scheduleIntro(
 
 export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
   const { db, drveto } = deps;
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   /** Préparer une fiche demande le droit de lancement et la lecture clinique (allergies…). */
   function assertCanPrepare(actor: Actor) {

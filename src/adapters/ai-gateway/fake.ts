@@ -1,3 +1,4 @@
+import { foldText } from "@/domains/commun";
 import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
 
 import { simulatedSynthesis } from "./simulated-synthesis";
@@ -19,13 +20,6 @@ import type {
  * tests reproductibles. Elle ne rassure jamais, ne diagnostique pas et renvoie toute question
  * de traitement ou de gravité au vétérinaire. Textes fictifs, à valider par un vétérinaire.
  */
-
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-}
 
 const TREATMENT =
   /\b(dose|doses|dosage|posologie|mg|ml|comprime|comprimes|cachet|gelule|medicament|medicaments|traitement|antibiotique|anti-inflammatoire|metacam|paracetamol|doliprane|aspirine|ibuprofene|pommade|donner|redonner|augmenter|arreter|medication|medicine|pill|pills|tablet|dose|give him|give her|ibuprofen|painkiller)\b/;
@@ -57,7 +51,7 @@ const EN = {
 };
 
 export function simulatedNumaReply(input: NumaReplyInput): NumaReply {
-  const text = normalize(input.ownerMessage);
+  const text = foldText(input.ownerMessage);
   const intent: NumaReply["intent"] = CONCERN.test(text)
     ? "concern"
     : TREATMENT.test(text)

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Numéro au format international E.164 (« +33612345678 »), comme l'exige WhatsApp. */
-export const E164 = /^\+[1-9][0-9]{7,14}$/;
+const E164 = /^\+[1-9][0-9]{7,14}$/;
 
 /**
  * Numéro saisi par une personne (« 06 12 34 56 78 », « +33 6 12… », « 0033… ») au format

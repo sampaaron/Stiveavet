@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { recordAudit } from "@/domains/audit/journal";
 
 import { and, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -7,7 +8,6 @@ import { JobError } from "@/domains/taches/kinds";
 import { emit, enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
 import {
-  auditEvents,
   availabilityWindows,
   consents,
   followupContacts,
@@ -253,14 +253,13 @@ export function followupEndHandlers(): Record<string, JobHandler> {
         followupId: followup.id,
         payload: { step: "closing", token: job.id },
       });
-    await tx.insert(auditEvents).values({
-      organizationId: followup.organizationId,
-      actorMembershipId: null,
-      action: "followup.ended_automatically",
-      targetType: "followup",
-      targetId: followup.id,
-      metadata: { from: followup.status },
-    });
+    await recordAudit(
+      tx,
+      { organizationId: followup.organizationId, membershipId: null },
+      "followup.ended_automatically",
+      { type: "followup", id: followup.id },
+      { from: followup.status },
+    );
     await emit(tx, {
       organizationId: followup.organizationId,
       topic: "followup.ended",
@@ -272,7 +271,7 @@ export function followupEndHandlers(): Record<string, JobHandler> {
 }
 
 /** Rappels d'une liste d'étapes : tâche la plus récente de chacune (affichage du programme). */
-export async function reminderJobs(
+async function reminderJobs(
   tx: TenantTransaction,
   followupId: string,
   stepIds: readonly string[],

@@ -140,7 +140,7 @@ function excerpt(text: string): string {
 }
 
 /** Bornes du jour de Paris qui contient `now`. */
-export function parisDayBounds(now: Date): { start: Date; end: Date } {
+function parisDayBounds(now: Date): { start: Date; end: Date } {
   const iso = (index: number) =>
     new Date(index * 86_400_000).toISOString().slice(0, 10);
   const today = parisDayIndex(now);

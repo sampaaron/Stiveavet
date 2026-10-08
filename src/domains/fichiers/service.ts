@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import type { AiGateway } from "@/adapters/ai-gateway/types";
 import type { ObjectStorage, StoredObject } from "@/adapters/object-storage";
-import type { AuditMetadata } from "@/domains/audit/schema";
+import { recordAudit, systemAuthor } from "@/domains/audit/journal";
 import { checkNumaReply } from "@/domains/conversations/guard";
 import {
   contactRoleInput,
@@ -26,14 +26,13 @@ import type { JobHandler } from "@/domains/taches/worker";
 import {
   animals,
   attachments,
-  auditEvents,
   followups,
   messages,
   organizationSettings,
   photoObservations,
   voiceTranscripts,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { signReadLink, verifyReadLink } from "./liens";
@@ -61,8 +60,8 @@ import {
  *   l'ouverture est journalisée (sans contenu).
  */
 
-export const TRANSCRIBE_KIND = "media.transcribe";
-export const OBSERVE_KIND = "media.observe";
+const TRANSCRIBE_KIND = "media.transcribe";
+const OBSERVE_KIND = "media.observe";
 export const PURGE_KIND = "attachment.purge";
 
 const MAX_TRANSCRIPT = 10_000;
@@ -139,30 +138,13 @@ function checkMedia(media: OwnerMedia): CheckedMedia {
 }
 
 /** Clé d'objet : cabinet, dossier, identifiant aléatoire ; aucun nom ni contenu. */
-export function followupObjectKey(
+function followupObjectKey(
   organizationId: string,
   followupId: string,
   attachmentId: string,
   extension: string,
 ): string {
   return `o/${organizationId}/suivis/${followupId}/${attachmentId}.${extension}`;
-}
-
-async function auditSystem(
-  tx: TenantTransaction,
-  organizationId: string,
-  action: string,
-  target: { type: "followup" | "attachment"; id: string },
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId,
-    actorMembershipId: null,
-    action,
-    targetType: target.type,
-    targetId: target.id,
-    metadata,
-  });
 }
 
 /**
@@ -319,9 +301,9 @@ export async function refuseOwnerMedia(
   },
   refusal: { kind: "photo" | "voice" | "other"; reason: MediaRefusal },
 ) {
-  await auditSystem(
+  await recordAudit(
     tx,
-    target.organizationId,
+    systemAuthor(target.organizationId),
     "whatsapp.media_refused",
     { type: "followup", id: target.followupId },
     { kind: refusal.kind, reason: refusal.reason },
@@ -346,12 +328,7 @@ export function mediaService(deps: {
   linkSecret: string;
 }) {
   const { db, storage, linkSecret } = deps;
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   /** Dépose le fichier puis l'enregistre ; si l'enregistrement échoue, le fichier part. */
   async function receive(
@@ -415,14 +392,13 @@ export function mediaService(deps: {
       return receive(actor.organizationId, followupId, media, (fn) =>
         run(actor, async (tx) => {
           const result = await fn(tx);
-          await tx.insert(auditEvents).values({
-            organizationId: actor.organizationId,
-            actorMembershipId: actor.membershipId,
-            action: "simulator.owner_media",
-            targetType: "followup",
-            targetId: followupId,
-            metadata: { kind: media.kind },
-          });
+          await recordAudit(
+            tx,
+            actor,
+            "simulator.owner_media",
+            { type: "followup", id: followupId },
+            { kind: media.kind },
+          );
           return result;
         }),
       );
@@ -511,14 +487,13 @@ export function mediaService(deps: {
           throw new DomainError("not_found");
         const followup = await loadFollowup(tx, actor, row.followupId);
         if (followup.access !== "clinical") throw new DomainError("not_found");
-        await tx.insert(auditEvents).values({
-          organizationId: actor.organizationId,
-          actorMembershipId: actor.membershipId,
-          action: "attachment.opened",
-          targetType: "followup",
-          targetId: row.followupId,
-          metadata: { attachmentId, kind: row.kind },
-        });
+        await recordAudit(
+          tx,
+          actor,
+          "attachment.opened",
+          { type: "followup", id: row.followupId },
+          { attachmentId, kind: row.kind },
+        );
         return row;
       });
       const object = await storage.getObject(stored.storageKey);
@@ -666,9 +641,9 @@ export function mediaHandlers(deps: {
       if (verdict.ok && text.length <= MAX_OBSERVATION_LENGTH) kept.push(text);
       else
         // Un diagnostic, un conseil de traitement ou une réassurance n'est jamais gardé.
-        await auditSystem(
+        await recordAudit(
           tx,
-          job.organizationId,
+          systemAuthor(job.organizationId),
           "photo.observation_blocked",
           { type: "followup", id: followupId },
           { reason: verdict.ok ? "length" : verdict.reason },
@@ -691,9 +666,9 @@ export function mediaHandlers(deps: {
       .update(attachments)
       .set({ deletedAt: new Date() })
       .where(eq(attachments.id, attachment.id));
-    await auditSystem(
+    await recordAudit(
       tx,
-      job.organizationId,
+      systemAuthor(job.organizationId),
       "attachment.purged",
       { type: "attachment", id: attachment.id },
       { kind: attachment.kind },

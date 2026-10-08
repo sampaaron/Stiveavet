@@ -34,10 +34,10 @@ import {
   organizations,
   users,
 } from "@/server/db/schema";
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { vetLimit } from "@/domains/facturation/limits";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { recordAudit as audit } from "@/domains/audit/journal";
 
 import { DomainError, assertPermission } from "./actor";
 import type { Actor } from "./actor";
@@ -50,7 +50,7 @@ import {
 } from "./permissions";
 import type { PermissionKey } from "./permissions";
 
-export const INVITATION_DAYS = 7;
+const INVITATION_DAYS = 7;
 
 export type TeamMember = {
   membershipId: string;
@@ -73,23 +73,6 @@ export type PendingInvitation = {
 };
 
 const uuid = z.uuid();
-
-function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  target: { type: string; id: string },
-  metadata: AuditMetadata = {},
-) {
-  return tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: target.type,
-    targetId: target.id,
-    metadata,
-  });
-}
 
 /** Vétérinaires actifs et invitations de vétérinaires en attente (limite de 3 par cabinet). */
 /** Places de vétérinaires occupées : membres actifs et, par défaut, invitations en attente. */
@@ -153,12 +136,9 @@ export function teamService(deps: {
   appUrl: string;
 }) {
   const { db, email, appUrl } = deps;
+  const inTenant = tenantRunner(db);
   const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    ).catch(translateDbError);
+    inTenant(actor, fn).catch(translateDbError);
 
   return {
     async members(actor: Actor): Promise<TeamMember[]> {
@@ -750,14 +730,16 @@ export async function acceptInvitation(
         await tx.execute(
           sql`SELECT auth.set_initial_password(${userId}, ${input.passwordHash})`,
         );
-        await tx.insert(auditEvents).values({
-          organizationId: invitation.organization_id,
-          actorMembershipId: invitedBy,
-          action: "membership.created",
-          targetType: "membership",
-          targetId: membershipId,
-          metadata: { role: invitation.role, source: "invitation" },
-        });
+        await audit(
+          tx,
+          {
+            organizationId: invitation.organization_id,
+            membershipId: invitedBy,
+          },
+          "membership.created",
+          { type: "membership", id: membershipId },
+          { role: invitation.role, source: "invitation" },
+        );
         return "accepted" as const;
       },
     );

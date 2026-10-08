@@ -6,7 +6,6 @@ import type { Actor } from "@/domains/equipe/actor";
 import {
   animalOwners,
   animals,
-  auditEvents,
   followupShares,
   followups,
   memberships,
@@ -14,9 +13,9 @@ import {
   protocolVersions,
   users,
 } from "@/server/db/schema";
-import type { AuditMetadata } from "@/domains/audit/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditFollowup as audit } from "@/domains/audit/journal";
 
 import { canManageFollowupAccess, followupAccess } from "./policies";
 import { loadFollowupRecord } from "./record";
@@ -204,30 +203,8 @@ async function firstOwners(tx: TenantTransaction, animalIds: string[]) {
   return result;
 }
 
-async function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
-}
-
 export function followupsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   /** Suivi et faits d'accès ; null si absent du cabinet. */
   async function load(tx: TenantTransaction, followupId: string) {

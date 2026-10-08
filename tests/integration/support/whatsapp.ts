@@ -78,7 +78,7 @@ export function recordingWhatsApp(options: { groups?: boolean } = {}) {
 }
 
 /** Exécutants limités à un cabinet : la base est partagée entre fichiers de test. */
-export function onlyFor<T extends JobHandler | DeadJobHandler>(
+function onlyFor<T extends JobHandler | DeadJobHandler>(
   organizationId: () => string,
   handlers: Record<string, T>,
 ): Record<string, T> {

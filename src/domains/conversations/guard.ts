@@ -1,3 +1,5 @@
+import { foldText } from "@/domains/commun";
+
 /**
  * Garde-fous déterministes de Numa (cahier des charges §3, architecture §10) : appliqués à
  * toute réponse de la passerelle IA avant envoi, quel que soit le prestataire. Une réponse
@@ -9,15 +11,7 @@ export type GuardReason =
 
 export type GuardVerdict = { ok: true } | { ok: false; reason: GuardReason };
 
-export const MAX_NUMA_REPLY = 1000;
-
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[’`]/g, "'");
-}
+const MAX_NUMA_REPLY = 1000;
 
 const RULES: [GuardReason, RegExp][] = [
   [
@@ -41,7 +35,7 @@ const RULES: [GuardReason, RegExp][] = [
 export function checkNumaReply(text: string): GuardVerdict {
   if (text.length === 0 || text.length > MAX_NUMA_REPLY)
     return { ok: false, reason: "length" };
-  const normalized = normalize(text);
+  const normalized = foldText(text);
   for (const [reason, pattern] of RULES)
     if (pattern.test(normalized)) return { ok: false, reason };
   return { ok: true };

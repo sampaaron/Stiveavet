@@ -1,3 +1,4 @@
+import { foldText, minutesOfDay } from "@/domains/commun";
 import { parisWallMinutes } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { DEFAULT_MESSAGE_WINDOWS } from "@/domains/reglages/content";
@@ -34,14 +35,6 @@ const RANK: Record<TriageLevel, number> = { normal: 0, watch: 1, urgent: 2 };
 
 export function higherLevel(a: TriageLevel, b: TriageLevel): TriageLevel {
   return RANK[a] >= RANK[b] ? a : b;
-}
-
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[’`]/g, "'");
 }
 
 /** Signaux d'urgence reconnus quel que soit le protocole. */
@@ -92,7 +85,7 @@ const STOP_WORDS = new Set([
 
 /** Racines significatives d'un texte : mots de 4 lettres et plus, coupés à 5 lettres. */
 function stems(text: string): string[] {
-  return normalize(text)
+  return foldText(text)
     .split(/[^a-z]+/)
     .filter((word) => word.length >= 4 && !STOP_WORDS.has(word))
     .map((word) => word.slice(0, 5));
@@ -114,7 +107,7 @@ export function assessOwnerMessage(
   body: string,
   rules: readonly FollowupAlertRule[],
 ): Assessment {
-  const text = normalize(body);
+  const text = foldText(body);
   // Le signe d'alerte le plus grave reconnu l'emporte.
   const matched = rules
     .filter((rule) => matchesRule(body, rule))
@@ -194,11 +187,6 @@ export function frenchHolidays(year: number): Set<string> {
 
 const DAY_MINUTES = 24 * 60;
 
-function minutesOf(time: string): number {
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
 /**
  * Période des consignes d'urgence, à l'heure de Paris : jour férié, puis heures du cabinet
  * (sa plage d'envoi des messages), puis week-end, sinon nuit.
@@ -218,8 +206,8 @@ export function emergencyPeriod(
   const open = plan.some(
     (window) =>
       window.weekday === weekday &&
-      minute >= minutesOf(window.startsAt) &&
-      minute < minutesOf(window.endsAt),
+      minute >= minutesOfDay(window.startsAt) &&
+      minute < minutesOfDay(window.endsAt),
   );
   if (open) return "day";
   return weekday >= 6 ? "weekend" : "night";

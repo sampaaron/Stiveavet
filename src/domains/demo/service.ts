@@ -17,7 +17,7 @@ import type { DemoStep } from "./emails";
 import type { DemoRequest } from "./validators";
 
 /** Demandes de démo par adresse IP : [nombre maximal, fenêtre en minutes]. */
-export const DEMO_RATE_LIMIT = [10, 60] as const;
+const DEMO_RATE_LIMIT = [10, 60] as const;
 
 export type DemoAccess = { locale: Locale; cabinetName: string };
 

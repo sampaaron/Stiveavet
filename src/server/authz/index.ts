@@ -14,7 +14,6 @@ import { appDatabase } from "@/server/db/client";
 import { membershipPermissions } from "@/server/db/schema";
 import { services } from "@/server/services";
 import { withTenant } from "@/server/db/tenant";
-import type { TenantTransaction } from "@/server/db/tenant";
 
 /**
  * Garde serveur unique (architecture §6), dans l'ordre : personne authentifiée → membre actif
@@ -70,16 +69,4 @@ export async function requirePermission(
   if (!anyOf.some((permission) => context.permissions.has(permission)))
     notFound();
   return context;
-}
-
-/** Transaction sous le cabinet et la personne du contexte (RLS). */
-export function withMember<T>(
-  context: MemberContext,
-  run: (tx: TenantTransaction) => Promise<T>,
-): Promise<T> {
-  return withTenant(
-    appDatabase(),
-    { organizationId: context.organizationId, userId: context.userId },
-    run,
-  );
 }

@@ -22,10 +22,7 @@ const sizes: Record<Size, string> = {
 
 type StyleProps = { variant?: Variant; size?: Size; icon?: ReactNode };
 
-export function buttonClasses({
-  variant = "primary",
-  size = "md",
-}: StyleProps = {}) {
+function buttonClasses({ variant = "primary", size = "md" }: StyleProps = {}) {
   return cn(base, variants[variant], sizes[size]);
 }
 

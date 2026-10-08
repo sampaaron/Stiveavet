@@ -10,7 +10,7 @@ let storage: ObjectStorage | undefined;
  * (`OBJECT_STORAGE_DIR`, chemin absolu) ; Scaleway Object Storage arrive en phase 3, avec
  * ses clés dans le gestionnaire de secrets (ADR 0004, ADR 0019).
  */
-export function objectStorage(): ObjectStorage {
+function objectStorage(): ObjectStorage {
   if (storage) return storage;
   if ((process.env.APP_ENV ?? "local") !== "local")
     throw new Error(
