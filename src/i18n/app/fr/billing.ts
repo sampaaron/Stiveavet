@@ -77,6 +77,7 @@ export const billing = {
     period: (start: string, end: string) => `du ${start} au ${end}`,
     status: {
       paid: "Payée",
+      processing: "Prélèvement en cours",
       open: "À prélever",
       failed: "Prélèvement refusé",
     },

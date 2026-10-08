@@ -4,6 +4,7 @@ import {
   count,
   desc,
   eq,
+  gt,
   inArray,
   isNull,
   lt,
@@ -12,8 +13,9 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 
+import { BillingUnavailableError } from "@/adapters/billing-provider/types";
 import type { BillingProvider } from "@/adapters/billing-provider/types";
-import type { AuditMetadata } from "@/domains/audit/schema";
+import { auditOrganization as audit } from "@/domains/audit/journal";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { vetSeats } from "@/domains/equipe/service";
@@ -47,6 +49,7 @@ import {
   usageChargeCents,
 } from "./rules";
 import { scheduleAnnualOffers } from "./offre-annuelle";
+import { recordPayment, refreshUnpaid, settleInvoice } from "./paiements";
 import type {
   Access,
   Activity,
@@ -57,6 +60,7 @@ import type {
 } from "./rules";
 
 const planInput = z.enum(PLANS);
+const DEFER_MS = 15 * 60_000;
 
 /** Statuts qui occupent une place parmi les suivis actifs (un brouillon n'en occupe pas). */
 const ACTIVE_STATUSES = ["active", "paused", "human_takeover"] as const;
@@ -71,7 +75,7 @@ export type InvoiceSummary = {
   subtotalCents: number;
   vatCents: number;
   totalCents: number;
-  status: "open" | "paid" | "failed";
+  status: "open" | "paid" | "failed" | "processing";
   issuedAt: Date;
 };
 
@@ -93,23 +97,6 @@ export type BillingOverview = {
   vetSeats: number;
   mandateSigned: boolean;
 };
-
-function audit(
-  tx: TenantTransaction,
-  organizationId: string,
-  actorMembershipId: string | null,
-  action: string,
-  metadata: AuditMetadata = {},
-) {
-  return tx.insert(auditEvents).values({
-    organizationId,
-    actorMembershipId,
-    action,
-    targetType: "organization",
-    targetId: organizationId,
-    metadata,
-  });
-}
 
 async function loadFacts(
   tx: TenantTransaction,
@@ -226,71 +213,119 @@ export function billingService(deps: {
     );
   };
 
+  /** Mandat signé ; avec Stripe, seul un mandat confirmé par Stripe compte. */
   async function mandateSigned(tx: TenantTransaction): Promise<boolean> {
     const [row] = await tx
       .select({ provider: integrationConnections.provider })
       .from(integrationConnections)
-      .where(eq(integrationConnections.provider, "payment_mandate"));
+      .where(
+        and(
+          eq(integrationConnections.provider, "payment_mandate"),
+          provider.simulated
+            ? undefined
+            : eq(integrationConnections.mode, "live"),
+        ),
+      );
     return Boolean(row);
   }
 
-  /** Prélève une facture et enregistre le résultat ; un échec ouvre le délai de 30 jours. */
+  /** Après une panne du prestataire, pas de nouvel essai avant 15 minutes. */
+  async function recentlyDeferred(
+    tx: TenantTransaction,
+    now: Date,
+  ): Promise<boolean> {
+    const [row] = await tx
+      .select({ n: count() })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.action, "invoice.collection_deferred"),
+          gt(auditEvents.occurredAt, new Date(now.getTime() - DEFER_MS)),
+        ),
+      );
+    return (row?.n ?? 0) > 0;
+  }
+
+  /**
+   * Prélève une facture et enregistre le résultat : payée ou refusée tout de suite (simulé),
+   * ou en cours jusqu'à l'événement de Stripe. Un refus ouvre le délai de 30 jours ; une
+   * panne du prestataire laisse la facture à prélever, sans rien bloquer.
+   */
   async function collect(
     tx: TenantTransaction,
     organizationId: string,
-    invoice: { id: string; totalCents: number },
+    invoice: { id: string; number: string; totalCents: number },
     now: Date,
-  ): Promise<boolean> {
-    const result = await provider.collect({
-      organizationId,
+  ): Promise<"paid" | "failed" | "processing" | "deferred"> {
+    // Chaque essai a son numéro : un appel rejoué garde la même clé d'idempotence.
+    const [tried] = await tx
+      .select({ n: count() })
+      .from(paymentEvents)
+      .where(
+        and(
+          eq(paymentEvents.invoiceId, invoice.id),
+          inArray(paymentEvents.kind, ["submitted", "failed"]),
+        ),
+      );
+    let result;
+    try {
+      result = await provider.collect(tx, {
+        organizationId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.number,
+        amountCents: invoice.totalCents,
+        attempt: (tried?.n ?? 0) + 1,
+      });
+    } catch (error) {
+      if (!(error instanceof BillingUnavailableError)) throw error;
+      await audit(
+        tx,
+        { organizationId: organizationId, membershipId: null },
+        "invoice.collection_deferred",
+        {
+          invoiceId: invoice.id,
+          code: error.code,
+        },
+      );
+      return "deferred";
+    }
+    if (result.status === "processing") {
+      await recordPayment(tx, organizationId, {
+        invoiceId: invoice.id,
+        kind: "submitted",
+        providerRef: result.providerRef,
+        amountCents: invoice.totalCents,
+        now,
+      });
+      await tx
+        .update(invoices)
+        .set({ status: "processing", paidAt: null })
+        .where(
+          and(
+            eq(invoices.id, invoice.id),
+            inArray(invoices.status, ["open", "failed"]),
+          ),
+        );
+      await refreshUnpaid(tx, now);
+      await audit(
+        tx,
+        { organizationId: organizationId, membershipId: null },
+        "invoice.submitted",
+        {
+          invoiceId: invoice.id,
+        },
+      );
+      return "processing";
+    }
+    await settleInvoice(tx, organizationId, {
       invoiceId: invoice.id,
-      amountCents: invoice.totalCents,
-    });
-    await tx.insert(paymentEvents).values({
-      organizationId,
-      invoiceId: invoice.id,
-      kind: result.status,
+      outcome: result.status,
       providerRef: result.providerRef,
       amountCents: invoice.totalCents,
-      occurredAt: now,
+      now,
+      simulated: provider.simulated,
     });
-    const paid = result.status === "succeeded";
-    await tx
-      .update(invoices)
-      .set(
-        paid
-          ? { status: "paid", paidAt: now }
-          : { status: "failed", paidAt: null },
-      )
-      .where(eq(invoices.id, invoice.id));
-    await audit(
-      tx,
-      organizationId,
-      null,
-      paid ? "invoice.paid" : "invoice.payment_failed",
-      {
-        invoiceId: invoice.id,
-        simulated: provider.simulated,
-      },
-    );
-    return paid;
-  }
-
-  /** Après un prélèvement, l'impayé reste ouvert tant qu'une facture est en échec. */
-  async function refreshUnpaid(tx: TenantTransaction, now: Date) {
-    const [failed] = await tx
-      .select({ n: count() })
-      .from(invoices)
-      .where(eq(invoices.status, "failed"));
-    const [row] = await tx
-      .select({ unpaidSince: subscriptions.unpaidSince })
-      .from(subscriptions);
-    if (!row) return;
-    const unpaid = (failed?.n ?? 0) > 0;
-    if (unpaid && !row.unpaidSince)
-      await tx.update(subscriptions).set({ unpaidSince: now });
-    if (!unpaid && row.unpaidSince)
-      await tx.update(subscriptions).set({ unpaidSince: null });
+    return result.status === "succeeded" ? "paid" : "failed";
   }
 
   /** Une échéance à émettre, ou une facture ouverte à prélever (mandat signé). */
@@ -313,7 +348,11 @@ export function billingService(deps: {
       .select({ n: count() })
       .from(invoices)
       .where(eq(invoices.status, "open"));
-    return (open?.n ?? 0) > 0 && (await mandateSigned(tx));
+    return (
+      (open?.n ?? 0) > 0 &&
+      (await mandateSigned(tx)) &&
+      !(await recentlyDeferred(tx, now))
+    );
   }
 
   /**
@@ -388,21 +427,30 @@ export function billingService(deps: {
               usage.map((event) => event.id),
             ),
           );
-      await audit(tx, organizationId, null, "invoice.issued", {
-        invoiceId: invoice.id,
-        month,
-      });
+      await audit(
+        tx,
+        { organizationId: organizationId, membershipId: null },
+        "invoice.issued",
+        {
+          invoiceId: invoice.id,
+          month,
+        },
+      );
     }
 
-    if (await mandateSigned(tx)) {
+    if ((await mandateSigned(tx)) && !(await recentlyDeferred(tx, now))) {
       const pending = await tx
-        .select({ id: invoices.id, totalCents: invoices.totalCents })
+        .select({
+          id: invoices.id,
+          number: invoices.number,
+          totalCents: invoices.totalCents,
+        })
         .from(invoices)
         .where(eq(invoices.status, "open"))
         .orderBy(asc(invoices.subscriptionMonth));
       for (const invoice of pending)
-        await collect(tx, organizationId, invoice, now);
-      await refreshUnpaid(tx, now);
+        if ((await collect(tx, organizationId, invoice, now)) === "deferred")
+          break;
     }
     return loadFacts(tx);
   }
@@ -507,8 +555,10 @@ export function billingService(deps: {
         await tx.update(subscriptions).set({ plan: parsed.data });
         await audit(
           tx,
-          actor.organizationId,
-          actor.membershipId,
+          {
+            organizationId: actor.organizationId,
+            membershipId: actor.membershipId,
+          },
           "subscription.plan_changed",
           {
             from: facts.plan,
@@ -542,8 +592,10 @@ export function billingService(deps: {
         }
         await audit(
           tx,
-          actor.organizationId,
-          actor.membershipId,
+          {
+            organizationId: actor.organizationId,
+            membershipId: actor.membershipId,
+          },
           "subscription.cycle_chosen",
           {
             cycle,
@@ -560,8 +612,10 @@ export function billingService(deps: {
         await tx.update(subscriptions).set({ canceledAt: now, endsAt });
         await audit(
           tx,
-          actor.organizationId,
-          actor.membershipId,
+          {
+            organizationId: actor.organizationId,
+            membershipId: actor.membershipId,
+          },
           "subscription.canceled",
           {
             endsAt: endsAt.toISOString(),
@@ -571,33 +625,51 @@ export function billingService(deps: {
       });
     },
 
-    /** Régularisation : nouveau prélèvement des factures en échec. */
-    async settle(actor: Actor, now = new Date()) {
+    /**
+     * Régularisation : nouveau prélèvement des factures refusées. Réglée tout de suite
+     * (simulé), en cours (Stripe, issue sous quelques jours) ou de nouveau refusée.
+     */
+    async settle(
+      actor: Actor,
+      now = new Date(),
+    ): Promise<"paid" | "processing" | "failed"> {
       return run(actor, async (tx) => {
         await sync(tx, actor.organizationId, now);
         if (!(await mandateSigned(tx))) throw new DomainError("invalid_target");
         const failed = await tx
-          .select({ id: invoices.id, totalCents: invoices.totalCents })
+          .select({
+            id: invoices.id,
+            number: invoices.number,
+            totalCents: invoices.totalCents,
+          })
           .from(invoices)
           .where(eq(invoices.status, "failed"))
           .orderBy(asc(invoices.subscriptionMonth));
         if (!failed.length) throw new DomainError("invalid_target");
-        let allPaid = true;
+        const results: string[] = [];
         for (const invoice of failed)
-          allPaid =
-            (await collect(tx, actor.organizationId, invoice, now)) && allPaid;
-        await refreshUnpaid(tx, now);
+          results.push(await collect(tx, actor.organizationId, invoice, now));
+        // Prestataire injoignable pour tout : rien n'a été tenté, le cabinet réessaiera.
+        if (results.every((result) => result === "deferred"))
+          throw new DomainError("payment_provider_unavailable");
+        const outcome = results.includes("failed")
+          ? "failed"
+          : results.includes("processing")
+            ? "processing"
+            : "paid";
         await audit(
           tx,
-          actor.organizationId,
-          actor.membershipId,
+          {
+            organizationId: actor.organizationId,
+            membershipId: actor.membershipId,
+          },
           "subscription.settlement_requested",
           {
             invoices: failed.length,
-            settled: allPaid,
+            outcome,
           },
         );
-        return allPaid;
+        return outcome;
       });
     },
   };

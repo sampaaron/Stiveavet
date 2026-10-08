@@ -77,6 +77,7 @@ export const billing: AppDictionary["billing"] = {
     period: (start: string, end: string) => `from ${start} to ${end}`,
     status: {
       paid: "Paid",
+      processing: "Collection in progress",
       open: "To be collected",
       failed: "Direct debit refused",
     },

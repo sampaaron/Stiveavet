@@ -4,7 +4,9 @@ import { and, asc, count, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
+import { BillingUnavailableError } from "@/adapters/billing-provider/types";
 import type { PaymentMandateProvider } from "@/adapters/payments/types";
+import { StripeError } from "@/adapters/stripe/api";
 import { simulatedNumberLabel } from "@/adapters/whatsapp/fake";
 import { SignupError, signupInput } from "@/adapters/whatsapp/inscription";
 import {
@@ -606,6 +608,8 @@ export function settingsService(deps: {
         );
         displayLabel = (await deps.drveto.connectPractice(code)).displayLabel;
       } else {
+        // Mandat réel : il passe par la page Stripe (`startMandate`), jamais par ce formulaire.
+        if (!deps.payments.simulated) throw new DomainError("invalid_target");
         displayLabel = (await deps.payments.signMandate(actor.organizationId))
           .displayLabel;
       }
@@ -624,6 +628,11 @@ export function settingsService(deps: {
           simulated: true,
         });
       });
+    },
+
+    /** Vrai si le mandat se signe chez Stripe (ADR 0027) plutôt qu'en simulation. */
+    mandateLive(): boolean {
+      return !deps.payments.simulated;
     },
 
     /** Identifiants publics du bouton d'inscription de Meta, si WhatsApp est réel. */
@@ -703,10 +712,48 @@ export function settingsService(deps: {
       });
     },
 
+    /**
+     * Mandat SEPA réel (ADR 0027) : adresse de la page Stripe où le cabinet saisit son IBAN.
+     * Le mandat n'est connecté qu'à la réception de l'événement signé de Stripe.
+     */
+    async startMandate(actor: Actor, locale: "fr" | "en"): Promise<string> {
+      const payments = deps.payments;
+      if (payments.simulated) throw new DomainError("invalid_target");
+      return run(actor, async (tx) => {
+        const [organization] = await tx
+          .select({ name: organizations.name })
+          .from(organizations);
+        if (!organization) throw new DomainError("not_found");
+        let url: string;
+        try {
+          url = await payments.startMandate(tx, {
+            organizationId: actor.organizationId,
+            organizationName: organization.name,
+            membershipId: actor.membershipId,
+            locale,
+          });
+        } catch (error) {
+          // Stripe injoignable ou compte refusé : message simple, rien n'est enregistré.
+          if (
+            error instanceof StripeError ||
+            error instanceof BillingUnavailableError
+          )
+            throw new DomainError("payment_provider_unavailable");
+          throw error;
+        }
+        await audit(tx, actor, "integration.mandate_started");
+        return url;
+      });
+    },
+
     async disconnect(actor: Actor, provider: Integration) {
+      const payments = deps.payments;
       await run(actor, async (tx) => {
         // Le jeton chiffré du cabinet est effacé avec la connexion.
         if (provider === "whatsapp") await tx.delete(whatsappAccounts);
+        // Mandat réel : retiré chez Stripe avant d'être effacé ici.
+        if (provider === "payment_mandate" && !payments.simulated)
+          await payments.revokeMandate(tx);
         await tx
           .delete(integrationConnections)
           .where(eq(integrationConnections.provider, provider));

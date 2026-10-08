@@ -3,11 +3,9 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 
 import { configuredAiGateway } from "@/adapters/ai-gateway";
-import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { emailSender, marketingEmailSender } from "@/adapters/email";
 import { lazyObjectStorage } from "@/adapters/object-storage";
-import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { agendaService } from "@/domains/agenda/captures";
 import type { AgendaService } from "@/domains/agenda/captures";
 import { appointmentsService } from "@/domains/agenda/demandes";
@@ -20,6 +18,7 @@ import { teamService } from "@/domains/equipe/service";
 import { mediaService } from "@/domains/fichiers/service";
 import type { MediaService } from "@/domains/fichiers/service";
 import { billingService } from "@/domains/facturation/service";
+import { billingProviders } from "@/domains/facturation/stripe";
 import type { BillingService } from "@/domains/facturation/service";
 import type { TeamService } from "@/domains/equipe/service";
 import { protocolsService } from "@/domains/protocoles/service";
@@ -100,21 +99,24 @@ export const services = {
     protocols ??= protocolsService(appDatabase());
     return protocols;
   },
-  /** dr.veto et mandat simulés (ADR 0004) ; WhatsApp simulé ou réel selon la configuration (ADR 0024). */
+  /**
+   * dr.veto simulé (ADR 0004) ; WhatsApp (ADR 0024) et mandat de prélèvement (ADR 0027)
+   * simulés ou réels selon la configuration.
+   */
   settings(): SettingsService {
     settings ??= settingsService({
       db: appDatabase(),
       whatsapp: setupFor(configuredWhatsApp()),
       drveto: fakeDrVeto,
-      payments: fakePaymentMandate,
+      payments: billingProviders().payments,
     });
     return settings;
   },
-  /** Prélèvements simulés uniquement en phase 1 (ADR 0011). */
+  /** Prélèvements simulés en local, par Stripe ailleurs (ADR 0011, 0027). */
   billing(): BillingService {
     billing ??= billingService({
       db: appDatabase(),
-      provider: fakeBillingProvider(),
+      provider: billingProviders().billing,
     });
     return billing;
   },

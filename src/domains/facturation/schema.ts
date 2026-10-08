@@ -8,7 +8,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-// Miroir typé de db/migrations/0006 (source de vérité) ; un test vérifie la concordance.
+// Miroir typé de db/migrations/0006 et 0019 (source de vérité) ; un test vérifie la concordance.
 
 export const subscriptionPlan = pgEnum("subscription_plan", [
   "solo",
@@ -22,10 +22,13 @@ export const invoiceStatus = pgEnum("invoice_status", [
   "open",
   "paid",
   "failed",
+  "processing",
 ]);
 export const paymentEventKind = pgEnum("payment_event_kind", [
   "succeeded",
   "failed",
+  "submitted",
+  "disputed",
 ]);
 
 const at = (name: string) =>
@@ -83,4 +86,14 @@ export const paymentEvents = pgTable("payment_events", {
   providerRef: text("provider_ref").notNull(),
   amountCents: integer("amount_cents").notNull(),
   occurredAt: at("occurred_at"),
+});
+
+/** Compte Stripe du cabinet (ADR 0027) : identifiants Stripe seulement, jamais d'IBAN. */
+export const billingAccounts = pgTable("billing_accounts", {
+  organizationId: uuid("organization_id").primaryKey(),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  paymentMethodId: text("payment_method_id"),
+  mandateId: text("mandate_id"),
+  requestedByMembershipId: uuid("requested_by_membership_id"),
+  updatedAt: at("updated_at"),
 });
