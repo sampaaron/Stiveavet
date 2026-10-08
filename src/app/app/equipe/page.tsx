@@ -54,10 +54,7 @@ export default async function TeamPage() {
     <>
       <PageHeader
         title={t.team.title}
-        description={t.team.description(
-          activeVets.length + pendingVets,
-          limit,
-        )}
+        description={t.team.description(activeVets.length + pendingVets, limit)}
       />
       <div className="grid gap-6">
         <SectionCard
@@ -137,7 +134,10 @@ function MemberCard({
           <h3 className="font-bold">
             {member.name}
             {member.isSelf ? (
-              <span className="font-normal text-ink-muted"> · {t.team.members.you}</span>
+              <span className="font-normal text-ink-muted">
+                {" "}
+                · {t.team.members.you}
+              </span>
             ) : null}
           </h3>
           <p className="text-sm text-ink-muted">

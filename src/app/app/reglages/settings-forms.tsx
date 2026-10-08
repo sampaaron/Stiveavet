@@ -2,6 +2,7 @@
 
 import { useActionState, useId } from "react";
 
+import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 import { TextField } from "@/ui/text-field";
 
@@ -77,16 +78,8 @@ export function ApplyDefaultsForm({ label }: { label: string }) {
 }
 
 const WINDOW_FORMS = {
-  messages: {
-    save: saveMessageWindowsAction,
-    legend: "Jours et heures d'envoi",
-    submit: "Enregistrer les horaires",
-  },
-  appointments: {
-    save: saveAppointmentWindowsAction,
-    legend: "Jours et heures des rendez-vous proposés",
-    submit: "Enregistrer les plages",
-  },
+  messages: saveMessageWindowsAction,
+  appointments: saveAppointmentWindowsAction,
 } as const;
 
 export function MessageWindowsForm({
@@ -102,15 +95,17 @@ export function MessageWindowsForm({
   }[];
   kind?: keyof typeof WINDOW_FORMS;
 }) {
-  const settings = WINDOW_FORMS[kind];
+  const t = useAppText();
+  const text =
+    kind === "messages" ? t.settings.messageWindows : t.settings.appointments;
   const [state, action, pending] = useActionState(
-    settings.save,
+    WINDOW_FORMS[kind],
     initialActionState,
   );
   return (
     <form action={action} className="grid gap-4">
       <fieldset className="grid gap-2">
-        <legend className="sr-only">{settings.legend}</legend>
+        <legend className="sr-only">{text.legend}</legend>
         {days.map((day) => (
           <div
             key={day.weekday}
@@ -126,22 +121,22 @@ export function MessageWindowsForm({
               {day.label}
             </label>
             <label className="flex items-center gap-2 text-sm text-ink-muted">
-              de
+              {t.settings.windows.from}
               <input
                 type="time"
                 name={`start-${day.weekday}`}
                 defaultValue={day.startsAt}
-                aria-label={`${day.label} : début`}
+                aria-label={t.settings.windows.start(day.label)}
                 className={timeClasses}
               />
             </label>
             <label className="flex items-center gap-2 text-sm text-ink-muted">
-              à
+              {t.settings.windows.to}
               <input
                 type="time"
                 name={`end-${day.weekday}`}
                 defaultValue={day.endsAt}
-                aria-label={`${day.label} : fin`}
+                aria-label={t.settings.windows.end(day.label)}
                 className={timeClasses}
               />
             </label>
@@ -150,7 +145,7 @@ export function MessageWindowsForm({
       </fieldset>
       <ActionMessage state={state} />
       <div>
-        <SubmitButton pending={pending}>{settings.submit}</SubmitButton>
+        <SubmitButton pending={pending}>{text.submit}</SubmitButton>
       </div>
     </form>
   );
@@ -161,6 +156,7 @@ export function AppointmentDurationsForm({
 }: {
   kinds: { kind: string; label: string; minutes: number }[];
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     saveAppointmentDurationsAction,
     initialActionState,
@@ -171,7 +167,7 @@ export function AppointmentDurationsForm({
         {kinds.map((item) => (
           <TextField
             key={item.kind}
-            label={`${item.label} (minutes)`}
+            label={t.settings.appointments.duration(item.label)}
             name={item.kind}
             type="number"
             inputMode="numeric"
@@ -185,7 +181,9 @@ export function AppointmentDurationsForm({
       </div>
       <ActionMessage state={state} />
       <div>
-        <SubmitButton pending={pending}>Enregistrer les durées</SubmitButton>
+        <SubmitButton pending={pending}>
+          {t.settings.appointments.submitDurations}
+        </SubmitButton>
       </div>
     </form>
   );
@@ -200,6 +198,7 @@ export function InstructionsForm({
   label: string;
   value: string;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     saveInstructionsAction,
     initialActionState,
@@ -225,9 +224,9 @@ export function InstructionsForm({
         <SubmitButton
           pending={pending}
           size="sm"
-          label={`Enregistrer : ${label}`}
+          label={t.settings.instructions.saveLabel(label)}
         >
-          Enregistrer
+          {t.common.save}
         </SubmitButton>
       </div>
     </form>
@@ -235,6 +234,8 @@ export function InstructionsForm({
 }
 
 export function ContactForm() {
+  const t = useAppText();
+  const text = t.settings.contacts;
   const [state, action, pending] = useActionState(
     addContactAction,
     initialActionState,
@@ -243,15 +244,15 @@ export function ContactForm() {
     <form action={action} className="grid gap-4" noValidate>
       <div className="grid gap-4 md:grid-cols-2">
         <TextField
-          label="Libellé du contact"
+          label={text.label}
           name="label"
           autoComplete="off"
           required
           maxLength={80}
-          hint="Par exemple : accueil du cabinet, clinique de garde partenaire."
+          hint={text.labelHint}
         />
         <TextField
-          label="Numéro"
+          label={text.phone}
           name="phone"
           type="tel"
           autoComplete="off"
@@ -261,7 +262,7 @@ export function ContactForm() {
       </div>
       <ActionMessage state={state} />
       <div>
-        <SubmitButton pending={pending}>Ajouter le contact</SubmitButton>
+        <SubmitButton pending={pending}>{text.add}</SubmitButton>
       </div>
     </form>
   );
@@ -274,6 +275,7 @@ export function RemoveContactForm({
   id: string;
   label: string;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     removeContactAction,
     initialActionState,
@@ -285,9 +287,9 @@ export function RemoveContactForm({
         pending={pending}
         variant="quiet"
         size="sm"
-        label={`Retirer le contact ${label}`}
+        label={t.settings.contacts.removeLabel(label)}
       >
-        Retirer
+        {t.common.remove}
       </SubmitButton>
       <ActionMessage state={state} />
     </form>
@@ -303,6 +305,8 @@ export function AlertSettingsForm({
   photoAnalysisEnabled: boolean;
   choices: Option[];
 }) {
+  const t = useAppText();
+  const text = t.settings.alerts;
   const [state, action, pending] = useActionState(
     saveAlertSettingsAction,
     initialActionState,
@@ -312,7 +316,7 @@ export function AlertSettingsForm({
     <form action={action} className="grid gap-4">
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${id}-delai`} className="text-sm font-semibold">
-          Délai avant d&apos;alerter les autres vétérinaires
+          {text.delay}
         </label>
         <select
           id={`${id}-delai`}
@@ -328,9 +332,7 @@ export function AlertSettingsForm({
           ))}
         </select>
         <p id={`${id}-delai-aide`} className="text-[13px] text-ink-muted">
-          Sans accusé de réception d&apos;une alerte urgente dans ce délai, les
-          autres vétérinaires du cabinet sont prévenus. Les consignes
-          d&apos;urgence partent au propriétaire immédiatement, sans attendre.
+          {text.delayHint}
         </p>
       </div>
       <label className="flex items-start gap-2.5 text-sm">
@@ -341,20 +343,13 @@ export function AlertSettingsForm({
           className="mt-0.5 size-4 accent-[var(--color-brand)]"
         />
         <span>
-          <span className="block font-semibold">
-            Analyse assistée des photos
-          </span>
-          <span className="block text-ink-muted">
-            Désactivée par défaut. Numa ne fournit que des observations et des
-            signaux de risque ; elle ne pose jamais de diagnostic.
-          </span>
+          <span className="block font-semibold">{text.photoAnalysis}</span>
+          <span className="block text-ink-muted">{text.photoAnalysisHint}</span>
         </span>
       </label>
       <ActionMessage state={state} />
       <div>
-        <SubmitButton pending={pending}>
-          Enregistrer les règles d&apos;alerte
-        </SubmitButton>
+        <SubmitButton pending={pending}>{text.submit}</SubmitButton>
       </div>
     </form>
   );
@@ -369,6 +364,8 @@ export function OnCallForm({
   defaultStart: string;
   defaultEnd: string;
 }) {
+  const t = useAppText();
+  const text = t.settings.onCall;
   const [state, action, pending] = useActionState(
     addOnCallAction,
     initialActionState,
@@ -380,7 +377,7 @@ export function OnCallForm({
       <div className="grid gap-4 md:grid-cols-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-vet`} className="text-sm font-semibold">
-            Vétérinaire de garde
+            {text.vet}
           </label>
           <select
             id={`${id}-vet`}
@@ -389,7 +386,7 @@ export function OnCallForm({
             className={fieldClasses}
           >
             <option value="" disabled>
-              Choisir…
+              {text.choose}
             </option>
             {candidates.map((candidate) => (
               <option key={candidate.value} value={candidate.value}>
@@ -400,7 +397,7 @@ export function OnCallForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-debut`} className="text-sm font-semibold">
-            Début
+            {text.start}
           </label>
           <input
             id={`${id}-debut`}
@@ -412,7 +409,7 @@ export function OnCallForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-fin`} className="text-sm font-semibold">
-            Fin
+            {text.end}
           </label>
           <input
             id={`${id}-fin`}
@@ -425,13 +422,15 @@ export function OnCallForm({
       </div>
       <ActionMessage state={state} />
       <div>
-        <SubmitButton pending={pending}>Ajouter la garde</SubmitButton>
+        <SubmitButton pending={pending}>{text.add}</SubmitButton>
       </div>
     </form>
   );
 }
 
+/** `label` : nom accessible complet du bouton (garde, vétérinaire et dates), mis en forme côté serveur. */
 export function RemoveOnCallForm({ id, label }: { id: string; label: string }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     removeOnCallAction,
     initialActionState,
@@ -439,13 +438,8 @@ export function RemoveOnCallForm({ id, label }: { id: string; label: string }) {
   return (
     <form action={action} className="flex flex-col items-end gap-1">
       <input type="hidden" name="id" value={id} />
-      <SubmitButton
-        pending={pending}
-        variant="quiet"
-        size="sm"
-        label={`Retirer la garde ${label}`}
-      >
-        Retirer
+      <SubmitButton pending={pending} variant="quiet" size="sm" label={label}>
+        {t.common.remove}
       </SubmitButton>
       <ActionMessage state={state} />
     </form>
@@ -498,6 +492,7 @@ export function DisconnectForm({
   provider: "whatsapp" | "drveto" | "payment_mandate";
   label: string;
 }) {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     disconnectAction,
     initialActionState,
@@ -509,9 +504,9 @@ export function DisconnectForm({
         pending={pending}
         variant="quiet"
         size="sm"
-        label={`Retirer la connexion ${label}`}
+        label={t.settings.integrations.removeLabel(label)}
       >
-        Retirer
+        {t.common.remove}
       </SubmitButton>
       <ActionMessage state={state} />
     </form>
@@ -519,6 +514,7 @@ export function DisconnectForm({
 }
 
 export function CompleteTeamForm() {
+  const t = useAppText();
   const [state, action, pending] = useActionState(
     completeTeamStepAction,
     initialActionState,
@@ -526,7 +522,9 @@ export function CompleteTeamForm() {
   return (
     <form action={action} className="grid gap-2">
       <div>
-        <SubmitButton pending={pending}>L&apos;équipe est prête</SubmitButton>
+        <SubmitButton pending={pending}>
+          {t.settings.onboarding.team.ready}
+        </SubmitButton>
       </div>
       <ActionMessage state={state} />
     </form>
@@ -534,6 +532,8 @@ export function CompleteTeamForm() {
 }
 
 export function TestFollowupForm({ protocols }: { protocols: Option[] }) {
+  const t = useAppText();
+  const text = t.settings.onboarding.testFollowup;
   const [state, action, pending] = useActionState(
     createTestFollowupAction,
     initialActionState,
@@ -543,7 +543,7 @@ export function TestFollowupForm({ protocols }: { protocols: Option[] }) {
     <form action={action} className="grid gap-3">
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${id}-protocole`} className="text-sm font-semibold">
-          Protocole du suivi test
+          {text.protocol}
         </label>
         <select
           id={`${id}-protocole`}
@@ -561,7 +561,7 @@ export function TestFollowupForm({ protocols }: { protocols: Option[] }) {
       <ActionMessage state={state} />
       <div>
         <SubmitButton pending={pending} variant="primary">
-          Créer le suivi test
+          {text.create}
         </SubmitButton>
       </div>
     </form>

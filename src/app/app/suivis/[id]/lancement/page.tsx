@@ -5,26 +5,25 @@ import { notFound } from "next/navigation";
 
 import { DomainError } from "@/domains/equipe/actor";
 import type { LaunchSheet } from "@/domains/suivis/lancement";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
+import type { Locale } from "@/i18n/locales";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
 import { formatDate, formatDateTime, toDateTimeInput } from "@/ui/format";
 
-import { FOLLOWUP_STATUS_LABELS, SPECIES_LABELS } from "../../followup-labels";
 import { TestMark } from "../../test-mark";
 
 import { ProtocolForm } from "./protocol-form";
 import { SheetForm } from "./sheet-form";
 
 // Titre générique : le nom de l'animal n'apparaît qu'après contrôle d'accès, dans la page.
-export const metadata: Metadata = { title: "Fiche de lancement" };
-
-const DONE: Record<string, string> = {
-  enregistre: "Fiche enregistrée.",
-  protocole:
-    "Protocole appliqué : étapes et signes d'alerte repris de sa version.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await appText();
+  return { title: t.followups.sheet.title };
+}
 
 async function loadSheet(
   context: Awaited<ReturnType<typeof requirePermission>>,
@@ -47,7 +46,14 @@ export default async function LaunchSheetPage({
   const { id } = await params;
   const sheet = await loadSheet(context, id);
   const { fait } = await searchParams;
-  const done = typeof fait === "string" ? DONE[fait] : undefined;
+  const { t, locale } = await appText();
+  const text = t.followups.sheet;
+  const done =
+    fait === "enregistre"
+      ? text.saved
+      : fait === "protocole"
+        ? text.protocolApplied
+        : undefined;
   const { followup } = sheet;
   const draft = followup.status === "draft";
 
@@ -58,20 +64,21 @@ export default async function LaunchSheetPage({
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Dossier de {followup.animalName}
+        {text.back(followup.animalName)}
       </Link>
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight">
             {draft
-              ? `Fiche de lancement de ${followup.animalName}`
-              : `Modifier le suivi de ${followup.animalName}`}
+              ? text.draftHeading(followup.animalName)
+              : text.editHeading(followup.animalName)}
           </h1>
           {followup.isTest ? <TestMark /> : null}
         </div>
         <p className="mt-1 text-ink-muted">
-          {followup.procedure} · {formatDateTime(followup.procedureAt)} ·{" "}
-          {FOLLOWUP_STATUS_LABELS[followup.status]} · Responsable :{" "}
+          {followup.procedure} ·{" "}
+          {formatDateTime(followup.procedureAt, locale)} ·{" "}
+          {t.labels.followupStatus[followup.status]} · {text.responsible}{" "}
           <span className="font-semibold text-ink">
             {followup.responsibleName}
           </span>
@@ -90,13 +97,12 @@ export default async function LaunchSheetPage({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
           {followup.status === "ended" ? (
-            <AlertBanner tone="info" title="Suivi terminé">
-              Réactivez-le depuis le dossier pour modifier ses étapes.
+            <AlertBanner tone="info" title={text.endedTitle}>
+              {text.endedBody}
             </AlertBanner>
           ) : !sheet.protocol ? (
-            <AlertBanner tone="watch" title="Choisissez un protocole">
-              Aucun protocole validé ne correspond à l&apos;intervention
-              importée. Choisissez-en un pour composer la fiche.
+            <AlertBanner tone="watch" title={text.noProtocolTitle}>
+              {text.noProtocolBody}
             </AlertBanner>
           ) : sheet.rights.canEdit ? (
             <SheetForm
@@ -109,14 +115,14 @@ export default async function LaunchSheetPage({
               }
             />
           ) : (
-            <AlertBanner tone="info" title="Modification réservée">
-              Un suivi lancé ne se modifie que par un vétérinaire.
+            <AlertBanner tone="info" title={text.restrictedTitle}>
+              {text.restrictedBody}
             </AlertBanner>
           )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          <SectionCard title="Protocole">
+          <SectionCard title={text.protocolTitle}>
             {draft ? (
               <ProtocolForm
                 followupId={followup.id}
@@ -131,52 +137,65 @@ export default async function LaunchSheetPage({
                 />
                 <span>
                   <span className="font-semibold">
-                    {sheet.protocol.name}, version{" "}
-                    {sheet.protocol.versionNumber}
+                    {text.protocolVersion(
+                      sheet.protocol.name,
+                      sheet.protocol.versionNumber,
+                    )}
                   </span>
                   <span className="block text-ink-muted">
-                    Version figée au lancement. Les modifications ne concernent
-                    que ce suivi.
+                    {text.protocolFrozen}
                   </span>
                 </span>
               </p>
             ) : null}
           </SectionCard>
-          <ImportedSummary sheet={sheet} />
+          <ImportedSummary sheet={sheet} t={t} locale={locale} />
         </div>
       </div>
     </>
   );
 }
 
-function ImportedSummary({ sheet }: { sheet: LaunchSheet }) {
+function ImportedSummary({
+  sheet,
+  t,
+  locale,
+}: {
+  sheet: LaunchSheet;
+  t: AppDictionary;
+  locale: Locale;
+}) {
   const { followup, imported, contacts } = sheet;
+  const text = t.followups.imported;
   return (
     <SectionCard
-      title="Résumé importé de dr.veto"
+      title={text.title}
       description={
         imported
-          ? `Lecture seule · import du ${formatDateTime(imported.importedAt)} (simulé)`
-          : "Suivi créé dans Stivea Vet, sans import."
+          ? text.importedOn(formatDateTime(imported.importedAt, locale))
+          : text.notImported
       }
     >
       <dl className="grid gap-3 text-sm">
         <Fact
-          label="Animal"
+          label={text.animal}
           value={[
             followup.animalName,
-            SPECIES_LABELS[followup.species],
+            t.labels.species[followup.species],
             followup.breed,
           ]
             .filter(Boolean)
             .join(" · ")}
         />
         <Fact
-          label="Intervention"
-          value={`${followup.procedure}, le ${formatDateTime(followup.procedureAt)}`}
+          label={text.procedure}
+          value={text.procedureOn(
+            followup.procedure,
+            formatDateTime(followup.procedureAt, locale),
+          )}
         />
         <div>
-          <dt className="text-ink-muted">Propriétaires</dt>
+          <dt className="text-ink-muted">{text.owners}</dt>
           <dd>
             {contacts.length ? (
               <ul className="grid gap-1">
@@ -184,9 +203,11 @@ function ImportedSummary({ sheet }: { sheet: LaunchSheet }) {
                   <li key={contact.role}>
                     <span className="font-semibold">{contact.name}</span>{" "}
                     <span className="text-ink-muted">
-                      · WhatsApp {contact.phone}
-                      {contact.language === "en" ? " · anglais" : ""}
-                      {contact.active ? "" : " · second contact, inactif"}
+                      {text.whatsapp(contact.phone)}
+                      {contact.language === "en"
+                        ? text.ownerLanguage(t.labels.languages.en)
+                        : ""}
+                      {contact.active ? "" : text.secondInactive}
                     </span>
                   </li>
                 ))}
@@ -199,30 +220,30 @@ function ImportedSummary({ sheet }: { sheet: LaunchSheet }) {
         {imported ? (
           <>
             <Fact
-              label="Allergies"
+              label={text.allergies}
               value={
                 imported.allergies.length
                   ? imported.allergies.join(" · ")
-                  : "Aucune signalée"
+                  : text.noAllergies
               }
             />
             <Fact
-              label="Antécédents"
+              label={text.antecedents}
               value={
                 imported.antecedents.length
                   ? imported.antecedents.join(" · ")
-                  : "Aucun signalé"
+                  : text.noAntecedents
               }
             />
-            <Fact label="Identifiant dr.veto" value={imported.externalRef} />
+            <Fact label={text.externalRef} value={imported.externalRef} />
           </>
         ) : null}
         <Fact
-          label="Contrôle prévu"
+          label={text.control}
           value={
             followup.controlAppointmentAt
-              ? formatDate(followup.controlAppointmentAt)
-              : "Non programmé"
+              ? formatDate(followup.controlAppointmentAt, locale)
+              : text.controlNone
           }
         />
       </dl>

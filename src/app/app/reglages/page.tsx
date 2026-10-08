@@ -53,10 +53,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader
-        title={text.title}
-        description={text.description}
-      />
+      <PageHeader title={text.title} description={text.description} />
       <div className="grid gap-6">
         {unconfigured ? (
           <AlertBanner
@@ -152,9 +149,7 @@ export default async function SettingsPage() {
               ))}
             </ul>
           ) : (
-            <p className="mb-5 text-sm text-ink-muted">
-              {text.contacts.empty}
-            </p>
+            <p className="mb-5 text-sm text-ink-muted">{text.contacts.empty}</p>
           )}
           {settings.contacts.length < 6 ? <ContactForm /> : null}
         </SectionCard>
@@ -202,9 +197,7 @@ export default async function SettingsPage() {
               })}
             </ul>
           ) : (
-            <p className="mb-5 text-sm text-ink-muted">
-              {text.onCall.empty}
-            </p>
+            <p className="mb-5 text-sm text-ink-muted">{text.onCall.empty}</p>
           )}
           <OnCallForm
             candidates={settings.onCallCandidates.map((candidate) => ({

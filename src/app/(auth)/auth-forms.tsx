@@ -8,11 +8,12 @@ import {
   PLAN_CATALOG,
   TRIAL_MONTHLY_CENTS,
   TRIAL_MONTHS,
-  formatEuros,
 } from "@/domains/facturation/rules";
+import { useAppText, useLocale } from "@/i18n/app/client";
 import { pathFor } from "@/i18n/routes";
 import { AlertBanner } from "@/ui/alert-banner";
 import { Button } from "@/ui/button";
+import { formatEuros } from "@/ui/format";
 import { TextField } from "@/ui/text-field";
 
 import {
@@ -27,9 +28,6 @@ import {
 import { initialFormState } from "./form-state";
 import type { FormState } from "./form-state";
 
-const PASSWORD_HINT =
-  "12 caractères minimum. Une phrase facile à retenir fonctionne très bien.";
-
 function Messages({ state }: { state: FormState }) {
   if (state.error) return <AlertBanner tone="urgent" title={state.error} />;
   if (state.notice) return <AlertBanner tone="success" title={state.notice} />;
@@ -37,6 +35,7 @@ function Messages({ state }: { state: FormState }) {
 }
 
 function Submit({ pending, children }: { pending: boolean; children: string }) {
+  const t = useAppText().auth;
   return (
     <Button
       type="submit"
@@ -44,12 +43,13 @@ function Submit({ pending, children }: { pending: boolean; children: string }) {
       disabled={pending}
       aria-busy={pending}
     >
-      {pending ? "Patientez…" : children}
+      {pending ? t.pending : children}
     </Button>
   );
 }
 
 export function LoginForm() {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     loginAction,
     initialFormState,
@@ -58,7 +58,7 @@ export function LoginForm() {
     <form action={action} className="flex flex-col gap-4" noValidate>
       <Messages state={state} />
       <TextField
-        label="Adresse e-mail"
+        label={t.fields.email}
         name="email"
         type="email"
         autoComplete="username"
@@ -67,20 +67,20 @@ export function LoginForm() {
         errors={state.fieldErrors?.email}
       />
       <TextField
-        label="Mot de passe"
+        label={t.fields.password}
         name="password"
         type="password"
         autoComplete="current-password"
         required
         errors={state.fieldErrors?.password}
       />
-      <Submit pending={pending}>Se connecter</Submit>
+      <Submit pending={pending}>{t.login.submit}</Submit>
       <p className="text-center text-sm">
         <Link
           href="/mot-de-passe-oublie"
           className="font-semibold text-brand-ink underline-offset-2 hover:underline"
         >
-          Mot de passe oublié ?
+          {t.login.forgotPassword}
         </Link>
       </p>
     </form>
@@ -88,6 +88,7 @@ export function LoginForm() {
 }
 
 export function CodeForm({ afterSignup = false }: { afterSignup?: boolean }) {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     verifyCodeAction,
     initialFormState,
@@ -99,23 +100,23 @@ export function CodeForm({ afterSignup = false }: { afterSignup?: boolean }) {
         <input type="hidden" name="origine" value="inscription" />
       ) : null}
       <TextField
-        label="Code de sécurité"
+        label={t.fields.code}
         name="code"
         inputMode="numeric"
         autoComplete="one-time-code"
         pattern="\d{6}"
         maxLength={7}
         required
-        hint="6 chiffres, valable 10 minutes."
+        hint={t.fields.codeHint}
         errors={state.fieldErrors?.code}
       />
-      <Submit pending={pending}>Valider le code</Submit>
+      <Submit pending={pending}>{t.code.submit}</Submit>
       <p className="text-center text-sm">
         <Link
           href="/connexion"
           className="font-semibold text-brand-ink underline-offset-2 hover:underline"
         >
-          Recevoir un nouveau code
+          {t.code.resend}
         </Link>
       </p>
     </form>
@@ -123,6 +124,7 @@ export function CodeForm({ afterSignup = false }: { afterSignup?: boolean }) {
 }
 
 export function UnlockForm() {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     unlockAction,
     initialFormState,
@@ -131,7 +133,7 @@ export function UnlockForm() {
     <form action={action} className="flex flex-col gap-4" noValidate>
       <Messages state={state} />
       <TextField
-        label="Mot de passe"
+        label={t.fields.password}
         name="password"
         type="password"
         autoComplete="current-password"
@@ -139,12 +141,13 @@ export function UnlockForm() {
         autoFocus
         errors={state.fieldErrors?.password}
       />
-      <Submit pending={pending}>Déverrouiller</Submit>
+      <Submit pending={pending}>{t.lock.submit}</Submit>
     </form>
   );
 }
 
 export function ResetRequestForm() {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     requestResetAction,
     initialFormState,
@@ -153,7 +156,7 @@ export function ResetRequestForm() {
     <form action={action} className="flex flex-col gap-4" noValidate>
       <Messages state={state} />
       <TextField
-        label="Adresse e-mail"
+        label={t.fields.email}
         name="email"
         type="email"
         autoComplete="username"
@@ -161,12 +164,13 @@ export function ResetRequestForm() {
         defaultValue={state.values?.email}
         errors={state.fieldErrors?.email}
       />
-      <Submit pending={pending}>Recevoir un lien</Submit>
+      <Submit pending={pending}>{t.forgot.submit}</Submit>
     </form>
   );
 }
 
 export function NewPasswordForm({ token }: { token: string }) {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     resetPasswordAction,
     initialFormState,
@@ -176,28 +180,29 @@ export function NewPasswordForm({ token }: { token: string }) {
       <Messages state={state} />
       <input type="hidden" name="token" value={token} />
       <TextField
-        label="Nouveau mot de passe"
+        label={t.fields.newPassword}
         name="password"
         type="password"
         autoComplete="new-password"
         required
-        hint={PASSWORD_HINT}
+        hint={t.passwordHint}
         errors={state.fieldErrors?.password}
       />
       <TextField
-        label="Confirmer le mot de passe"
+        label={t.fields.confirmPassword}
         name="confirmation"
         type="password"
         autoComplete="new-password"
         required
         errors={state.fieldErrors?.confirmation}
       />
-      <Submit pending={pending}>Enregistrer le mot de passe</Submit>
+      <Submit pending={pending}>{t.reset.submit}</Submit>
     </form>
   );
 }
 
 export function SignupForm() {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     signupAction,
     initialFormState,
@@ -206,7 +211,7 @@ export function SignupForm() {
     <form action={action} className="flex flex-col gap-4" noValidate>
       <Messages state={state} />
       <TextField
-        label="Nom du cabinet"
+        label={t.fields.organizationName}
         name="organizationName"
         autoComplete="organization"
         required
@@ -214,16 +219,16 @@ export function SignupForm() {
         errors={state.fieldErrors?.organizationName}
       />
       <TextField
-        label="Votre nom"
+        label={t.fields.displayName}
         name="displayName"
         autoComplete="name"
         required
-        hint="Tel qu'il apparaîtra à votre équipe, par exemple « Dr Claire Fontaine »."
+        hint={t.fields.displayNameHint}
         defaultValue={state.values?.displayName}
         errors={state.fieldErrors?.displayName}
       />
       <TextField
-        label="Adresse e-mail professionnelle"
+        label={t.fields.workEmail}
         name="email"
         type="email"
         autoComplete="username"
@@ -233,16 +238,16 @@ export function SignupForm() {
       />
       <PlanChoice value={state.values?.plan} errors={state.fieldErrors?.plan} />
       <TextField
-        label="Mot de passe"
+        label={t.fields.password}
         name="password"
         type="password"
         autoComplete="new-password"
         required
-        hint={PASSWORD_HINT}
+        hint={t.passwordHint}
         errors={state.fieldErrors?.password}
       />
       <TextField
-        label="Confirmer le mot de passe"
+        label={t.fields.confirmPassword}
         name="confirmation"
         type="password"
         autoComplete="new-password"
@@ -250,7 +255,7 @@ export function SignupForm() {
         errors={state.fieldErrors?.confirmation}
       />
       <Consents values={state.values} errors={state.fieldErrors} />
-      <Submit pending={pending}>Créer le cabinet</Submit>
+      <Submit pending={pending}>{t.signup.submit}</Submit>
     </form>
   );
 }
@@ -264,6 +269,7 @@ export function InvitationForm({
   email: string;
   displayName: string;
 }) {
+  const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     acceptInvitationAction,
     initialFormState,
@@ -273,16 +279,16 @@ export function InvitationForm({
       <Messages state={state} />
       <input type="hidden" name="token" value={token} />
       <TextField
-        label="Adresse e-mail"
+        label={t.fields.email}
         name="email"
         type="email"
         autoComplete="username"
         value={email}
         readOnly
-        hint="L'adresse à laquelle l'invitation a été envoyée."
+        hint={t.fields.invitationEmailHint}
       />
       <TextField
-        label="Votre nom"
+        label={t.fields.displayName}
         name="displayName"
         autoComplete="name"
         required
@@ -290,28 +296,27 @@ export function InvitationForm({
         errors={state.fieldErrors?.displayName}
       />
       <TextField
-        label="Mot de passe"
+        label={t.fields.password}
         name="password"
         type="password"
         autoComplete="new-password"
         required
-        hint={PASSWORD_HINT}
+        hint={t.passwordHint}
         errors={state.fieldErrors?.password}
       />
       <TextField
-        label="Confirmer le mot de passe"
+        label={t.fields.confirmPassword}
         name="confirmation"
         type="password"
         autoComplete="new-password"
         required
         errors={state.fieldErrors?.confirmation}
       />
-      <Submit pending={pending}>Créer mon compte</Submit>
+      <Submit pending={pending}>{t.invitation.submit}</Submit>
     </form>
   );
 }
 
-/** Formule appliquée après les 2 mois d'essai pilote ; modifiable ensuite dans Facturation. */
 /** Acceptation des conditions et pouvoir de souscrire : deux cases distinctes, jamais pré-cochées. */
 function Consents({
   values,
@@ -321,34 +326,36 @@ function Consents({
   errors: FormState["fieldErrors"];
 }) {
   const id = useId();
+  const t = useAppText().auth.signup.consents;
+  const locale = useLocale();
   const boxes = [
     {
       name: "acceptTerms",
       label: (
         <>
-          J&apos;accepte les{" "}
+          {t.termsBefore}
           <Link
-            href={pathFor("terms", "fr")}
+            href={pathFor("terms", locale)}
             target="_blank"
             className="font-semibold text-brand-ink underline underline-offset-2"
           >
-            conditions d&apos;utilisation
-          </Link>{" "}
-          et j&apos;ai lu la{" "}
-          <Link
-            href={pathFor("privacy", "fr")}
-            target="_blank"
-            className="font-semibold text-brand-ink underline underline-offset-2"
-          >
-            politique de confidentialité
+            {t.termsLink}
           </Link>
-          .
+          {t.termsMiddle}
+          <Link
+            href={pathFor("privacy", locale)}
+            target="_blank"
+            className="font-semibold text-brand-ink underline underline-offset-2"
+          >
+            {t.privacyLink}
+          </Link>
+          {t.termsAfter}
         </>
       ),
     },
     {
       name: "authorized",
-      label: <>Je confirme être autorisé à souscrire au nom de ce cabinet.</>,
+      label: <>{t.authorized}</>,
     },
   ] as const;
   return (
@@ -382,6 +389,7 @@ function Consents({
   );
 }
 
+/** Formule appliquée après les 2 mois d'essai pilote ; modifiable ensuite dans Facturation. */
 function PlanChoice({
   value,
   errors,
@@ -390,18 +398,17 @@ function PlanChoice({
   errors?: readonly string[];
 }) {
   const id = useId();
+  const text = useAppText();
+  const t = text.auth.signup.plan;
+  const locale = useLocale();
   return (
     <fieldset
       className="grid gap-2"
       aria-describedby={`${id}-aide${errors?.length ? ` ${id}-erreur` : ""}`}
     >
-      <legend className="mb-1 text-sm font-semibold">
-        Formule après l&apos;essai
-      </legend>
+      <legend className="mb-1 text-sm font-semibold">{t.legend}</legend>
       <p id={`${id}-aide`} className="text-[13px] text-ink-muted">
-        Essai pilote à {formatEuros(TRIAL_MONTHLY_CENTS)} HT par mois pendant{" "}
-        {TRIAL_MONTHS} mois, sans engagement. Ensuite, la formule choisie, au
-        mois : l&apos;engagement annuel n&apos;est jamais automatique.
+        {t.help(formatEuros(TRIAL_MONTHLY_CENTS, locale), TRIAL_MONTHS)}
       </p>
       {PLANS.map((plan) => {
         const definition = PLAN_CATALOG[plan];
@@ -419,15 +426,16 @@ function PlanChoice({
             />
             <span>
               <span className="block font-semibold">
-                {definition.label} · {formatEuros(definition.monthlyCents)} HT
-                par mois
+                {t.option(
+                  text.labels.plans[plan].name,
+                  formatEuros(definition.monthlyCents, locale),
+                )}
               </span>
               <span className="block text-ink-muted">
-                {definition.maxVets === 1
-                  ? "1 vétérinaire"
-                  : `Jusqu'à ${definition.maxVets} vétérinaires`}
-                . Avec engagement annuel :{" "}
-                {formatEuros(definition.annualMonthlyCents)} HT par mois.
+                {t.details(
+                  definition.maxVets,
+                  formatEuros(definition.annualMonthlyCents, locale),
+                )}
               </span>
             </span>
           </label>

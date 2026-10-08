@@ -1,54 +1,28 @@
 import type { Integration, SettingsView } from "@/domains/reglages/service";
+import { appText } from "@/i18n/app/server";
 import { formatDate } from "@/ui/format";
 
 import { ConnectForm, DisconnectForm } from "./settings-forms";
 
-type Field = { label: string; type: "tel" | "text"; hint: string };
-
-export const INTEGRATIONS: Record<
-  Integration,
-  { title: string; description: string; submitLabel: string; field?: Field }
-> = {
-  whatsapp: {
-    title: "WhatsApp Business",
-    description:
-      "Le numéro professionnel du cabinet, d'où Numa écrit aux propriétaires et où arrivent les alertes urgentes.",
-    submitLabel: "Connecter le numéro (simulé)",
-    field: {
-      label: "Numéro WhatsApp Business",
-      type: "tel",
-      hint: "Seuls les deux derniers chiffres sont conservés.",
-    },
-  },
-  drveto: {
-    title: "dr.veto",
-    description:
-      "Le logiciel du cabinet, pour retrouver l'animal, le propriétaire et l'agenda.",
-    submitLabel: "Connecter dr.veto (simulé)",
-    field: {
-      label: "Code du cabinet dr.veto",
-      type: "text",
-      hint: "Code fictif, par exemple CAB-1234.",
-    },
-  },
-  payment_mandate: {
-    title: "Mandat de prélèvement",
-    description:
-      "Pour l'essai pilote à 86 € HT par mois. Aucune donnée bancaire n'est demandée pendant cette phase.",
-    submitLabel: "Signer le mandat (simulé)",
-  },
+/** Champ à saisir pour chaque connexion simulée ; aucun pour le mandat. */
+const FIELD_TYPES: Record<Integration, "tel" | "text" | null> = {
+  whatsapp: "tel",
+  drveto: "text",
+  payment_mandate: null,
 };
 
-export function SimulatedBadge() {
+const PROVIDERS = Object.keys(FIELD_TYPES) as Integration[];
+
+export function SimulatedBadge({ label }: { label: string }) {
   return (
     <span className="rounded-full bg-watch-soft px-2 py-0.5 text-[12px] font-semibold text-watch">
-      Simulé
+      {label}
     </span>
   );
 }
 
 /** État d'une connexion simulée : libellé masqué, ou formulaire de connexion. */
-export function IntegrationPanel({
+export async function IntegrationPanel({
   provider,
   connection,
   headingLevel = 3,
@@ -57,31 +31,40 @@ export function IntegrationPanel({
   connection: SettingsView["integrations"][Integration];
   headingLevel?: 2 | 3;
 }) {
-  const { title, description, submitLabel, field } = INTEGRATIONS[provider];
+  const { t, locale } = await appText();
+  const text = t.settings.integrations;
+  const copy = text[provider];
+  const fieldType = FIELD_TYPES[provider];
+  const field =
+    fieldType && "field" in copy
+      ? { label: copy.field, type: fieldType, hint: copy.hint }
+      : undefined;
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Heading className="flex items-center gap-2 font-semibold">
-            {title} <SimulatedBadge />
+            {copy.title} <SimulatedBadge label={text.simulated} />
           </Heading>
-          <p className="text-sm text-ink-muted">{description}</p>
+          <p className="text-sm text-ink-muted">{copy.description}</p>
         </div>
         {connection ? (
-          <DisconnectForm provider={provider} label={title} />
+          <DisconnectForm provider={provider} label={copy.title} />
         ) : null}
       </div>
       {connection ? (
         <p className="text-sm">
-          <span className="font-semibold">Connecté</span> :{" "}
-          {connection.displayLabel}, depuis le{" "}
-          {formatDate(connection.connectedAt)}.
+          <span className="font-semibold">{text.connected}</span>
+          {text.connectedDetail(
+            connection.displayLabel,
+            formatDate(connection.connectedAt, locale),
+          )}
         </p>
       ) : (
         <ConnectForm
           provider={provider}
-          submitLabel={submitLabel}
+          submitLabel={copy.submit}
           field={field}
         />
       )}
@@ -96,7 +79,7 @@ export function IntegrationList({
 }) {
   return (
     <div className="grid gap-6">
-      {(Object.keys(INTEGRATIONS) as Integration[]).map((provider, index) => (
+      {PROVIDERS.map((provider, index) => (
         <div
           key={provider}
           className={index > 0 ? "border-t border-line pt-6" : undefined}
