@@ -87,6 +87,48 @@ export const journal = {
     "job.retried": (actor: string) => `${actor} a relancé une tâche en échec`,
     "job.cancelled": (actor: string) =>
       `${actor} a abandonné une tâche en échec`,
+    "followup.test_created": (actor: string) =>
+      `${actor} a créé un suivi de test`,
+    "protocol.created": (actor: string) => `${actor} a créé un protocole`,
+    "protocol.duplicated": (actor: string) =>
+      `${actor} a dupliqué un protocole`,
+    "protocol.installed": (actor: string) =>
+      `${actor} a ajouté un protocole de la bibliothèque`,
+    "protocol.version_created": (actor: string) =>
+      `${actor} a créé une nouvelle version d'un protocole`,
+    "protocol.validated": (actor: string) => `${actor} a validé un protocole`,
+    "protocol.archived": (actor: string) => `${actor} a archivé un protocole`,
+    "protocol.restored": (actor: string) =>
+      `${actor} a rétabli un protocole archivé`,
+    "settings.alerts_changed": (actor: string) =>
+      `${actor} a modifié les réglages des alertes`,
+    "settings.defaults_applied": (actor: string) =>
+      `${actor} a appliqué les réglages par défaut de Numa`,
+    "settings.emergency_contact_added": (actor: string) =>
+      `${actor} a ajouté un contact d'urgence`,
+    "settings.emergency_contact_removed": (actor: string) =>
+      `${actor} a retiré un contact d'urgence`,
+    "settings.emergency_instructions_changed": (actor: string) =>
+      `${actor} a modifié les consignes d'urgence`,
+    "settings.message_windows_changed": (actor: string) =>
+      `${actor} a modifié les heures d'envoi de Numa`,
+    "settings.on_call_added": (actor: string) => `${actor} a ajouté une garde`,
+    "settings.on_call_removed": (actor: string) =>
+      `${actor} a retiré une garde`,
+    "integration.connected": (actor: string) =>
+      `${actor} a connecté un service (WhatsApp, dr.veto ou prélèvement)`,
+    "integration.disconnected": (actor: string) =>
+      `${actor} a déconnecté un service (WhatsApp, dr.veto ou prélèvement)`,
+    "onboarding.step_completed": (actor: string) =>
+      `${actor} a terminé une étape de l'installation guidée`,
+    "subscription.plan_changed": (actor: string) =>
+      `${actor} a changé de formule`,
+    "subscription.cycle_chosen": (actor: string) =>
+      `${actor} a choisi la facturation mensuelle ou annuelle`,
+    "subscription.canceled": (actor: string) =>
+      `${actor} a résilié l'abonnement`,
+    "subscription.settlement_requested": (actor: string) =>
+      `${actor} a relancé un prélèvement refusé`,
   },
   automatic: {
     "numa.reply_blocked":
@@ -111,6 +153,9 @@ export const journal = {
     "alert.raised": "Triage : un message de propriétaire a ouvert une alerte",
     "alert.escalated":
       "Urgence sans accusé de réception : toute l'équipe vétérinaire a été alertée",
+    "invoice.issued": "Facture émise",
+    "invoice.paid": "Prélèvement d'une facture réussi",
+    "invoice.payment_failed": "Prélèvement d'une facture refusé",
   },
   /** Langue de Numa pour un propriétaire ; `language` : nom de la langue (« Anglais »). */
   ownerLanguageDetected: (owner: "primary" | "secondary", language: string) =>

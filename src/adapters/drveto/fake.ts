@@ -306,6 +306,43 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  // Fiches de lancement relues en anglais (e2e du lot 19, une par projet) : jamais lancées.
+  {
+    ref: "DV-20711",
+    animal: {
+      name: "Hazel",
+      species: "dog",
+      breed: "Beagle",
+      birthDate: "2022-05-14",
+      weightGrams: 11200,
+    },
+    owners: [
+      { fullName: "Olivia Brown", phone: "+33639980119", language: "en" },
+    ],
+    procedure: { label: "Retrait d'une masse cutanée", hoursAgo: 2 },
+    controlInDays: 12,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20718",
+    animal: {
+      name: "Juniper",
+      species: "cat",
+      breed: "Maine coon",
+      birthDate: "2021-11-02",
+      weightGrams: 5600,
+    },
+    owners: [
+      { fullName: "James Taylor", phone: "+33639980120", language: "en" },
+    ],
+    procedure: { label: "Castration", hoursAgo: 2 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

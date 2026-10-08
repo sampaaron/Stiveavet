@@ -82,6 +82,47 @@ export const journal: AppDictionary["journal"] = {
     "alert.resolved": (actor: string) => `${actor} closed an alert`,
     "job.retried": (actor: string) => `${actor} retried a failed task`,
     "job.cancelled": (actor: string) => `${actor} abandoned a failed task`,
+    "followup.test_created": (actor: string) =>
+      `${actor} created a test follow-up`,
+    "protocol.created": (actor: string) => `${actor} created a protocol`,
+    "protocol.duplicated": (actor: string) => `${actor} duplicated a protocol`,
+    "protocol.installed": (actor) =>
+      `${actor} added a protocol from the library`,
+    "protocol.version_created": (actor) =>
+      `${actor} created a new version of a protocol`,
+    "protocol.validated": (actor: string) => `${actor} validated a protocol`,
+    "protocol.archived": (actor: string) => `${actor} archived a protocol`,
+    "protocol.restored": (actor: string) =>
+      `${actor} restored an archived protocol`,
+    "settings.alerts_changed": (actor: string) =>
+      `${actor} changed the alert settings`,
+    "settings.defaults_applied": (actor) =>
+      `${actor} applied Numa's default settings`,
+    "settings.emergency_contact_added": (actor) =>
+      `${actor} added an emergency contact`,
+    "settings.emergency_contact_removed": (actor) =>
+      `${actor} removed an emergency contact`,
+    "settings.emergency_instructions_changed": (actor) =>
+      `${actor} changed the emergency instructions`,
+    "settings.message_windows_changed": (actor) =>
+      `${actor} changed Numa's sending hours`,
+    "settings.on_call_added": (actor: string) =>
+      `${actor} added an on-call shift`,
+    "settings.on_call_removed": (actor: string) =>
+      `${actor} removed an on-call shift`,
+    "integration.connected": (actor) =>
+      `${actor} connected a service (WhatsApp, dr.veto or direct debit)`,
+    "integration.disconnected": (actor) =>
+      `${actor} disconnected a service (WhatsApp, dr.veto or direct debit)`,
+    "onboarding.step_completed": (actor) =>
+      `${actor} completed a step of the guided setup`,
+    "subscription.plan_changed": (actor: string) => `${actor} changed plan`,
+    "subscription.cycle_chosen": (actor) =>
+      `${actor} chose monthly or annual billing`,
+    "subscription.canceled": (actor: string) =>
+      `${actor} cancelled the subscription`,
+    "subscription.settlement_requested": (actor) =>
+      `${actor} retried a failed direct debit`,
   },
   automatic: {
     "numa.reply_blocked":
@@ -105,6 +146,9 @@ export const journal: AppDictionary["journal"] = {
     "alert.raised": "Triage: an owner's message opened an alert",
     "alert.escalated":
       "Urgent case not acknowledged: the whole veterinary team was alerted",
+    "invoice.issued": "Invoice issued",
+    "invoice.paid": "Invoice direct debit succeeded",
+    "invoice.payment_failed": "Invoice direct debit failed",
   },
   ownerLanguageDetected: (owner: "primary" | "secondary", language: string) =>
     `Numa's language recognised in the ${owner === "secondary" ? "second owner's" : "owner's"} messages: ${language}`,

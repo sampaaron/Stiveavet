@@ -87,7 +87,9 @@ export default async function ActivityPage() {
                   >
                     {formatDateTime(event.occurredAt, locale)}
                   </time>
-                  <span>{sentence(t, event)}</span>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {sentence(t, event)}
+                  </span>
                 </li>
               ))}
             </ol>
