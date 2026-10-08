@@ -16,6 +16,8 @@ import type { ProtocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import type { SettingsService } from "@/domains/reglages/service";
 import { followupsService } from "@/domains/suivis/service";
+import { jobsService } from "@/domains/taches/service";
+import type { JobsService } from "@/domains/taches/service";
 import type { FollowupsService } from "@/domains/suivis/service";
 import { appDatabase } from "@/server/db/client";
 import { serverEnv } from "@/server/env";
@@ -26,6 +28,7 @@ let protocols: ProtocolsService | undefined;
 let settings: SettingsService | undefined;
 let billing: BillingService | undefined;
 let demo: DemoService | undefined;
+let jobs: JobsService | undefined;
 
 /** Services métier branchés sur la base applicative et l'envoi d'e-mails. */
 export const services = {
@@ -62,6 +65,11 @@ export const services = {
       provider: fakeBillingProvider(),
     });
     return billing;
+  },
+  /** Tâches en échec, relance et abandon (ADR 0014). */
+  jobs(): JobsService {
+    jobs ??= jobsService(appDatabase());
+    return jobs;
   },
   /** Démo du site public : e-mails commerciaux séparés, vers Mailpit uniquement (ADR 0012). */
   demo(): DemoService {

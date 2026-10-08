@@ -40,6 +40,9 @@ const ACTION_SENTENCES: Record<string, (entry: Entry) => string> = {
     `${actorName} a changé la confidentialité d'un dossier`,
   "followup.reassigned": ({ actorName }) =>
     `${actorName} a réattribué un dossier`,
+  "job.retried": ({ actorName }) => `${actorName} a relancé une tâche en échec`,
+  "job.cancelled": ({ actorName }) =>
+    `${actorName} a abandonné une tâche en échec`,
 };
 
 function sentence(event: Entry & { action: string }): string {

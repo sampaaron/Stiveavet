@@ -11,7 +11,7 @@ pnpm install
 pnpm dev                 # http://localhost:3000
 ```
 
-Pile complète (application, PostgreSQL, Mailpit) :
+Pile complète (application, worker de la file de tâches, PostgreSQL, Mailpit) :
 
 ```bash
 cp .env.example .env     # puis renseigner les trois mots de passe locaux et les URL associées
@@ -21,6 +21,8 @@ pnpm db:seed             # deux cabinets fictifs, avec le rôle applicatif (sous
 ```
 
 Mailpit (e-mails capturés, dont les codes de sécurité) : http://localhost:8025.
+
+Worker de la file de tâches hors Docker : `pnpm worker` (boucle) ou `pnpm worker --once` (un passage). Les tâches en échec se relancent depuis « Tâches en échec » dans l'espace cabinet (ADR 0014).
 
 Comptes fictifs créés par `pnpm db:seed`, tous avec la phrase de passe `tilleuls fictifs en local` :
 
