@@ -32,28 +32,57 @@ export function followupStatus(followup: Followup): Status {
   return "normal";
 }
 
-type FollowupCardProps = {
-  followup: Followup;
+/** Ligne d'un suivi telle qu'affichée : textes déjà mis en forme par la page. */
+export type FollowupCardData = {
+  id: string;
+  animalName: string;
+  species: Followup["animal"]["species"];
+  status: Status;
+  summaryLine: string;
+  procedure: string;
+  dayLabel: string;
   vetName: string;
+  lastActivity: string;
+};
+
+/** Ligne d'un suivi des données de démonstration (site public). */
+export function fixtureCard(
+  followup: Followup,
+  vetName: string,
+): FollowupCardData {
+  return {
+    id: followup.id,
+    animalName: followup.animal.name,
+    species: followup.animal.species,
+    status: followupStatus(followup),
+    summaryLine: followup.summaryLine,
+    procedure: followup.procedure,
+    dayLabel: followup.dayLabel,
+    vetName,
+    lastActivity: followup.lastActivity,
+  };
+}
+
+type FollowupCardProps = {
+  followup: FollowupCardData;
   /** Adresse du dossier ; la démo du site public pointe vers sa propre page. */
   href?: string;
 };
 
 /** Ligne de suivi cliquable, utilisée dans les priorités et la liste des suivis. */
-export function FollowupCard({ followup, vetName, href }: FollowupCardProps) {
-  const { animal } = followup;
+export function FollowupCard({ followup, href }: FollowupCardProps) {
   return (
     <Link
       href={href ?? `/app/suivis/${followup.id}`}
       className="group flex items-center gap-4 rounded-[var(--radius-control)] px-3 py-3 transition-colors hover:bg-canvas-subtle"
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted group-hover:bg-surface">
-        <SpeciesIcon species={animal.species} />
+        <SpeciesIcon species={followup.species} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="font-semibold">{animal.name}</span>
-          <StatusBadge status={followupStatus(followup)} />
+          <span className="font-semibold">{followup.animalName}</span>
+          <StatusBadge status={followup.status} />
         </span>
         <span className="mt-0.5 block truncate text-sm text-ink-muted">
           {followup.summaryLine}
@@ -64,7 +93,7 @@ export function FollowupCard({ followup, vetName, href }: FollowupCardProps) {
           {followup.procedure} · {followup.dayLabel}
         </span>
         <span className="block">
-          {vetName} · {followup.lastActivity}
+          {followup.vetName} · {followup.lastActivity}
         </span>
       </span>
       <ChevronRight

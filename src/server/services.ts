@@ -28,6 +28,10 @@ import type { SettingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
+import { synthesisService } from "@/domains/suivis/synthese";
+import type { SynthesisService } from "@/domains/suivis/synthese";
+import { todayService } from "@/domains/suivis/tableau";
+import type { TodayService } from "@/domains/suivis/tableau";
 import { JOB_HANDLERS, OUTBOX_ROUTES } from "@/domains/taches/registry";
 import { jobsService } from "@/domains/taches/service";
 import { createWorker } from "@/domains/taches/worker";
@@ -50,6 +54,8 @@ let conversations: ConversationsService | undefined;
 let alerts: AlertsService | undefined;
 let media: MediaService | undefined;
 let agenda: AgendaService | undefined;
+let synthesis: SynthesisService | undefined;
+let today: TodayService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 declare global {
@@ -137,6 +143,20 @@ export const services = {
       ai: fakeAiGateway,
     });
     return agenda;
+  },
+  /** Synthèse pré-consultation, rédaction simulée sous garde-fous (ADR 0020). */
+  synthesis(): SynthesisService {
+    synthesis ??= synthesisService({ db: appDatabase(), ai: fakeAiGateway });
+    return synthesis;
+  },
+  /** Tableau de bord « Aujourd'hui », lu dans la base ; agenda dr.veto simulé (ADR 0020). */
+  today(): TodayService {
+    today ??= todayService({
+      db: appDatabase(),
+      followups: services.followups(),
+      drveto: fakeDrVeto,
+    });
+    return today;
   },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement

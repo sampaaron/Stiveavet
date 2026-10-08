@@ -349,9 +349,10 @@ describe("photos du propriétaire", () => {
     ]);
     const { rows } = await admin.query(
       `SELECT metadata FROM audit_events WHERE organization_id = $1
-       AND action = 'photo.observation_blocked' ORDER BY occurred_at`,
+       AND action = 'photo.observation_blocked' ORDER BY metadata ->> 'reason'`,
       [org],
     );
+    // Même transaction, même horodatage : l'ordre est celui des motifs.
     expect(rows.map((row: { metadata: unknown }) => row.metadata)).toEqual([
       { reason: "diagnosis" },
       { reason: "dosage" },

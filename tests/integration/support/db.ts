@@ -51,6 +51,9 @@ export const TENANT_TABLES = [
   "followup_treatments",
   "followup_steps",
   "followup_alert_rules",
+  "photo_observations",
+  "agenda_free_slots",
+  "followup_syntheses",
 ] as const;
 
 export function pools() {

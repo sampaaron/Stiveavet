@@ -1,5 +1,6 @@
 import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
 
+import { simulatedSynthesis } from "./simulated-synthesis";
 import { readSimulatedVoiceText } from "./simulated-voice";
 import type {
   AgendaCaptureInput,
@@ -197,5 +198,8 @@ export const fakeAiGateway: AiGateway = {
   },
   async readAgendaCapture(input) {
     return simulatedAgendaReading(input);
+  },
+  async summarizeFollowup(input) {
+    return simulatedSynthesis(input);
   },
 };

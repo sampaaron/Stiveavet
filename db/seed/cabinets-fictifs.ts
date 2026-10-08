@@ -38,7 +38,7 @@ import { fakePaymentMandate } from "../../src/adapters/payments/fake";
 import { fakeWhatsApp } from "../../src/adapters/whatsapp/fake";
 import { withTenant } from "../../src/server/db/tenant";
 
-import { insertFollowupRecord } from "./dossiers-fictifs";
+import { controlOf, insertFollowupRecord } from "./dossiers-fictifs";
 import type { Database, TenantTransaction } from "../../src/server/db/tenant";
 
 /**
@@ -119,6 +119,16 @@ function daysAgo(dayLabel: string): Date {
   return new Date(Date.now() - days * 24 * 3600 * 1000);
 }
 
+/** Date de naissance tirée de l'âge affiché (« 6 ans », « 1 an »), au format `AAAA-MM-JJ`. */
+function birthDate(age: string): string | null {
+  const years = Number(/(\d+)\s*ans?/.exec(age)?.[1]);
+  if (!Number.isFinite(years) || years <= 0) return null;
+  const date = new Date();
+  date.setUTCFullYear(date.getUTCFullYear() - years);
+  date.setUTCMonth(date.getUTCMonth() - 2);
+  return date.toISOString().slice(0, 10);
+}
+
 function grams(weight: string): number {
   return Math.round(
     Number(weight.replace(",", ".").replace(/[^\d.]/g, "")) * 1000,
@@ -145,6 +155,7 @@ export async function insertFollowup(
       name: data.animal.name,
       species: data.animal.species === "chat" ? "cat" : "dog",
       breed: data.animal.breed,
+      birthDate: birthDate(data.animal.age),
       weightGrams: grams(data.animal.weight),
     })
     .returning({ id: animals.id });
@@ -194,8 +205,9 @@ export async function insertFollowup(
     isPrivate: data.isPrivate,
     startedAt,
     protocolVersionId,
+    controlAppointmentAt: controlOf(data, new Date())?.at ?? null,
   });
-  return { animalId: animal.id, startedAt, contacts };
+  return { animalId: animal.id, startedAt, contacts, protocolVersionId };
 }
 
 /** Membre du jeu fictif agissant avec les droits par défaut de son rôle. */

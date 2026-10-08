@@ -1,6 +1,7 @@
 /**
- * Types des données fictives affichées par les écrans de référence (lot 2).
- * Les vrais modèles de données arrivent avec le schéma PostgreSQL (lot 3).
+ * Types des données fictives de la démo du site public et du jeu de données local (lot 2).
+ * Les messages, pièces jointes et rendez-vous servent aussi de forme d'affichage aux écrans
+ * de l'espace cabinet, qui lisent la base depuis le lot 17.
  */
 export type Triage = "normal" | "watch" | "urgent";
 export type ConsentState = "pending" | "given" | "stopped";

@@ -50,10 +50,17 @@ test.describe("tableau de bord « Aujourd'hui »", () => {
   }) => {
     await page.goto("/app");
 
-    await expect(
-      page.getByRole("meter", { name: "Suivis actifs" }),
-    ).toHaveAttribute("aria-valuenow", "7");
-    await expect(page.getByText("3 places incluses restantes")).toBeVisible();
+    // Données vivantes : d'autres scénarios lancent des suivis, seul l'accord compte.
+    const meter = page.getByRole("meter", { name: "Suivis actifs" });
+    const active = Number(await meter.getAttribute("aria-valuenow"));
+    expect(active).toBeGreaterThanOrEqual(7);
+    await expect(meter).toHaveAttribute("aria-valuemax", "10");
+    if (active < 10)
+      await expect(
+        page.getByText(
+          `${10 - active} place${10 - active > 1 ? "s" : ""} incluse${10 - active > 1 ? "s" : ""} restante${10 - active > 1 ? "s" : ""}`,
+        ),
+      ).toBeVisible();
   });
 
   test("identifie les rendez-vous Stivea dans l'agenda", async ({ page }) => {
@@ -85,6 +92,8 @@ test.describe("tableau de bord « Aujourd'hui »", () => {
 });
 
 test.describe("dossier animal et conversation Numa", () => {
+  test.describe.configure({ retries: 0 });
+
   test("montre la synthèse, le consentement et le cadre de Numa", async ({
     page,
   }) => {
@@ -105,7 +114,9 @@ test.describe("dossier animal et conversation Numa", () => {
 
   test("écrire au propriétaire met Numa en pause jusqu'à « Reprendre Numa »", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    // Écrit dans la vraie conversation de Caramel : un seul projet, sans nouvelle tentative.
+    test.skip(testInfo.project.name !== "desktop", "Conversation partagée");
     await page.goto(caramel);
 
     await page
@@ -124,12 +135,18 @@ test.describe("dossier animal et conversation Numa", () => {
     await expect(page.getByText("Numa suit la conversation")).toBeVisible();
   });
 
-  test("l'accusé de réception remplace l'alerte urgente", async ({ page }) => {
+  test("l'urgence attend l'accusé de réception d'un vétérinaire", async ({
+    page,
+  }) => {
+    // L'accusé lui-même est éprouvé sur un animal réservé (urgences.spec.ts).
     await page.goto(caramel);
 
-    await page.getByRole("button", { name: "Accuser réception" }).click();
+    const alert = page
+      .getByRole("alert")
+      .filter({ hasText: "Urgence signalée" });
+    await expect(alert).toContainText("sans accusé de réception");
     await expect(
-      page.getByText("Réception de l'urgence confirmée par Dr Fontaine"),
+      alert.getByRole("button", { name: "Accuser réception" }),
     ).toBeVisible();
   });
 

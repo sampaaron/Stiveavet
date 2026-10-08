@@ -1,4 +1,11 @@
-import type { DrVetoAnimalHit, DrVetoConnector, DrVetoRecord } from "./types";
+import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
+
+import type {
+  DrVetoAgendaEntry,
+  DrVetoAnimalHit,
+  DrVetoConnector,
+  DrVetoRecord,
+} from "./types";
 
 /**
  * Simulation : aucun appel réseau ; le code du cabinet n'est jamais conservé en clair.
@@ -298,6 +305,52 @@ function toRecord(entry: FakeAnimal, now: Date): DrVetoRecord {
   };
 }
 
+/** Agenda simulé d'une journée : consultations, chirurgie et créneau d'urgence fictifs. */
+const AGENDA: ReadonlyArray<
+  Omit<DrVetoAgendaEntry, "ref" | "startsAt" | "endsAt"> & {
+    time: string;
+    minutes: number;
+  }
+> = [
+  {
+    time: "09:00",
+    minutes: 20,
+    title: "Consultation vaccinale · Gaïa",
+    kind: "consultation",
+    practitionerName: "Dr Claire Fontaine",
+  },
+  {
+    time: "10:30",
+    minutes: 90,
+    title: "Chirurgie · Nala (stérilisation)",
+    kind: "surgery",
+    practitionerName: "Dr Hugo Marchal",
+  },
+  {
+    time: "15:15",
+    minutes: 30,
+    title: "Consultation · Hercule (boiterie)",
+    kind: "consultation",
+    practitionerName: "Dr Inès Benali",
+  },
+  {
+    time: "16:40",
+    minutes: 20,
+    title: "Consultation · Plume",
+    kind: "consultation",
+    practitionerName: "Dr Claire Fontaine",
+  },
+  {
+    time: "18:00",
+    minutes: 15,
+    title: "Créneau d'urgence réservé",
+    kind: "emergency",
+    practitionerName: "Dr Claire Fontaine",
+  },
+];
+
+const pad = (value: number) => String(value).padStart(2, "0");
+
 export function createFakeDrVeto(
   clock: () => Date = () => new Date(),
 ): DrVetoConnector {
@@ -334,6 +387,25 @@ export function createFakeDrVeto(
     async importRecord(ref) {
       const entry = ANIMALS.find((candidate) => candidate.ref === ref);
       return entry ? toRecord(entry, clock()) : null;
+    },
+    async agendaOfDay(day) {
+      const index = Math.floor(parisWallMinutes(day) / 1440);
+      const date = new Date(index * DAY);
+      const iso = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+      return AGENDA.flatMap((entry, position) => {
+        const startsAt = parisLocalToDate(`${iso}T${entry.time}`);
+        if (!startsAt) return [];
+        return [
+          {
+            ref: `AG-${iso}-${position + 1}`,
+            startsAt,
+            endsAt: new Date(startsAt.getTime() + entry.minutes * 60_000),
+            title: entry.title,
+            kind: entry.kind,
+            practitionerName: entry.practitionerName,
+          },
+        ];
+      });
     },
   };
 }

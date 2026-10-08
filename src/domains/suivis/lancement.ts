@@ -351,7 +351,7 @@ async function activeVets(tx: TenantTransaction) {
 }
 
 /** Copie les étapes et signes d'alerte d'une version de protocole dans une nouvelle révision. */
-async function copyProtocolPlan(
+export async function copyProtocolPlan(
   tx: TenantTransaction,
   organizationId: string,
   followupId: string,

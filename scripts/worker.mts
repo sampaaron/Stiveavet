@@ -10,7 +10,11 @@ import { hostname } from "node:os";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { JOB_HANDLERS, OUTBOX_ROUTES } from "../src/domains/taches/registry";
+import {
+  JOB_HANDLERS,
+  JOB_PLANNERS,
+  OUTBOX_ROUTES,
+} from "../src/domains/taches/registry";
 import { createWorker } from "../src/domains/taches/worker";
 import * as schema from "../src/server/db/schema";
 
@@ -33,6 +37,7 @@ const worker = createWorker({
   workerId,
   handlers: JOB_HANDLERS,
   routes: OUTBOX_ROUTES,
+  planners: JOB_PLANNERS,
 });
 
 let stopping = false;
@@ -46,7 +51,7 @@ async function pass() {
     const result = await worker.runOnce();
     if (Object.values(result).some((value) => value > 0))
       console.warn(
-        `Passage : ${result.published} événement(s) publié(s), ${result.succeeded} réussie(s), ${result.retried} reprogrammée(s), ${result.dead} en échec, ${result.lost} reprise(s) ailleurs.`,
+        `Passage : ${result.planned} tâche(s) périodique(s), ${result.published} événement(s) publié(s), ${result.succeeded} réussie(s), ${result.retried} reprogrammée(s), ${result.dead} en échec, ${result.lost} reprise(s) ailleurs.`,
       );
   } catch (error) {
     // Nom de l'erreur seulement : son message peut citer une donnée.
