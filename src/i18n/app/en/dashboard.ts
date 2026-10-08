@@ -95,5 +95,7 @@ export const dashboard: AppDictionary["dashboard"] = {
       "New follow-ups are suspended. Ongoing follow-ups continue until they end.",
     readOnly: (date: string) => `Practice in read-only mode until ${date}.`,
     closed: "Access to the practice has ended.",
+    annualChoice:
+      "After the trial: choose between the annual commitment and monthly billing. If you do not answer, nothing switches.",
   },
 };

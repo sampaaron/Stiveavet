@@ -39,6 +39,11 @@ test.describe("Clinique des Tilleuls (Claire)", () => {
     ).toBeVisible();
     // Choix enregistré une fois pour toutes : vérifié sur un seul format d'écran.
     if (test.info().project.name !== "desktop") return;
+    // Tant que le choix est à faire, il est rappelé sur tout l'espace cabinet (ADR 0023).
+    const notice = page.getByText(
+      "Après l'essai : choisissez entre l'engagement annuel et le mois. Sans réponse, rien ne bascule.",
+    );
+    await expect(notice).toBeVisible();
     await page.getByRole("button", { name: "Rester au mois" }).click();
     await expect(
       page.getByText("Possible à tout moment, sur votre demande uniquement."),
@@ -46,6 +51,8 @@ test.describe("Clinique des Tilleuls (Claire)", () => {
     await expect(
       page.getByRole("button", { name: "Rester au mois" }),
     ).toHaveCount(0);
+    await page.goto("/app");
+    await expect(notice).toHaveCount(0);
   });
 });
 

@@ -33,6 +33,7 @@ export const tasks = {
     "attachment.purge": "Suppression d'un fichier",
     "retention.sweep": "Recherche des données arrivées à échéance",
     "followup.purge": "Effacement d'un suivi arrivé à échéance",
+    "billing.annual_offer": "E-mail d'offre d'engagement annuel",
   },
   unknownKind: "Tâche technique",
   /** Motifs techniques d'échec, par code (jamais le message brut d'une exception). */

@@ -34,6 +34,7 @@ export const tasks: AppDictionary["tasks"] = {
     "attachment.purge": "File deletion",
     "retention.sweep": "Search for data past its retention date",
     "followup.purge": "Erasure of a follow-up past its retention date",
+    "billing.annual_offer": "Annual commitment offer e-mail",
   },
   unknownKind: "Technical task",
   errors: {

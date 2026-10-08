@@ -154,6 +154,8 @@ export const journal = {
     "alert.escalated":
       "Urgence sans accusé de réception : toute l'équipe vétérinaire a été alertée",
     "invoice.issued": "Facture émise",
+    "billing.annual_offer_sent":
+      "Offre d'engagement annuel envoyée par e-mail à qui gère la facturation",
     "invoice.paid": "Prélèvement d'une facture réussi",
     "invoice.payment_failed": "Prélèvement d'une facture refusé",
   },

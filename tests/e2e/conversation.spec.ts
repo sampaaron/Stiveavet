@@ -104,9 +104,9 @@ test("accord, échange, reprise en main puis « Reprendre Numa »", async ({
     .fill("Bonjour, ici Dr Fontaine. Je passe prendre des nouvelles.");
   await page.getByRole("button", { name: "Envoyer", exact: true }).click();
   await expect(page).toHaveURL(/\?fait=reprise-en-main#conversation$/);
-  await expect(page.getByRole("status").first()).toContainText(
-    "vous avez repris la main",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "vous avez repris la main" }),
+  ).toBeVisible();
   await expect(conversation).toContainText(
     "Vous avez repris la main : Numa est en pause.",
   );
