@@ -86,7 +86,11 @@ export const messages = pgTable("messages", {
 });
 
 export type SystemNoteCode =
-  "group_created" | "left_group" | "group_emptied" | "group_stopped";
+  | "group_created"
+  | "left_group"
+  | "group_emptied"
+  | "group_stopped"
+  | "file_refused";
 
 export const attachments = pgTable("attachments", {
   id: uuid("id")

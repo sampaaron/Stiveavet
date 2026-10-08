@@ -47,6 +47,7 @@ export type FixedStep =
   | "stopped"
   | "resumed"
   | "photo_received"
+  | "file_refused"
   | "consent_given_waiting"
   | "group_welcome"
   | "stop_clarify"
@@ -67,6 +68,8 @@ const FR: Record<
     `Bonne nouvelle, le suivi de ${c.animalName} reprend avec l'équipe de ${c.practiceName}. Écrivez STOP à tout moment pour l'arrêter.`,
   photo_received: (c) =>
     `Merci ${c.ownerFirstName}, la photo de ${c.animalName} est bien arrivée. Je la transmets à l'équipe de ${c.practiceName} : seul le vétérinaire peut l'interpréter. En cas d'urgence, appelez directement le cabinet.`,
+  file_refused: (c) =>
+    `Désolée ${c.ownerFirstName}, je n'ai pas pu recevoir ce fichier : il est trop lourd ou dans un format que je ne sais pas lire. Vous pouvez envoyer une photo ou un message vocal, ou décrire la situation par écrit. En cas d'urgence, appelez directement ${c.practiceName}.`,
   consent_given_waiting: (c) =>
     `Merci ${c.ownerFirstName} ! C'est noté. Dès que ${c.otherFirstName ?? "l'autre propriétaire"} aura accepté aussi, je créerai le groupe dédié au suivi de ${c.animalName}. En attendant, je vous écris ici. En cas d'urgence, appelez directement le cabinet.`,
   group_welcome: (c) =>
@@ -93,6 +96,8 @@ const EN: Record<
     `Good news, the follow-up of ${c.animalName} resumes with the ${c.practiceName} team. Write STOP at any time to end it.`,
   photo_received: (c) =>
     `Thank you ${c.ownerFirstName}, the photo of ${c.animalName} has arrived. I'm passing it on to the ${c.practiceName} team: only the vet can interpret it. In an emergency, call the clinic directly.`,
+  file_refused: (c) =>
+    `Sorry ${c.ownerFirstName}, I couldn't receive this file: it is too large or in a format I can't read. You can send a photo or a voice message, or describe the situation in writing. In an emergency, call ${c.practiceName} directly.`,
   consent_given_waiting: (c) =>
     `Thank you ${c.ownerFirstName}! As soon as ${c.otherFirstName ?? "the other owner"} accepts too, I will create the group for ${c.animalName}'s follow-up. Until then, I'll write to you here. In an emergency, call the clinic directly.`,
   group_welcome: (c) =>

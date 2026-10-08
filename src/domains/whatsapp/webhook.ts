@@ -4,8 +4,9 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { classifyGraphError } from "@/adapters/whatsapp/cloud-api";
-import { receiveInTx } from "@/domains/conversations/service";
+import { receiveInTx, recordInbound } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/equipe/actor";
+import { refuseOwnerMedia } from "@/domains/fichiers/service";
 import {
   followupContacts,
   followups,
@@ -19,6 +20,7 @@ import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { SEND_JOB, notifyFailure } from "./envoi";
+import { queueMediaDownload } from "./medias";
 
 /**
  * Webhook de la WhatsApp Cloud API (ADR 0024). Meta signe chaque envoi avec le secret de
@@ -94,6 +96,12 @@ const inbound = z.object({
       list_reply: z.object({ title: z.string() }).optional(),
     })
     .optional(),
+  image: z
+    .object({ id: z.string(), caption: z.string().optional() })
+    .optional(),
+  audio: z.object({ id: z.string() }).optional(),
+  video: z.object({ caption: z.string().optional() }).optional(),
+  document: z.object({ caption: z.string().optional() }).optional(),
 });
 
 const status = z.object({
@@ -131,16 +139,45 @@ export const webhookPayload = z.object({
 type Inbound = z.infer<typeof inbound>;
 type Status = z.infer<typeof status>;
 
-/** Texte écrit par le propriétaire ; photos et vocaux arrivent au lot 22. */
+/** Texte écrit par le propriétaire (ou légende d'un fichier). */
 function inboundText(message: Inbound): string | null {
   const text =
     message.text?.body ??
     message.button?.text ??
     message.interactive?.button_reply?.title ??
     message.interactive?.list_reply?.title ??
+    message.image?.caption ??
+    message.video?.caption ??
+    message.document?.caption ??
     null;
   const trimmed = text?.trim().slice(0, 4096) ?? "";
   return trimmed.length > 0 ? trimmed : null;
+}
+
+const MEDIA_ID = /^[0-9]{5,40}$/;
+
+/**
+ * Fichier joint : photo ou vocal à télécharger (lot 22) ; vidéo, document ou autocollant
+ * refusés (formats non lus). Localisation, contacts et réactions sont ignorés.
+ */
+function inboundMedia(
+  message: Inbound,
+): { kind: "photo" | "voice"; id: string } | { kind: "other" } | null {
+  if (
+    message.type === "image" &&
+    message.image &&
+    MEDIA_ID.test(message.image.id)
+  )
+    return { kind: "photo", id: message.image.id };
+  if (
+    message.type === "audio" &&
+    message.audio &&
+    MEDIA_ID.test(message.audio.id)
+  )
+    return { kind: "voice", id: message.audio.id };
+  if (["image", "audio", "video", "document", "sticker"].includes(message.type))
+    return { kind: "other" };
+  return null;
 }
 
 function atOf(value: string, now: Date): Date {
@@ -390,17 +427,51 @@ export async function handleWebhook(
             result.ignored += 1;
             continue;
           }
+          const media = inboundMedia(message.data);
           const body = inboundText(message.data);
-          const target = body ? await routeInbound(tx, message.data) : null;
-          if (!body || !target) {
+          const target =
+            body || media ? await routeInbound(tx, message.data) : null;
+          if (!target) {
             result.ignored += 1;
             continue;
           }
           try {
             // Point de sauvegarde : un message refusé n'annule pas les autres du lot.
-            await tx.transaction((inner) =>
-              receiveInTx(inner, target.followupId, body, target.role),
-            );
+            await tx.transaction(async (inner) => {
+              if (!media) {
+                await receiveInTx(
+                  inner,
+                  target.followupId,
+                  body ?? "",
+                  target.role,
+                );
+                return;
+              }
+              const caption = body ?? "";
+              const { messageId } = await recordInbound(
+                inner,
+                target.followupId,
+                caption,
+                target.role,
+              );
+              const received = {
+                organizationId,
+                followupId: target.followupId,
+                messageId,
+                caption,
+              };
+              if (media.kind === "other")
+                await refuseOwnerMedia(inner, received, {
+                  kind: "other",
+                  reason: "file_type",
+                });
+              else
+                await queueMediaDownload(inner, {
+                  ...received,
+                  mediaId: media.id,
+                  kind: media.kind,
+                });
+            });
             result.messages += 1;
           } catch (error) {
             if (!(error instanceof DomainError)) throw error;

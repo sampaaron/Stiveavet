@@ -165,19 +165,18 @@ async function auditSystem(
   });
 }
 
-async function receiveInTx(
+/**
+ * Fichier déjà déposé, rattaché au message reçu, puis la suite : transcription d'un vocal,
+ * ou accusé de réception (et analyse si activée) d'une photo.
+ */
+async function attachInTx(
   tx: TenantTransaction,
-  followupId: string,
+  target: { organizationId: string; followupId: string; messageId: string },
   media: CheckedMedia,
   attachmentId: string,
   storageKey: string,
-): Promise<{ messageId: string; outcome: InboundOutcome }> {
-  const { messageId, organizationId } = await recordInbound(
-    tx,
-    followupId,
-    media.caption,
-    media.from,
-  );
+): Promise<InboundOutcome> {
+  const { organizationId, followupId, messageId } = target;
   await tx.insert(attachments).values({
     id: attachmentId,
     organizationId,
@@ -202,14 +201,14 @@ async function receiveInTx(
       followupId,
       payload: { attachmentId },
     });
-    return { messageId, outcome: "stored" };
+    return "stored";
   }
   const { outcome } = await processInbound(
     tx,
     followupId,
     messageId,
     media.caption,
-    { photo: true },
+    { media: "photo" },
   );
   const [settings] = await tx
     .select({ enabled: organizationSettings.photoAnalysisEnabled })
@@ -225,7 +224,117 @@ async function receiveInTx(
       followupId,
       payload: { attachmentId },
     });
+  return outcome;
+}
+
+async function receiveInTx(
+  tx: TenantTransaction,
+  followupId: string,
+  media: CheckedMedia,
+  attachmentId: string,
+  storageKey: string,
+): Promise<{ messageId: string; outcome: InboundOutcome }> {
+  const { messageId, organizationId } = await recordInbound(
+    tx,
+    followupId,
+    media.caption,
+    media.from,
+  );
+  const outcome = await attachInTx(
+    tx,
+    { organizationId, followupId, messageId },
+    media,
+    attachmentId,
+    storageKey,
+  );
   return { messageId, outcome };
+}
+
+/** Motif d'un fichier reçu mais refusé, gardé au journal sans contenu. */
+export type MediaRefusal =
+  "too_large" | "file_type" | "expired" | "integrity" | "unavailable";
+
+/**
+ * Fichier envoyé par WhatsApp (lot 22, ADR 0025), une fois téléchargé chez Meta : type lu
+ * dans le contenu, taille bornée, dépôt privé, puis la même suite qu'un fichier du simulateur.
+ * Le message reçu existe déjà (enregistré par le webhook, avec la légende). Renvoie le motif
+ * d'un refus, sans rien déposer.
+ */
+export async function storeOwnerMedia(
+  tx: TenantTransaction,
+  storage: ObjectStorage,
+  target: {
+    organizationId: string;
+    followupId: string;
+    messageId: string;
+    caption: string;
+  },
+  media: { kind: "photo" | "voice"; bytes: Uint8Array },
+): Promise<MediaRefusal | null> {
+  let checked: CheckedMedia;
+  try {
+    checked = checkMedia({ ...media, caption: target.caption });
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+    return media.bytes.length >
+      (media.kind === "photo" ? MAX_PHOTO_BYTES : MAX_VOICE_BYTES)
+      ? "too_large"
+      : "file_type";
+  }
+  const attachmentId = randomUUID();
+  const key = followupObjectKey(
+    target.organizationId,
+    target.followupId,
+    attachmentId,
+    checked.extension,
+  );
+  await storage.putObject(key, {
+    bytes: checked.bytes,
+    contentType: checked.contentType,
+  });
+  try {
+    // Point de sauvegarde : si l'enregistrement échoue, le fichier déposé est retiré.
+    await tx.transaction((inner) =>
+      attachInTx(inner, target, checked, attachmentId, key),
+    );
+  } catch (error) {
+    await storage.deleteObject(key);
+    throw error;
+  }
+  return null;
+}
+
+/**
+ * Fichier refusé : trace au journal (type et motif seulement), trace dans la conversation
+ * pour l'équipe, et Numa demande au propriétaire de le renvoyer ou de décrire la situation.
+ * La légende éventuelle est triée comme un message écrit.
+ */
+export async function refuseOwnerMedia(
+  tx: TenantTransaction,
+  target: {
+    organizationId: string;
+    followupId: string;
+    messageId: string;
+    caption: string;
+  },
+  refusal: { kind: "photo" | "voice" | "other"; reason: MediaRefusal },
+) {
+  await auditSystem(
+    tx,
+    target.organizationId,
+    "whatsapp.media_refused",
+    { type: "followup", id: target.followupId },
+    { kind: refusal.kind, reason: refusal.reason },
+  );
+  await processInbound(
+    tx,
+    target.followupId,
+    target.messageId,
+    target.caption,
+    {
+      media: "refused",
+    },
+  );
 }
 
 export type MediaService = ReturnType<typeof mediaService>;

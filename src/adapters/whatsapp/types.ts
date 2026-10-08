@@ -53,6 +53,14 @@ export type WhatsAppConnector = {
     groupRef: string;
     idempotencyKey: string;
   }): Promise<void>;
+  /**
+   * Photo ou vocal envoyé par un propriétaire (webhook) : télécharge le fichier chez Meta,
+   * sans dépasser `maxBytes`, et vérifie son empreinte. Le type sera relu dans le contenu.
+   */
+  downloadMedia(input: {
+    mediaId: string;
+    maxBytes: number;
+  }): Promise<Uint8Array>;
 };
 
 /**
@@ -79,5 +87,25 @@ export class WhatsAppSendError extends Error {
     readonly code: string,
   ) {
     super(`whatsapp:${failure}:${code}`);
+  }
+}
+
+/**
+ * Échec de téléchargement d'un média :
+ * - `retry` : Meta indisponible, nouvelle tentative ;
+ * - `too_large` : fichier au-delà de la limite, refusé sans le télécharger en entier ;
+ * - `gone` : média expiré ou inconnu chez Meta (30 jours) ; inutile de réessayer ;
+ * - `integrity` : contenu différent de l'empreinte annoncée par Meta ;
+ * - `account` : compte du cabinet à reconnecter.
+ */
+export type MediaFailure =
+  "retry" | "too_large" | "gone" | "integrity" | "account";
+
+export class WhatsAppMediaError extends Error {
+  constructor(
+    readonly failure: MediaFailure,
+    readonly code: string,
+  ) {
+    super(`whatsapp-media:${failure}:${code}`);
   }
 }

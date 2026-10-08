@@ -6,6 +6,7 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import type { EmailMessage } from "@/adapters/email/types";
+import { createMemoryStorage } from "@/adapters/object-storage/memory";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { metaImitation } from "@/adapters/whatsapp/imitation";
 import { embeddedSignup } from "@/adapters/whatsapp/inscription";
@@ -18,8 +19,10 @@ import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import { liveProvider, tokenContext } from "@/domains/whatsapp/connexion";
 import type { WhatsAppSetup } from "@/domains/whatsapp/connexion";
+import { mediaHandlers } from "@/domains/fichiers/service";
 import { failureEmailHandlers } from "@/domains/whatsapp/echecs";
 import { FAILURE_EMAIL_JOB, SEND_JOB } from "@/domains/whatsapp/envoi";
+import { MEDIA_JOB, mediaDownloadHandlers } from "@/domains/whatsapp/medias";
 import {
   handleWebhook,
   validSignature,
@@ -95,20 +98,28 @@ const conversations = conversationsService(appDb);
 const protocols = protocolsService(appDb);
 
 const emails: EmailMessage[] = [];
+const storage = createMemoryStorage();
+const provider = liveProvider({ fetch: meta.fetch, box });
+const downloads = mediaDownloadHandlers({ whatsapp: provider, storage });
 const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-whatsapp",
   organizationId: () => org,
-  whatsapp: { provider: liveProvider({ fetch: meta.fetch, box }) },
+  whatsapp: { provider },
   ai: fakeAiGateway,
-  extra: failureEmailHandlers({
-    email: {
-      async send(message) {
-        emails.push(message);
+  extra: {
+    ...failureEmailHandlers({
+      email: {
+        async send(message) {
+          emails.push(message);
+        },
       },
-    },
-    appUrl: "http://localhost:3000",
-  }),
+      appUrl: "http://localhost:3000",
+    }),
+    ...mediaHandlers({ storage, ai: fakeAiGateway }),
+    ...downloads.handlers,
+  },
+  extraDead: downloads.dead,
 });
 
 const org = randomUUID();
@@ -671,5 +682,199 @@ describe("envois et webhooks", () => {
       [SEND_JOB, messageId],
     );
     expect(rows).toEqual([{ status: "dead", attempts: 1 }]);
+  });
+});
+
+const PNG = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 73, 72, 68, 82,
+]);
+const OGG = new TextEncoder().encode("OggS\0\u0002vocal fictif de test");
+
+/** Le propriétaire envoie un fichier depuis WhatsApp : Meta le garde, puis le webhook. */
+async function ownerSends(
+  type: "image" | "audio" | "video",
+  media: Record<string, string>,
+  wamid = `wamid.IN${randomUUID()}`,
+) {
+  meta.userWrites(OWNER_PHONE);
+  const body = webhookBody({
+    messages: [
+      {
+        from: OWNER_PHONE.slice(1),
+        id: wamid,
+        timestamp: seconds(),
+        type,
+        [type]: media,
+      },
+    ],
+  });
+  return { body, result: await deliverWebhook(body) };
+}
+
+async function lastInbound() {
+  const inbound = (await messagesOf(plume)).filter(
+    (message) => message.direction === "inbound",
+  );
+  return inbound.at(-1);
+}
+
+async function attachmentOf(messageId: string | undefined) {
+  const { rows } = await admin.query(
+    `SELECT id, kind, content_type, byte_size, storage_key FROM attachments
+     WHERE message_id = $1`,
+    [messageId],
+  );
+  return rows[0] as
+    | {
+        id: string;
+        kind: string;
+        content_type: string;
+        byte_size: number;
+        storage_key: string;
+      }
+    | undefined;
+}
+
+async function refusals() {
+  const { rows } = await admin.query(
+    `SELECT metadata FROM audit_events
+     WHERE organization_id = $1 AND action = 'whatsapp.media_refused'
+     ORDER BY occurred_at`,
+    [org],
+  );
+  return rows.map((row: { metadata: unknown }) => row.metadata);
+}
+
+describe("photos et vocaux reçus par WhatsApp", () => {
+  beforeAll(async () => {
+    // Le vétérinaire rend la main à Numa après ses messages.
+    await conversations.resumeNuma(await actor(ids.vet), plume);
+    await drain(plume);
+  });
+
+  it("une photo est téléchargée chez Meta, déposée en privé, et Numa accuse réception", async () => {
+    const mediaId = meta.addMedia(PNG, "image/png");
+    const { body, result } = await ownerSends("image", {
+      id: mediaId,
+      mime_type: "image/png",
+    });
+    expect(result).toEqual({ messages: 1, statuses: 0, ignored: 0 });
+    // Rejoué : ni second message ni second téléchargement.
+    await deliverWebhook(body);
+    const message = await lastInbound();
+    const { rows: jobs } = await admin.query(
+      "SELECT payload FROM scheduled_jobs WHERE kind = $1 AND followup_id = $2",
+      [MEDIA_JOB, plume],
+    );
+    // Seuls des identifiants dans la tâche.
+    expect(jobs).toEqual([
+      { payload: { messageId: message?.id, mediaId, kind: "photo" } },
+    ]);
+
+    await drain(plume);
+    const attachment = await attachmentOf(message?.id);
+    expect(attachment).toMatchObject({
+      kind: "photo",
+      content_type: "image/png",
+      byte_size: PNG.length,
+    });
+    expect(storage.keys()).toContain(attachment?.storage_key);
+    expect(meta.downloads.filter((d) => d.mediaId === mediaId)).toHaveLength(1);
+    expect(meta.sent.at(-1)?.body).toContain(
+      "la photo de Plume est bien arrivée",
+    );
+  });
+
+  it("un vocal est téléchargé puis transcrit", async () => {
+    const mediaId = meta.addMedia(OGG, "audio/ogg; codecs=opus");
+    await ownerSends("audio", { id: mediaId, mime_type: "audio/ogg" });
+    await drain(plume);
+    const message = await lastInbound();
+    const attachment = await attachmentOf(message?.id);
+    expect(attachment).toMatchObject({
+      kind: "voice",
+      content_type: "audio/ogg",
+    });
+    const { rows } = await admin.query(
+      "SELECT 1 FROM voice_transcripts WHERE attachment_id = $1",
+      [attachment?.id],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("trop lourd, mauvais type, vidéo ou expiré : refusé, tracé sans contenu, et Numa le dit", async () => {
+    const before = meta.sent.length;
+    const keys = storage.keys().length;
+    const big = new Uint8Array(6 * 1024 * 1024);
+    big.set([0xff, 0xd8, 0xff]);
+    const heavy = meta.addMedia(big, "image/jpeg");
+    await ownerSends("image", { id: heavy, caption: "Regardez sa cicatrice" });
+    await drain(plume);
+    // Refusé sur la taille annoncée : rien n'a été téléchargé.
+    expect(meta.downloads.filter((d) => d.mediaId === heavy)).toEqual([]);
+
+    const html = meta.addMedia(
+      new TextEncoder().encode("<svg onload=alert(1)>"),
+      "image/png",
+    );
+    await ownerSends("image", { id: html });
+    await drain(plume);
+
+    await ownerSends("video", { id: "1234567", caption: "" });
+    await drain(plume);
+
+    const expired = meta.addMedia(PNG, "image/png");
+    meta.expireMedia(expired);
+    await ownerSends("image", { id: expired });
+    await drain(plume);
+
+    expect(await refusals()).toEqual([
+      { kind: "photo", reason: "too_large" },
+      { kind: "photo", reason: "file_type" },
+      { kind: "other", reason: "file_type" },
+      { kind: "photo", reason: "expired" },
+    ]);
+    expect(storage.keys()).toHaveLength(keys);
+    // L'équipe voit chaque refus ; la légende reste le message du propriétaire.
+    const { rows: notes } = await admin.query(
+      `SELECT note_names FROM messages WHERE followup_id = $1 AND note_code = 'file_refused'`,
+      [plume],
+    );
+    expect(notes).toHaveLength(4);
+    expect(notes[0]).toEqual({ note_names: ["Margaux"] });
+    const replies = meta.sent.slice(before);
+    expect(replies).toHaveLength(4);
+    for (const reply of replies)
+      expect(reply.body).toContain("je n'ai pas pu recevoir ce fichier");
+    const { rows: failed } = await admin.query(
+      "SELECT status FROM scheduled_jobs WHERE kind = $1 AND followup_id = $2 AND status <> 'succeeded'",
+      [MEDIA_JOB, plume],
+    );
+    expect(failed).toEqual([]);
+  });
+
+  it("Meta indisponible jusqu'au bout : la tâche passe en échec et le fichier est refusé", async () => {
+    const mediaId = meta.addMedia(PNG, "image/png");
+    await ownerSends("image", { id: mediaId });
+    const message = await lastInbound();
+    // Compte déconnecté entre-temps : plus aucun téléchargement possible.
+    await admin.query(
+      "DELETE FROM whatsapp_accounts WHERE organization_id = $1",
+      [org],
+    );
+    await drain(plume);
+    const { rows } = await admin.query(
+      `SELECT status, last_error_code FROM scheduled_jobs
+       WHERE kind = $1 AND payload ->> 'messageId' = $2`,
+      [MEDIA_JOB, message?.id],
+    );
+    expect(rows).toEqual([
+      { status: "dead", last_error_code: "provider_account" },
+    ]);
+    expect(await attachmentOf(message?.id)).toBeUndefined();
+    expect((await refusals()).at(-1)).toEqual({
+      kind: "photo",
+      reason: "unavailable",
+    });
   });
 });

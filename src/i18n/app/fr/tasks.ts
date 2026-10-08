@@ -35,6 +35,7 @@ export const tasks = {
     "followup.purge": "Effacement d'un suivi arrivé à échéance",
     "billing.annual_offer": "E-mail d'offre d'engagement annuel",
     "whatsapp.send": "Message WhatsApp",
+    "whatsapp.media": "Photo ou vocal reçu par WhatsApp",
     "alert.deliver": "Alerte WhatsApp à un vétérinaire",
     "notify.whatsapp_failed": "E-mail d'échec d'un envoi WhatsApp",
   },

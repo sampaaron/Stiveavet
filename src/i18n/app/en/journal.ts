@@ -131,6 +131,8 @@ export const journal: AppDictionary["journal"] = {
   automatic: {
     "numa.reply_blocked":
       "Safeguard: a reply from Numa was replaced with a referral to the vet",
+    "whatsapp.media_refused":
+      "A file sent on WhatsApp was refused (too large, unsupported format or unavailable)",
     "attachment.purged":
       "A file that reached the end of its retention period was deleted",
     "photo.observation_blocked":

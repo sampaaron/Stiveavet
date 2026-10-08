@@ -216,6 +216,8 @@ export const dossier = {
     contactState: (name: string, state: string) => `${name} : ${state}`,
     groupOpen: "Groupe WhatsApp ouvert",
     groupLater: "Groupe créé quand les deux auront accepté",
+    /** Message du propriétaire fait d'un fichier seul, avant sa réception ou après un refus. */
+    fileSent: "Fichier envoyé par WhatsApp",
     /** Traces du groupe (messages « système »), selon leur code. */
     notes: {
       group_created: (names: string) =>
@@ -225,6 +227,8 @@ export const dossier = {
         `${name} a quitté le groupe ; plus personne n'y reste, il est fermé.`,
       group_stopped: (name: string) =>
         `Groupe fermé : ${name} a demandé l'arrêt du suivi.`,
+      file_refused: (name: string) =>
+        `Fichier de ${name} non reçu : trop lourd ou format non pris en charge. Numa lui a demandé de le renvoyer ou de décrire la situation.`,
     },
     states: {
       stoppedByOwner:
