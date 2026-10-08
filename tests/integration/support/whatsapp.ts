@@ -63,6 +63,7 @@ export function recordingWhatsApp(options: { groups?: boolean } = {}) {
     async closeGroup() {
       groupCalls.push("close");
     },
+    downloadMedia: fakeWhatsApp.downloadMedia,
   };
   return {
     connector,
@@ -104,6 +105,7 @@ export function conversationWorker(deps: {
   whatsapp: { provider: WhatsAppProvider };
   ai: AiGateway;
   extra?: Record<string, JobHandler>;
+  extraDead?: Record<string, DeadJobHandler>;
 }) {
   const sends = sendHandlers({ whatsapp: deps.whatsapp.provider });
   const alerts = alertHandlers({ whatsapp: deps.whatsapp.provider });
@@ -127,6 +129,7 @@ export function conversationWorker(deps: {
       deadHandlers: onlyFor(deps.organizationId, {
         ...sends.dead,
         ...alerts.dead,
+        ...deps.extraDead,
       }),
     }),
   };

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { maskPhone } from "@/domains/whatsapp/numero";
 
+import { WhatsAppMediaError } from "./types";
 import type { WhatsAppConnector } from "./types";
 
 function simulatedRef(key: string): string {
@@ -25,6 +26,10 @@ export const fakeWhatsApp: WhatsAppConnector = {
   },
   async removeFromGroup() {},
   async closeGroup() {},
+  // Le simulateur dépose ses fichiers directement : aucun média n'est à télécharger.
+  async downloadMedia() {
+    throw new WhatsAppMediaError("gone", "simulated");
+  },
 };
 
 /** Libellé affiché après la connexion simulée du numéro du cabinet. */

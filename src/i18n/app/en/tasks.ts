@@ -36,6 +36,7 @@ export const tasks: AppDictionary["tasks"] = {
     "followup.purge": "Erasure of a follow-up past its retention date",
     "billing.annual_offer": "Annual commitment offer e-mail",
     "whatsapp.send": "WhatsApp message",
+    "whatsapp.media": "Photo or voice note received on WhatsApp",
     "alert.deliver": "WhatsApp alert to a vet",
     "notify.whatsapp_failed": "E-mail about a failed WhatsApp message",
   },

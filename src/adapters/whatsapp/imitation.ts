@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 import { z } from "zod";
 
@@ -83,6 +83,17 @@ function graphError(status: number, code: number): Response {
 
 export type MetaImitation = ReturnType<typeof metaImitation>;
 
+/** Média reçu d'un propriétaire, tel que Meta le garde (30 jours). */
+type ImitatedMedia = {
+  bytes: Uint8Array;
+  mimeType: string;
+  /** Ce que Meta annonce, qui peut mentir dans un test (taille, empreinte). */
+  declaredSize: number;
+  sha256: string;
+};
+
+const MEDIA_HOST = "lookaside.fbsbx.com";
+
 /** Compte WhatsApp que le cabinet choisit dans la fenêtre d'inscription de Meta. */
 export type ImitatedSignup = {
   code: string;
@@ -112,6 +123,39 @@ export function metaImitation(options: {
   const failures: { code: number; status: number }[] = [];
   let unreachable = false;
   let counter = 0;
+  const media = new Map<string, ImitatedMedia>();
+  /** Téléchargements de fichiers effectivement servis (octets envoyés). */
+  const downloads: { mediaId: string; bytes: number }[] = [];
+
+  /** Média : adresse temporaire, puis fichier, toujours avec le jeton du cabinet. */
+  function handleMedia(url: URL, init: RequestInit): Response | null {
+    const isFile = url.hostname === MEDIA_HOST;
+    const path = url.pathname.replace(/^\/v[0-9]+\.[0-9]+\//, "");
+    const id = isFile
+      ? url.searchParams.get("mid")
+      : /^[0-9]{5,40}$/.exec(path)?.[0];
+    if (!id || (init.method ?? "GET") !== "GET") return null;
+    const auth = new Headers(init.headers).get("authorization");
+    if (auth !== `Bearer ${options.accessToken}`) return graphError(401, 190);
+    const stored = media.get(id);
+    if (!stored)
+      return isFile
+        ? new Response(null, { status: 404 })
+        : graphError(404, 100);
+    if (!isFile)
+      return Response.json({
+        messaging_product: "whatsapp",
+        id,
+        url: `https://${MEDIA_HOST}/whatsapp_business/attachments/?mid=${id}`,
+        mime_type: stored.mimeType,
+        sha256: stored.sha256,
+        file_size: stored.declaredSize,
+      });
+    downloads.push({ mediaId: id, bytes: stored.bytes.byteLength });
+    return new Response(stored.bytes.slice(), {
+      headers: { "content-type": stored.mimeType },
+    });
+  }
 
   function windowOpen(to: string): boolean {
     const at = lastInbound.get(to.replace(/^\+/, ""));
@@ -185,6 +229,8 @@ export function metaImitation(options: {
     const path = url.pathname.replace(/^\/v[0-9]+\.[0-9]+\//, "");
     const signupResponse = handleSignup(path, url, init);
     if (signupResponse) return signupResponse;
+    const mediaResponse = handleMedia(url, init);
+    if (mediaResponse) return mediaResponse;
     const auth = new Headers(init.headers).get("authorization");
     if (auth !== `Bearer ${options.accessToken}`) return graphError(401, 190);
     const match = /^([0-9]{5,30})\/messages$/.exec(path);
@@ -263,6 +309,27 @@ export function metaImitation(options: {
     /** Prochain envoi : numéro absent de WhatsApp. */
     nextUnreachable() {
       unreachable = true;
+    },
+    downloads,
+    /** Le propriétaire envoie un fichier : Meta le garde et renvoie son identifiant. */
+    addMedia(
+      bytes: Uint8Array,
+      mimeType: string,
+      declared: { size?: number; sha256?: string } = {},
+    ): string {
+      const id = String(9_000_000_000 + (counter += 1));
+      media.set(id, {
+        bytes,
+        mimeType,
+        declaredSize: declared.size ?? bytes.byteLength,
+        sha256:
+          declared.sha256 ?? createHash("sha256").update(bytes).digest("hex"),
+      });
+      return id;
+    },
+    /** Média expiré chez Meta. */
+    expireMedia(id: string) {
+      media.delete(id);
     },
     /** Corps signé comme Meta le signe (en-tête X-Hub-Signature-256). */
     sign(body: string): string {

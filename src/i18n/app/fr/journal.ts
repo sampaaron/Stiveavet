@@ -137,6 +137,8 @@ export const journal = {
   automatic: {
     "numa.reply_blocked":
       "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
+    "whatsapp.media_refused":
+      "Un fichier envoyé par WhatsApp a été refusé (trop lourd, format non pris en charge ou indisponible)",
     "attachment.purged":
       "Un fichier arrivé à sa date limite de conservation a été supprimé",
     "photo.observation_blocked":

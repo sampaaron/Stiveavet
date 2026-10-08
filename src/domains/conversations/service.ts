@@ -257,6 +257,7 @@ const sourceSteps = [
   "urgent",
   "deliver",
   "photo_received",
+  "file_refused",
   "stop_clarify",
   "left_group",
   "stopped_all",
@@ -631,6 +632,8 @@ const NOTE_BODY: Record<SystemNoteCode, (names: string[]) => string> = {
     `${who[0] ?? ""} a quitté le groupe ; plus personne n'y reste, il est fermé.`,
   group_stopped: (who) =>
     `Groupe fermé : ${who[0] ?? ""} a demandé l'arrêt du suivi.`,
+  file_refused: (who) =>
+    `Fichier de ${who[0] ?? ""} non reçu : trop lourd ou format non pris en charge.`,
 };
 
 function frenchList(items: readonly string[]): string {
@@ -1369,7 +1372,8 @@ export function conversationHandlers(deps: {
         return;
       }
       case "reply":
-      case "photo_received": {
+      case "photo_received":
+      case "file_refused": {
         // Reprise en main, pause, arrêt ou accord retiré depuis l'arrivée du message.
         const target = replyTarget(ctx, reach, writer, source.threadId);
         if (!target || !(await numaMayReply(tx, ctx))) return;
@@ -1381,7 +1385,7 @@ export function conversationHandlers(deps: {
             ctx,
             target,
             key,
-            fixedContent("photo_received", wordingFor(ctx, target)),
+            fixedContent(payload.step, wordingFor(ctx, target)),
           );
         return;
       }
@@ -1685,17 +1689,27 @@ export async function processInbound(
   followupId: string,
   messageId: string,
   text: string,
-  options: { photo?: boolean } = {},
+  /** Photo reçue, ou fichier refusé (trop lourd, format non lu, lot 22). */
+  options: { media?: "photo" | "refused" } = {},
 ): Promise<{ outcome: InboundOutcome; triage: TriageLevel }> {
   const ctx = await loadContext(tx, followupId, true);
   const [source] = await tx
-    .select({ contactId: messages.followupContactId })
+    .select({
+      contactId: messages.followupContactId,
+      threadId: messages.threadId,
+    })
     .from(messages)
     .where(
       and(eq(messages.id, messageId), eq(messages.followupId, followupId)),
     );
   const writer = ctx.contacts.find((c) => c.id === source?.contactId);
-  if (!writer) throw new DomainError("not_found");
+  if (!writer || !source) throw new DomainError("not_found");
+  // L'équipe voit qu'un fichier envoyé n'a pas pu être reçu.
+  if (options.media === "refused")
+    await systemNote(tx, ctx, source.threadId, {
+      code: "file_refused",
+      names: [firstName(writer.ownerFullName)],
+    });
   await learnLanguage(tx, ctx, writer, text);
   const reach = await reachOf(tx, ctx);
   const consent = reach.consents.get(writer.id) ?? null;
@@ -1818,11 +1832,15 @@ export async function processInbound(
       );
       outcome = "consent_reminder";
     } else if (mayReply) {
-      // Une photo sans légende : accusé de réception fixe, sans passer par l'IA.
+      // Fichier refusé, ou photo sans légende : message fixe, sans passer par l'IA.
       await enqueueMessageJob(
         tx,
         ctx,
-        options.photo && text.length === 0 ? "photo_received" : "reply",
+        options.media === "refused"
+          ? "file_refused"
+          : options.media === "photo" && text.length === 0
+            ? "photo_received"
+            : "reply",
         messageId,
       );
       outcome = "reply";
