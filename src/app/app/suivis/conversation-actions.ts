@@ -12,6 +12,8 @@ import {
 } from "@/domains/conversations/service";
 import { MAX_PHOTO_BYTES } from "@/domains/fichiers/media";
 import { photoCaptionInput } from "@/domains/fichiers/service";
+import { appText } from "@/i18n/app/server";
+import type { AppDictionary } from "@/i18n/app/types";
 import { memberContext } from "@/server/authz";
 import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
@@ -25,7 +27,34 @@ import { domainFailure } from "../domain-messages";
  * propriétaire et le rôle. Le texte d'un message n'apparaît dans aucun journal.
  */
 
-const INVALID: ActionState = { error: "Demande invalide. Rechargez la page." };
+async function invalid(): Promise<ActionState> {
+  const { t } = await appText();
+  return { error: t.common.invalidRequest };
+}
+
+type Validation = AppDictionary["dossier"]["validation"];
+
+/**
+ * Message d'un champ refusé, dans la langue de la personne : d'après la nature du refus
+ * (trop court, trop long), jamais d'après un texte du domaine.
+ */
+async function fieldError(
+  error: z.ZodError,
+  messages: (validation: Validation) => { empty: string; tooLong: string },
+): Promise<ActionState> {
+  const { t } = await appText();
+  const { empty, tooLong } = messages(t.dossier.validation);
+  const issue = error.issues[0];
+  if (issue?.code === "too_small") return { error: empty };
+  if (issue?.code === "too_big") return { error: tooLong };
+  return { error: t.common.invalidRequest };
+}
+
+const messageError = (error: z.ZodError) =>
+  fieldError(error, (v) => ({
+    empty: v.emptyMessage,
+    tooLong: v.messageTooLong,
+  }));
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -39,7 +68,7 @@ async function guarded<T>(
     return { ok: await run() };
   } catch (error) {
     if (!(error instanceof DomainError)) throw error;
-    return { failure: domainFailure(error) };
+    return { failure: await domainFailure(error) };
   }
 }
 
@@ -51,10 +80,9 @@ export async function writeToOwnerAction(
   form: FormData,
 ): Promise<ActionState> {
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return INVALID;
+  if (!id.success) return invalid();
   const body = ownerMessageInput.safeParse(text(form, "body"));
-  if (!body.success)
-    return { error: body.error.issues[0]?.message ?? INVALID.error };
+  if (!body.success) return messageError(body.error);
   const context = await memberContext();
   const result = await guarded(() =>
     services.conversations().writeToOwner(context, id.data, body.data),
@@ -72,7 +100,7 @@ export async function resumeNumaAction(
   form: FormData,
 ): Promise<ActionState> {
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return INVALID;
+  if (!id.success) return invalid();
   const context = await memberContext();
   const result = await guarded(() =>
     services.conversations().resumeNuma(context, id.data),
@@ -107,12 +135,11 @@ export async function simulateOwnerAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return INVALID;
+  if (!id.success) return invalid();
   const body = ownerMessageInput.safeParse(text(form, "body"));
-  if (!body.success)
-    return { error: body.error.issues[0]?.message ?? INVALID.error };
+  if (!body.success) return messageError(body.error);
   const role = simulatedRole(form);
-  if (!role.success) return INVALID;
+  if (!role.success) return invalid();
   const context = await memberContext();
   const result = await guarded(async () => {
     await services
@@ -133,7 +160,7 @@ export async function runDueNowAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return INVALID;
+  if (!id.success) return invalid();
   const context = await memberContext();
   const result = await guarded(async () => {
     await services.conversations().makeDueNow(context, id.data);
@@ -151,17 +178,24 @@ export async function simulateOwnerPhotoAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return INVALID;
+  if (!id.success) return invalid();
   const file = form.get("photo");
-  if (!(file instanceof File) || file.size === 0)
-    return { error: "Choisissez une photo." };
-  if (file.size > MAX_PHOTO_BYTES)
-    return { error: "Photo trop lourde : 5 Mo au plus." };
+  if (!(file instanceof File) || file.size === 0) {
+    const { t } = await appText();
+    return { error: t.dossier.validation.choosePhoto };
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    const { t } = await appText();
+    return { error: t.dossier.validation.photoTooLarge };
+  }
   const caption = photoCaptionInput.safeParse(text(form, "caption"));
   if (!caption.success)
-    return { error: caption.error.issues[0]?.message ?? INVALID.error };
+    return fieldError(caption.error, (v) => ({
+      empty: v.captionTooLong,
+      tooLong: v.captionTooLong,
+    }));
   const role = simulatedRole(form);
-  if (!role.success) return INVALID;
+  if (!role.success) return invalid();
   const bytes = new Uint8Array(await file.arrayBuffer());
   const context = await memberContext();
   const result = await guarded(async () => {
@@ -178,11 +212,7 @@ export async function simulateOwnerPhotoAction(
   redirect(simulatorPage(id.data, role.data, "photo"));
 }
 
-const spokenInput = z
-  .string()
-  .trim()
-  .min(1, "Écrivez ce que dit le message vocal.")
-  .max(1000, "Message vocal trop long (1 000 caractères au plus).");
+const spokenInput = z.string().trim().min(1).max(1000);
 
 /**
  * Simulateur : le propriétaire envoie un message vocal. Le fichier est un vrai son, qui
@@ -194,12 +224,15 @@ export async function simulateOwnerVoiceAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return INVALID;
+  if (!id.success) return invalid();
   const spoken = spokenInput.safeParse(text(form, "spoken"));
   if (!spoken.success)
-    return { error: spoken.error.issues[0]?.message ?? INVALID.error };
+    return fieldError(spoken.error, (v) => ({
+      empty: v.spokenEmpty,
+      tooLong: v.spokenTooLong,
+    }));
   const role = simulatedRole(form);
-  if (!role.success) return INVALID;
+  if (!role.success) return invalid();
   const context = await memberContext();
   const result = await guarded(async () => {
     await services.media().simulateOwnerMedia(context, id.data, {
