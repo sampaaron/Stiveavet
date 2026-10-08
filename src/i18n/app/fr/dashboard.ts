@@ -100,5 +100,7 @@ export const dashboard = {
       "Nouveaux suivis suspendus. Les suivis en cours continuent jusqu'à leur fin.",
     readOnly: (date: string) => `Cabinet en lecture seule jusqu'au ${date}.`,
     closed: "L'accès au cabinet est terminé.",
+    annualChoice:
+      "Après l'essai : choisissez entre l'engagement annuel et le mois. Sans réponse, rien ne bascule.",
   },
 };

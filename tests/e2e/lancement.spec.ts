@@ -77,7 +77,9 @@ test("une vétérinaire lance, modifie, met en pause, reprend et arrête un suiv
     .check();
   await page.getByRole("button", { name: "Lancer le suivi" }).click();
   await expect(page).toHaveURL(/\/app\/suivis\/[0-9a-f-]+\?fait=lance$/);
-  await expect(page.getByRole("status").first()).toContainText("Suivi lancé");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Suivi lancé" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Pilotage du suivi" }),
   ).toBeVisible();
@@ -116,7 +118,9 @@ test("une vétérinaire lance, modifie, met en pause, reprend et arrête un suiv
   await page.getByRole("button", { name: "Arrêter le suivi" }).click();
   await page.getByRole("button", { name: "Confirmer l'arrêt" }).click();
   await expect(page).toHaveURL(/\?fait=arret$/);
-  await expect(page.getByRole("status").first()).toContainText("Suivi arrêté");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Suivi arrêté" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Réactiver le suivi" }),
   ).toBeVisible();

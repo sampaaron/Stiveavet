@@ -9,6 +9,8 @@ import {
   TRIAL_MONTHLY_CENTS,
   access,
   addMonths,
+  annualOfferOpensAt,
+  annualStartsAt,
   billingPeriod,
   canCommitAnnual,
   canStartFollowups,
@@ -111,20 +113,45 @@ describe("prix", () => {
 });
 
 describe("engagement annuel", () => {
-  it("se demande explicitement, à partir du mois 3, jamais pendant l'essai", () => {
-    expect(canCommitAnnual(facts(), month(1))).toBe(false);
-    expect(canCommitAnnual(facts(), month(2))).toBe(true);
+  it("se propose à 45 jours d'essai, sur demande explicite seulement", () => {
+    expect(annualOfferOpensAt(facts())).toEqual(day(45));
+    expect(canCommitAnnual(facts(), day(44))).toBe(false);
+    expect(canCommitAnnual(facts(), day(45))).toBe(true);
+    expect(canCommitAnnual(facts(), month(4))).toBe(true);
     expect(canCommitAnnual(facts({ cycle: "annual" }), month(4))).toBe(false);
     expect(canCommitAnnual(facts({ canceledAt: month(3) }), month(4))).toBe(
       false,
     );
   });
 
-  it("rappelle le choix pendant la période souple tant qu'il n'est pas fait", () => {
-    expect(commitmentReminder(facts(), month(1))).toBe(false);
+  it("commence à la prochaine échéance, jamais pendant l'essai", () => {
+    // Pris à 45 jours (mois 2) : effet au prélèvement du mois 3.
+    expect(annualStartsAt(facts(), day(45))).toEqual(month(2));
+    // Pris au mois 4 : effet au mois 5.
+    expect(annualStartsAt(facts(), month(3, 10))).toEqual(month(4));
+    // Même pris le premier jour, l'essai reste sans engagement.
+    expect(annualStartsAt(facts(), day(1))).toEqual(month(2));
+  });
+
+  it("demande le choix dès l'offre, puis le redemande au 6e mois à un cabinet resté au mois", () => {
+    expect(commitmentReminder(facts(), day(44))).toBe(false);
+    expect(commitmentReminder(facts(), day(45))).toBe(true);
     expect(commitmentReminder(facts(), month(4))).toBe(true);
+    // Resté au mois à 50 jours : plus de rappel avant le 6e mois…
+    const stayed = facts({ cycleChosenAt: day(50) });
+    expect(commitmentReminder(stayed, month(3))).toBe(false);
+    // … puis un seul rappel pendant le 6e mois.
+    expect(commitmentReminder(stayed, month(5, 1))).toBe(true);
+    expect(commitmentReminder(stayed, month(6, 1))).toBe(false);
+    // Un choix fait pendant le 6e mois n'est pas redemandé.
     expect(
-      commitmentReminder(facts({ cycleChosenAt: month(3) }), month(4)),
+      commitmentReminder(facts({ cycleChosenAt: month(5, 2) }), month(5, 3)),
+    ).toBe(false);
+    expect(
+      commitmentReminder(
+        facts({ cycle: "annual", cycleChosenAt: day(50) }),
+        month(5, 1),
+      ),
     ).toBe(false);
     expect(commitmentReminder(facts({ canceledAt: month(3) }), month(4))).toBe(
       false,

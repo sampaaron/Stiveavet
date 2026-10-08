@@ -147,6 +147,8 @@ export const journal: AppDictionary["journal"] = {
     "alert.escalated":
       "Urgent case not acknowledged: the whole veterinary team was alerted",
     "invoice.issued": "Invoice issued",
+    "billing.annual_offer_sent":
+      "Annual commitment offer e-mailed to whoever manages billing",
     "invoice.paid": "Invoice direct debit succeeded",
     "invoice.payment_failed": "Invoice direct debit failed",
   },

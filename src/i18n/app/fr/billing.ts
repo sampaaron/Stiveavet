@@ -49,12 +49,14 @@ export const billing = {
     reminder:
       "À choisir avant le 7e mois. Sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.",
     anytime: "Possible à tout moment, sur votre demande uniquement.",
+    offer: (trialEnd: string) =>
+      `Votre essai se termine le ${trialEnd}. Vous pouvez choisir dès maintenant ; sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.`,
     prices: (annual: string, monthly: string) =>
       `Avec engagement : ${annual} HT par mois pendant 12 mois. Sans engagement : ${monthly} HT par mois.`,
     stayMonthlyIntro:
       "Vous préférez garder la liberté de résilier chaque mois.",
-    confirm: (price: string) =>
-      `Je m'engage pour 12 mois à ${price} HT par mois, prélevés chaque mois.`,
+    confirm: (price: string, startsOn: string) =>
+      `Je m'engage pour 12 mois à ${price} HT par mois, prélevés chaque mois à partir du ${startsOn}.`,
     submit: "Passer à l'engagement annuel",
     stayMonthly: "Rester au mois",
   },

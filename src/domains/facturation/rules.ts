@@ -51,8 +51,14 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
 
 export const TRIAL_MONTHLY_CENTS = 8_600;
 export const TRIAL_MONTHS = 2;
-/** Mois à partir duquel un engagement annuel peut être demandé (mois 3 à 6 : sur demande). */
-export const ANNUAL_FROM_MONTH = 3;
+/**
+ * Jour de l'essai où l'engagement annuel est proposé (décision d'Aaron du 8 octobre 2026,
+ * ADR 0023) : vers un mois et demi, pour le prélèvement suivant. L'engagement ne commence
+ * jamais avant la fin de l'essai.
+ */
+export const ANNUAL_OFFER_DAYS = 45;
+/** Mois où l'engagement est reproposé à un cabinet resté au mois. */
+export const ANNUAL_REMINDER_MONTH = 6;
 /** Le choix explicite doit être fait avant ce mois ; aucune bascule automatique. */
 export const COMMITMENT_DECISION_MONTH = 7;
 export const INCLUDED_ACTIVE_FOLLOWUPS = 10;
@@ -136,25 +142,42 @@ export function isCanceled(facts: SubscriptionFacts, now: Date): boolean {
   return facts.endsAt !== null && facts.endsAt <= now;
 }
 
-/** L'engagement annuel ne se prend que sur demande explicite, à partir du mois 3. */
+/** Ouverture de l'offre d'engagement annuel, pendant l'essai. */
+export function annualOfferOpensAt(
+  facts: Pick<SubscriptionFacts, "startedAt">,
+): Date {
+  return new Date(facts.startedAt.getTime() + ANNUAL_OFFER_DAYS * DAY_MS);
+}
+
+/** Début de l'engagement pris à `now` : la prochaine échéance, jamais pendant l'essai. */
+export function annualStartsAt(facts: SubscriptionFacts, now: Date): Date {
+  const next = Math.max(subscriptionMonth(facts, now) + 1, TRIAL_MONTHS + 1);
+  return billingPeriod(facts, next).start;
+}
+
+/** L'engagement annuel ne se prend que sur demande explicite, une fois l'offre ouverte. */
 export function canCommitAnnual(facts: SubscriptionFacts, now: Date): boolean {
   return (
     facts.canceledAt === null &&
     facts.cycle === "monthly" &&
-    subscriptionMonth(facts, now) >= ANNUAL_FROM_MONTH
+    now >= annualOfferOpensAt(facts)
   );
 }
 
-/** Rappel du choix à faire avant le 7e mois ; sans réponse, la formule reste mensuelle. */
+/**
+ * Le choix est demandé à l'ouverture de l'offre, puis redemandé au 6e mois à un cabinet
+ * resté au mois ; sans réponse, la formule reste mensuelle.
+ */
 export function commitmentReminder(
   facts: SubscriptionFacts,
   now: Date,
 ): boolean {
-  return (
-    facts.canceledAt === null &&
-    facts.cycleChosenAt === null &&
-    phase(facts, now) === "flexible"
-  );
+  if (!canCommitAnnual(facts, now)) return false;
+  const month = subscriptionMonth(facts, now);
+  if (month >= COMMITMENT_DECISION_MONTH) return false;
+  if (facts.cycleChosenAt === null) return true;
+  const reminderStart = billingPeriod(facts, ANNUAL_REMINDER_MONTH).start;
+  return month === ANNUAL_REMINDER_MONTH && facts.cycleChosenAt < reminderStart;
 }
 
 /**

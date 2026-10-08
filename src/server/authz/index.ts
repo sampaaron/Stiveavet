@@ -25,6 +25,8 @@ import type { TenantTransaction } from "@/server/db/tenant";
 export type MemberContext = Actor & {
   /** Accès du cabinet selon sa facturation (impayé, résiliation, lecture seule). */
   billing: Access;
+  /** Choix entre engagement annuel et mensuel à faire (ADR 0023). */
+  commitmentReminder: boolean;
 };
 
 export const memberContext = cache(async (): Promise<MemberContext> => {
@@ -40,10 +42,12 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
   );
   // En lecture seule ou après la fin de l'accès, seuls les droits de consultation restent
   // effectifs ; les droits en base ne changent pas et reviennent après régularisation.
-  const billing = await services.billing().accessFor({
-    organizationId: session.organizationId,
-    userId: session.userId,
-  });
+  const { access: billing, commitmentReminder } = await services
+    .billing()
+    .accessFor({
+      organizationId: session.organizationId,
+      userId: session.userId,
+    });
   return {
     organizationId: session.organizationId,
     userId: session.userId,
@@ -54,6 +58,7 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
       billing,
     ),
     billing,
+    commitmentReminder,
   };
 });
 

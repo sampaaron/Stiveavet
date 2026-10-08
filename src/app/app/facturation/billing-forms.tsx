@@ -104,7 +104,13 @@ export function PlanForm({
   );
 }
 
-export function CommitAnnualForm({ priceLabel }: { priceLabel: string }) {
+export function CommitAnnualForm({
+  priceLabel,
+  startsOnLabel,
+}: {
+  priceLabel: string;
+  startsOnLabel: string;
+}) {
   const [state, action, pending] = useActionState(
     chooseCycleAction,
     initialActionState,
@@ -113,7 +119,9 @@ export function CommitAnnualForm({ priceLabel }: { priceLabel: string }) {
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="cycle" value="annual" />
-      <ConfirmBox>{t.billing.annual.confirm(priceLabel)}</ConfirmBox>
+      <ConfirmBox>
+        {t.billing.annual.confirm(priceLabel, startsOnLabel)}
+      </ConfirmBox>
       <ActionMessage state={state} />
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>

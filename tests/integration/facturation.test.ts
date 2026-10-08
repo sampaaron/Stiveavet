@@ -229,7 +229,7 @@ describe("échéances et prélèvements simulés", () => {
     ).toBe(true);
     expect(overview.access.kind).toBe("grace");
     const later = new Date(Date.now() + 31 * day);
-    expect(await declining.accessFor(owner, later)).toEqual({
+    expect((await declining.accessFor(owner, later)).access).toEqual({
       kind: "blocked",
       reason: "unpaid",
     });
@@ -244,7 +244,9 @@ describe("échéances et prélèvements simulés", () => {
     expect(settled.invoices.every((invoice) => invoice.status === "paid")).toBe(
       true,
     );
-    expect(await paying.accessFor(owner, later)).toEqual({ kind: "full" });
+    expect((await paying.accessFor(owner, later)).access).toEqual({
+      kind: "full",
+    });
     expect(await domainError(paying.settle(owner))).toBe("invalid_target");
   });
 });
@@ -302,20 +304,48 @@ describe("suppléments d'usage", () => {
 });
 
 describe("formule et engagement", () => {
-  it("l'engagement annuel se demande à partir du mois 3, jamais pendant l'essai", async () => {
-    const trial = await cabinet(new Date());
-    expect(await domainError(paying.chooseCycle(trial.owner, "annual"))).toBe(
+  it("l'engagement annuel est proposé à 45 jours d'essai et commence après l'essai", async () => {
+    const day = 86_400_000;
+    const early = await cabinet(new Date(Date.now() - 40 * day));
+    expect(await domainError(paying.chooseCycle(early.owner, "annual"))).toBe(
       "invalid_target",
     );
-    // La base refuse aussi un engagement annuel pendant l'essai.
+    // La base refuse aussi un engagement pris avant le 45e jour…
     const code = await errorCode(
-      asApp(app, trial.org, (client) =>
+      asApp(app, early.org, (client) =>
         client.query(
-          "UPDATE subscriptions SET cycle = 'annual', cycle_chosen_at = now(), annual_ends_at = now() + interval '1 year'",
+          "UPDATE subscriptions SET cycle = 'annual', cycle_chosen_at = now(), annual_ends_at = started_at + interval '14 months'",
         ),
       ),
     );
     expect(code).toBe("23514");
+
+    // … et un engagement qui couvrirait l'essai.
+    const offered = await cabinet(new Date(Date.now() - 46 * day));
+    expect(
+      await errorCode(
+        asApp(app, offered.org, (client) =>
+          client.query(
+            "UPDATE subscriptions SET cycle = 'annual', cycle_chosen_at = now(), annual_ends_at = now() + interval '1 year'",
+          ),
+        ),
+      ),
+    ).toBe("23514");
+    const trial = await paying.overview(offered.owner);
+    expect(trial.phase).toBe("trial");
+    expect(trial.canCommitAnnual).toBe(true);
+    expect(trial.commitmentReminder).toBe(true);
+    expect((await paying.accessFor(offered.owner)).commitmentReminder).toBe(
+      true,
+    );
+    await paying.chooseCycle(offered.owner, "annual");
+    const committed = await paying.overview(offered.owner);
+    expect(committed.facts?.cycle).toBe("annual");
+    // 86 € jusqu'à la fin de l'essai, puis le tarif annuel pendant 12 mois.
+    expect(committed.nextPriceCents).toBe(21_600);
+    const startedAt = committed.facts?.startedAt ?? new Date();
+    expect(committed.facts?.annualEndsAt).toEqual(addMonths(startedAt, 14));
+    expect(committed.commitmentReminder).toBe(false);
 
     const flexible = await cabinet(addMonths(new Date(), -2));
     await paying.chooseCycle(flexible.owner, "annual");
@@ -377,7 +407,7 @@ describe("résiliation", () => {
     );
 
     const after = new Date(endsAt.getTime() + day);
-    expect(await paying.accessFor(owner, after)).toEqual({
+    expect((await paying.accessFor(owner, after)).access).toEqual({
       kind: "blocked",
       reason: "canceled",
     });
@@ -394,16 +424,18 @@ describe("résiliation", () => {
         .where(eq(followups.id, running)),
     );
     expect(
-      await paying.accessFor(owner, new Date(after.getTime() + day)),
+      (await paying.accessFor(owner, new Date(after.getTime() + day))).access,
     ).toEqual({
       kind: "read_only",
       reason: "canceled",
       until: addMonths(after, 3),
     });
-    expect(await paying.accessFor(owner, addMonths(after, 3))).toEqual({
-      kind: "closed",
-      reason: "canceled",
-    });
+    expect((await paying.accessFor(owner, addMonths(after, 3))).access).toEqual(
+      {
+        kind: "closed",
+        reason: "canceled",
+      },
+    );
   });
 });
 

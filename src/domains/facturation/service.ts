@@ -34,6 +34,7 @@ import {
   PLAN_CATALOG,
   access,
   addMonths,
+  annualStartsAt,
   billingPeriod,
   canCommitAnnual,
   canStartFollowups,
@@ -45,6 +46,7 @@ import {
   subscriptionMonth,
   usageChargeCents,
 } from "./rules";
+import { scheduleAnnualOffers } from "./offre-annuelle";
 import type {
   Access,
   Activity,
@@ -151,7 +153,10 @@ export async function followupActivity(
   };
 }
 
-/** Abonnement créé à l'inscription : essai de 2 mois, puis la formule choisie. */
+/**
+ * Abonnement créé à l'inscription : essai de 2 mois, puis la formule choisie. L'offre
+ * d'engagement annuel est programmée en même temps (ADR 0023).
+ */
 export async function startSubscription(
   tx: TenantTransaction,
   organizationId: string,
@@ -159,6 +164,7 @@ export async function startSubscription(
   startedAt = new Date(),
 ) {
   await tx.insert(subscriptions).values({ organizationId, plan, startedAt });
+  await scheduleAnnualOffers(tx, organizationId, { startedAt });
 }
 
 /**
@@ -467,14 +473,20 @@ export function billingService(deps: {
   }
 
   return {
-    /** Accès du cabinet, après rattrapage des échéances ; lu par la garde serveur. */
+    /**
+     * Accès du cabinet, après rattrapage des échéances, et choix d'engagement en attente ;
+     * lu par la garde serveur à chaque requête.
+     */
     async accessFor(
       context: { organizationId: string; userId: string },
       now = new Date(),
-    ): Promise<Access> {
+    ): Promise<{ access: Access; commitmentReminder: boolean }> {
       return withTenant(db, context, async (tx) => {
         const facts = await sync(tx, context.organizationId, now);
-        return access(facts, now, await followupActivity(tx));
+        return {
+          access: access(facts, now, await followupActivity(tx)),
+          commitmentReminder: facts ? commitmentReminder(facts, now) : false,
+        };
       });
     },
 
@@ -506,7 +518,7 @@ export function billingService(deps: {
       });
     },
 
-    /** Choix explicite : engagement annuel (à partir du mois 3) ou rester au mois. */
+    /** Choix explicite : engagement annuel (offert dès 45 jours d'essai) ou rester au mois. */
     async chooseCycle(
       actor: Actor,
       cycle: "annual" | "monthly",
@@ -517,15 +529,11 @@ export function billingService(deps: {
         if (cycle === "annual") {
           if (!canCommitAnnual(facts, now))
             throw new DomainError("invalid_target");
-          const { start } = billingPeriod(
-            facts,
-            subscriptionMonth(facts, now) + 1,
-          );
           await tx.update(subscriptions).set({
             cycle: "annual",
             cycleChosenAt: now,
-            // Engagement de 12 mois à partir de la prochaine échéance.
-            annualEndsAt: addMonths(start, 12),
+            // 12 mois à partir de la prochaine échéance, jamais pendant l'essai.
+            annualEndsAt: addMonths(annualStartsAt(facts, now), 12),
           });
         } else {
           if (facts.cycle !== "monthly" || facts.cycleChosenAt)

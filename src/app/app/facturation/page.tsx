@@ -8,7 +8,10 @@ import {
   PLAN_CATALOG,
   REACTIVATION_SURCHARGE_CENTS,
   TRIAL_MONTHS,
+  annualStartsAt,
+  billingPeriod,
   cancellationEffectiveAt,
+  monthlyPriceCents,
 } from "@/domains/facturation/rules";
 import type { BillingOverview } from "@/domains/facturation/service";
 import { appText } from "@/i18n/app/server";
@@ -163,9 +166,13 @@ export default async function BillingPage() {
           <SectionCard
             title={text.annual.title}
             description={
-              overview.commitmentReminder
-                ? text.annual.reminder
-                : text.annual.anytime
+              overview.phase === "trial"
+                ? text.annual.offer(
+                    date(billingPeriod(facts, TRIAL_MONTHS).end),
+                  )
+                : overview.commitmentReminder
+                  ? text.annual.reminder
+                  : text.annual.anytime
             }
           >
             <div className="grid gap-6 lg:grid-cols-2">
@@ -179,6 +186,7 @@ export default async function BillingPage() {
                 {overview.canCommitAnnual ? (
                   <CommitAnnualForm
                     priceLabel={euros(plan.annualMonthlyCents)}
+                    startsOnLabel={date(annualStartsAt(facts, now))}
                   />
                 ) : null}
               </div>
@@ -321,7 +329,7 @@ function phaseLabel(
     return phase.trial(
       month,
       TRIAL_MONTHS,
-      formatEuros(PLAN_CATALOG[facts.plan].monthlyCents, locale),
+      formatEuros(monthlyPriceCents(facts, TRIAL_MONTHS + 1), locale),
     );
   if (facts.cycle === "annual" && facts.annualEndsAt)
     return phase.annualUntil(formatDate(facts.annualEndsAt, locale));

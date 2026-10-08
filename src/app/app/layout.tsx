@@ -74,6 +74,7 @@ export default async function CabinetLayout({
       <BillingNotice
         access={context.billing}
         canManage={context.permissions.has("billing.manage")}
+        commitmentReminder={context.commitmentReminder}
       />
       <AlertsNotice alerts={alerts} />
       {children}

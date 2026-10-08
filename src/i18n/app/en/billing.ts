@@ -49,11 +49,13 @@ export const billing: AppDictionary["billing"] = {
     reminder:
       "To be decided before month 7. If you do not answer, you stay on monthly billing at the no-commitment rate: nothing switches automatically.",
     anytime: "Possible at any time, only at your request.",
+    offer: (trialEnd) =>
+      `Your trial ends on ${trialEnd}. You can choose now; if you do not answer, you stay on monthly billing at the no-commitment rate: nothing switches automatically.`,
     prices: (annual: string, monthly: string) =>
       `With commitment: ${annual} excl. VAT per month for 12 months. Without commitment: ${monthly} excl. VAT per month.`,
     stayMonthlyIntro: "You would rather keep the freedom to cancel each month.",
-    confirm: (price: string) =>
-      `I commit for 12 months at ${price} excl. VAT per month, collected monthly.`,
+    confirm: (price: string, startsOn: string) =>
+      `I commit for 12 months at ${price} excl. VAT per month, collected monthly from ${startsOn}.`,
     submit: "Switch to the annual commitment",
     stayMonthly: "Stay on monthly billing",
   },
