@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
 import {
+  APPOINTMENT_KINDS,
+  APPOINTMENT_KIND_LABELS,
+} from "@/domains/agenda/rendez-vous";
+import {
   EMERGENCY_PERIODS,
   EMERGENCY_PERIOD_LABELS,
   ESCALATION_CHOICES,
@@ -18,6 +22,7 @@ import { PageHeader } from "@/ui/page-header";
 import { IntegrationList } from "./integrations";
 import {
   AlertSettingsForm,
+  AppointmentDurationsForm,
   ApplyDefaultsForm,
   ContactForm,
   InstructionsForm,
@@ -35,6 +40,9 @@ export default async function SettingsPage() {
 
   const windows = new Map(
     settings.messageWindows.map((window) => [window.weekday, window]),
+  );
+  const appointmentWindows = new Map(
+    settings.appointmentWindows.map((window) => [window.weekday, window]),
   );
   const nextHour = new Date();
   nextHour.setMinutes(0, 0, 0);
@@ -59,7 +67,8 @@ export default async function SettingsPage() {
             }
           >
             Les réglages de départ (envois du lundi au samedi de 8 h à 20 h,
-            consignes d&apos;urgence génériques) se modifient ensuite ici.
+            rendez-vous en semaine de 9 h à 18 h, consignes d&apos;urgence
+            génériques) se modifient ensuite ici.
           </AlertBanner>
         ) : null}
 
@@ -79,6 +88,34 @@ export default async function SettingsPage() {
               };
             })}
           />
+        </SectionCard>
+
+        <SectionCard
+          title="Rendez-vous proposés par Numa"
+          description="Quand un propriétaire demande un rendez-vous, Numa propose jusqu'à trois créneaux libres de l'agenda du vétérinaire responsable, dans ces plages seulement (heure de Paris). Sans créneau adapté, elle annonce que le cabinet rappellera. Chaque rendez-vous attend la confirmation de l'équipe."
+        >
+          <div className="grid gap-8 lg:grid-cols-2">
+            <MessageWindowsForm
+              kind="appointments"
+              days={WEEKDAYS.map((weekday) => {
+                const window = appointmentWindows.get(weekday);
+                return {
+                  weekday,
+                  label: WEEKDAY_LABELS[weekday],
+                  enabled: Boolean(window),
+                  startsAt: window?.startsAt ?? "09:00",
+                  endsAt: window?.endsAt ?? "18:00",
+                };
+              })}
+            />
+            <AppointmentDurationsForm
+              kinds={APPOINTMENT_KINDS.map((kind) => ({
+                kind,
+                label: APPOINTMENT_KIND_LABELS[kind],
+                minutes: settings.appointmentMinutes[kind],
+              }))}
+            />
+          </div>
         </SectionCard>
 
         <SectionCard

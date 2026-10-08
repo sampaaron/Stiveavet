@@ -32,4 +32,12 @@ export const fakeWhatsApp: WhatsAppConnector = {
   async sendStaffAlert({ idempotencyKey }) {
     return { externalRef: simulatedRef(idempotencyKey) };
   },
+  async createGroup({ idempotencyKey }) {
+    return { groupRef: `${simulatedRef(idempotencyKey)}:groupe` };
+  },
+  async sendGroupMessage({ idempotencyKey }) {
+    return { externalRef: simulatedRef(idempotencyKey) };
+  },
+  async removeFromGroup() {},
+  async closeGroup() {},
 };

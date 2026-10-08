@@ -49,6 +49,7 @@ type Sent = { to: string; body: string; idempotencyKey: string };
 const sent: Sent[] = [];
 let failNext = 0;
 const whatsapp: WhatsAppConnector = {
+  ...fakeWhatsApp,
   simulated: true,
   connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
   sendStaffAlert: fakeWhatsApp.sendStaffAlert,

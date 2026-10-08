@@ -5,6 +5,8 @@
  * Contenu à faire valider (juriste, cahier des charges §19) avant la mise en production.
  */
 export const CONSENT_WORDING_VERSION = "consentement-v1";
+/** Demande d'accord à deux propriétaires : le groupe partagé est expliqué avant l'accord (§6). */
+export const PAIR_CONSENT_WORDING_VERSION = "consentement-groupe-v1";
 
 export type WordingContext = {
   language: "fr" | "en";
@@ -12,6 +14,8 @@ export type WordingContext = {
   animalName: string;
   practiceName: string;
   vetName: string;
+  /** Second propriétaire du suivi (deux contacts, cahier des charges §6). */
+  otherFirstName?: string;
 };
 
 export type FixedStep =
@@ -22,7 +26,14 @@ export type FixedStep =
   | "resumed"
   | "closing"
   | "check_in"
-  | "photo_received";
+  | "photo_received"
+  | "intro_pair"
+  | "consent_given_waiting"
+  | "group_welcome"
+  | "stop_clarify"
+  | "left_group"
+  | "stopped_all"
+  | "stopped_by_other";
 
 const FR: Record<FixedStep, (c: WordingContext) => string> = {
   intro: (c) =>
@@ -41,6 +52,20 @@ const FR: Record<FixedStep, (c: WordingContext) => string> = {
     `Merci ${c.ownerFirstName}, la photo de ${c.animalName} est bien arrivée. Je la transmets à l'équipe de ${c.practiceName} : seul le vétérinaire peut l'interpréter. En cas d'urgence, appelez directement le cabinet.`,
   closing: (c) =>
     `Le suivi de ${c.animalName} prévu par ${c.practiceName} se termine aujourd'hui, date du rendez-vous de contrôle. Je ne vous enverrai plus de message de suivi. Cette conversation reste ouverte : si vous m'écrivez, je transmets votre message à l'équipe. En cas d'urgence, appelez directement le cabinet.`,
+  intro_pair: (c) =>
+    `${FR.intro(c).split("\n\nRépondez OUI")[0]}\n\nCe suivi est proposé aussi à ${c.otherFirstName ?? "l'autre propriétaire"}. Si vous l'acceptez tous les deux, je créerai un groupe WhatsApp dédié au suivi de ${c.animalName} : vous y verrez tous les deux les messages, les vôtres comme les miens.\n\nRépondez OUI pour accepter ce suivi sur WhatsApp. Vous pourrez écrire STOP à tout moment pour l'arrêter.`,
+  consent_given_waiting: (c) =>
+    `Merci ${c.ownerFirstName} ! C'est noté. Dès que ${c.otherFirstName ?? "l'autre propriétaire"} aura accepté aussi, je créerai le groupe dédié au suivi de ${c.animalName}. En attendant, je vous écris ici. En cas d'urgence, appelez directement le cabinet.`,
+  group_welcome: (c) =>
+    `Bonjour ${c.ownerFirstName} ! Vous avez accepté le suivi de ${c.animalName} : voici le groupe qui lui est dédié. Je suis Numa, l'assistante IA (intelligence artificielle) de ${c.practiceName} ; je ne pose pas de diagnostic et l'équipe lit tous les messages. Chacun peut écrire ici. Écrivez STOP à tout moment pour arrêter.`,
+  stop_clarify: (c) =>
+    `${c.ownerFirstName}, vous avez écrit STOP. Souhaitez-vous seulement quitter le groupe, ou arrêter le suivi de ${c.animalName} ?\n\nRépondez GROUPE pour quitter le groupe : ${c.otherFirstName ?? "l'autre propriétaire"} continuera de recevoir les nouvelles. Répondez TOUT pour arrêter le suivi.\n\nEn attendant votre réponse, je ne vous envoie plus de message de suivi.`,
+  left_group: (c) =>
+    `C'est noté, vous avez quitté le groupe du suivi de ${c.animalName} : je ne vous enverrai plus de message de suivi. ${c.otherFirstName ?? "L'autre propriétaire"} continue avec l'équipe de ${c.practiceName}. Vous pouvez toujours m'écrire ici ; en cas d'urgence, appelez directement le cabinet.`,
+  stopped_all: (c) =>
+    `C'est noté : le suivi de ${c.animalName} s'arrête, je n'enverrai plus de message de suivi. Écrivez REPRENDRE si vous changez d'avis. Pour toute question, contactez directement ${c.practiceName}.`,
+  stopped_by_other: (c) =>
+    `${c.otherFirstName ?? "L'autre propriétaire"} a demandé l'arrêt du suivi de ${c.animalName} : je n'enverrai plus de message de suivi. Vous pouvez toujours écrire ici, votre message sera transmis à l'équipe de ${c.practiceName}. En cas d'urgence, appelez directement le cabinet.`,
 };
 
 const EN: Record<FixedStep, (c: WordingContext) => string> = {
@@ -51,7 +76,7 @@ const EN: Record<FixedStep, (c: WordingContext) => string> = {
   consent_reminder: (c) =>
     `To follow ${c.animalName}, I need your agreement: reply YES to accept, or STOP to decline. Your message has been passed on to the ${c.practiceName} team.`,
   stopped: (c) =>
-    `Noted: you will no longer receive follow-up messages about ${c.animalName}. Write REPRENDRE (resume) if you change your mind. For any question, contact ${c.practiceName} directly.`,
+    `Noted: you will no longer receive follow-up messages about ${c.animalName}. Write RESUME if you change your mind. For any question, contact ${c.practiceName} directly.`,
   resumed: (c) =>
     `Good news, the follow-up of ${c.animalName} resumes with the ${c.practiceName} team. Write STOP at any time to end it.`,
   check_in: (c) =>
@@ -60,6 +85,20 @@ const EN: Record<FixedStep, (c: WordingContext) => string> = {
     `Thank you ${c.ownerFirstName}, the photo of ${c.animalName} has arrived. I'm passing it on to the ${c.practiceName} team: only the vet can interpret it. In an emergency, call the clinic directly.`,
   closing: (c) =>
     `The follow-up of ${c.animalName} planned by ${c.practiceName} ends today, the date of the check-up. I won't send you any more follow-up messages. This conversation stays open: if you write to me, I'll pass your message on to the team. In an emergency, call the clinic directly.`,
+  intro_pair: (c) =>
+    `${EN.intro(c).split("\n\nReply YES")[0]}\n\nThis follow-up is also offered to ${c.otherFirstName ?? "the other owner"}. If you both accept, I will create a WhatsApp group dedicated to ${c.animalName}'s follow-up: you will both see all messages there, yours and mine.\n\nReply YES to accept this follow-up on WhatsApp. You can write STOP at any time to end it.`,
+  consent_given_waiting: (c) =>
+    `Thank you ${c.ownerFirstName}! As soon as ${c.otherFirstName ?? "the other owner"} accepts too, I will create the group for ${c.animalName}'s follow-up. Until then, I'll write to you here. In an emergency, call the clinic directly.`,
+  group_welcome: (c) =>
+    `Hello ${c.ownerFirstName}! You have accepted ${c.animalName}'s follow-up: this is its dedicated group. I'm Numa, the AI (artificial intelligence) assistant of ${c.practiceName}; I do not make diagnoses and the team reads every message. Everyone can write here. Write STOP at any time to end it.`,
+  stop_clarify: (c) =>
+    `${c.ownerFirstName}, you wrote STOP. Do you only want to leave the group, or stop ${c.animalName}'s follow-up?\n\nReply GROUP to leave the group: ${c.otherFirstName ?? "the other owner"} will keep receiving updates. Reply ALL to stop the follow-up.\n\nUntil you reply, I won't send you any follow-up message.`,
+  left_group: (c) =>
+    `Noted, you have left the group for ${c.animalName}'s follow-up: I won't send you any more follow-up messages. ${c.otherFirstName ?? "The other owner"} continues with the ${c.practiceName} team. You can still write to me here; in an emergency, call the clinic directly.`,
+  stopped_all: (c) =>
+    `Noted: ${c.animalName}'s follow-up stops, I won't send any more follow-up messages. Write RESUME if you change your mind. For any question, contact ${c.practiceName} directly.`,
+  stopped_by_other: (c) =>
+    `${c.otherFirstName ?? "The other owner"} asked to stop ${c.animalName}'s follow-up: I won't send any more follow-up messages. You can still write here, your message will be passed on to the ${c.practiceName} team. In an emergency, call the clinic directly.`,
 };
 
 export function fixedMessage(step: FixedStep, context: WordingContext): string {

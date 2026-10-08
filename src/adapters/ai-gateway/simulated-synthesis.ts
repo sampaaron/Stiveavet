@@ -1,3 +1,5 @@
+import { slotChoice, wantsAppointment } from "@/domains/agenda/rendez-vous";
+
 import type { SynthesisDraft, SynthesisEvent, SynthesisInput } from "./types";
 
 /**
@@ -101,8 +103,12 @@ export function simulatedSynthesis(input: SynthesisInput): SynthesisDraft {
     parts.push(t.latest(at, line(latest, input.language)));
   }
 
+  // Demande de rendez-vous ou choix d'un créneau (lot 18) : ni un signal, ni une question
+  // ouverte ; l'agenda les suit.
+  const logistics = (event: SynthesisEvent) =>
+    slotChoice(event.text) !== null || wantsAppointment(event.text);
   const positives = said
-    .filter((event) => event.triage === "normal")
+    .filter((event) => event.triage === "normal" && !logistics(event))
     .slice(-MAX_SIGNALS)
     .map((event) => line(event, input.language));
   const negatives = flagged
@@ -111,7 +117,7 @@ export function simulatedSynthesis(input: SynthesisInput): SynthesisDraft {
 
   // Questions du propriétaire, et dernière question de Numa restée sans réponse.
   const openQuestions = said
-    .filter((event) => event.text.includes("?"))
+    .filter((event) => event.text.includes("?") && !logistics(event))
     .slice(-MAX_QUESTIONS)
     .map((event) => t.ownerQuestion(t.quote(excerpt(event.text))));
   const lastQuestion = events.findLast(

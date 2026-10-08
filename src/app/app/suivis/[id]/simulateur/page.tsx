@@ -60,17 +60,31 @@ export default async function OwnerSimulatorPage({
   const view = await loadView(context, id);
   if (view.status === "draft" || view.isTest) notFound();
   const links = await services.media().readLinks(context, id);
-  const { fait } = await searchParams;
+  const { fait, contact } = await searchParams;
   const done = typeof fait === "string" ? DONE[fait] : undefined;
-  const ownerFirstName = view.ownerFirstName ?? "Propriétaire";
-  // Ce que le propriétaire voit : les messages envoyés, jamais ceux en attente ou bloqués.
-  const visible = view.messages.filter(
-    (message) =>
+  // Le propriétaire joué : le principal, ou le second contact s'il participe (lot 18).
+  const persona =
+    view.contacts.find(
+      (item) =>
+        item.role === (contact === "secondary" ? "secondary" : "primary"),
+    ) ?? view.contacts[0];
+  const role = persona?.role ?? "primary";
+  const ownerFirstName =
+    persona?.firstName ?? view.ownerFirstName ?? "Propriétaire";
+  const others = view.contacts.filter((item) => item.role !== role);
+  // Ce que ce propriétaire voit : ses échanges directs avec le cabinet et le groupe tant qu'il
+  // en est membre ; les messages envoyés seulement, jamais ceux en attente ou bloqués.
+  const visible = view.messages.filter((message) => {
+    const sent =
       message.author === "owner" ||
       message.delivery === "sent" ||
       message.delivery === "delivered" ||
-      message.delivery === "read",
-  );
+      message.delivery === "read";
+    if (!sent) return false;
+    if (message.channel === "direct") return message.contactRole === role;
+    const leftAt = persona?.leftGroupAt;
+    return !leftAt || message.occurredAt.getTime() < leftAt.getTime();
+  });
 
   return (
     <>
@@ -94,6 +108,34 @@ export default async function OwnerSimulatorPage({
           </span>
         </p>
       </header>
+
+      {others.length ? (
+        <nav
+          aria-label="Propriétaire joué"
+          className="mb-4 flex flex-wrap items-center gap-2 text-sm"
+        >
+          <span className="text-ink-muted">Vous jouez :</span>
+          {view.contacts.map((item) =>
+            item.role === role ? (
+              <span
+                key={item.role}
+                aria-current="true"
+                className="rounded-full bg-brand px-3 py-1 font-semibold text-white"
+              >
+                {item.firstName}
+              </span>
+            ) : (
+              <Link
+                key={item.role}
+                href={`/app/suivis/${view.followupId}/simulateur${item.role === "secondary" ? "?contact=secondary" : ""}`}
+                className="rounded-full border border-line px-3 py-1 font-semibold hover:bg-canvas-subtle"
+              >
+                Jouer {item.firstName}
+              </Link>
+            ),
+          )}
+        </nav>
+      ) : null}
 
       {done ? (
         <p
@@ -120,7 +162,7 @@ export default async function OwnerSimulatorPage({
             {visible.length ? (
               visible.map((message) => (
                 <li key={message.id}>
-                  <PhoneBubble message={message} links={links} />
+                  <PhoneBubble message={message} links={links} role={role} />
                 </li>
               ))
             ) : (
@@ -133,6 +175,7 @@ export default async function OwnerSimulatorPage({
             <OwnerSimulatorForm
               followupId={view.followupId}
               ownerFirstName={ownerFirstName}
+              from={role}
             />
           </div>
         </section>
@@ -153,10 +196,12 @@ export default async function OwnerSimulatorPage({
             <OwnerPhotoForm
               followupId={view.followupId}
               ownerFirstName={ownerFirstName}
+              from={role}
             />
             <OwnerVoiceForm
               followupId={view.followupId}
               ownerFirstName={ownerFirstName}
+              from={role}
             />
           </section>
         </div>
@@ -168,11 +213,13 @@ export default async function OwnerSimulatorPage({
 function PhoneBubble({
   message,
   links,
+  role,
 }: {
   message: ConversationMessage;
   links: Record<string, SignedLink>;
+  role: "primary" | "secondary";
 }) {
-  const mine = message.author === "owner";
+  const mine = message.author === "owner" && message.contactRole === role;
   return (
     <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
       <div
@@ -181,11 +228,18 @@ function PhoneBubble({
           mine ? "rounded-br-md bg-brand-soft" : "rounded-bl-md bg-surface",
         )}
       >
+        {message.channel === "group" ? (
+          <p className="mb-0.5 text-[11px] font-semibold tracking-wide text-brand-ink uppercase">
+            Groupe
+          </p>
+        ) : null}
         {mine ? null : (
           <p className="mb-0.5 text-xs font-semibold text-ink-muted">
             {message.author === "numa"
               ? "Numa · assistante IA"
-              : (message.authorName ?? "Cabinet")}
+              : message.author === "owner"
+                ? (message.contactName ?? "Propriétaire")
+                : (message.authorName ?? "Cabinet")}
           </p>
         )}
         {message.attachment?.kind === "photo" &&

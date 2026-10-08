@@ -69,3 +69,59 @@ export async function removeSlotAction(
   revalidatePath("/app/agenda");
   redirect("/app/agenda?fait=retire");
 }
+
+const decisionInput = z.object({
+  appointmentId: z.uuid(),
+  decision: z.enum(["confirm", "decline"]),
+});
+
+/** Confirmer ou refuser un créneau choisi par le propriétaire (`appointments.confirm`). */
+export async function decideAppointmentAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const parsed = decisionInput.safeParse({
+    appointmentId: text(form, "appointmentId"),
+    decision: text(form, "decision"),
+  });
+  if (!parsed.success) return INVALID;
+  const context = await memberContext();
+  const { appointmentId, decision } = parsed.data;
+  try {
+    if (decision === "confirm")
+      await services.appointments().confirm(context, appointmentId);
+    else await services.appointments().decline(context, appointmentId);
+  } catch (error) {
+    if (error instanceof DomainError) {
+      revalidatePath("/app/agenda");
+      return domainFailure(error);
+    }
+    throw error;
+  }
+  revalidatePath("/app/agenda");
+  revalidatePath("/app");
+  redirect(
+    `/app/agenda?fait=${decision === "confirm" ? "confirme" : "refuse"}`,
+  );
+}
+
+/** Le cabinet a rappelé le propriétaire qui demandait un rendez-vous. */
+export async function closeCallbackAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const request = z.uuid().safeParse(text(form, "requestId"));
+  if (!request.success) return INVALID;
+  const context = await memberContext();
+  try {
+    await services.appointments().closeCallback(context, request.data);
+  } catch (error) {
+    if (error instanceof DomainError) {
+      revalidatePath("/app/agenda");
+      return domainFailure(error);
+    }
+    throw error;
+  }
+  revalidatePath("/app/agenda");
+  redirect("/app/agenda?fait=rappele");
+}

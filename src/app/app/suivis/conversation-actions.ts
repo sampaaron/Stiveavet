@@ -6,7 +6,10 @@ import { z } from "zod";
 
 import { buildSimulatedVoiceNote } from "@/adapters/ai-gateway/simulated-voice";
 import { DomainError } from "@/domains/equipe/actor";
-import { ownerMessageInput } from "@/domains/conversations/service";
+import {
+  contactRoleInput,
+  ownerMessageInput,
+} from "@/domains/conversations/service";
 import { MAX_PHOTO_BYTES } from "@/domains/fichiers/media";
 import { photoCaptionInput } from "@/domains/fichiers/service";
 import { memberContext } from "@/server/authz";
@@ -84,6 +87,19 @@ function assertLocal() {
   if (serverEnv().APP_ENV !== "local") notFound();
 }
 
+/** Propriétaire joué dans le simulateur : le principal, ou le second contact (lot 18). */
+function simulatedRole(form: FormData) {
+  return contactRoleInput.safeParse(text(form, "from") || "primary");
+}
+
+function simulatorPage(
+  followup: string,
+  role: "primary" | "secondary",
+  done: string,
+) {
+  return `/app/suivis/${followup}/simulateur?${role === "secondary" ? "contact=secondary&" : ""}fait=${done}`;
+}
+
 /** Simulateur : le membre joue le propriétaire et écrit depuis « son » WhatsApp. */
 export async function simulateOwnerAction(
   _previous: ActionState,
@@ -95,17 +111,19 @@ export async function simulateOwnerAction(
   const body = ownerMessageInput.safeParse(text(form, "body"));
   if (!body.success)
     return { error: body.error.issues[0]?.message ?? INVALID.error };
+  const role = simulatedRole(form);
+  if (!role.success) return INVALID;
   const context = await memberContext();
   const result = await guarded(async () => {
     await services
       .conversations()
-      .simulateOwnerMessage(context, id.data, body.data);
+      .simulateOwnerMessage(context, id.data, body.data, role.data);
     // Numa répond tout de suite, comme le ferait le worker.
     await services.simulatorWorker().runOnce();
   });
   if ("failure" in result) return result.failure;
   revalidatePath(`/app/suivis/${id.data}`);
-  redirect(`/app/suivis/${id.data}/simulateur?fait=envoye`);
+  redirect(simulatorPage(id.data, role.data, "envoye"));
 }
 
 /** Simulateur : « faire passer le temps » jusqu'aux envois prévus de ce suivi. */
@@ -142,6 +160,8 @@ export async function simulateOwnerPhotoAction(
   const caption = photoCaptionInput.safeParse(text(form, "caption"));
   if (!caption.success)
     return { error: caption.error.issues[0]?.message ?? INVALID.error };
+  const role = simulatedRole(form);
+  if (!role.success) return INVALID;
   const bytes = new Uint8Array(await file.arrayBuffer());
   const context = await memberContext();
   const result = await guarded(async () => {
@@ -149,12 +169,13 @@ export async function simulateOwnerPhotoAction(
       kind: "photo",
       bytes,
       caption: caption.data,
+      from: role.data,
     });
     await services.simulatorWorker().runOnce();
   });
   if ("failure" in result) return result.failure;
   revalidatePath(`/app/suivis/${id.data}`);
-  redirect(`/app/suivis/${id.data}/simulateur?fait=photo`);
+  redirect(simulatorPage(id.data, role.data, "photo"));
 }
 
 const spokenInput = z
@@ -177,11 +198,14 @@ export async function simulateOwnerVoiceAction(
   const spoken = spokenInput.safeParse(text(form, "spoken"));
   if (!spoken.success)
     return { error: spoken.error.issues[0]?.message ?? INVALID.error };
+  const role = simulatedRole(form);
+  if (!role.success) return INVALID;
   const context = await memberContext();
   const result = await guarded(async () => {
     await services.media().simulateOwnerMedia(context, id.data, {
       kind: "voice",
       bytes: buildSimulatedVoiceNote(spoken.data),
+      from: role.data,
     });
     // Transcription, puis ce qu'elle déclenche (réponse de Numa, consignes d'urgence).
     await services.simulatorWorker().runOnce();
@@ -189,5 +213,5 @@ export async function simulateOwnerVoiceAction(
   });
   if ("failure" in result) return result.failure;
   revalidatePath(`/app/suivis/${id.data}`);
-  redirect(`/app/suivis/${id.data}/simulateur?fait=vocal`);
+  redirect(simulatorPage(id.data, role.data, "vocal"));
 }

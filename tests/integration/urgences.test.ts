@@ -60,6 +60,7 @@ type StaffAlert = { membershipId: string; kind: string; at: Date };
 const sent: Sent[] = [];
 const staffAlerts: StaffAlert[] = [];
 const whatsapp: WhatsAppConnector = {
+  ...fakeWhatsApp,
   simulated: true,
   connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
   async sendMessage(input) {

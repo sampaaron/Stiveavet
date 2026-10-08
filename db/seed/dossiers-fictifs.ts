@@ -76,7 +76,8 @@ const CONTROLS: Record<
   { inDays: number; at: string; source: "numa" | "staff" }
 > = {
   Caramel: { inDays: 5, at: "17:15", source: "staff" },
-  Moka: { inDays: 0, at: "14:30", source: "numa" },
+  // Rendez-vous confirmés par le cabinet : Numa ne fait que proposer (trigger de la 0014).
+  Moka: { inDays: 0, at: "14:30", source: "staff" },
   Pixel: { inDays: 8, at: "11:00", source: "staff" },
   Ruby: { inDays: 2, at: "09:30", source: "staff" },
   Oscar: { inDays: 13, at: "10:00", source: "staff" },

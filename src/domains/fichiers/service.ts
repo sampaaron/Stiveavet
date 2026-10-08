@@ -8,11 +8,15 @@ import type { ObjectStorage, StoredObject } from "@/adapters/object-storage";
 import type { AuditMetadata } from "@/domains/audit/schema";
 import { checkNumaReply } from "@/domains/conversations/guard";
 import {
+  contactRoleInput,
   currentConsentState,
   processInbound,
   recordInbound,
 } from "@/domains/conversations/service";
-import type { InboundOutcome } from "@/domains/conversations/service";
+import type {
+  ContactRole,
+  InboundOutcome,
+} from "@/domains/conversations/service";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
@@ -70,12 +74,14 @@ export const photoCaptionInput = z
   .trim()
   .max(1024, "Légende trop longue.");
 
+/** `from` : l'un des deux propriétaires du suivi (le principal par défaut, lot 18). */
 export type OwnerMedia =
-  | { kind: "photo"; bytes: Uint8Array; caption?: string }
-  | { kind: "voice"; bytes: Uint8Array };
+  | { kind: "photo"; bytes: Uint8Array; caption?: string; from?: unknown }
+  | { kind: "voice"; bytes: Uint8Array; from?: unknown };
 
 type CheckedMedia = {
   kind: "photo" | "voice";
+  from: ContactRole;
   bytes: Uint8Array;
   caption: string;
   contentType: string;
@@ -95,6 +101,9 @@ const EXTENSIONS: Record<string, string> = {
 /** Type lu dans le fichier et taille bornée ; sinon refus sans détail. */
 function checkMedia(media: OwnerMedia): CheckedMedia {
   const { bytes } = media;
+  const role = contactRoleInput.safeParse(media.from ?? "primary");
+  if (!role.success) throw new DomainError("not_found");
+  const from = role.data;
   if (media.kind === "photo") {
     const contentType = sniffImage(bytes);
     const caption = photoCaptionInput.safeParse(media.caption ?? "");
@@ -107,6 +116,7 @@ function checkMedia(media: OwnerMedia): CheckedMedia {
       throw new DomainError("invalid_file");
     return {
       kind: "photo",
+      from,
       bytes,
       caption: caption.data,
       contentType,
@@ -119,6 +129,7 @@ function checkMedia(media: OwnerMedia): CheckedMedia {
     throw new DomainError("invalid_file");
   return {
     kind: "voice",
+    from,
     bytes,
     caption: "",
     contentType,
@@ -165,6 +176,7 @@ async function receiveInTx(
     tx,
     followupId,
     media.caption,
+    media.from,
   );
   await tx.insert(attachments).values({
     id: attachmentId,
@@ -509,7 +521,15 @@ export function mediaHandlers(deps: {
       .from(organizationSettings)
       .where(eq(organizationSettings.organizationId, job.organizationId));
     if (!settings?.enabled) return;
-    if ((await currentConsentState(tx, followupId)) !== "given") return;
+    const [source] = await tx
+      .select({ contactId: messages.followupContactId })
+      .from(messages)
+      .where(eq(messages.id, messageId));
+    // L'accord qui compte est celui de la personne qui a envoyé la photo.
+    if (
+      (await currentConsentState(tx, followupId, source?.contactId)) !== "given"
+    )
+      return;
     const [context] = await tx
       .select({ animalName: animals.name, language: messages.language })
       .from(messages)

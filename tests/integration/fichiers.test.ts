@@ -67,6 +67,7 @@ const team = teamService({
 
 const sent: { body: string }[] = [];
 const whatsapp: WhatsAppConnector = {
+  ...fakeWhatsApp,
   simulated: true,
   connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
   sendStaffAlert: fakeWhatsApp.sendStaffAlert,

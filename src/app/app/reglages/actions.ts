@@ -9,6 +9,7 @@ import {
   EMERGENCY_PERIODS,
   ESCALATION_CHOICES,
   WEEKDAYS,
+  appointmentDurationsInput,
   contactInput,
   instructionsInput,
   messageWindowsInput,
@@ -87,6 +88,52 @@ export async function saveMessageWindowsAction(
     await attempt(
       () => services.settings().saveMessageWindows(context, parsed.data),
       "Horaires d'envoi enregistrés.",
+    ),
+  );
+}
+
+export async function saveAppointmentWindowsAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const windows = WEEKDAYS.filter((day) => form.get(`day-${day}`) === "on").map(
+    (weekday) => ({
+      weekday,
+      startsAt: text(form, `start-${weekday}`),
+      endsAt: text(form, `end-${weekday}`),
+    }),
+  );
+  const parsed = messageWindowsInput.safeParse(windows);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const context = await memberContext();
+  return finish(
+    await attempt(
+      () => services.settings().saveAppointmentWindows(context, parsed.data),
+      "Plages de rendez-vous enregistrées.",
+    ),
+  );
+}
+
+export async function saveAppointmentDurationsAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const minutes = (name: string) => {
+    const value = text(form, name);
+    return /^\d{1,3}$/.test(value) ? Number(value) : Number.NaN;
+  };
+  const parsed = appointmentDurationsInput.safeParse({
+    post_op_control: minutes("post_op_control"),
+    emergency: minutes("emergency"),
+    treatment_followup: minutes("treatment_followup"),
+    other: minutes("other"),
+  });
+  if (!parsed.success) return firstIssue(parsed.error);
+  const context = await memberContext();
+  return finish(
+    await attempt(
+      () => services.settings().saveAppointmentDurations(context, parsed.data),
+      "Durées des rendez-vous enregistrées.",
     ),
   );
 }

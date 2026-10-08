@@ -6,6 +6,11 @@ import { z } from "zod";
 import type { DrVetoConnector } from "@/adapters/drveto/types";
 import type { PaymentMandateProvider } from "@/adapters/payments/types";
 import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
+import {
+  APPOINTMENT_KINDS,
+  DEFAULT_APPOINTMENT_MINUTES,
+} from "@/domains/agenda/rendez-vous";
+import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
 import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
@@ -14,6 +19,7 @@ import { canReadProtocol } from "@/domains/protocoles/policies";
 import {
   animalOwners,
   animals,
+  appointmentDurations,
   auditEvents,
   availabilityWindows,
   emergencyContacts,
@@ -34,10 +40,12 @@ import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import {
+  DEFAULT_APPOINTMENT_WINDOWS,
   DEFAULT_INSTRUCTIONS,
   DEFAULT_MESSAGE_WINDOWS,
   EMERGENCY_PERIODS,
   alertSettingsInput,
+  appointmentDurationsInput,
   contactInput,
   instructionsInput,
   messageWindowsInput,
@@ -62,6 +70,9 @@ export type SettingsView = {
   escalationDelayMinutes: number;
   photoAnalysisEnabled: boolean;
   messageWindows: WindowInput[];
+  /** Plages où Numa peut proposer un rendez-vous, et durée de chaque type (lot 18). */
+  appointmentWindows: WindowInput[];
+  appointmentMinutes: Record<AppointmentKind, number>;
   instructions: Partial<Record<EmergencyPeriod, string>>;
   contacts: { id: string; label: string; phone: string }[];
   onCall: {
@@ -151,15 +162,16 @@ export function settingsService(deps: {
     tx: TenantTransaction,
     actor: Actor,
     windows: WindowInput[],
+    kind: "messages" | "appointments" = "messages",
   ) {
     await tx
       .delete(availabilityWindows)
-      .where(eq(availabilityWindows.kind, "messages"));
+      .where(eq(availabilityWindows.kind, kind));
     if (windows.length)
       await tx.insert(availabilityWindows).values(
         windows.map((window) => ({
           organizationId: actor.organizationId,
-          kind: "messages" as const,
+          kind,
           weekday: window.weekday,
           startsAt: window.startsAt,
           endsAt: window.endsAt,
@@ -199,11 +211,19 @@ export function settingsService(deps: {
     async get(actor: Actor): Promise<SettingsView> {
       return run(actor, async (tx) => {
         const [settings] = await tx.select().from(organizationSettings);
-        const windows = await tx
+        const allWindows = await tx
           .select()
           .from(availabilityWindows)
-          .where(eq(availabilityWindows.kind, "messages"))
           .orderBy(asc(availabilityWindows.weekday));
+        const windowsOf = (kind: "messages" | "appointments") =>
+          allWindows
+            .filter((window) => window.kind === kind)
+            .map((window) => ({
+              weekday: window.weekday as WindowInput["weekday"],
+              startsAt: hhmm(window.startsAt),
+              endsAt: hhmm(window.endsAt),
+            }));
+        const durations = await tx.select().from(appointmentDurations);
         const instructions = await tx.select().from(emergencyInstructions);
         const contacts = await tx
           .select()
@@ -240,11 +260,15 @@ export function settingsService(deps: {
         return {
           escalationDelayMinutes: settings?.escalationDelayMinutes ?? 240,
           photoAnalysisEnabled: settings?.photoAnalysisEnabled ?? false,
-          messageWindows: windows.map((window) => ({
-            weekday: window.weekday as WindowInput["weekday"],
-            startsAt: hhmm(window.startsAt),
-            endsAt: hhmm(window.endsAt),
-          })),
+          messageWindows: windowsOf("messages"),
+          appointmentWindows: windowsOf("appointments"),
+          appointmentMinutes: Object.fromEntries(
+            APPOINTMENT_KINDS.map((kind) => [
+              kind,
+              durations.find((row) => row.kind === kind)?.minutes ??
+                DEFAULT_APPOINTMENT_MINUTES[kind],
+            ]),
+          ) as Record<AppointmentKind, number>,
           instructions: Object.fromEntries(
             instructions.map((row) => [row.period, row.instructions]),
           ),
@@ -341,6 +365,17 @@ export function settingsService(deps: {
           .where(eq(availabilityWindows.kind, "messages"));
         if ((windows?.n ?? 0) === 0)
           await replaceWindows(tx, actor, DEFAULT_MESSAGE_WINDOWS);
+        const [appointmentWindows] = await tx
+          .select({ n: count() })
+          .from(availabilityWindows)
+          .where(eq(availabilityWindows.kind, "appointments"));
+        if ((appointmentWindows?.n ?? 0) === 0)
+          await replaceWindows(
+            tx,
+            actor,
+            DEFAULT_APPOINTMENT_WINDOWS,
+            "appointments",
+          );
         const existing = new Set(
           (
             await tx
@@ -374,6 +409,49 @@ export function settingsService(deps: {
         await audit(tx, actor, "settings.message_windows_changed", {
           days: parsed.length,
         });
+      });
+    },
+
+    /** Plages où Numa peut proposer un rendez-vous ; sans plage, le cabinet rappelle. */
+    async saveAppointmentWindows(actor: Actor, windows: unknown) {
+      const parsed = parse(messageWindowsInput, windows);
+      await run(actor, async (tx) => {
+        await replaceWindows(tx, actor, parsed, "appointments");
+        await audit(tx, actor, "settings.appointment_windows_changed", {
+          days: parsed.length,
+        });
+      });
+    },
+
+    async saveAppointmentDurations(actor: Actor, input: unknown) {
+      const minutes = parse(appointmentDurationsInput, input);
+      await run(actor, async (tx) => {
+        for (const kind of APPOINTMENT_KINDS)
+          await tx
+            .insert(appointmentDurations)
+            .values({
+              organizationId: actor.organizationId,
+              kind,
+              minutes: minutes[kind],
+              updatedByMembershipId: actor.membershipId,
+            })
+            .onConflictDoUpdate({
+              target: [
+                appointmentDurations.organizationId,
+                appointmentDurations.kind,
+              ],
+              set: {
+                minutes: minutes[kind],
+                updatedByMembershipId: actor.membershipId,
+                updatedAt: new Date(),
+              },
+            });
+        await audit(
+          tx,
+          actor,
+          "settings.appointment_durations_changed",
+          minutes,
+        );
       });
     },
 

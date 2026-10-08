@@ -11,6 +11,8 @@ import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
 import { agendaService } from "@/domains/agenda/captures";
 import type { AgendaService } from "@/domains/agenda/captures";
+import { appointmentsService } from "@/domains/agenda/demandes";
+import type { AppointmentsService } from "@/domains/agenda/demandes";
 import { conversationsService } from "@/domains/conversations/service";
 import type { ConversationsService } from "@/domains/conversations/service";
 import { demoService } from "@/domains/demo/service";
@@ -54,6 +56,7 @@ let conversations: ConversationsService | undefined;
 let alerts: AlertsService | undefined;
 let media: MediaService | undefined;
 let agenda: AgendaService | undefined;
+let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
 let today: TodayService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
@@ -143,6 +146,11 @@ export const services = {
       ai: fakeAiGateway,
     });
     return agenda;
+  },
+  /** Rendez-vous proposés par Numa, confirmés par le cabinet (ADR 0021). */
+  appointments(): AppointmentsService {
+    appointments ??= appointmentsService(appDatabase());
+    return appointments;
   },
   /** Synthèse pré-consultation, rédaction simulée sous garde-fous (ADR 0020). */
   synthesis(): SynthesisService {

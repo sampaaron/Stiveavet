@@ -90,6 +90,26 @@ describe("synthèse simulée", () => {
     expect(content.withheld).toBe(0);
   });
 
+  it("ne prend ni une demande de rendez-vous ni un choix de créneau pour un signal", () => {
+    const logistics = simulatedSynthesis({
+      language: "fr",
+      procedure: "Ovariectomie",
+      dayNumber: 1,
+      events: [
+        {
+          at: at(18),
+          from: "owner",
+          text: "Peut-on prendre rendez-vous pour le contrôle ?",
+          media: null,
+          triage: "normal",
+        },
+        { at: at(19), from: "owner", text: "2", media: null, triage: "normal" },
+      ],
+    });
+    expect(logistics.positives).toEqual([]);
+    expect(logistics.openQuestions).toEqual([]);
+  });
+
   it("sans nouvelles, le dit simplement ; en anglais aussi", () => {
     expect(
       simulatedSynthesis({

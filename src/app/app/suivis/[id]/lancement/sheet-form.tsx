@@ -50,6 +50,8 @@ export function SheetForm({
     followup.responsibleMembershipId,
   );
   const [firstHours, setFirstHours] = useState(followup.firstContactHours);
+  const second = sheet.contacts.find((contact) => contact.role === "secondary");
+  const [secondActive, setSecondActive] = useState(second?.active ?? false);
   const [control, setControl] = useState(controlInput);
   const [steps, setSteps] = useState<EditableStep[]>(() =>
     sheet.steps
@@ -71,6 +73,7 @@ export function SheetForm({
   const payload: Payload = {
     responsibleMembershipId: draft ? responsible : undefined,
     firstContactHours: draft ? firstHours : undefined,
+    secondContactActive: draft && second ? secondActive : undefined,
     controlAppointmentAt: control,
     steps: steps.map(({ offsetHours, kind, content }) => ({
       offsetHours,
@@ -155,6 +158,26 @@ export function SheetForm({
               </p>
             </div>
           </div>
+          {second ? (
+            <label className="mt-4 flex items-start gap-3 rounded-[var(--radius-control)] border border-line p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-[var(--color-brand)]"
+                checked={secondActive}
+                onChange={(event) => setSecondActive(event.target.checked)}
+              />
+              <span>
+                <span className="font-semibold">
+                  Inclure {second.name}, second propriétaire
+                </span>
+                <span className="block text-ink-muted">
+                  Numa lui demande aussi son accord. Dès que les deux ont
+                  accepté, un groupe WhatsApp réunit les propriétaires et Numa ;
+                  chacun peut le quitter par STOP.
+                </span>
+              </span>
+            </label>
+          ) : null}
         </SectionCard>
       ) : null}
 

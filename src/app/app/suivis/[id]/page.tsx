@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import type { AppointmentsService } from "@/domains/agenda/demandes";
+import { APPOINTMENT_KIND_LABELS } from "@/domains/agenda/rendez-vous";
 import type { FollowupClinical, FollowupView } from "@/domains/suivis/service";
 import type {
   FollowupContactView,
@@ -134,13 +136,17 @@ export default async function FollowupPage({
 
   // Dossier clinique d'un suivi lancé : tout est lu dans la base, au moment de l'ouverture.
   const now = new Date();
-  const [view, links, alerts, programme, synthesis] = await Promise.all([
-    services.conversations().view(context, followup.id),
-    services.media().readLinks(context, followup.id),
-    services.alerts().ofFollowup(context, followup.id),
-    services.launch().programme(context, followup.id),
-    services.synthesis().forFollowup(context, followup.id, { now }),
-  ]);
+  const [view, links, alerts, programme, synthesis, appointments] =
+    await Promise.all([
+      services.conversations().view(context, followup.id),
+      services.media().readLinks(context, followup.id),
+      services.alerts().ofFollowup(context, followup.id),
+      services.launch().programme(context, followup.id),
+      services.synthesis().forFollowup(context, followup.id, { now }),
+      context.permissions.has("agenda.read")
+        ? services.appointments().ofFollowup(context, followup.id, now)
+        : Promise.resolve([]),
+    ]);
   const openAlerts = alerts.filter((alert) => alert.status !== "resolved");
   const primary = record.contacts.find((contact) => contact.role === "primary");
 
@@ -213,13 +219,16 @@ export default async function FollowupPage({
 
         <div className="flex min-w-0 flex-col gap-6">
           <Synthesis synthesis={synthesis} />
-          <Contacts contacts={record.contacts} />
+          <Contacts contacts={record.contacts} group={view.group} />
           <Treatments treatments={record.facts.treatments} />
           <NextStepsCard
             programme={programme}
             controlAppointmentAt={followup.controlAppointmentAt}
             now={now}
           />
+          {appointments.length ? (
+            <Appointments appointments={appointments} />
+          ) : null}
           <SectionCard
             title="Allergies et antécédents"
             description="Résumé importé de dr.veto (simulé)."
@@ -576,14 +585,22 @@ const CONSENT_STATUS = {
 } as const;
 
 /** Propriétaires et accord : jamais le numéro complet, seulement ses deux derniers chiffres. */
-function Contacts({ contacts }: { contacts: FollowupContactView[] }) {
+function Contacts({
+  contacts,
+  group,
+}: {
+  contacts: FollowupContactView[];
+  group: boolean;
+}) {
   const active = contacts.filter((contact) => contact.active);
   return (
     <SectionCard
       title="Propriétaires et accord"
       description={
         active.length > 1
-          ? "Un groupe WhatsApp sera créé quand les deux contacts auront accepté."
+          ? group
+            ? "Groupe WhatsApp ouvert avec les deux propriétaires et Numa. Chacun peut le quitter par STOP."
+            : "Un groupe WhatsApp sera créé quand les deux contacts auront accepté."
           : undefined
       }
     >
@@ -618,6 +635,50 @@ function Contacts({ contacts }: { contacts: FollowupContactView[] }) {
                   : "consent-pending"
               }
             />
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
+  );
+}
+
+/** Rendez-vous à venir de ce suivi : proposés par Numa (à confirmer) ou confirmés. */
+function Appointments({
+  appointments,
+}: {
+  appointments: Awaited<ReturnType<AppointmentsService["ofFollowup"]>>;
+}) {
+  return (
+    <SectionCard
+      title="Rendez-vous"
+      description="Numa ne propose que des créneaux libres du vétérinaire responsable ; le cabinet confirme."
+      headingLevel={2}
+    >
+      <ul className="grid gap-3 text-sm">
+        {appointments.map((item) => (
+          <li
+            key={item.id}
+            className="flex flex-wrap items-center justify-between gap-2"
+          >
+            <span>
+              <span className="block font-semibold">
+                {formatDateTime(item.startsAt)}
+              </span>
+              <span className="block text-ink-muted">
+                {APPOINTMENT_KIND_LABELS[item.kind]}
+                {item.source === "numa" ? " · choisi avec Numa" : ""}
+              </span>
+            </span>
+            {item.status === "proposed" ? (
+              <Link
+                href="/app/agenda"
+                className="font-semibold text-brand-ink underline-offset-2 hover:underline"
+              >
+                À confirmer
+              </Link>
+            ) : (
+              <span className="font-semibold text-brand-ink">Confirmé</span>
+            )}
           </li>
         ))}
       </ul>
