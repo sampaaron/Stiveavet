@@ -4,6 +4,8 @@ export const billing: AppDictionary["billing"] = {
   title: "Billing",
   description:
     "Prices excl. VAT, invoiced to the practice and collected every month. Direct debits are simulated during this phase: no bank account is charged.",
+  descriptionLive:
+    "Prices excl. VAT, invoiced to the practice and collected every month by SEPA direct debit, through Stripe.",
   exclVat: (amount: string) => `${amount} excl. VAT`,
   inclVat: (amount: string) => `${amount} incl. VAT`,
   noSubscription: {
@@ -74,9 +76,11 @@ export const billing: AppDictionary["billing"] = {
     title: "Invoices",
     description:
       "Amounts excl. VAT, with VAT at 20%. Invoices are simulated during this phase.",
+    descriptionLive: "Amounts excl. VAT, with VAT at 20%.",
     period: (start: string, end: string) => `from ${start} to ${end}`,
     status: {
       paid: "Paid",
+      processing: "Collection in progress",
       open: "To be collected",
       failed: "Direct debit refused",
     },
@@ -110,6 +114,7 @@ export const billing: AppDictionary["billing"] = {
       "The read-only period has ended. Contact support for any export request.",
   },
   settle: "Retry the direct debit (simulated)",
+  settleLive: "Retry the direct debit",
   notices: {
     confirmRequired: "Tick the confirmation box to continue.",
     planChanged: "Plan changed. It applies from the next billing date.",
@@ -120,6 +125,8 @@ export const billing: AppDictionary["billing"] = {
       `Cancellation recorded. It takes effect on ${date}; your active follow-ups continue until they end.`,
     settled:
       "Direct debit successful (simulated). Thank you, everything is in order.",
+    settleProcessing:
+      'Direct debit sent. Your bank confirms it within a few business days; the invoice stays "in progress" until then.',
     settleFailed:
       "The direct debit failed again. Check the mandate or contact support.",
   },

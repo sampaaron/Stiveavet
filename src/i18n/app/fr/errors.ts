@@ -42,5 +42,7 @@ export const errors = {
       "Ce numéro WhatsApp est déjà relié à un autre cabinet sur Stivea Vet.",
     optin_missing:
       "Cochez l'accord du propriétaire pour WhatsApp, recueilli au cabinet, avant de lancer le suivi.",
+    payment_provider_unavailable:
+      "Le service de prélèvement ne répond pas pour le moment. Rien n'a été prélevé ; réessayez dans quelques minutes.",
   },
 };

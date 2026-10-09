@@ -21,7 +21,7 @@ export const webhookEvents = pgTable("webhook_events", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   organizationId: uuid("organization_id").notNull(),
-  provider: text("provider").$type<"whatsapp">().notNull(),
+  provider: text("provider").$type<"whatsapp" | "stripe">().notNull(),
   eventKey: text("event_key").notNull(),
   kind: text("kind").notNull(),
   receivedAt: at("received_at").notNull().defaultNow(),

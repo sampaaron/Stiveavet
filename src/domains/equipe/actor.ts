@@ -39,7 +39,8 @@ export class DomainError extends Error {
       | "capture_unreadable"
       | "whatsapp_signup_failed"
       | "whatsapp_number_taken"
-      | "optin_missing",
+      | "optin_missing"
+      | "payment_provider_unavailable",
   ) {
     super(code);
   }

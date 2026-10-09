@@ -334,6 +334,20 @@ export async function connectWhatsAppAction(
   );
 }
 
+/** Mandat SEPA réel : ouvre la page de signature de Stripe (ADR 0027). */
+export async function startMandateAction(): Promise<ActionState> {
+  const context = await memberContext();
+  const { locale } = await appText();
+  let url: string;
+  try {
+    url = await services.settings().startMandate(context, locale);
+  } catch (error) {
+    if (error instanceof DomainError) return domainFailure(error);
+    throw error;
+  }
+  redirect(url);
+}
+
 export async function disconnectAction(
   _previous: ActionState,
   form: FormData,

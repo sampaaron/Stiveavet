@@ -3,7 +3,7 @@ import { appText } from "@/i18n/app/server";
 import { services } from "@/server/services";
 import { formatDate } from "@/ui/format";
 
-import { ConnectForm, DisconnectForm } from "./settings-forms";
+import { ConnectForm, DisconnectForm, MandateForm } from "./settings-forms";
 import { WhatsAppSignup } from "./whatsapp-signup";
 
 /** Champ à saisir pour chaque connexion simulée ; aucun pour le mandat. */
@@ -45,7 +45,10 @@ export async function IntegrationPanel({
   // WhatsApp réel (ADR 0024) : connexion par l'inscription intégrée de Meta.
   const signup =
     provider === "whatsapp" ? services.settings().whatsappSignup() : null;
-  const simulated = connection ? !connection.live : !signup;
+  // Mandat réel (ADR 0027) : signature sur la page de Stripe.
+  const mandateLive =
+    provider === "payment_mandate" && services.settings().mandateLive();
+  const simulated = connection ? !connection.live : !signup && !mandateLive;
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -54,7 +57,11 @@ export async function IntegrationPanel({
             {copy.title}{" "}
             {simulated ? <SimulatedBadge label={text.simulated} /> : null}
           </Heading>
-          <p className="text-sm text-ink-muted">{copy.description}</p>
+          <p className="text-sm text-ink-muted">
+            {mandateLive && "descriptionLive" in copy
+              ? copy.descriptionLive
+              : copy.description}
+          </p>
         </div>
         {connection ? (
           <DisconnectForm provider={provider} label={copy.title} />
@@ -70,6 +77,8 @@ export async function IntegrationPanel({
         </p>
       ) : signup ? (
         <WhatsAppSignup appId={signup.appId} configId={signup.configId} />
+      ) : mandateLive && "submitLive" in copy ? (
+        <MandateForm submitLabel={copy.submitLive} />
       ) : (
         <ConnectForm
           provider={provider}

@@ -120,6 +120,9 @@ export const settings = {
       description:
         "Pour l'essai pilote à 86 € HT par mois. Aucune donnée bancaire n'est demandée pendant cette phase.",
       submit: "Signer le mandat (simulé)",
+      submitLive: "Signer le mandat SEPA",
+      descriptionLive:
+        "Prélèvement SEPA des factures. Vous saisissez votre IBAN sur la page sécurisée de Stripe : Stivea Vet ne le voit jamais.",
     },
   },
   notices: {

@@ -355,8 +355,8 @@ describe("planning de garde", () => {
     expect(code).toBe("23514");
   });
 
-  it("la base refuse toute connexion réelle autre que WhatsApp (dr.veto, prélèvement)", async () => {
-    for (const provider of ["drveto", "payment_mandate"])
+  it("la base refuse une connexion réelle à dr.veto (WhatsApp et prélèvement seulement)", async () => {
+    for (const provider of ["drveto"])
       expect(
         await errorCode(
           asApp(app, org, (client) =>

@@ -95,11 +95,17 @@ export async function settleAction(): Promise<ActionState> {
   const context = await memberContext();
   const { t } = await appText();
   try {
-    const settled = await services.billing().settle(context);
+    const outcome = await services.billing().settle(context);
+    const notices = t.billing.notices;
     return finish(
-      settled
-        ? { notice: t.billing.notices.settled }
-        : { error: t.billing.notices.settleFailed },
+      outcome === "failed"
+        ? { error: notices.settleFailed }
+        : {
+            notice:
+              outcome === "processing"
+                ? notices.settleProcessing
+                : notices.settled,
+          },
     );
   } catch (error) {
     if (error instanceof DomainError) return finish(await domainFailure(error));

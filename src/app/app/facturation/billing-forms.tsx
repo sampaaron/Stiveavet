@@ -35,7 +35,7 @@ function ConfirmBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function SettleForm() {
+export function SettleForm({ simulated }: { simulated: boolean }) {
   const [state, action, pending] = useActionState(
     settleAction,
     initialActionState,
@@ -45,7 +45,7 @@ export function SettleForm() {
     <form action={action} className="grid gap-2">
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          {t.billing.settle}
+          {simulated ? t.billing.settle : t.billing.settleLive}
         </Button>
       </div>
       <ActionMessage state={state} />

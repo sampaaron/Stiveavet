@@ -118,6 +118,9 @@ export const settings: AppDictionary["settings"] = {
       description:
         "For the pilot trial at €86 excl. VAT per month. No bank details are requested during this phase.",
       submit: "Sign the mandate (simulated)",
+      submitLive: "Sign the SEPA mandate",
+      descriptionLive:
+        "SEPA direct debit of your invoices. You enter your IBAN on Stripe's secure page: Stivea Vet never sees it.",
     },
   },
   notices: {

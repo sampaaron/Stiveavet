@@ -238,7 +238,7 @@ describe("échéances et prélèvements simulés", () => {
       "billing_blocked",
     );
 
-    expect(await paying.settle(owner)).toBe(true);
+    expect(await paying.settle(owner)).toBe("paid");
     const settled = await paying.overview(owner);
     expect(settled.access).toEqual({ kind: "full" });
     expect(settled.invoices.every((invoice) => invoice.status === "paid")).toBe(
@@ -462,12 +462,19 @@ describe("droits et intégrité", () => {
     const unpaid = await errorCode(
       asApp(app, org, (client) =>
         client.query(
-          "UPDATE invoices SET status = 'failed', paid_at = NULL WHERE id = $1",
+          "UPDATE invoices SET status = 'open', paid_at = NULL WHERE id = $1",
           [invoiceId],
         ),
       ),
     );
     expect(unpaid).toBe("42501");
+    // Seule évolution d'une facture payée : une contestation bancaire la repasse en refusée.
+    await asApp(app, org, (client) =>
+      client.query(
+        "UPDATE invoices SET status = 'failed', paid_at = NULL WHERE id = $1",
+        [invoiceId],
+      ),
+    );
     for (const table of [
       "invoices",
       "subscriptions",

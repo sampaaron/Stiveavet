@@ -11,7 +11,7 @@ export function fakeBillingProvider(
 ): BillingProvider {
   return {
     simulated: true,
-    async collect({ organizationId }) {
+    async collect(_tx, { organizationId }) {
       return {
         status: options.decline?.has(organizationId) ? "failed" : "succeeded",
         providerRef: `sim_${randomBytes(8).toString("hex")}`,

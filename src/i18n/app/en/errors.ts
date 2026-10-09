@@ -43,5 +43,7 @@ export const errors: AppDictionary["errors"] = {
       "This WhatsApp number is already linked to another practice on Stivea Vet.",
     optin_missing:
       "Tick the owner's WhatsApp agreement, collected at the practice, before launching the follow-up.",
+    payment_provider_unavailable:
+      "The direct debit service is not responding right now. Nothing was charged; try again in a few minutes.",
   },
 };
