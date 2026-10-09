@@ -3,6 +3,8 @@ export const billing = {
   title: "Facturation",
   description:
     "Prix hors taxes, facturés au cabinet et prélevés chaque mois. Prélèvements simulés pendant cette phase : aucun compte bancaire n'est débité.",
+  descriptionLive:
+    "Prix hors taxes, facturés au cabinet et prélevés chaque mois par prélèvement SEPA, via Stripe.",
   /** Montant hors taxes ou toutes taxes comprises ; `amount` est déjà mis en forme. */
   exclVat: (amount: string) => `${amount} HT`,
   inclVat: (amount: string) => `${amount} TTC`,
@@ -74,6 +76,7 @@ export const billing = {
     title: "Factures",
     description:
       "Montants hors taxes et TVA à 20 %. Factures simulées pendant cette phase.",
+    descriptionLive: "Montants hors taxes et TVA à 20 %.",
     period: (start: string, end: string) => `du ${start} au ${end}`,
     status: {
       paid: "Payée",
@@ -111,6 +114,7 @@ export const billing = {
       "La période de lecture seule est terminée. Contactez le support pour toute demande d'export.",
   },
   settle: "Relancer le prélèvement (simulé)",
+  settleLive: "Relancer le prélèvement",
   notices: {
     confirmRequired: "Cochez la case de confirmation pour continuer.",
     planChanged: "Formule modifiée. Elle s'applique à la prochaine échéance.",
@@ -120,6 +124,8 @@ export const billing = {
     cancelled: (date: string) =>
       `Résiliation enregistrée. Elle prend effet le ${date} ; vos suivis en cours continuent jusqu'à leur fin.`,
     settled: "Prélèvement réussi (simulé). Merci, tout est en ordre.",
+    settleProcessing:
+      "Prélèvement envoyé. Votre banque le confirme sous quelques jours ouvrés ; la facture reste « en cours » d'ici là.",
     settleFailed:
       "Le prélèvement a de nouveau échoué. Vérifiez le mandat ou contactez le support.",
   },

@@ -178,14 +178,25 @@ describe("prélèvements", () => {
   it("Stripe injoignable : la facture reste à prélever, rien n'est bloqué", async () => {
     const owner = await cabinet();
     await handleStripeEvent(appDb, event(await signMandate(owner)));
-    stripe.failNext(
-      { status: 503, code: "api_error" },
-      { status: 503, code: "api_error" },
-    );
+    // Une seule panne : après un report, plus aucun essai avant 15 minutes.
+    stripe.failNext({ status: 503, code: "api_error" });
     const overview = await billing.overview(owner);
     expect(overview.invoices.some((invoice) => invoice.status === "open")).toBe(
       true,
     );
     expect(overview.access).toEqual({ kind: "full" });
+  });
+
+  it("deux échéances calculées en même temps ne prélèvent qu'une fois chaque facture", async () => {
+    const owner = await cabinet();
+    await handleStripeEvent(appDb, event(await signMandate(owner)));
+    await Promise.all([billing.overview(owner), billing.overview(owner)]);
+    const intents = stripe.intents.filter(
+      (candidate) =>
+        candidate.metadata.organization_id === owner.organizationId,
+    );
+    const invoices = intents.map((intent) => intent.metadata.invoice_id);
+    expect(invoices.length).toBeGreaterThan(0);
+    expect(new Set(invoices).size).toBe(invoices.length);
   });
 });

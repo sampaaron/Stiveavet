@@ -74,9 +74,19 @@ export default async function BillingPage() {
 
   return (
     <>
-      <PageHeader title={text.title} description={text.description} />
+      <PageHeader
+        title={text.title}
+        description={
+          overview.simulated ? text.description : text.descriptionLive
+        }
+      />
       <div className="grid gap-6">
-        <AccessBanner access={overview.access} t={t} locale={locale} />
+        <AccessBanner
+          access={overview.access}
+          simulated={overview.simulated}
+          t={t}
+          locale={locale}
+        />
         {!overview.mandateSigned ? (
           <AlertBanner
             tone="watch"
@@ -232,7 +242,11 @@ export default async function BillingPage() {
 
         <SectionCard
           title={text.invoices.title}
-          description={text.invoices.description}
+          description={
+            overview.simulated
+              ? text.invoices.description
+              : text.invoices.descriptionLive
+          }
         >
           {overview.invoices.length ? (
             <ul className="grid gap-3">
@@ -338,10 +352,12 @@ function phaseLabel(
 
 function AccessBanner({
   access,
+  simulated,
   t,
   locale,
 }: {
   access: Access;
+  simulated: boolean;
   t: AppDictionary;
   locale: Locale;
 }) {
@@ -354,7 +370,7 @@ function AccessBanner({
         <AlertBanner
           tone="watch"
           title={text.graceTitle(access.daysLeft)}
-          action={<SettleForm />}
+          action={<SettleForm simulated={simulated} />}
         >
           {text.graceBody(formatDate(access.blockedAt, locale))}
         </AlertBanner>
@@ -364,7 +380,11 @@ function AccessBanner({
         <AlertBanner
           tone="urgent"
           title={text.blockedTitle}
-          action={access.reason === "unpaid" ? <SettleForm /> : undefined}
+          action={
+            access.reason === "unpaid" ? (
+              <SettleForm simulated={simulated} />
+            ) : undefined
+          }
         >
           {access.reason === "unpaid"
             ? text.blockedUnpaid
@@ -376,7 +396,11 @@ function AccessBanner({
         <AlertBanner
           tone="info"
           title={text.readOnlyTitle(formatDate(access.until, locale))}
-          action={access.reason === "unpaid" ? <SettleForm /> : undefined}
+          action={
+            access.reason === "unpaid" ? (
+              <SettleForm simulated={simulated} />
+            ) : undefined
+          }
         >
           {text.readOnlyBody}
         </AlertBanner>

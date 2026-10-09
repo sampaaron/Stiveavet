@@ -96,6 +96,8 @@ export type BillingOverview = {
   /** Vétérinaires actifs et invités, comparés à la limite de chaque formule. */
   vetSeats: number;
   mandateSigned: boolean;
+  /** Prélèvements simulés (poste local) ou réels, par Stripe (ADR 0027). */
+  simulated: boolean;
 };
 
 async function loadFacts(
@@ -506,6 +508,7 @@ export function billingService(deps: {
       commitmentReminder: facts ? commitmentReminder(facts, now) : false,
       vetSeats: await vetSeats(tx),
       mandateSigned: await mandateSigned(tx),
+      simulated: provider.simulated,
     };
   }
 
