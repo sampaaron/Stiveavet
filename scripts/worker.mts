@@ -11,6 +11,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { aiConfig, aiGatewayFor } from "../src/adapters/ai-gateway";
+import { wakeChannel } from "../src/adapters/queue/config";
 import {
   JOB_PLANNERS,
   OUTBOX_ROUTES,
@@ -34,7 +35,9 @@ const workerId = `worker-${
 }-${process.pid}`;
 
 let registry: ReturnType<typeof jobRegistry>;
+let wake: ReturnType<typeof wakeChannel>;
 try {
+  wake = wakeChannel(process.env);
   registry = jobRegistry({
     whatsapp: providerFor(whatsappConfig(process.env)),
     ai: aiGatewayFor(aiConfig(process.env)),
@@ -83,7 +86,8 @@ if (process.argv.includes("--once")) await pass();
 else
   while (!stopping) {
     await pass();
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    // Jusqu'au prochain signal de Scaleway Queues, ou l'intervalle fixe sans file.
+    await wake.wait(intervalMs);
   }
 await pool.end();
 console.warn("Worker arrêté.");

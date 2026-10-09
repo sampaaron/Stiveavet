@@ -1,0 +1,8 @@
+# Copier vers staging.tfvars (jamais versionné). Aucun secret ici : les secrets passent
+# par TF_VAR_secrets ou le gestionnaire de secrets, au moment de l'application.
+environment        = "staging"
+app_image          = "rg.fr-par.scw.cloud/stivea-staging/app:COMMIT"
+worker_image       = "rg.fr-par.scw.cloud/stivea-staging/worker:COMMIT"
+app_domain         = "staging.stivea.fr"
+email_domain       = "mail.stivea.fr"
+accept_email_terms = false

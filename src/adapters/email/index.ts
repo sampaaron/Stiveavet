@@ -1,42 +1,23 @@
 import "server-only";
 
-import { serverEnv } from "@/server/env";
-
-import { SmtpEmailSender } from "./smtp";
+import { emailConfig, senderFor } from "./config";
+import type { EmailKind } from "./config";
 import type { EmailSender } from "./types";
 
-/**
- * Deux expéditeurs distincts (architecture §10) : les e-mails de service (codes, factures,
- * équipe) et les e-mails commerciaux, désinscriptibles et sans aucune donnée clinique.
- */
-const FROM = {
-  service: "Stivea Vet <securite@stivea.test>",
-  marketing: "Stivea Vet <bonjour@stivea.test>",
-} as const;
+/** Expéditeurs de l'application, créés au premier envoi (ADR 0028). */
+const senders: Partial<Record<EmailKind, EmailSender>> = {};
 
-const senders: Partial<Record<keyof typeof FROM, EmailSender>> = {};
-
-function localSender(kind: keyof typeof FROM): EmailSender {
-  const existing = senders[kind];
-  if (existing) return existing;
-  const env = serverEnv();
-  if (env.APP_ENV !== "local")
-    throw new Error(
-      "Aucun prestataire d'e-mail réel n'est autorisé pour le moment (ADR 0004)",
-    );
-  if (!env.SMTP_HOST || !env.SMTP_PORT)
-    throw new Error("Configuration invalide : SMTP_HOST, SMTP_PORT");
-  const sender = new SmtpEmailSender(env.SMTP_HOST, env.SMTP_PORT, FROM[kind]);
-  senders[kind] = sender;
-  return sender;
+function sender(kind: EmailKind): EmailSender {
+  senders[kind] ??= senderFor(emailConfig(process.env), kind);
+  return senders[kind];
 }
 
 export function emailSender(): EmailSender {
-  return localSender("service");
+  return sender("service");
 }
 
 export function marketingEmailSender(): EmailSender {
-  return localSender("marketing");
+  return sender("marketing");
 }
 
 export type { EmailMessage, EmailSender } from "./types";
