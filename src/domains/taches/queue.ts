@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { outboxEvents, scheduledJobs } from "@/server/db/schema";
 import type { JobPayload } from "@/server/db/schema";
+import { requestWake } from "@/server/db/tenant";
 import type { TenantTransaction } from "@/server/db/tenant";
 
 import { IDEMPOTENCY_KEY_PATTERN, JOB_KIND_PATTERN } from "./kinds";
@@ -61,7 +62,11 @@ export async function enqueue(
       target: [scheduledJobs.organizationId, scheduledJobs.idempotencyKey],
     })
     .returning({ id: scheduledJobs.id });
-  if (created) return { id: created.id, created: true };
+  if (created) {
+    // Le worker est réveillé une fois la transaction validée (ADR 0028).
+    requestWake();
+    return { id: created.id, created: true };
+  }
   const existing = await tx.execute<{ id: string }>(
     sql`SELECT id FROM scheduled_jobs WHERE organization_id = ${job.organizationId} AND idempotency_key = ${job.idempotencyKey}`,
   );
@@ -81,6 +86,7 @@ export type EmitInput = z.input<typeof emitInput>;
 
 /** Événement métier, publié plus tard par le worker (outbox transactionnelle). */
 export async function emit(tx: TenantTransaction, input: EmitInput) {
+  requestWake();
   const event = emitInput.parse(input);
   const [row] = await tx
     .insert(outboxEvents)

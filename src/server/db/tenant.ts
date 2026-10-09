@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -21,12 +23,42 @@ const contextSchema = z.object({
  * (et la personne) courants. Les politiques RLS de PostgreSQL filtrent alors chaque requête ;
  * le réglage est local à la transaction et ne peut pas fuir vers une autre requête du pool.
  */
+/**
+ * Réveil du worker après validation (ADR 0028) : une transaction qui inscrit une tâche le
+ * demande (`requestWake`), et le signal ne part qu'une fois la transaction validée.
+ */
+const pendingWake = new AsyncLocalStorage<{ wake: boolean }>();
+let wakeHook: (() => void) | null = null;
+
+export function onTenantCommitWake(hook: () => void) {
+  wakeHook = hook;
+}
+
+export function requestWake() {
+  const state = pendingWake.getStore();
+  if (state) state.wake = true;
+}
+
 export async function withTenant<T>(
   db: Database,
   context: TenantContext,
   run: (tx: TenantTransaction) => Promise<T>,
 ): Promise<T> {
   const { organizationId, userId } = contextSchema.parse(context);
+  const state = { wake: false };
+  const result = await pendingWake.run(state, () =>
+    transaction(db, organizationId, userId, run),
+  );
+  if (state.wake) wakeHook?.();
+  return result;
+}
+
+function transaction<T>(
+  db: Database,
+  organizationId: string,
+  userId: string | undefined,
+  run: (tx: TenantTransaction) => Promise<T>,
+): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT set_config('app.organization_id', ${organizationId}, true)`,
