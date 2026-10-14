@@ -7,6 +7,32 @@ export const dashboard = {
   /** Sous-titre avec accès clinique : la date, puis les urgences et les cas à surveiller. */
   headline: (day: string, urgent: number, watch: number) =>
     `${day} · ${urgent} urgence${urgent > 1 ? "s" : ""} et ${watch} cas à surveiller`,
+  /** Sous-titre court (la date est au-dessus du titre). */
+  headlineShort: (urgent: number, watch: number) =>
+    `${nombre(urgent, "urgence", "urgences")} et ${watch} cas à surveiller`,
+  /** Le point de Numa, en tête du tableau de bord : des décomptes, jamais un avis médical. */
+  briefing: {
+    title: "Le point de Numa",
+    clinical: (active: number, urgent: number, watch: number) => {
+      const parts = [
+        urgent
+          ? `${nombre(urgent, "urgence attend", "urgences attendent")} un vétérinaire`
+          : null,
+        watch
+          ? nombre(watch, "cas est à surveiller", "cas sont à surveiller")
+          : null,
+      ].filter((part): part is string => part !== null);
+      const signals = parts.length
+        ? `${parts.join(" et ")}.`
+        : "Aucune alerte en attente.";
+      return `J'accompagne ${nombre(active, "animal", "animaux")} en ce moment. ${signals} Je ne pose jamais de diagnostic : la décision reste la vôtre.`;
+    },
+    summary: (active: number) =>
+      `J'accompagne ${nombre(active, "animal", "animaux")} pour le cabinet. Je ne pose jamais de diagnostic et je renvoie toute question médicale à l'équipe.`,
+    searchPlaceholder:
+      "Rechercher un animal, un propriétaire, une intervention…",
+    searchSubmit: "Rechercher dans les suivis",
+  },
   empty: {
     title: "Aucun suivi pour l'instant",
     admin:

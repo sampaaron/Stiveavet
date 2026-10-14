@@ -1,3 +1,5 @@
+import "@fontsource-variable/fraunces";
+
 import { LockKeyhole, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -7,7 +9,6 @@ import { memberProfile } from "@/server/auth/profile";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 import { AppShell } from "@/ui/app-shell";
-import { Button } from "@/ui/button";
 
 import { lockAction, logoutAction } from "../(auth)/actions";
 import { LanguageSwitch } from "../language-switch";
@@ -31,8 +32,13 @@ export default async function CabinetLayout({
     services.alerts().open(context),
   ]);
 
+  const pendingAlerts = alerts.filter(
+    (alert) => alert.status === "open" || alert.status === "escalated",
+  ).length;
+
   return (
     <AppShell
+      pendingAlerts={pendingAlerts}
       organizationName={profile.organizationName}
       user={{
         name: profile.displayName,
@@ -41,34 +47,30 @@ export default async function CabinetLayout({
       permissions={[...context.permissions]}
       locale={locale}
       accountActions={
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <form action={lockAction} className="flex-1">
-              <Button
-                type="submit"
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                icon={<LockKeyhole aria-hidden="true" className="size-3.5" />}
-              >
-                {t.shell.lock}
-              </Button>
-            </form>
-            <form action={logoutAction} className="flex-1">
-              <Button
-                type="submit"
-                variant="quiet"
-                size="sm"
-                className="w-full"
-                icon={<LogOut aria-hidden="true" className="size-3.5" />}
-              >
-                {t.shell.logout}
-              </Button>
-            </form>
-          </div>
-          <LanguageSwitch />
+        <div className="flex shrink-0 gap-0.5">
+          <form action={lockAction}>
+            <button
+              type="submit"
+              title={t.shell.lock}
+              className="grid size-9 place-items-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-mint"
+            >
+              <LockKeyhole aria-hidden="true" className="size-4" />
+              <span className="sr-only">{t.shell.lock}</span>
+            </button>
+          </form>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              title={t.shell.logout}
+              className="grid size-9 place-items-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-mint"
+            >
+              <LogOut aria-hidden="true" className="size-4" />
+              <span className="sr-only">{t.shell.logout}</span>
+            </button>
+          </form>
         </div>
       }
+      accountFooter={<LanguageSwitch variant="onDark" />}
     >
       <IdleLock idleMinutes={AUTH_POLICY.idleLockMinutes} />
       <BillingNotice

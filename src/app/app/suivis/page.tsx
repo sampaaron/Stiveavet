@@ -7,7 +7,7 @@ import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { Button, ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
-import { SpeciesIcon } from "@/ui/followup-card";
+import { AnimalAvatar } from "@/ui/animal-avatar";
 import { formatDate } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
@@ -185,11 +185,10 @@ export default async function FollowupsPage({
                     href={`/app/suivis/${followup.id}`}
                     className="flex items-center gap-4 px-5 py-4 hover:bg-canvas-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
                   >
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-canvas-subtle text-ink-muted">
-                      <SpeciesIcon
-                        species={followup.species === "cat" ? "chat" : "chien"}
-                      />
-                    </span>
+                    <AnimalAvatar
+                      name={followup.animalName}
+                      species={followup.species}
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold">

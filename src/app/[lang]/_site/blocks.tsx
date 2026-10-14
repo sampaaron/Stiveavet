@@ -56,7 +56,7 @@ export function SectionTitle({
   );
 }
 
-/** En-tête des pages intérieures : titre éditorial sur fond clair. */
+/** En-tête des pages intérieures : titre éditorial sur la nuit du héros, avec ses halos. */
 export function PageIntro({
   title,
   lead,
@@ -67,13 +67,14 @@ export function PageIntro({
   children?: ReactNode;
 }) {
   return (
-    <div className="border-b border-line bg-surface px-4 py-14 sm:py-20">
-      <div className="mx-auto max-w-6xl">
+    <div className="relative overflow-hidden bg-night px-4 py-14 text-white sm:py-20">
+      <div aria-hidden="true" className="absolute inset-0 site-halos" />
+      <div className="relative mx-auto max-w-6xl">
         <h1 className="max-w-3xl font-display text-[2rem] leading-tight font-semibold tracking-tight sm:text-5xl">
           {title}
         </h1>
         {lead ? (
-          <p className="mt-4 max-w-2xl text-base text-ink-muted sm:text-lg">
+          <p className="mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
             {lead}
           </p>
         ) : null}
@@ -119,10 +120,13 @@ export function AssistantPortrait({
   assistant,
   t,
   size = 72,
+  onDark = false,
 }: {
   assistant: "numa" | "stive";
   t: SiteDictionary;
   size?: number;
+  /** Sur un fond sombre (en-tête des pages). */
+  onDark?: boolean;
 }) {
   const name = assistant === "numa" ? "Numa" : "Stive";
   const ai = assistant === "numa" ? t.common.numaAi : t.common.stiveAi;
@@ -133,11 +137,19 @@ export function AssistantPortrait({
         alt={`${name}, ${ai}`}
         width={size}
         height={size}
-        className="shrink-0 rounded-full object-cover ring-4 ring-surface"
+        className={cn(
+          "shrink-0 rounded-full object-cover ring-4",
+          onDark ? "ring-white/15" : "ring-surface",
+        )}
       />
       <div>
         <p className="text-xl font-bold">{name}</p>
-        <p className="mt-1 w-fit rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
+        <p
+          className={cn(
+            "mt-1 w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold",
+            onDark ? "bg-white/10 text-mint" : "bg-accent/10 text-accent",
+          )}
+        >
           {ai}
         </p>
       </div>

@@ -1,11 +1,18 @@
 import {
   ArrowRight,
+  CalendarCheck,
+  CalendarDays,
+  CircleAlert,
+  Eye,
   FolderOpen,
   MessageSquareText,
+  MessagesSquare,
   PawPrint,
   Plus,
+  Search,
 } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import { daysSince } from "@/domains/suivis/calendrier";
@@ -17,10 +24,10 @@ import type {
 import type { AgendaEvent as AgendaEventData } from "@/fixtures/types";
 import { AgendaEvent } from "@/ui/agenda-event";
 import { AlertBanner } from "@/ui/alert-banner";
-import { AssistantCard } from "@/ui/assistant-card";
+import { AiBadge, AssistantAvatar, AssistantCard } from "@/ui/assistant-card";
 import { ButtonLink } from "@/ui/button";
 import { CapacityMeter } from "@/ui/capacity-meter";
-import { Card, SectionCard, StatCard } from "@/ui/card";
+import { Card, SectionCard, StatGrid, StatTile } from "@/ui/card";
 import { memberProfile } from "@/server/auth/profile";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
@@ -170,6 +177,7 @@ export default async function TodayPage() {
     return (
       <>
         <PageHeader
+          eyebrow={formatDayTitle(now, locale)}
           title={text.greeting(profile.firstName)}
           description={profile.organizationName}
         />
@@ -202,14 +210,46 @@ export default async function TodayPage() {
   const agenda =
     today.agenda?.map((item) => toAgendaEvent(t, locale, item)) ?? [];
 
+  const canSearch =
+    can("followups.read_all") ||
+    can("followups.read_own") ||
+    can("followups.read_summary");
+  const chips = [
+    can("followups.launch")
+      ? {
+          href: "/app/animaux/nouveau",
+          label: text.actions.newAnimal,
+          icon: Plus,
+        }
+      : null,
+    can("owner_messages.reply") && visible[0]
+      ? {
+          href: `/app/suivis/${urgent[0]?.id ?? visible[0].id}`,
+          label: text.actions.writeToOwner,
+          icon: MessageSquareText,
+        }
+      : null,
+    views.length > 0
+      ? {
+          href: "/app/suivis",
+          label: text.actions.allFollowups,
+          icon: FolderOpen,
+        }
+      : null,
+    today.agenda
+      ? { href: "/app/agenda", label: text.actions.agenda, icon: CalendarDays }
+      : null,
+  ].filter((chip) => chip !== null);
+
   return (
     <>
       <PageHeader
+        eyebrow={todayLabel}
         title={text.greeting(profile.firstName)}
         description={
           clinical
-            ? text.headline(todayLabel, urgent.length, watch.length)
-            : todayLabel
+            ? text.headlineShort(urgent.length, watch.length)
+            : profile.organizationName
         }
         actions={
           <>
@@ -235,6 +275,79 @@ export default async function TodayPage() {
       />
 
       <div className="grid gap-6">
+        <section
+          aria-labelledby="point-de-numa"
+          className="rounded-[var(--radius-panel)] border border-line p-5 shadow-[var(--shadow-card)] assistant-glow sm:p-7"
+        >
+          <div className="flex items-start gap-4">
+            <AssistantAvatar
+              assistant="numa"
+              size={56}
+              className="size-11 ring-4 ring-brand-soft sm:size-14"
+            />
+            <div className="min-w-0">
+              <h2
+                id="point-de-numa"
+                className="flex flex-wrap items-center gap-2 font-bold"
+              >
+                {text.briefing.title}
+                <AiBadge assistant="numa" />
+              </h2>
+              <p className="mt-1 max-w-3xl text-[15px] leading-relaxed">
+                {clinical
+                  ? text.briefing.clinical(
+                      today.activeFollowups,
+                      urgent.length,
+                      watch.length,
+                    )
+                  : text.briefing.summary(today.activeFollowups)}
+              </p>
+            </div>
+          </div>
+          {canSearch ? (
+            <form action="/app/suivis" role="search" className="relative mt-5">
+              <label htmlFor="recherche-globale" className="sr-only">
+                {t.shell.search.label}
+              </label>
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-ink-muted"
+              />
+              <input
+                id="recherche-globale"
+                name="q"
+                type="search"
+                autoComplete="off"
+                maxLength={80}
+                placeholder={text.briefing.searchPlaceholder}
+                className="h-14 w-full rounded-full border border-line bg-surface pr-16 pl-13 text-[15px] text-ink shadow-[var(--shadow-pill)] placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+              />
+              <button
+                type="submit"
+                className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-brand text-white hover:bg-brand-strong"
+              >
+                <ArrowRight aria-hidden="true" className="size-5" />
+                <span className="sr-only">{text.briefing.searchSubmit}</span>
+              </button>
+            </form>
+          ) : null}
+          {chips.length > 0 ? (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {chips.map(({ href, label, icon: Icon }) => (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-surface/80 px-4 text-sm font-medium text-ink transition-colors hover:border-brand/40 hover:bg-brand-soft"
+                  >
+                    <Icon aria-hidden="true" className="size-4 text-brand" />
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+
         {urgent.map((followup) => {
           const card = toCard(t, locale, followup, now);
           return (
@@ -261,47 +374,45 @@ export default async function TodayPage() {
           );
         })}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatGrid>
           {clinical ? (
             <>
-              <StatCard
+              <StatTile
                 label={text.stats.urgent}
                 value={urgent.length}
                 tone="urgent"
                 hint={text.stats.urgentHint}
+                icon={<CircleAlert className="size-4" />}
               />
-              <StatCard
+              <StatTile
                 label={text.stats.watch}
                 value={watch.length}
                 tone="watch"
                 hint={text.stats.watchHint}
+                icon={<Eye className="size-4" />}
               />
             </>
           ) : null}
-          <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">
-              {text.stats.active}
-            </p>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-brand-ink tabular-nums">
-              {today.activeFollowups} / {today.includedFollowups}
-            </p>
-            <div className="mt-2">
-              <CapacityMeter
-                used={today.activeFollowups}
-                included={today.includedFollowups}
-              />
-            </div>
-          </Card>
-          <StatCard
+          <StatTile
+            label={text.stats.active}
+            value={`${today.activeFollowups} / ${today.includedFollowups}`}
+            tone="brand"
+            icon={<MessagesSquare className="size-4" />}
+          >
+            <CapacityMeter
+              used={today.activeFollowups}
+              included={today.includedFollowups}
+            />
+          </StatTile>
+          <StatTile
             label={text.stats.appointments}
             value={today.stiveaAppointments}
             hint={text.stats.appointmentsHint}
+            icon={<CalendarCheck className="size-4" />}
           />
-        </div>
+        </StatGrid>
 
-        <ActivityPanel stats={stats} t={t} locale={locale} />
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
             {clinical ? (
               <>
@@ -433,59 +544,13 @@ export default async function TodayPage() {
               links={{ followups: views.length > 0, alerts: clinical }}
             />
 
-            <SectionCard title={text.quickActions}>
-              <div className="grid gap-2">
-                {can("followups.launch") ? (
-                  <ButtonLink
-                    href="/app/suivis/nouveau"
-                    variant="secondary"
-                    className="justify-start"
-                  >
-                    <PawPrint aria-hidden="true" className="size-4" />
-                    {text.actions.launch}
-                  </ButtonLink>
-                ) : null}
-                {can("followups.launch") ? (
-                  <ButtonLink
-                    href="/app/animaux/nouveau"
-                    variant="secondary"
-                    className="justify-start"
-                  >
-                    <Plus aria-hidden="true" className="size-4" />
-                    {text.actions.newAnimal}
-                  </ButtonLink>
-                ) : null}
-                {views.length > 0 ? (
-                  <ButtonLink
-                    href="/app/suivis"
-                    variant="secondary"
-                    className="justify-start"
-                  >
-                    <FolderOpen aria-hidden="true" className="size-4" />
-                    {text.actions.openAFile}
-                  </ButtonLink>
-                ) : null}
-                {can("owner_messages.reply") && visible[0] ? (
-                  <ButtonLink
-                    href={`/app/suivis/${urgent[0]?.id ?? visible[0].id}`}
-                    variant="secondary"
-                    className="justify-start"
-                  >
-                    <MessageSquareText aria-hidden="true" className="size-4" />
-                    {text.actions.writeToOwner}
-                  </ButtonLink>
-                ) : null}
-              </div>
-            </SectionCard>
-
-            <AssistantCard assistant="numa">
-              {text.numa(today.activeFollowups)}
-            </AssistantCard>
             {can("stive.use") ? (
               <AssistantCard assistant="stive">{text.stive}</AssistantCard>
             ) : null}
           </div>
         </div>
+
+        <ActivityPanel stats={stats} t={t} locale={locale} />
       </div>
     </>
   );

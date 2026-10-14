@@ -22,6 +22,8 @@ type SectionCardProps = {
   className?: string;
   /** Niveau du titre dans la page, pour garder une hiérarchie correcte. */
   headingLevel?: 2 | 3;
+  /** Ancre de la carte, pour le sommaire d'une longue page (`PageSections`). */
+  id?: string;
 };
 
 export function SectionCard({
@@ -31,13 +33,14 @@ export function SectionCard({
   children,
   className,
   headingLevel = 2,
+  id,
 }: SectionCardProps) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
-    <Card className={cn("p-5 sm:p-6", className)}>
+    <Card id={id} className={cn("scroll-mt-6 p-5 sm:p-6", className)}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Heading className="text-base font-bold tracking-tight">
+        <div className="min-w-0">
+          <Heading className="text-[17px] font-bold tracking-tight">
             {title}
           </Heading>
           {description ? (
@@ -60,36 +63,87 @@ const toneClasses: Record<Tone, string> = {
   urgent: "text-urgent",
 };
 
+const iconTones: Record<Tone, string> = {
+  neutral: "bg-canvas-subtle text-ink-muted",
+  brand: "bg-brand-soft text-brand-ink",
+  watch: "bg-watch-soft text-watch",
+  urgent: "bg-urgent-soft text-urgent",
+};
+
 type StatCardProps = {
   label: string;
   value: ReactNode;
   hint?: string;
   tone?: Tone;
   icon?: ReactNode;
+  /** Complément sous la valeur (jauge, lien). */
+  children?: ReactNode;
 };
 
-export function StatCard({
+/** Chiffre clé sans cadre, pour les bandeaux de chiffres (`StatGrid`). */
+export function StatTile({
   label,
   value,
   hint,
   tone = "neutral",
   icon,
-}: StatCardProps) {
+  children,
+  className,
+}: StatCardProps & { className?: string }) {
   return (
-    <Card className="p-5">
+    <div className={cn("bg-surface p-5", className)}>
       <div className="flex items-center justify-between gap-2 text-sm font-medium text-ink-muted">
         <span>{label}</span>
-        {icon ? <span aria-hidden="true">{icon}</span> : null}
+        {icon ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-full",
+              iconTones[tone],
+            )}
+          >
+            {icon}
+          </span>
+        ) : null}
       </div>
       <p
         className={cn(
-          "mt-2 text-3xl font-bold tracking-tight tabular-nums",
+          "mt-2 font-display text-[2rem] leading-none font-semibold tracking-tight tabular-nums",
           toneClasses[tone],
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-sm text-ink-muted">{hint}</p> : null}
+      {children ? <div className="mt-3">{children}</div> : null}
+      {hint ? <p className="mt-1.5 text-sm text-ink-muted">{hint}</p> : null}
+    </div>
+  );
+}
+
+/** Bandeau de chiffres clés : une seule carte, séparée par de fins filets. */
+export function StatGrid({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card
+      className={cn(
+        "grid gap-px overflow-hidden bg-line sm:grid-cols-2 xl:grid-cols-4",
+        className,
+      )}
+    >
+      {children}
+    </Card>
+  );
+}
+
+export function StatCard(props: StatCardProps) {
+  return (
+    <Card className="overflow-hidden">
+      <StatTile {...props} />
     </Card>
   );
 }

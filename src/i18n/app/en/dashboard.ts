@@ -5,6 +5,30 @@ export const dashboard: AppDictionary["dashboard"] = {
   greeting: (firstName: string) => `Hello ${firstName}`,
   headline: (day: string, urgent: number, watch: number) =>
     `${day} · ${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
+  headlineShort: (urgent: number, watch: number) =>
+    `${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
+  briefing: {
+    title: "Numa's update",
+    clinical: (active: number, urgent: number, watch: number) => {
+      const parts = [
+        urgent
+          ? `${urgent} ${urgent === 1 ? "emergency is" : "emergencies are"} waiting for a vet`
+          : null,
+        watch
+          ? `${watch} ${watch === 1 ? "case needs" : "cases need"} watching`
+          : null,
+      ].filter((part): part is string => part !== null);
+      const signals = parts.length
+        ? `${parts.join(" and ")}.`
+        : "No alert pending.";
+      const first = signals.charAt(0).toUpperCase() + signals.slice(1);
+      return `I'm following ${active} ${active === 1 ? "animal" : "animals"} right now. ${first} I never make a diagnosis: the decision is always yours.`;
+    },
+    summary: (active: number) =>
+      `I'm following ${active} ${active === 1 ? "animal" : "animals"} for the practice. I never make a diagnosis and I refer every medical question to the team.`,
+    searchPlaceholder: "Search for an animal, an owner, a procedure…",
+    searchSubmit: "Search follow-ups",
+  },
   empty: {
     title: "No follow-ups yet",
     admin:

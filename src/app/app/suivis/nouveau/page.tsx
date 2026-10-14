@@ -12,7 +12,6 @@ import { AlertBanner } from "@/ui/alert-banner";
 import { Button, ButtonLink } from "@/ui/button";
 import { Card, SectionCard } from "@/ui/card";
 import { AnimalAvatar } from "@/ui/animal-avatar";
-import { SpeciesIcon } from "@/ui/followup-card";
 import { formatDateTime } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
@@ -247,10 +246,8 @@ export default async function NewFollowupPage({
                     key={hit.ref}
                     className="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
                   >
-                    <span className="hidden size-10 place-items-center rounded-xl bg-canvas-subtle text-ink-muted sm:grid">
-                      <SpeciesIcon
-                        species={hit.species === "cat" ? "chat" : "chien"}
-                      />
+                    <span className="hidden sm:block">
+                      <AnimalAvatar name={hit.name} species={hit.species} />
                     </span>
                     <div className="min-w-0">
                       <p className="font-semibold">

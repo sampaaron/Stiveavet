@@ -7,6 +7,17 @@ export const shell: AppDictionary["shell"] = {
   mainNavigation: "Main navigation",
   lock: "Lock",
   logout: "Sign out",
+  newFollowup: "New follow-up",
+  search: {
+    label: "Search follow-ups",
+    placeholder: "Animal, owner, procedure…",
+    shortcut: "Press / to search",
+  },
+  /** Cloche des alertes : un simple décompte, sans contenu clinique. */
+  alertsNone: "Alerts: none pending",
+  alertsPending: (count: number) => `Alerts: ${count} not acknowledged`,
+  onThisPage: "On this page",
+  workspace: "Practice workspace",
   nav: {
     today: "Today",
     followups: "Follow-ups",
@@ -15,6 +26,7 @@ export const shell: AppDictionary["shell"] = {
     agenda: "Calendar",
     stive: "Stive",
     practice: "Practice",
+    assistants: "AI assistants",
     protocols: "Protocols",
     settings: "Numa, emergencies and on-call",
     team: "Team and permissions",

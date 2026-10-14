@@ -63,7 +63,7 @@ export function HomePage({ locale, t }: SiteProps) {
           </div>
           <div className="relative pb-6 lg:pb-0">
             <PhoneDemo t={t} />
-            <div className="mt-6 flex justify-center lg:absolute lg:-bottom-10 lg:-left-28 lg:mt-0 lg:block">
+            <div className="mt-6 flex justify-center lg:absolute lg:-bottom-10 lg:-left-12 lg:mt-0 lg:block">
               <FloatingAlert t={t} />
             </div>
           </div>

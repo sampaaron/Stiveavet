@@ -1,3 +1,5 @@
+import "@fontsource-variable/fraunces";
+
 import { CalendarPlus, MessageSquareText, PawPrint } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -30,6 +32,7 @@ const statuses: Status[] = [
 export default function DesignSystemPage() {
   return (
     <AppShell
+      pendingAlerts={2}
       organizationName="Clinique vétérinaire des Tilleuls"
       user={{
         name: "Dr Claire Fontaine",

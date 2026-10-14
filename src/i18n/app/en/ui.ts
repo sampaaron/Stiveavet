@@ -2,7 +2,7 @@ import type { AppDictionary } from "../types";
 
 export const ui: AppDictionary["ui"] = {
   status: {
-    normal: "Normal",
+    normal: "Nothing flagged",
     watch: "To watch",
     urgent: "Urgent",
     paused: "Paused",

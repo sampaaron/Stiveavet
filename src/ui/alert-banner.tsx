@@ -13,22 +13,22 @@ const tones: Record<
   info: {
     icon: Info,
     className: "border-line bg-surface",
-    iconClassName: "text-ink-muted",
+    iconClassName: "bg-canvas-subtle text-ink-muted",
   },
   success: {
     icon: CircleCheck,
-    className: "border-brand/20 bg-brand-soft",
-    iconClassName: "text-brand",
+    className: "border-brand/20 bg-brand-soft/60",
+    iconClassName: "bg-surface text-brand",
   },
   watch: {
     icon: Eye,
-    className: "border-watch/20 bg-watch-soft",
-    iconClassName: "text-watch",
+    className: "border-watch/20 bg-watch-soft/70",
+    iconClassName: "bg-surface text-watch",
   },
   urgent: {
     icon: CircleAlert,
-    className: "border-urgent/25 bg-urgent-soft",
-    iconClassName: "text-urgent",
+    className: "border-urgent/25 bg-urgent-soft/70",
+    iconClassName: "bg-urgent text-white",
   },
 };
 
@@ -37,6 +37,8 @@ type AlertBannerProps = {
   title: string;
   children?: ReactNode;
   action?: ReactNode;
+  /** Bandeau fin d'une ligne, pour les rappels communs à tout l'espace cabinet. */
+  compact?: boolean;
 };
 
 /** Bandeau d'information. Le ton urgent est annoncé immédiatement aux lecteurs d'écran. */
@@ -45,22 +47,34 @@ export function AlertBanner({
   title,
   children,
   action,
+  compact = false,
 }: AlertBannerProps) {
   const { icon: Icon, className, iconClassName } = tones[tone];
   return (
     <div
       role={tone === "urgent" ? "alert" : "status"}
       className={cn(
-        "flex flex-col gap-3 rounded-[var(--radius-card)] border p-4 sm:flex-row sm:items-center",
+        "flex rounded-[var(--radius-card)] border",
+        compact
+          ? "flex-row flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5"
+          : "flex-col gap-3 p-4 sm:flex-row sm:items-center",
         className,
       )}
     >
-      <Icon
+      <span
         aria-hidden="true"
-        className={cn("size-5 shrink-0", iconClassName)}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">{title}</p>
+        className={cn(
+          "grid shrink-0 place-items-center rounded-full",
+          compact ? "size-7" : "size-9",
+          iconClassName,
+        )}
+      >
+        <Icon className={compact ? "size-4" : "size-[18px]"} />
+      </span>
+      <div className={cn("min-w-0 flex-1", compact && "basis-48")}>
+        <p className={compact ? "text-sm font-medium" : "font-semibold"}>
+          {title}
+        </p>
         {children ? (
           <div className="mt-0.5 text-sm text-ink-muted">{children}</div>
         ) : null}

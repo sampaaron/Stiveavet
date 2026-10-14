@@ -37,7 +37,7 @@ export const labels: AppDictionary["labels"] = {
     ended: "Ended",
   },
   species: { dog: "Dog", cat: "Cat", both: "Dog and cat" },
-  triage: { normal: "Normal", watch: "To watch", urgent: "Urgent" },
+  triage: { normal: "Nothing flagged", watch: "To watch", urgent: "Urgent" },
   protocolCategories: {
     surgery: "Surgery",
     dental: "Dental",

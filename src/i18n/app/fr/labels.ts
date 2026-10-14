@@ -36,7 +36,11 @@ export const labels = {
     ended: "Terminé",
   },
   species: { dog: "Chien", cat: "Chat", both: "Chien et chat" },
-  triage: { normal: "Normal", watch: "À surveiller", urgent: "Urgent" },
+  triage: {
+    normal: "Rien à signaler",
+    watch: "À surveiller",
+    urgent: "Urgent",
+  },
   protocolCategories: {
     surgery: "Chirurgie",
     dental: "Dentaire",

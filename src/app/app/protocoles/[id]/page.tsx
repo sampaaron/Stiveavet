@@ -71,7 +71,9 @@ export default async function ProtocolPage({
 
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">{content.name}</h1>
+          <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
+            {content.name}
+          </h1>
           <ValidationBadge validated={protocol.version.validatedAt !== null} />
           {protocol.archived ? (
             <span className="text-xs font-semibold text-ink-muted">

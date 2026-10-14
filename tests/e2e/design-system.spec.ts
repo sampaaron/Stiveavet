@@ -28,7 +28,7 @@ test("chaque statut porte un libellé lisible, pas seulement une couleur", async
   await page.goto(page_url);
 
   for (const label of [
-    "Normal",
+    "Rien à signaler",
     "À surveiller",
     "Urgent",
     "En pause",

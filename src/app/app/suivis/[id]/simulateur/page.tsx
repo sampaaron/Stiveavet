@@ -109,7 +109,9 @@ export default async function OwnerSimulatorPage({
         {text.back(view.animalName)}
       </Link>
       <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">{text.title}</h1>
+        <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
+          {text.title}
+        </h1>
         <p className="mt-1 flex items-start gap-2 text-ink-muted">
           <FlaskConical aria-hidden="true" className="mt-1 size-4 shrink-0" />
           <span>{text.intro(ownerFirstName)}</span>

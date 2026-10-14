@@ -10,7 +10,6 @@ import {
   MessagesSquare,
   PawPrint,
   Settings2,
-  Sparkles,
   Sun,
   Users,
 } from "lucide-react";
@@ -27,6 +26,10 @@ export type NavItem = {
   icon: LucideIcon;
   /** Visible si la personne a au moins une de ces permissions (aucune : visible de tous). */
   anyOf?: readonly string[];
+  /** Portrait de l'assistant IA affiché à la place de l'icône (section « Assistants IA »). */
+  assistant?: "numa" | "stive";
+  /** Pastille du nombre d'alertes sans accusé de réception. */
+  badge?: "alerts";
 };
 export type NavSection = { label?: NavLabel; items: NavItem[] };
 
@@ -59,6 +62,7 @@ export const appNavigation: NavSection[] = [
         label: "alerts",
         icon: BellRing,
         anyOf: ["clinical.read"],
+        badge: "alerts",
       },
       {
         href: "/app/agenda",
@@ -66,11 +70,17 @@ export const appNavigation: NavSection[] = [
         icon: CalendarDays,
         anyOf: ["agenda.read"],
       },
+    ],
+  },
+  {
+    label: "assistants",
+    items: [
       {
-        href: "/app/stive",
-        label: "stive",
-        icon: Sparkles,
-        anyOf: ["stive.use"],
+        href: "/app/reglages",
+        label: "settings",
+        icon: Settings2,
+        anyOf: ["organization.settings"],
+        assistant: "numa",
       },
     ],
   },
@@ -82,12 +92,6 @@ export const appNavigation: NavSection[] = [
         label: "protocols",
         icon: ClipboardList,
         anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
-      },
-      {
-        href: "/app/reglages",
-        label: "settings",
-        icon: Settings2,
-        anyOf: ["organization.settings"],
       },
       {
         href: "/app/equipe",

@@ -12,7 +12,13 @@ import { chooseLocaleAction } from "./locale-actions";
  * Bascule de langue de l'interface (ADR 0022) : enregistrée dans le compte si la personne est
  * connectée, puis retour à la même page.
  */
-export function LanguageSwitch({ className }: { className?: string }) {
+export function LanguageSwitch({
+  className,
+  variant = "quiet",
+}: {
+  className?: string;
+  variant?: "quiet" | "onDark";
+}) {
   const t = useAppText().common.language;
   const locale = useLocale();
   const pathname = usePathname();
@@ -31,9 +37,9 @@ export function LanguageSwitch({ className }: { className?: string }) {
       />
       <Button
         type="submit"
-        variant="quiet"
+        variant={variant}
         size="sm"
-        className="w-full"
+        className={variant === "onDark" ? "w-full justify-start" : "w-full"}
         icon={<Languages aria-hidden="true" className="size-3.5" />}
       >
         <span className="sr-only">{t.label} </span>

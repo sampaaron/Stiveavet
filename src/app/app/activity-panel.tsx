@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ActivityStats } from "@/domains/suivis/statistiques";
 import type { AppDictionary } from "@/i18n/app/types";
 import type { Locale } from "@/i18n/locales";
-import { SectionCard, StatCard } from "@/ui/card";
+import { SectionCard, StatGrid, StatTile } from "@/ui/card";
 import { formatMinutes } from "@/ui/format";
 
 const INTL: Record<Locale, string> = { fr: "fr-FR", en: "en-GB" };
@@ -37,18 +37,18 @@ export function ActivityPanel({
   );
   return (
     <SectionCard title={text.title} description={text.description}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+      <StatGrid className="shadow-none">
+        <StatTile
           label={text.launched}
           value={stats.launched}
           hint={text.launchedHint(stats.ongoing)}
         />
-        <StatCard
+        <StatTile
           label={text.messages}
           value={stats.ownerMessages}
           hint={text.messagesHint(stats.outboundMessages)}
         />
-        <StatCard
+        <StatTile
           label={text.response}
           value={rate === null ? "—" : `${rate} %`}
           tone="brand"
@@ -61,7 +61,7 @@ export function ActivityPanel({
                 )
           }
         />
-        <StatCard
+        <StatTile
           label={text.alerts}
           value={stats.alerts.created}
           hint={
@@ -70,7 +70,7 @@ export function ActivityPanel({
               : text.medianAck(formatMinutes(stats.medianAckMinutes, locale))
           }
         />
-      </div>
+      </StatGrid>
 
       <figure className="mt-6">
         <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">

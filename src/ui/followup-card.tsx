@@ -1,22 +1,11 @@
-import { Cat, ChevronRight, Dog } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import type { Followup } from "@/fixtures/types";
 
-import { cn } from "./cn";
+import { AnimalAvatar } from "./animal-avatar";
 import { StatusBadge } from "./status-badge";
 import type { Status } from "./status-badge";
-
-export function SpeciesIcon({
-  species,
-  className,
-}: {
-  species: Followup["animal"]["species"];
-  className?: string;
-}) {
-  const Icon = species === "chat" ? Cat : Dog;
-  return <Icon aria-hidden="true" className={cn("size-5", className)} />;
-}
 
 /** Statut principal d'un suivi : la gravité prime, puis l'état du suivi. */
 function followupStatus(followup: Followup): Status {
@@ -76,9 +65,10 @@ export function FollowupCard({ followup, href }: FollowupCardProps) {
       href={href ?? `/app/suivis/${followup.id}`}
       className="group flex items-center gap-4 rounded-[var(--radius-control)] px-3 py-3 transition-colors hover:bg-canvas-subtle"
     >
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted group-hover:bg-surface">
-        <SpeciesIcon species={followup.species} />
-      </span>
+      <AnimalAvatar
+        name={followup.animalName}
+        species={followup.species === "chat" ? "cat" : "dog"}
+      />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-semibold">{followup.animalName}</span>
