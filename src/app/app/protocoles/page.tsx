@@ -151,7 +151,14 @@ function ProtocolList({
   return (
     <section aria-labelledby={headingId} className="grid gap-3">
       <div>
-        <h2 id={headingId} className="text-lg font-bold tracking-tight">
+        <h2
+          id={headingId}
+          className="flex items-center gap-2.5 text-base font-bold tracking-tight"
+        >
+          <span
+            aria-hidden="true"
+            className="h-4 w-1 shrink-0 rounded-full bg-brand"
+          />
           {title}
         </h2>
         {description ? (

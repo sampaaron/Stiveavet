@@ -29,7 +29,7 @@ export function AgendaEvent({
   const t = appDictionary(locale).ui.agendaEvent;
   const body = (
     <>
-      <span className="w-14 shrink-0 text-sm font-semibold tabular-nums">
+      <span className="w-14 shrink-0 font-mono text-[13px] font-semibold tabular-nums">
         {event.time}
       </span>
       <span className="min-w-0 flex-1">
@@ -41,11 +41,11 @@ export function AgendaEvent({
         </span>
       </span>
       {event.pending ? (
-        <span className="shrink-0 rounded-full bg-watch-soft px-2 py-0.5 text-xs font-semibold text-watch">
+        <span className="shrink-0 rounded-md border border-watch/25 bg-watch-soft px-2 py-0.5 text-xs font-semibold text-watch">
           {t.pending}
         </span>
       ) : event.fromStivea ? (
-        <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-ink">
+        <span className="shrink-0 rounded-md border border-brand/25 bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-ink">
           Stivea
         </span>
       ) : null}

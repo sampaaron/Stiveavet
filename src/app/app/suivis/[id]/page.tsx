@@ -206,7 +206,7 @@ export default async function FollowupPage({
           {
             label: vitals.weight,
             value: weightLabel(locale, record.facts.animal.weightGrams) ?? "—",
-            mono: true,
+            numeric: true,
           },
           { label: vitals.responsible, value: followup.responsibleName },
           {

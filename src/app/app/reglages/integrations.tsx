@@ -18,7 +18,7 @@ const PROVIDERS = Object.keys(FIELD_TYPES) as Integration[];
 
 function SimulatedBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full bg-watch-soft px-2 py-0.5 text-[12px] font-semibold text-watch">
+    <span className="rounded-md border border-watch/25 bg-watch-soft px-2 py-0.5 text-[12px] font-semibold text-watch">
       {label}
     </span>
   );

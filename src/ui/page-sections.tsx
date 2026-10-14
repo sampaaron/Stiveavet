@@ -17,9 +17,7 @@ export function PageSections({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[12.5rem_minmax(0,1fr)] lg:gap-10">
       <nav aria-label={label} className="hidden lg:block">
-        <p className="px-3 pb-2 text-[11px] font-bold tracking-[0.08em] text-ink-muted uppercase">
-          {label}
-        </p>
+        <p className="px-3 pb-2 tech-label text-ink-muted">{label}</p>
         <ul className="sticky top-6 space-y-0.5 border-l border-line">
           {sections.map((section) => (
             <li key={section.id}>

@@ -120,7 +120,7 @@ export default async function AnimalPage({
         vitals={facts.map(([label, value]) => ({
           label,
           value,
-          mono: label === text.weight || label === text.registered,
+          numeric: label === text.weight || label === text.registered,
         }))}
       />
 
@@ -141,7 +141,7 @@ export default async function AnimalPage({
                   <p className="font-semibold">
                     {owner.fullName}
                     {index === 0 && record.owners.length > 1 ? (
-                      <span className="ml-2 rounded-full bg-canvas-subtle px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                      <span className="ml-2 rounded-md border border-line bg-canvas-subtle px-2 py-0.5 text-xs font-semibold text-ink-muted">
                         {text.primary}
                       </span>
                     ) : null}

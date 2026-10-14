@@ -80,6 +80,10 @@
     @apply bg-canvas-subtle;
   }
 
+  input[type="time"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
   input[type="time"]::-webkit-calendar-picker-indicator {
     opacity: 0.55;
   }

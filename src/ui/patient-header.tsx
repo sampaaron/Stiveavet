@@ -6,8 +6,8 @@ import { cn } from "./cn";
 export type Vital = {
   label: string;
   value: ReactNode;
-  /** Valeur chiffrée (âge, poids, date) : chasse fixe. */
-  mono?: boolean;
+  /** Valeur chiffrée (poids, date) : chiffres à chasse fixe. */
+  numeric?: boolean;
 };
 
 type PatientHeaderProps = {
@@ -104,7 +104,7 @@ export function PatientHeader({
             <dd
               className={cn(
                 "mt-1 text-sm font-semibold [overflow-wrap:anywhere] text-ink",
-                vital.mono && "font-mono tabular-nums",
+                vital.numeric && "tabular-nums",
               )}
             >
               {vital.value}

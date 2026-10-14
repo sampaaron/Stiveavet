@@ -91,9 +91,7 @@ export default async function AgendaPage({
             <div className="grid gap-5">
               {days.map(({ day, items }) => (
                 <section key={day} aria-label={day}>
-                  <h3 className="mb-2 text-sm font-semibold text-ink-muted">
-                    {day}
-                  </h3>
+                  <h3 className="mb-2 tech-label text-ink-muted">{day}</h3>
                   <ul
                     className="grid gap-2"
                     aria-label={t.agenda.slots.dayListLabel(day)}
@@ -104,15 +102,15 @@ export default async function AgendaPage({
                       return (
                         <li
                           key={slot.id}
-                          className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line px-3 py-2"
+                          className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-l-4 border-line border-l-brand bg-surface px-3 py-2"
                         >
                           <span className="flex min-w-0 items-center gap-2 text-sm">
                             <CalendarClock
                               aria-hidden="true"
                               className="size-4 shrink-0 text-brand"
                             />
-                            <span className="font-semibold">
-                              {start} – {end}
+                            <span className="font-mono text-[13px] font-semibold tabular-nums">
+                              {start}–{end}
                             </span>
                             <span className="truncate text-ink-muted">
                               {slot.vetName}

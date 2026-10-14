@@ -7,12 +7,12 @@ export async function ValidationBadge({ validated }: { validated: boolean }) {
   const { t } = await appText();
   const text = t.protocols.validationBadge;
   return validated ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-semibold text-brand-ink">
+    <span className="inline-flex items-center gap-1 rounded-md border border-brand/25 bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-ink">
       <CircleCheck aria-hidden="true" className="size-3.5" />
       {text.validated}
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-watch-soft px-2.5 py-0.5 text-xs font-semibold text-watch">
+    <span className="inline-flex items-center gap-1 rounded-md border border-watch/25 bg-watch-soft px-2 py-0.5 text-xs font-semibold text-watch">
       <ShieldAlert aria-hidden="true" className="size-3.5" />
       {text.toValidate}
     </span>

@@ -30,7 +30,7 @@ const tones: Record<
     icon: CircleAlert,
     className:
       "border-urgent/30 bg-linear-to-r from-urgent-soft to-surface before:bg-urgent",
-    iconClassName: "bg-urgent text-white ring-4 ring-urgent/15",
+    iconClassName: "bg-urgent text-white ring-2 ring-urgent/20",
   },
 };
 
