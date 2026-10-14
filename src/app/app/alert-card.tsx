@@ -7,7 +7,7 @@ import type { Locale } from "@/i18n/locales";
 import { AlertBanner } from "@/ui/alert-banner";
 import { formatDateTime, formatTime } from "@/ui/format";
 
-import { AlertButtons } from "./alert-buttons";
+import { AlertButtons, ReassignForm } from "./alert-buttons";
 import { triageReasonText } from "./triage-reason";
 
 /** État de l'alerte : qui est prévenu, l'escalade, l'accusé de réception. */
@@ -35,7 +35,10 @@ function statusLine(
         time(alert.acknowledgedAt),
       );
     case "resolved":
-      return text.resolved;
+      return text.resolved(
+        alert.resolvedBy,
+        alert.resolvedAt ? formatDateTime(alert.resolvedAt, locale) : null,
+      );
   }
 }
 
@@ -73,6 +76,20 @@ export async function AlertCard({
     >
       <span className="block">{triageReasonText(t, alert.reason)}</span>
       <span className="mt-1 block">{statusLine(t, locale, alert)}</span>
+      {alert.assignees.length > 1 ? (
+        <ReassignForm
+          alertId={alert.id}
+          from={from}
+          options={alert.assignees.map((vet) => ({
+            value: vet.id,
+            label:
+              vet.id === alert.targetMembershipId
+                ? t.alerts.reassign.current(vet.name)
+                : vet.name,
+          }))}
+          current={alert.targetMembershipId}
+        />
+      ) : null}
       {from === "alertes" ? (
         <Link
           href={`/app/suivis/${alert.followupId}#conversation`}

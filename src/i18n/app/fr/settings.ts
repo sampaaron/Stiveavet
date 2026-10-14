@@ -81,6 +81,9 @@ export const settings = {
     description:
       "Simulées pendant cette phase : aucun numéro WhatsApp, cabinet dr.veto ou compte bancaire réel n'est contacté.",
     simulated: "Simulé",
+    notIncluded:
+      "Compris dans la formule Premium. En attendant, enregistrez vos patients dans Animaux : le suivi fonctionne sans logiciel connecté.",
+    seePlans: "Voir les formules",
     connected: "Connecté",
     /** Suite de « Connecté », après le mot en gras. */
     connectedDetail: (label: string, date: string) =>
@@ -120,7 +123,7 @@ export const settings = {
     payment_mandate: {
       title: "Mandat de prélèvement",
       description:
-        "Pour l'essai pilote à 86 € HT par mois. Aucune donnée bancaire n'est demandée pendant cette phase.",
+        "Pour le prélèvement mensuel de votre formule. Aucune donnée bancaire n'est demandée pendant cette phase.",
       submit: "Signer le mandat (simulé)",
       submitLive: "Signer le mandat SEPA",
       descriptionLive:

@@ -1,6 +1,7 @@
 import type { Integration, SettingsView } from "@/domains/reglages/service";
 import { appText } from "@/i18n/app/server";
 import { services } from "@/server/services";
+import { ButtonLink } from "@/ui/button";
 import { formatDate } from "@/ui/format";
 
 import { ConnectForm, DisconnectForm, MandateForm } from "./settings-forms";
@@ -27,10 +28,13 @@ function SimulatedBadge({ label }: { label: string }) {
 export async function IntegrationPanel({
   provider,
   connection,
+  included = true,
   headingLevel = 3,
 }: {
   provider: Integration;
   connection: SettingsView["integrations"][Integration];
+  /** Faux : la formule ne comprend pas cette connexion (dr.veto hors Premium). */
+  included?: boolean;
   headingLevel?: 2 | 3;
 }) {
   const { t, locale } = await appText();
@@ -75,6 +79,15 @@ export async function IntegrationPanel({
             formatDate(connection.connectedAt, locale),
           )}
         </p>
+      ) : !included ? (
+        <div className="grid gap-3 text-sm">
+          <p>{text.notIncluded}</p>
+          <div>
+            <ButtonLink href="/app/facturation" variant="secondary" size="sm">
+              {text.seePlans}
+            </ButtonLink>
+          </div>
+        </div>
       ) : signup ? (
         <WhatsAppSignup appId={signup.appId} configId={signup.configId} />
       ) : mandateLive && "submitLive" in copy ? (
@@ -92,8 +105,10 @@ export async function IntegrationPanel({
 
 export function IntegrationList({
   integrations,
+  advancedIntegrations,
 }: {
   integrations: SettingsView["integrations"];
+  advancedIntegrations: boolean;
 }) {
   return (
     <div className="grid gap-6">
@@ -105,6 +120,7 @@ export function IntegrationList({
           <IntegrationPanel
             provider={provider}
             connection={integrations[provider]}
+            included={provider !== "drveto" || advancedIntegrations}
           />
         </div>
       ))}

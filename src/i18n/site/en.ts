@@ -31,7 +31,7 @@ export const en: SiteDictionary = {
     pricing: {
       title: "Pricing",
       description:
-        "Pilot trial at €86 excl. VAT per month for 2 months, then Solo, Solo Pro, Clinic or Clinic Pro. Prices excl. VAT, per practice.",
+        "Three plans per practice, Starter, Pro and Premium, without commitment. Prices excl. VAT.",
     },
     security: {
       title: "Security and data",
@@ -47,9 +47,9 @@ export const en: SiteDictionary = {
       description: "Stivea Vet outages and maintenance.",
     },
     trial: {
-      title: "Start the trial",
+      title: "Get started with Stivea Vet",
       description:
-        "2-month pilot trial at €86 excl. VAT per month, in real use and without commitment.",
+        "Create your practice, choose your plan and run a first test follow-up, without commitment.",
     },
     demo: {
       title: "Request the demo",
@@ -76,7 +76,7 @@ export const en: SiteDictionary = {
   common: {
     brandVet: "vet",
     skipToContent: "Skip to content",
-    ctaTrial: "Start the trial at {price} excl. VAT",
+    ctaTrial: "Start from {price} excl. VAT per month",
     ctaDemo: "See the demo",
     login: "Log in",
     numaAi: "AI assistant",
@@ -86,8 +86,6 @@ export const en: SiteDictionary = {
     soon: "Coming soon",
     atLaunch: "At launch",
     fictionalData: "Fictional data",
-    appInFrench:
-      "During the pilot, the Stivea Vet workspace is available in French; the English interface is on its way.",
   },
 
   nav: {
@@ -113,7 +111,7 @@ export const en: SiteDictionary = {
     legal: "Information",
     links: {
       demo: "Demo",
-      trial: "Pilot trial",
+      trial: "Get started",
       help: "Help centre",
       status: "Service status",
       login: "Log in",
@@ -131,8 +129,8 @@ export const en: SiteDictionary = {
       titleAccent: "without adding to your day.",
       lead: "Numa, an AI assistant, talks with owners on the practice's professional WhatsApp. She follows your protocol, spots warning signs and prepares a summary for you. The medical decision always stays with you.",
       points: [
-        "2-month trial in real use",
-        "No commitment during the trial",
+        "On your real follow-ups from day one",
+        "No commitment, cancel any month",
         "Guided setup",
       ],
     },
@@ -282,8 +280,8 @@ export const en: SiteDictionary = {
           a: "No. Stivea Vet connects to dr.veto at launch, read-only, and never writes to it. Vétocom and Vetup will follow.",
         },
         {
-          q: "How much does the trial cost?",
-          a: "{price} excl. VAT per month for 2 months, in real use, cancellable at any time. No annual commitment is ever created automatically.",
+          q: "How much does Stivea Vet cost?",
+          a: "From {price} excl. VAT per month with the Starter plan, without commitment and cancellable at any time. No annual commitment is ever created automatically.",
         },
         {
           q: "What happens at night and at weekends?",
@@ -293,7 +291,7 @@ export const en: SiteDictionary = {
     },
     finalCta: {
       title: "Try Stivea Vet on your real follow-ups",
-      body: "2 months at {price} excl. VAT per month, without commitment. You can also explore the demo first, on a fictional practice.",
+      body: "From {price} excl. VAT per month, without commitment. You can also explore the demo first, on a fictional practice.",
     },
   },
 
@@ -441,34 +439,37 @@ export const en: SiteDictionary = {
 
   pricing: {
     title: "Simple pricing, per practice",
-    lead: "All prices exclude VAT, are billed per practice and collected monthly. Invoices are sent by e-mail.",
-    trial: {
-      badge: "To get started",
-      name: "Pilot trial",
-      price: "{price} excl. VAT per month for {months} months",
-      points: [
-        "Real use, on your real follow-ups",
-        "No commitment, cancellable at any time",
-        "Then the plan chosen at sign-up",
-      ],
-    },
-    plansTitle: "After the trial",
-    annual: "with annual commitment",
-    monthly: "no commitment",
+    lead: "Three plans, without commitment. Prices exclude VAT, are per practice and collected monthly; invoices are sent by e-mail.",
+    plansTitle: "Plans",
+    featured: "Most popular",
+    annual:
+      "{price} excl. VAT / month with an annual commitment, available from month 3",
     perMonthExclVat: "excl. VAT / month",
+    monthly: "no commitment",
     plans: {
-      solo: { name: "Solo", vets: "1 vet", stive: "Limited Stive" },
-      solo_pro: { name: "Solo Pro", vets: "1 vet", stive: "Fuller Stive" },
-      clinic: {
-        name: "Clinic",
-        vets: "Up to 3 vets",
-        stive: "One Stive per vet, with a lower limit",
+      starter: {
+        name: "Starter",
+        pitch: "For the vet getting started with patient follow-up.",
       },
-      clinic_pro: {
-        name: "Clinic Pro",
-        vets: "Up to 3 vets",
-        stive: "A fuller personal Stive for each vet",
+      pro: {
+        name: "Pro",
+        pitch: "For the practice following its patients every day, with Stive.",
       },
+      premium: {
+        name: "Premium",
+        pitch: "For the whole team, connected to the practice software.",
+      },
+    },
+    quota: {
+      vet: "1 vet",
+      vets: "Up to {count} vets",
+      assistant: "1 assistant",
+      assistants: "Up to {count} assistants",
+      assistantsUnlimited: "Unlimited assistants",
+      followups: "{included} active follow-ups included, up to {max}",
+      stive: "Stive, the team's AI assistant",
+      noStive: "No Stive",
+      integrations: "Connection to the practice software (dr.veto)",
     },
     larger: {
       name: "More than 3 vets",
@@ -476,15 +477,15 @@ export const en: SiteDictionary = {
     },
     usageTitle: "Numa follow-ups",
     usage: [
-      "{included} simultaneous active follow-ups are included in every plan.",
-      "Beyond that, each new follow-up launched costs {launch} excl. VAT.",
-      "Reactivating a past follow-up while {included} follow-ups are active costs {reactivation} excl. VAT.",
+      "Each plan includes a number of simultaneous active follow-ups.",
+      "Beyond that, each new follow-up launched costs {launch} excl. VAT, up to the plan's ceiling.",
+      "Reactivating a past follow-up beyond the included follow-ups costs {reactivation} excl. VAT.",
       "The extra is collected with the next subscription payment. When a follow-up ends, a place is freed.",
     ],
     rulesTitle: "Subscription rules",
     rules: [
-      "The first six months never create an automatic annual commitment.",
-      "From month 3, you can ask for the annual commitment. Before month 7, you choose: annual commitment or monthly plan.",
+      "The first two months carry no commitment: you discover Stivea Vet on your real follow-ups.",
+      "From month 3, you can ask for the annual commitment. Before month 7, you choose: annual commitment or monthly plan. Nothing switches automatically.",
       "After a failed payment, you have 30 days to settle before new follow-ups are blocked.",
       "After a cancellation or an unpaid invoice, ongoing follow-ups always continue, then you keep read-only access for 3 months.",
     ],
@@ -536,7 +537,7 @@ export const en: SiteDictionary = {
 
   help: {
     title: "Help centre",
-    lead: "Guides and videos arrive with the opening of the pilot trial. They will also be available inside the software.",
+    lead: "Guides and videos arrive when the service opens. They will also be available inside the software.",
     topics: [
       "Setting up Stivea Vet step by step",
       "Launching and running a first follow-up",
@@ -564,17 +565,17 @@ export const en: SiteDictionary = {
   },
 
   trial: {
-    title: "Start the pilot trial",
-    lead: "{months} months at {price} excl. VAT per month, on your real follow-ups, without commitment.",
+    title: "Get started with Stivea Vet",
+    lead: "From {price} excl. VAT per month, on your real follow-ups, without commitment.",
     stepsTitle: "How it works",
     steps: [
-      "You create the practice and your administrator vet account, and choose the plan that will follow the trial.",
+      "You create the practice and your administrator vet account, and choose your plan: Starter, Pro or Premium.",
       "You accept the terms of use and confirm you are authorised to subscribe on behalf of the practice.",
       "You land straight in the guided setup: WhatsApp, dr.veto, hours, team, protocols, direct debit mandate and a first test follow-up.",
     ],
     reassuranceTitle: "Good to know",
     reassurance: [
-      "The trial can be cancelled at any time.",
+      "The subscription can be cancelled every month.",
       "No annual commitment is created automatically during the first six months.",
       "An ongoing follow-up is never interrupted, even after a cancellation.",
     ],
@@ -653,8 +654,8 @@ export const en: SiteDictionary = {
         body: "The vet always keeps the medical decision. The practice is responsible for its protocols, warning signs and emergency instructions. Numa and Stive make no diagnosis and change no treatment.",
       },
       {
-        title: "Trial, plans and payment",
-        body: "The pilot trial lasts 2 months and can be cancelled at any time. Prices exclude VAT, are per practice and collected monthly. No annual commitment is created automatically during the first six months.",
+        title: "Plans and payment",
+        body: "The subscription is monthly and can be cancelled at any time. Prices exclude VAT, are per practice and collected monthly. An annual commitment only exists at your request, from month 3: it is never created automatically.",
       },
       {
         title: "Unpaid invoices and cancellation",
@@ -680,7 +681,7 @@ export const en: SiteDictionary = {
       },
       {
         title: "Demo requests",
-        body: "For the demo, we keep your e-mail address, practice name, number of vets and language, for one year at most. They are used to open the demo and to send five e-mails over two weeks, which you can unsubscribe from at any time. The series stops as soon as a trial starts.",
+        body: "For the demo, we keep your e-mail address, practice name, number of vets and language, for one year at most. They are used to open the demo and to send five e-mails over two weeks, which you can unsubscribe from at any time. The series stops as soon as a practice is created.",
       },
       {
         title: "Your rights",

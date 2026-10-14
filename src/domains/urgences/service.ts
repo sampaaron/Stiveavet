@@ -18,7 +18,8 @@ import { z } from "zod";
 import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
-import { VET_ROLES } from "@/domains/equipe/permissions";
+import type { PermissionKey } from "@/domains/equipe/permissions";
+import { VET_ROLES, isPermissionKey } from "@/domains/equipe/permissions";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { loadFollowup } from "@/domains/suivis/lancement";
@@ -40,6 +41,7 @@ import {
   followupAlertRules,
   followupShares,
   followups,
+  membershipPermissions,
   memberships,
   notificationDeliveries,
   onCallSchedules,
@@ -96,8 +98,16 @@ export type AlertView = {
   escalatedAt: Date | null;
   acknowledgedBy: string | null;
   acknowledgedAt: Date | null;
+  resolvedBy: string | null;
+  resolvedAt: Date | null;
   canAcknowledge: boolean;
+  /** Vétérinaires à qui confier l'alerte (accès clinique au dossier), destinataire compris. */
+  assignees: { id: string; name: string }[];
+  targetMembershipId: string;
 };
+
+/** Alertes en cours, ou historique des alertes closes. */
+export type AlertListView = "open" | "resolved";
 
 const uuid = z.uuid();
 const alertPayload = z.object({ alertId: z.uuid() });
@@ -648,10 +658,64 @@ export function alertsService(db: Database) {
       );
   }
 
+  /** Vétérinaires actifs du cabinet et leurs droits, pour choisir à qui confier une alerte. */
+  async function activeVets(tx: TenantTransaction) {
+    const rows = await tx
+      .select({
+        id: memberships.id,
+        name: users.displayName,
+        permission: membershipPermissions.permission,
+      })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(
+        membershipPermissions,
+        eq(membershipPermissions.membershipId, memberships.id),
+      )
+      .where(
+        and(
+          inArray(memberships.role, [...VET_ROLES]),
+          isNull(memberships.deactivatedAt),
+        ),
+      )
+      .orderBy(asc(users.displayName));
+    const vets = new Map<
+      string,
+      { id: string; name: string; permissions: Set<PermissionKey> }
+    >();
+    for (const row of rows) {
+      const vet = vets.get(row.id) ?? {
+        id: row.id,
+        name: row.name,
+        permissions: new Set<PermissionKey>(),
+      };
+      if (row.permission && isPermissionKey(row.permission))
+        vet.permissions.add(row.permission);
+      vets.set(row.id, vet);
+    }
+    return [...vets.values()];
+  }
+
+  /** Seul un vétérinaire qui lit le dossier en clinique peut recevoir l'alerte. */
+  function assigneesOf(
+    vets: Awaited<ReturnType<typeof activeVets>>,
+    facts: Parameters<typeof followupAccess>[1],
+  ) {
+    return vets
+      .filter(
+        (vet) =>
+          followupAccess(
+            { membershipId: vet.id, permissions: vet.permissions },
+            facts,
+          ) === "clinical",
+      )
+      .map(({ id, name }) => ({ id, name }));
+  }
+
   async function listAlerts(
     tx: TenantTransaction,
     actor: Actor,
-    filter: { followupId?: string; openOnly: boolean },
+    filter: { followupId?: string; view: AlertListView | "all" },
   ): Promise<AlertView[]> {
     const rows = await tx
       .select({
@@ -665,6 +729,9 @@ export function alertsService(db: Database) {
         createdAt: alerts.createdAt,
         escalateAt: alerts.escalateAt,
         escalatedAt: alerts.escalatedAt,
+        resolvedAt: alerts.resolvedAt,
+        resolvedByMembershipId: alerts.resolvedByMembershipId,
+        targetMembershipId: alerts.targetMembershipId,
         responsibleMembershipId: followups.responsibleMembershipId,
         isPrivate: followups.isPrivate,
       })
@@ -680,10 +747,17 @@ export function alertsService(db: Database) {
           filter.followupId
             ? eq(alerts.followupId, filter.followupId)
             : undefined,
-          filter.openOnly ? ne(alerts.status, "resolved") : undefined,
+          filter.view === "open" ? ne(alerts.status, "resolved") : undefined,
+          filter.view === "resolved"
+            ? eq(alerts.status, "resolved")
+            : undefined,
         ),
       )
-      .orderBy(desc(alerts.createdAt))
+      .orderBy(
+        filter.view === "resolved"
+          ? desc(alerts.resolvedAt)
+          : desc(alerts.createdAt),
+      )
       .limit(100);
     if (!rows.length) return [];
     const now = new Date();
@@ -723,19 +797,36 @@ export function alertsService(db: Database) {
       )
       .orderBy(asc(acknowledgements.acknowledgedAt));
     const isVet = VET_ROLES.has(actor.role);
+    const vets = await activeVets(tx);
+    const resolverIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          row.resolvedByMembershipId ? [row.resolvedByMembershipId] : [],
+        ),
+      ),
+    ];
+    const resolvers = new Map(
+      (resolverIds.length
+        ? await tx
+            .select({ id: memberships.id, name: users.displayName })
+            .from(memberships)
+            .innerJoin(users, eq(users.id, memberships.userId))
+            .where(inArray(memberships.id, resolverIds))
+        : []
+      ).map((row) => [row.id, row.name]),
+    );
+    const factsOf = (row: (typeof rows)[number]) => ({
+      responsibleMembershipId: row.responsibleMembershipId,
+      isPrivate: row.isPrivate,
+      sharedWith: shares
+        .filter((share) => share.followupId === row.followupId)
+        .map((share) => share.membershipId),
+    });
     return rows
-      .filter(
-        (row) =>
-          followupAccess(actor, {
-            responsibleMembershipId: row.responsibleMembershipId,
-            isPrivate: row.isPrivate,
-            sharedWith: shares
-              .filter((share) => share.followupId === row.followupId)
-              .map((share) => share.membershipId),
-          }) === "clinical",
-      )
+      .filter((row) => followupAccess(actor, factsOf(row)) === "clinical")
       .map((row) => {
         const ack = acks.find((entry) => entry.alertId === row.id);
+        const open = row.status !== "resolved";
         return {
           id: row.id,
           followupId: row.followupId,
@@ -749,7 +840,13 @@ export function alertsService(db: Database) {
           escalatedAt: row.escalatedAt,
           acknowledgedBy: ack?.name ?? null,
           acknowledgedAt: ack?.at ?? null,
-          canAcknowledge: isVet && row.status !== "resolved",
+          resolvedBy: row.resolvedByMembershipId
+            ? (resolvers.get(row.resolvedByMembershipId) ?? null)
+            : null,
+          resolvedAt: row.resolvedAt,
+          canAcknowledge: isVet && open,
+          assignees: isVet && open ? assigneesOf(vets, factsOf(row)) : [],
+          targetMembershipId: row.targetMembershipId,
         };
       });
   }
@@ -793,7 +890,13 @@ export function alertsService(db: Database) {
     /** Alertes non closes des dossiers que l'acteur peut lire en clinique. */
     async open(actor: Actor): Promise<AlertView[]> {
       if (!actor.permissions.has("clinical.read")) return [];
-      return run(actor, (tx) => listAlerts(tx, actor, { openOnly: true }));
+      return run(actor, (tx) => listAlerts(tx, actor, { view: "open" }));
+    },
+
+    /** Historique : les 100 dernières alertes closes, avec qui les a closes. */
+    async history(actor: Actor): Promise<AlertView[]> {
+      if (!actor.permissions.has("clinical.read")) return [];
+      return run(actor, (tx) => listAlerts(tx, actor, { view: "resolved" }));
     },
 
     /** Alertes d'un dossier, closes comprises. */
@@ -802,7 +905,7 @@ export function alertsService(db: Database) {
       return run(actor, async (tx) => {
         const followup = await loadFollowup(tx, actor, followupId);
         if (followup.access !== "clinical") throw new DomainError("not_found");
-        return listAlerts(tx, actor, { followupId, openOnly: false });
+        return listAlerts(tx, actor, { followupId, view: "all" });
       });
     },
 
@@ -822,6 +925,44 @@ export function alertsService(db: Database) {
           alertId: alert.id,
           level: alert.level,
           escalated: alert.status === "escalated",
+        });
+        return alert.followupId;
+      });
+    },
+
+    /**
+     * Confier l'alerte à un autre vétérinaire qui lit le dossier en clinique. Il est prévenu
+     * comme le premier destinataire (WhatsApp pour une urgence) ; l'escalade prévue continue.
+     */
+    async reassign(actor: Actor, alertId: string, membershipId: string) {
+      assertPermission(actor, "clinical.read");
+      if (!uuid.safeParse(membershipId).success)
+        throw new DomainError("invalid_target");
+      return run(actor, async (tx) => {
+        const alert = await lockAlert(tx, actor, alertId);
+        if (alert.status === "resolved")
+          throw new DomainError("invalid_transition");
+        if (alert.targetMembershipId === membershipId) return alert.followupId;
+        const followup = await loadFollowup(tx, actor, alert.followupId);
+        const assignees = assigneesOf(await activeVets(tx), followup);
+        if (!assignees.some((vet) => vet.id === membershipId))
+          throw new DomainError("invalid_target");
+        await tx
+          .update(alerts)
+          .set({ targetMembershipId: membershipId })
+          .where(eq(alerts.id, alert.id));
+        await enqueue(tx, {
+          organizationId: actor.organizationId,
+          kind: "alert.notify",
+          idempotencyKey: `alert:${alert.id}:notify:${membershipId}`,
+          runAt: new Date(),
+          followupId: alert.followupId,
+          payload: { alertId: alert.id },
+        });
+        await audit(tx, actor, "alert.reassigned", alert.followupId, {
+          alertId: alert.id,
+          from: alert.targetMembershipId,
+          to: membershipId,
         });
         return alert.followupId;
       });

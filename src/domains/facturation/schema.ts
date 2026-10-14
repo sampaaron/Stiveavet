@@ -8,13 +8,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-// Miroir typé de db/migrations/0006 et 0019 (source de vérité) ; un test vérifie la concordance.
+// Miroir typé de db/migrations/0006, 0019 et 0022 (source de vérité) ; un test vérifie la concordance.
 
 export const subscriptionPlan = pgEnum("subscription_plan", [
-  "solo",
-  "solo_pro",
-  "clinic",
-  "clinic_pro",
+  "starter",
+  "pro",
+  "premium",
 ]);
 export const billingCycle = pgEnum("billing_cycle", ["monthly", "annual"]);
 export const usageKind = pgEnum("usage_kind", ["launch", "reactivation"]);

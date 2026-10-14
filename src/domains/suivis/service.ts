@@ -18,6 +18,7 @@ import type { Database, TenantTransaction } from "@/server/db/tenant";
 import { auditFollowup as audit } from "@/domains/audit/journal";
 
 import { canManageFollowupAccess, followupAccess } from "./policies";
+import type { FollowupAccess, Viewer } from "./policies";
 import { loadFollowupRecord } from "./record";
 
 type Status = "draft" | "active" | "paused" | "human_takeover" | "ended";
@@ -187,6 +188,32 @@ async function activeShares(tx: TenantTransaction, followupIds: string[]) {
     byFollowup.set(row.followupId, list);
   }
   return byFollowup;
+}
+
+/** Accès de l'acteur à chacun de ces suivis (historique d'un animal, registre). */
+export async function followupAccessMap(
+  tx: TenantTransaction,
+  viewer: Viewer,
+  rows: readonly {
+    id: string;
+    responsibleMembershipId: string;
+    isPrivate: boolean;
+  }[],
+): Promise<Map<string, FollowupAccess>> {
+  const shares = await activeShares(
+    tx,
+    rows.map((row) => row.id),
+  );
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      followupAccess(viewer, {
+        responsibleMembershipId: row.responsibleMembershipId,
+        isPrivate: row.isPrivate,
+        sharedWith: (shares.get(row.id) ?? []).map((s) => s.membershipId),
+      }),
+    ]),
+  );
 }
 
 async function firstOwners(tx: TenantTransaction, animalIds: string[]) {

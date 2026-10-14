@@ -7,6 +7,19 @@ export const alerts: AppDictionary["alerts"] = {
   done: {
     recue: "Acknowledged: the escalation is cancelled.",
     close: "Alert closed.",
+    confiee: "Alert reassigned: the chosen vet has been notified.",
+  },
+  views: {
+    label: "Show",
+    open: "Open",
+    history: "History",
+  },
+  history: {
+    section: "Closed alerts",
+    description:
+      "The latest 100 closed alerts from the files you can read, with who closed them.",
+    emptyTitle: "No closed alerts",
+    emptyDescription: "Closed alerts will appear here.",
   },
   empty: {
     section: "No open alerts",
@@ -42,11 +55,17 @@ export const alerts: AppDictionary["alerts"] = {
       `Not acknowledged: the whole veterinary team has been alerted${time ? ` at ${time}` : ""}.`,
     acknowledged: (by: string | null, time: string | null) =>
       `Acknowledged by ${by ?? "a vet"}${time ? ` at ${time}` : ""}. The escalation is cancelled.`,
-    resolved: "Alert closed.",
+    resolved: (by: string | null, date: string | null) =>
+      `Closed by ${by ?? "a vet"}${date ? ` on ${date}` : ""}.`,
   },
   buttons: {
     acknowledge: "Acknowledge",
     resolve: "Close the alert",
+  },
+  reassign: {
+    label: "Assign to",
+    submit: "Assign",
+    current: (name: string) => `${name} (current)`,
   },
   phone: {
     title: "My number for urgent alerts",

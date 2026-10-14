@@ -20,7 +20,9 @@ import { domainFailure } from "../domain-messages";
 
 const input = z.object({
   alertId: z.uuid(),
-  intent: z.enum(["acknowledge", "resolve"]),
+  intent: z.enum(["acknowledge", "resolve", "reassign"]),
+  // Destinataire choisi pour « Confier » ; le service vérifie son accès clinique au dossier.
+  membershipId: z.uuid().optional(),
   // Retour vers la liste des alertes ou le dossier, jamais vers une adresse libre.
   from: z.enum(["alertes", "dossier"]),
 });
@@ -57,25 +59,31 @@ export async function alertAction(
   const parsed = input.safeParse({
     alertId: text(form, "alertId"),
     intent: text(form, "intent"),
+    membershipId: text(form, "membershipId") || undefined,
     from: text(form, "from"),
   });
   if (!parsed.success) {
     const { t } = await appText();
     return { error: t.common.invalidRequest };
   }
-  const { alertId, intent, from } = parsed.data;
+  const { alertId, intent, membershipId, from } = parsed.data;
   const context = await memberContext();
+  const service = services.alerts();
   let followupId: string;
   try {
     followupId =
       intent === "acknowledge"
-        ? await services.alerts().acknowledge(context, alertId)
-        : await services.alerts().resolve(context, alertId);
+        ? await service.acknowledge(context, alertId)
+        : intent === "resolve"
+          ? await service.resolve(context, alertId)
+          : await service.reassign(context, alertId, membershipId ?? "");
   } catch (error) {
     if (error instanceof DomainError) return domainFailure(error);
     throw error;
   }
-  const done = intent === "acknowledge" ? "recue" : "close";
+  const done = { acknowledge: "recue", resolve: "close", reassign: "confiee" }[
+    intent
+  ];
   revalidatePath("/app", "layout");
   redirect(
     from === "dossier"

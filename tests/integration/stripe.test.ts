@@ -70,7 +70,7 @@ async function cabinet(): Promise<Actor> {
   ]);
   if (!adminId) throw new Error("cabinet");
   await withTenant(appDb, { organizationId: org }, (tx) =>
-    startSubscription(tx, org, "clinic", addMonths(new Date(), -1)),
+    startSubscription(tx, org, "premium", addMonths(new Date(), -1)),
   );
   const { rows } = await admin.query<{ user_id: string }>(
     "SELECT user_id FROM memberships WHERE id = $1",

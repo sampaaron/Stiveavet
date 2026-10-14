@@ -8,6 +8,7 @@ import {
   CreditCard,
   LifeBuoy,
   MessagesSquare,
+  PawPrint,
   Settings2,
   Sparkles,
   Sun,
@@ -46,6 +47,12 @@ export const appNavigation: NavSection[] = [
           "followups.read_own",
           "followups.read_summary",
         ],
+      },
+      {
+        href: "/app/animaux",
+        label: "patients",
+        icon: PawPrint,
+        anyOf: ["followups.launch"],
       },
       {
         href: "/app/alertes",

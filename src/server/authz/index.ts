@@ -40,13 +40,15 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
         .where(eq(membershipPermissions.membershipId, session.membershipId)),
   );
   // En lecture seule ou après la fin de l'accès, seuls les droits de consultation restent
-  // effectifs ; les droits en base ne changent pas et reviennent après régularisation.
-  const { access: billing, commitmentReminder } = await services
-    .billing()
-    .accessFor({
-      organizationId: session.organizationId,
-      userId: session.userId,
-    });
+  // effectifs, et Stive suit l'offre ; les droits en base ne changent pas.
+  const {
+    access: billing,
+    commitmentReminder,
+    plan,
+  } = await services.billing().accessFor({
+    organizationId: session.organizationId,
+    userId: session.userId,
+  });
   return {
     organizationId: session.organizationId,
     userId: session.userId,
@@ -55,6 +57,7 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
     permissions: restrictPermissions(
       new Set(rows.map((row) => row.permission).filter(isPermissionKey)),
       billing,
+      plan,
     ),
     billing,
     commitmentReminder,

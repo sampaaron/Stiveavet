@@ -20,8 +20,8 @@ export const billing: AppDictionary["billing"] = {
   },
   plan: "Plan",
   phase: {
-    trial: (month: number, months: number, price: string) =>
-      `Pilot trial, month ${month} of ${months}, then ${price} excl. VAT per month`,
+    trial: (month: number, months: number) =>
+      `Discovery, month ${month} of ${months}, no commitment`,
     annualUntil: (date: string) => `Annual commitment until ${date}`,
     monthly: (month: number) =>
       `No commitment, month ${month} of your subscription`,
@@ -40,8 +40,13 @@ export const billing: AppDictionary["billing"] = {
   },
   usage: {
     title: "Numa usage",
-    description: (included: number, launch: string, reactivation: string) =>
-      `${included} simultaneous active follow-ups are included. Beyond that, each new follow-up costs ${launch} excl. VAT and each reactivation ${reactivation} excl. VAT, collected with the next subscription payment. A follow-up that ends frees up its place; test follow-ups do not count.`,
+    description: (
+      included: number,
+      max: number,
+      launch: string,
+      reactivation: string,
+    ) =>
+      `${included} simultaneous active follow-ups are included in your plan. Beyond that, each new follow-up costs ${launch} excl. VAT and each reactivation ${reactivation} excl. VAT, collected with the next subscription payment, up to ${max} active follow-ups. A follow-up that ends frees up its place; test follow-ups do not count.`,
     pending: (launches: number, reactivations: number, amount: string) =>
       `Awaiting billing: ${launches} launch${launches === 1 ? "" : "es"} and ${reactivations} reactivation${reactivations === 1 ? "" : "s"}, i.e. ${amount} excl. VAT.`,
     nonePending: "No extra charges pending.",
@@ -52,7 +57,7 @@ export const billing: AppDictionary["billing"] = {
       "To be decided before month 7. If you do not answer, you stay on monthly billing at the no-commitment rate: nothing switches automatically.",
     anytime: "Possible at any time, only at your request.",
     offer: (trialEnd) =>
-      `Your trial ends on ${trialEnd}. You can choose now; if you do not answer, you stay on monthly billing at the no-commitment rate: nothing switches automatically.`,
+      `Your first two months end on ${trialEnd}. You can choose now; if you do not answer, you stay on monthly billing at the no-commitment rate: nothing switches automatically.`,
     prices: (annual: string, monthly: string) =>
       `With commitment: ${annual} excl. VAT per month for 12 months. Without commitment: ${monthly} excl. VAT per month.`,
     stayMonthlyIntro: "You would rather keep the freedom to cancel each month.",
@@ -63,12 +68,10 @@ export const billing: AppDictionary["billing"] = {
   },
   changePlan: {
     title: "Change plan",
-    description: (vetSeats: number, trialMonths: number | null) =>
-      `The new plan applies from the next billing date${trialMonths ? `, after the ${trialMonths}-month trial` : ""}. Your team has ${vetSeats} vet${vetSeats === 1 ? "" : "s"}, pending invitations included.`,
+    description: (vetSeats: number, assistantSeats: number) =>
+      `The new plan applies from the next billing date. Your team has ${vetSeats} vet${vetSeats === 1 ? "" : "s"} and ${assistantSeats} assistant${assistantSeats === 1 ? "" : "s"}, pending invitations included: a plan too small for the team cannot be selected.`,
     option: (name: string, price: string) =>
       `${name} · ${price} excl. VAT per month`,
-    optionDetail: (maxVets: number, stive: string) =>
-      `${maxVets === 1 ? "1 vet" : `Up to ${maxVets} vets`}. ${stive}.`,
     legend: "Plan",
     submit: "Change plan",
   },

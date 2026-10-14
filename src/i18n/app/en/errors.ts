@@ -18,6 +18,14 @@ export const errors: AppDictionary["errors"] = {
     already_installed: "This template is already in the practice's protocols.",
     billing_blocked:
       "New follow-ups are suspended: settle the payment in Billing. Ongoing follow-ups continue.",
+    plan_quota_reached:
+      "Your plan's active follow-up cap is reached. End a follow-up or upgrade in Billing.",
+    plan_assistant_limit:
+      "Your plan has no assistant seats left. Upgrade in Billing to grow the team.",
+    plan_feature_missing:
+      "This feature is not included in your plan. Compare plans in Billing.",
+    plan_integration_connected:
+      "dr.veto is connected: disconnect it in Settings before moving to a plan without integrations.",
     plan_vet_limit:
       "This plan has fewer vet seats than your current team (pending invitations included).",
     on_call_overlap: "This on-call shift overlaps one already planned.",

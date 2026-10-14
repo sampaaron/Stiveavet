@@ -83,7 +83,7 @@ async function cabinet(startedAt: Date) {
   );
   if (!adminId) throw new Error("cabinet");
   await withTenant(appDb, { organizationId: org }, (tx) =>
-    startSubscription(tx, org, "clinic", startedAt),
+    startSubscription(tx, org, "premium", startedAt),
   );
   return { org, tag, owner: await actorOf(org, adminId) };
 }
@@ -149,9 +149,9 @@ describe("offre d'engagement annuel par e-mail", () => {
     ]);
     const [message] = email.sent;
     expect(message?.subject).toBe(
-      "Après votre essai Stivea Vet : engagement annuel ou mensuel ?",
+      "Stivea Vet : engagement annuel ou mensuel ?",
     );
-    expect(message?.text).toMatch(/216,00\s€ HT par mois pendant 12 mois/);
+    expect(message?.text).toMatch(/169,00\s€ HT par mois pendant 12 mois/);
     expect(message?.text).toContain("rien ne bascule automatiquement");
     expect(message?.text).toContain("http://localhost:3000/app/facturation");
     const { rows } = await admin.query(

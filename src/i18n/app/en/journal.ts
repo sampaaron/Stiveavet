@@ -26,6 +26,14 @@ export const journal: AppDictionary["journal"] = {
       `${actor} changed the role of ${member}`,
   },
   byMember: {
+    "animal.created": (actor: string) => `${actor} registered an animal`,
+    "animal.updated": (actor: string) => `${actor} edited an animal's record`,
+    "animal.viewed": (actor: string) => `${actor} viewed an animal's record`,
+    "animal.archived": (actor: string) => `${actor} archived an animal`,
+    "animal.restored": (actor: string) =>
+      `${actor} restored an archived animal`,
+    "animal.deleted": (actor: string) =>
+      `${actor} deleted an animal that was never followed`,
     "organization.created": (actor: string) => `${actor} created the practice`,
     "invitation.created": (actor: string) => `${actor} sent an invitation`,
     "invitation.revoked": (actor: string) => `${actor} cancelled an invitation`,
@@ -82,6 +90,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} changed the appointment durations`,
     "alert.acknowledged": (actor: string) => `${actor} acknowledged an alert`,
     "alert.resolved": (actor: string) => `${actor} closed an alert`,
+    "alert.reassigned": (actor: string) =>
+      `${actor} assigned an alert to another vet`,
     "job.retried": (actor: string) => `${actor} retried a failed task`,
     "job.cancelled": (actor: string) => `${actor} abandoned a failed task`,
     "followup.test_created": (actor: string) =>
@@ -129,6 +139,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} retried a failed direct debit`,
   },
   automatic: {
+    "animal.purged":
+      "A register animal with no follow-up for fifteen months was deleted",
     "numa.ai_unavailable":
       "AI service unavailable: Numa referred the owner to the team, without a drafted reply",
     "numa.reply_blocked":
@@ -168,6 +180,8 @@ export const journal: AppDictionary["journal"] = {
     actor: string,
   ) =>
     `Numa's language corrected for the ${owner === "secondary" ? "second owner" : "owner"} by ${actor}: ${language}`,
+  preparedManually: (actor: string) =>
+    `${actor} prepared a follow-up from the practice register`,
   logins: {
     login_succeeded: "Sign-in succeeded",
     login_failed: "Sign-in refused",

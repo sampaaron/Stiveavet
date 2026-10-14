@@ -29,7 +29,8 @@ test.describe("nouveau cabinet", () => {
   test("installation guidée complète, avec des connexions simulées", async ({
     page,
   }) => {
-    await signUp(page);
+    // dr.veto (intégration avancée) n'est compris qu'en Premium.
+    await signUp(page, "Premium");
     await expect(
       page.getByRole("heading", { level: 1, name: "Démarrage guidé" }),
     ).toBeVisible();

@@ -40,7 +40,11 @@ export class DomainError extends Error {
       | "whatsapp_signup_failed"
       | "whatsapp_number_taken"
       | "optin_missing"
-      | "payment_provider_unavailable",
+      | "payment_provider_unavailable"
+      | "plan_quota_reached"
+      | "plan_assistant_limit"
+      | "plan_feature_missing"
+      | "plan_integration_connected",
   ) {
     super(code);
   }

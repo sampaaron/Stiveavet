@@ -71,18 +71,38 @@ export const labels = {
     weekend: "Le week-end",
     holiday: "Les jours fériés",
   },
-  /** Formules (noms et Stive inclus), mêmes mots que le site public. */
+  /** Offres (noms, accroche, Stive), mêmes mots que le site public. */
   plans: {
-    solo: { name: "Solo", stive: "Stive limité" },
-    solo_pro: { name: "Solo Pro", stive: "Stive plus complet" },
-    clinic: {
-      name: "Clinique",
-      stive: "Un Stive par vétérinaire, avec une limite plus basse",
+    starter: {
+      name: "Starter",
+      pitch: "Pour un vétérinaire qui démarre ses suivis",
+      stive: "Sans Stive",
     },
-    clinic_pro: {
-      name: "Clinique Pro",
-      stive: "Un Stive personnel plus complet par vétérinaire",
+    pro: {
+      name: "Pro",
+      pitch: "L'offre la plus choisie par les cabinets",
+      stive: "Stive inclus",
     },
+    premium: {
+      name: "Premium",
+      pitch: "Toute l'équipe, et le logiciel du cabinet connecté",
+      stive: "Stive pour chaque vétérinaire",
+    },
+  },
+  planFeatured: "Offre phare",
+  /** Quotas d'une offre, tels que le catalogue les fixe. */
+  planQuota: {
+    vets: (count: number) =>
+      count === 1 ? "1 vétérinaire" : `Jusqu'à ${count} vétérinaires`,
+    assistants: (count: number | null) =>
+      count === null
+        ? "Assistants sans limite"
+        : count === 1
+          ? "1 assistant"
+          : `Jusqu'à ${count} assistants`,
+    followups: (included: number, max: number) =>
+      `${included} suivis actifs inclus, jusqu'à ${max}`,
+    integrations: "Connexion au logiciel du cabinet (dr.veto)",
   },
   /** Motif d'un triage automatique ; un motif écrit par un vétérinaire s'affiche tel quel. */
   triageReasons: {

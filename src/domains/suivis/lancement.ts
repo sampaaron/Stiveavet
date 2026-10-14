@@ -9,8 +9,12 @@ import { recordUsage } from "@/domains/facturation/service";
 import { MAX_STEPS } from "@/domains/protocoles/content";
 import { emit } from "@/domains/taches/queue";
 import { maskPhone } from "@/domains/whatsapp/numero";
+import { currentContacts } from "@/domains/patients/service";
+import { manualFollowupInput } from "@/domains/patients/content";
+import type { ManualFollowupInput } from "@/domains/patients/content";
 import {
   alertRules,
+  animalOwners,
   animals,
   followupAlertRules,
   followupContacts,
@@ -192,6 +196,76 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     });
   }
 
+  /**
+   * Brouillon commun aux deux entrées (dr.veto, registre du cabinet) : premier message
+   * suggéré, contacts (le second n'écrit que si le vétérinaire l'active, lot 18) et plan du
+   * protocole proposé.
+   */
+  async function insertDraft(
+    tx: TenantTransaction,
+    actor: Actor,
+    draft: {
+      animalId: string;
+      responsible: string;
+      procedure: string;
+      procedureAt: Date;
+      controlAppointmentAt: Date | null;
+      versionId: string | null;
+      contacts: {
+        ownerId: string;
+        ownerContactId: string;
+        language: "fr" | "en";
+      }[];
+    },
+  ): Promise<string> {
+    const organizationId = actor.organizationId;
+    const followupId = randomUUID();
+    await tx.insert(followups).values({
+      id: followupId,
+      organizationId,
+      animalId: draft.animalId,
+      responsibleMembershipId: draft.responsible,
+      procedure: draft.procedure.slice(0, 160),
+      procedureAt: draft.procedureAt,
+      controlAppointmentAt: draft.controlAppointmentAt,
+      firstContactAt: firstContactAt(
+        draft.procedureAt,
+        FIRST_CONTACT_SUGGESTION_HOURS,
+      ),
+      status: "draft",
+      protocolVersionId: draft.versionId,
+      planRevision: draft.versionId ? 1 : 0,
+    });
+    for (const [index, contact] of draft.contacts.slice(0, 2).entries())
+      await tx.insert(followupContacts).values({
+        organizationId,
+        followupId,
+        ownerId: contact.ownerId,
+        ownerContactId: contact.ownerContactId,
+        role: index === 0 ? "primary" : "secondary",
+        active: index === 0,
+        language: contact.language,
+      });
+    if (draft.versionId)
+      await copyProtocolPlan(
+        tx,
+        organizationId,
+        followupId,
+        draft.versionId,
+        1,
+        new Date(),
+      );
+    return followupId;
+  }
+
+  /** Vétérinaire responsable proposé : l'acteur s'il l'est, sinon le premier actif. */
+  async function defaultResponsible(tx: TenantTransaction, actor: Actor) {
+    if (VET_ROLES.has(actor.role)) return actor.membershipId;
+    const [first] = await activeVets(tx);
+    if (!first) throw new DomainError("invalid_target");
+    return first.membershipId;
+  }
+
   return {
     /** Recherche dans dr.veto ; signale les animaux qui ont déjà un suivi ouvert. */
     async search(actor: Actor, query: string): Promise<DrVetoSearchHit[]> {
@@ -239,11 +313,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
         if (!record) throw new DomainError("invalid_target");
         const organizationId = actor.organizationId;
 
-        const vets = await activeVets(tx);
-        const responsible = VET_ROLES.has(actor.role)
-          ? actor.membershipId
-          : vets[0]?.membershipId;
-        if (!responsible) throw new DomainError("invalid_target");
+        const responsible = await defaultResponsible(tx, actor);
 
         const [known] = await tx
           .select({ id: animals.id })
@@ -268,6 +338,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
               breed: record.animal.breed,
               birthDate: record.animal.birthDate,
               weightGrams: record.animal.weightGrams,
+              archivedAt: null,
             })
             .where(eq(animals.id, animalId));
         } else {
@@ -295,22 +366,20 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           record.animal.species,
           choices,
         );
-        const followupId = randomUUID();
-        await tx.insert(followups).values({
-          id: followupId,
-          organizationId,
+        const contacts = [];
+        for (const owner of record.owners.slice(0, 2))
+          contacts.push({
+            ...(await upsertOwner(tx, organizationId, animalId, owner)),
+            language: owner.language,
+          });
+        const followupId = await insertDraft(tx, actor, {
           animalId,
-          responsibleMembershipId: responsible,
-          procedure: record.procedure.label.slice(0, 160),
+          responsible,
+          procedure: record.procedure.label,
           procedureAt: record.procedure.at,
           controlAppointmentAt: record.controlAppointmentAt,
-          firstContactAt: firstContactAt(
-            record.procedure.at,
-            FIRST_CONTACT_SUGGESTION_HOURS,
-          ),
-          status: "draft",
-          protocolVersionId: versionId,
-          planRevision: versionId ? 1 : 0,
+          versionId,
+          contacts,
         });
         await tx.insert(followupImports).values({
           followupId,
@@ -321,19 +390,6 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           antecedents: record.antecedents,
           importedByMembershipId: actor.membershipId,
         });
-        for (const [index, owner] of record.owners.slice(0, 2).entries()) {
-          const ids = await upsertOwner(tx, organizationId, animalId, owner);
-          await tx.insert(followupContacts).values({
-            organizationId,
-            followupId,
-            ownerId: ids.ownerId,
-            ownerContactId: ids.ownerContactId,
-            role: index === 0 ? "primary" : "secondary",
-            // Le second contact n'écrit que si le vétérinaire l'active (lot 18).
-            active: index === 0,
-            language: owner.language,
-          });
-        }
         const treatments = record.treatments.slice(0, MAX_TREATMENTS);
         if (treatments.length)
           await tx.insert(followupTreatments).values(
@@ -345,18 +401,113 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
               instructions: treatment.instructions.slice(0, 300),
             })),
           );
-        if (versionId)
-          await copyProtocolPlan(
-            tx,
-            organizationId,
-            followupId,
-            versionId,
-            1,
-            new Date(),
-          );
         await audit(tx, actor, "followup.prepared", followupId, {
           source: "drveto_simulated",
           treatments: treatments.length,
+          protocolSuggested: versionId !== null,
+        });
+        return followupId;
+      });
+    },
+
+    /** Protocoles validés que l'acteur peut appliquer à cette espèce. */
+    async protocolOptions(actor: Actor, species: "dog" | "cat") {
+      assertCanPrepare(actor);
+      return run(actor, async (tx) =>
+        (await protocolChoices(tx, actor))
+          .filter((choice) => fitsSpecies(choice, species))
+          .map((choice) => ({ id: choice.protocolId, name: choice.name })),
+      );
+    },
+
+    /**
+     * Crée le brouillon depuis la fiche d'un animal du registre (sans dr.veto) : intervention
+     * saisie, protocole choisi ou proposé, propriétaires de l'animal comme contacts.
+     */
+    async prepareFromAnimal(
+      actor: Actor,
+      animalId: string,
+      input: ManualFollowupInput,
+    ): Promise<string> {
+      assertCanPrepare(actor);
+      const parsed = manualFollowupInput.safeParse(input);
+      if (!uuid.safeParse(animalId).success || !parsed.success)
+        throw new DomainError("invalid_target");
+      const draft = parsed.data;
+      return run(actor, async (tx) => {
+        const [animal] = await tx
+          .select({
+            species: animals.species,
+            archivedAt: animals.archivedAt,
+          })
+          .from(animals)
+          .where(eq(animals.id, animalId))
+          .for("update");
+        if (!animal) throw new DomainError("not_found");
+        if (animal.archivedAt) throw new DomainError("invalid_transition");
+        const [open] = await tx
+          .select({ id: followups.id })
+          .from(followups)
+          .where(
+            and(
+              eq(followups.animalId, animalId),
+              ne(followups.status, "ended"),
+            ),
+          );
+        if (open) throw new DomainError("already_followed");
+
+        const choices = (await protocolChoices(tx, actor)).filter((choice) =>
+          fitsSpecies(choice, animal.species),
+        );
+        let versionId: string | null;
+        if (draft.protocolId) {
+          const chosen = choices.find(
+            (choice) => choice.protocolId === draft.protocolId,
+          );
+          if (!chosen) throw new DomainError("invalid_target");
+          versionId = chosen.versionId;
+        } else
+          versionId = suggestProtocol(draft.procedure, animal.species, choices);
+
+        const ownerRows = await tx
+          .select({
+            ownerId: animalOwners.ownerId,
+            language: owners.preferredLanguage,
+          })
+          .from(animalOwners)
+          .innerJoin(owners, eq(owners.id, animalOwners.ownerId))
+          .where(eq(animalOwners.animalId, animalId))
+          .orderBy(asc(animalOwners.createdAt));
+        const numbers = await currentContacts(
+          tx,
+          ownerRows.map((row) => row.ownerId),
+        );
+        const contacts = ownerRows.flatMap((row) => {
+          const whatsapp = numbers.get(row.ownerId)?.whatsapp;
+          return whatsapp
+            ? [
+                {
+                  ownerId: row.ownerId,
+                  ownerContactId: whatsapp.id,
+                  language: row.language,
+                },
+              ]
+            : [];
+        });
+        if (!contacts.length) throw new DomainError("invalid_target");
+
+        const followupId = await insertDraft(tx, actor, {
+          animalId,
+          responsible: await defaultResponsible(tx, actor),
+          procedure: draft.procedure,
+          procedureAt: draft.procedureAt,
+          controlAppointmentAt: draft.controlAppointmentAt,
+          versionId,
+          contacts,
+        });
+        await audit(tx, actor, "followup.prepared", followupId, {
+          source: "manual",
+          treatments: 0,
           protocolSuggested: versionId !== null,
         });
         return followupId;

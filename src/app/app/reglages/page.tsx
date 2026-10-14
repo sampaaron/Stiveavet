@@ -215,7 +215,10 @@ export default async function SettingsPage() {
           title={text.integrations.title}
           description={text.integrations.description}
         >
-          <IntegrationList integrations={settings.integrations} />
+          <IntegrationList
+            integrations={settings.integrations}
+            advancedIntegrations={settings.advancedIntegrations}
+          />
         </SectionCard>
       </div>
     </>

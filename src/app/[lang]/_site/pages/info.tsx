@@ -1,14 +1,14 @@
 import { CircleDashed, LifeBuoy, ShieldAlert } from "lucide-react";
 
 import {
-  INCLUDED_ACTIVE_FOLLOWUPS,
+  FEATURED_PLAN,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
   REACTIVATION_SURCHARGE_CENTS,
-  TRIAL_MONTHLY_CENTS,
-  TRIAL_MONTHS,
+  STARTING_PRICE_CENTS,
 } from "@/domains/facturation/rules";
+import type { PlanDefinition } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
 import { fill } from "@/i18n/site";
@@ -34,63 +34,57 @@ export function PricingPage({ locale, t }: SiteProps) {
   return (
     <>
       <PageIntro title={pricing.title} lead={pricing.lead} />
-      <Section labelledBy="essai">
-        <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-brand/30 bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
-          <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-            <div>
-              <p className="w-fit rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand-ink">
-                {pricing.trial.badge}
-              </p>
-              <h2
-                id="essai"
-                className="mt-4 font-display text-3xl font-semibold"
-              >
-                {pricing.trial.name}
-              </h2>
-              <p className="mt-2 text-lg">
-                {fill(pricing.trial.price, {
-                  price: price(TRIAL_MONTHLY_CENTS),
-                  months: TRIAL_MONTHS,
-                })}
-              </p>
-              <CtaLink href={pathFor("trial", locale)} className="mt-6">
-                {trialCta(locale, t)}
-              </CtaLink>
-            </div>
-            <CheckList items={pricing.trial.points} />
-          </div>
-        </div>
-      </Section>
-
-      <Section labelledBy="formules" className="pt-0 sm:pt-0">
+      <Section labelledBy="formules">
         <SectionTitle id="formules" title={pricing.plansTitle} />
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-8 grid gap-4 lg:grid-cols-3">
           {PLANS.map((plan) => {
             const copy = pricing.plans[plan];
             const definition = PLAN_CATALOG[plan];
+            const featured = plan === FEATURED_PLAN;
             return (
               <li key={plan}>
-                <Card className="flex h-full flex-col p-6">
-                  <h3 className="text-lg font-bold">{copy.name}</h3>
-                  <p className="text-sm text-ink-muted">{copy.vets}</p>
+                <Card
+                  className={
+                    featured
+                      ? "flex h-full flex-col border-brand p-6 ring-1 ring-brand"
+                      : "flex h-full flex-col p-6"
+                  }
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-lg font-bold">{copy.name}</h3>
+                    {featured ? (
+                      <p className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand-ink">
+                        {pricing.featured}
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-sm text-ink-muted">{copy.pitch}</p>
                   <p className="mt-5">
                     <span className="text-3xl font-bold tracking-tight">
-                      {price(definition.annualMonthlyCents)}
-                    </span>{" "}
-                    <span className="text-sm text-ink-muted">
-                      {pricing.perMonthExclVat}
-                    </span>
-                  </p>
-                  <p className="text-sm text-ink-muted">{pricing.annual}</p>
-                  <p className="mt-3 text-sm">
-                    <span className="font-semibold">
                       {price(definition.monthlyCents)}
                     </span>{" "}
-                    {pricing.perMonthExclVat} · {pricing.monthly}
+                    <span className="text-sm text-ink-muted">
+                      {pricing.perMonthExclVat} · {pricing.monthly}
+                    </span>
                   </p>
-                  <p className="mt-5 border-t border-line pt-4 text-sm">
-                    {copy.stive}
+                  <p className="mt-1 text-sm text-ink-muted">
+                    {fill(pricing.annual, {
+                      price: price(definition.annualMonthlyCents),
+                    })}
                   </p>
+                  <CheckList
+                    className="mt-5 border-t border-line pt-4"
+                    items={planLines(pricing.quota, definition)}
+                  />
+                  <div className="mt-auto pt-6">
+                    <CtaLink
+                      href={pathFor("trial", locale)}
+                      tone={featured ? "primary" : "outline"}
+                      className="w-full"
+                    >
+                      {trialCta(locale, t)}
+                    </CtaLink>
+                  </div>
                 </Card>
               </li>
             );
@@ -110,7 +104,6 @@ export function PricingPage({ locale, t }: SiteProps) {
               className="mt-6"
               items={pricing.usage.map((line) =>
                 fill(line, {
-                  included: INCLUDED_ACTIVE_FOLLOWUPS,
                   launch: price(LAUNCH_SURCHARGE_CENTS),
                   reactivation: price(REACTIVATION_SURCHARGE_CENTS),
                 }),
@@ -131,6 +124,27 @@ export function PricingPage({ locale, t }: SiteProps) {
       </div>
     </>
   );
+}
+
+/** Ce que comprend une formule, tiré du catalogue (une seule source). */
+function planLines(
+  quota: SiteProps["t"]["pricing"]["quota"],
+  plan: PlanDefinition,
+): string[] {
+  const count = (one: string, many: string, value: number) =>
+    value === 1 ? one : fill(many, { count: value });
+  return [
+    count(quota.vet, quota.vets, plan.maxVets),
+    plan.maxAssistants === null
+      ? quota.assistantsUnlimited
+      : count(quota.assistant, quota.assistants, plan.maxAssistants),
+    fill(quota.followups, {
+      included: plan.includedActiveFollowups,
+      max: plan.maxActiveFollowups,
+    }),
+    plan.stive ? quota.stive : quota.noStive,
+    ...(plan.advancedIntegrations ? [quota.integrations] : []),
+  ];
 }
 
 export function SecurityPage({ locale, t }: SiteProps) {
@@ -227,16 +241,9 @@ export function TrialPage({ locale, t }: SiteProps) {
       <PageIntro
         title={trial.title}
         lead={fill(trial.lead, {
-          months: TRIAL_MONTHS,
-          price: formatPrice(TRIAL_MONTHLY_CENTS, locale),
+          price: formatPrice(STARTING_PRICE_CENTS, locale),
         })}
-      >
-        {t.common.appInFrench ? (
-          <p className="mt-4 max-w-2xl text-sm text-ink-muted">
-            {t.common.appInFrench}
-          </p>
-        ) : null}
-      </PageIntro>
+      />
       <Section labelledBy="deroulement">
         <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
           <Card className="p-6 sm:p-8">

@@ -52,6 +52,11 @@ export const animals = pgTable("animals", {
   externalRef: text("external_ref"),
   createdAt,
   updatedAt,
+  /** Migration 0021 : registre des animaux saisi par le cabinet. */
+  sex: text("sex").$type<"female" | "male">(),
+  neutered: boolean("neutered"),
+  notes: text("notes"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
 });
 
 export const owners = pgTable("owners", {

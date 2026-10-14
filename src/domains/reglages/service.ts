@@ -17,6 +17,8 @@ import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
+import { currentPlan } from "@/domains/facturation/limits";
+import { planDefinition } from "@/domains/facturation/rules";
 import { canReadProtocol } from "@/domains/protocoles/policies";
 import { tokenContext } from "@/domains/whatsapp/connexion";
 import { maskPhone } from "@/domains/whatsapp/numero";
@@ -98,10 +100,14 @@ export type SettingsView = {
       { displayLabel: string; connectedAt: Date; live: boolean }
     >
   >;
+  /** La formule comprend-elle les intégrations avancées (dr.veto) ? */
+  advancedIntegrations: boolean;
 };
 
 export type OnboardingView = {
   steps: Record<OnboardingStep, boolean>;
+  /** dr.veto n'est compris qu'en Premium ; l'étape est alors sans objet. */
+  advancedIntegrations: boolean;
   completed: number;
   /** Protocoles validés du cabinet, pour le suivi test. */
   validatedProtocols: { id: string; name: string }[];
@@ -282,6 +288,8 @@ export function settingsService(deps: {
               },
             ]),
           ),
+          advancedIntegrations: planDefinition(await currentPlan(tx))
+            .advancedIntegrations,
         };
       });
     },
@@ -295,6 +303,7 @@ export function settingsService(deps: {
               .from(integrationConnections)
           ).map((row) => row.provider),
         );
+        const { advancedIntegrations } = planDefinition(await currentPlan(tx));
         const [windows] = await tx
           .select({ n: count() })
           .from(availabilityWindows)
@@ -335,7 +344,7 @@ export function settingsService(deps: {
         const steps: Record<OnboardingStep, boolean> = {
           organization: true,
           whatsapp: integrations.has("whatsapp"),
-          drveto: integrations.has("drveto"),
+          drveto: integrations.has("drveto") || !advancedIntegrations,
           rules:
             (windows?.n ?? 0) > 0 &&
             (contacts?.n ?? 0) > 0 &&
@@ -347,6 +356,7 @@ export function settingsService(deps: {
         };
         return {
           steps,
+          advancedIntegrations,
           completed: Object.values(steps).filter(Boolean).length,
           validatedProtocols,
         };
@@ -599,6 +609,10 @@ export function settingsService(deps: {
           parse(contactInput.shape.phone, input),
         );
       } else if (provider === "drveto") {
+        // Intégrations avancées : formule Premium uniquement, vérifié côté serveur.
+        const plan = await run(actor, (tx) => currentPlan(tx));
+        if (!planDefinition(plan).advancedIntegrations)
+          throw new DomainError("plan_feature_missing");
         const code = parse(
           z
             .string()

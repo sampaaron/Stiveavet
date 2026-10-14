@@ -6,14 +6,14 @@ import { useActionState, useId } from "react";
 import {
   PLANS,
   PLAN_CATALOG,
-  TRIAL_MONTHLY_CENTS,
-  TRIAL_MONTHS,
+  FEATURED_PLAN,
 } from "@/domains/facturation/rules";
 import { useAppText, useLocale } from "@/i18n/app/client";
 import { pathFor } from "@/i18n/routes";
 import { AlertBanner } from "@/ui/alert-banner";
 import { Button } from "@/ui/button";
 import { formatEuros } from "@/ui/format";
+import { planHighlights } from "@/ui/plan-summary";
 import { TextField } from "@/ui/text-field";
 
 import {
@@ -389,7 +389,7 @@ function Consents({
   );
 }
 
-/** Formule appliquée après les 2 mois d'essai pilote ; modifiable ensuite dans Facturation. */
+/** Formule choisie à l'inscription ; modifiable ensuite dans Facturation. */
 function PlanChoice({
   value,
   errors,
@@ -408,7 +408,7 @@ function PlanChoice({
     >
       <legend className="mb-1 text-sm font-semibold">{t.legend}</legend>
       <p id={`${id}-aide`} className="text-[13px] text-ink-muted">
-        {t.help(formatEuros(TRIAL_MONTHLY_CENTS, locale), TRIAL_MONTHS)}
+        {t.help}
       </p>
       {PLANS.map((plan) => {
         const definition = PLAN_CATALOG[plan];
@@ -421,7 +421,7 @@ function PlanChoice({
               type="radio"
               name="plan"
               value={plan}
-              defaultChecked={(value ?? "clinic") === plan}
+              defaultChecked={(value ?? FEATURED_PLAN) === plan}
               className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]"
             />
             <span>
@@ -430,10 +430,15 @@ function PlanChoice({
                   text.labels.plans[plan].name,
                   formatEuros(definition.monthlyCents, locale),
                 )}
+                {plan === FEATURED_PLAN ? (
+                  <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-white">
+                    {text.labels.planFeatured}
+                  </span>
+                ) : null}
               </span>
               <span className="block text-ink-muted">
                 {t.details(
-                  definition.maxVets,
+                  planHighlights(text.labels, plan).join(" · "),
                   formatEuros(definition.annualMonthlyCents, locale),
                 )}
               </span>

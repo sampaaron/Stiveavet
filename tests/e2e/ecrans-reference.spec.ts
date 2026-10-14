@@ -54,13 +54,11 @@ test.describe("tableau de bord « Aujourd'hui »", () => {
     const meter = page.getByRole("meter", { name: "Suivis actifs" });
     const active = Number(await meter.getAttribute("aria-valuenow"));
     expect(active).toBeGreaterThanOrEqual(7);
-    await expect(meter).toHaveAttribute("aria-valuemax", "10");
-    if (active < 10)
-      await expect(
-        page.getByText(
-          `${10 - active} place${10 - active > 1 ? "s" : ""} incluse${10 - active > 1 ? "s" : ""} restante${10 - active > 1 ? "s" : ""}`,
-        ),
-      ).toBeVisible();
+    // Les Tilleuls sont en Premium : 100 suivis actifs inclus.
+    await expect(meter).toHaveAttribute("aria-valuemax", "100");
+    await expect(
+      page.getByText(`${100 - active} places incluses restantes`),
+    ).toBeVisible();
   });
 
   test("identifie les rendez-vous Stivea dans l'agenda", async ({ page }) => {

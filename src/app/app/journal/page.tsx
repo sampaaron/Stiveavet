@@ -56,6 +56,8 @@ function sentence(t: AppDictionary, event: ActivityEvent): string {
         ? text.ownerLanguageDetected(owner, language)
         : text.ownerLanguageChanged(owner, language, actor);
   }
+  if (action === "followup.prepared" && metadata.source === "manual")
+    return text.preparedManually(actor);
   if (hasKey(text.onMember, action))
     return text.onMember[action](actor, member);
   if (hasKey(text.byMember, action)) return text.byMember[action](actor);

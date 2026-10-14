@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import type { Access } from "@/domains/facturation/rules";
 import {
-  INCLUDED_ACTIVE_FOLLOWUPS,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
@@ -11,7 +10,6 @@ import {
   annualStartsAt,
   billingPeriod,
   cancellationEffectiveAt,
-  monthlyPriceCents,
 } from "@/domains/facturation/rules";
 import type { BillingOverview } from "@/domains/facturation/service";
 import { appText } from "@/i18n/app/server";
@@ -25,6 +23,7 @@ import { CapacityMeter } from "@/ui/capacity-meter";
 import { Card, SectionCard } from "@/ui/card";
 import { formatDate, formatEuros } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
+import { planHighlights } from "@/ui/plan-summary";
 import { EmptyState } from "@/ui/states";
 
 import {
@@ -140,13 +139,13 @@ export default async function BillingPage() {
             <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
               {text.activeFollowups.count(
                 overview.activeFollowups,
-                INCLUDED_ACTIVE_FOLLOWUPS,
+                plan.includedActiveFollowups,
               )}
             </p>
             <div className="mt-3">
               <CapacityMeter
                 used={overview.activeFollowups}
-                included={INCLUDED_ACTIVE_FOLLOWUPS}
+                included={plan.includedActiveFollowups}
               />
             </div>
           </Card>
@@ -155,7 +154,8 @@ export default async function BillingPage() {
         <SectionCard
           title={text.usage.title}
           description={text.usage.description(
-            INCLUDED_ACTIVE_FOLLOWUPS,
+            plan.includedActiveFollowups,
+            plan.maxActiveFollowups,
             euros(LAUNCH_SURCHARGE_CENTS),
             euros(REACTIVATION_SURCHARGE_CENTS),
           )}
@@ -215,25 +215,24 @@ export default async function BillingPage() {
             title={text.changePlan.title}
             description={text.changePlan.description(
               overview.vetSeats,
-              overview.phase === "trial" ? TRIAL_MONTHS : null,
+              overview.assistantSeats,
             )}
           >
             <PlanForm
               current={facts.plan}
               options={PLANS.map((key) => {
                 const option = PLAN_CATALOG[key];
-                const names = t.labels.plans[key];
                 return {
                   value: key,
                   label: text.changePlan.option(
-                    names.name,
+                    t.labels.plans[key].name,
                     euros(option.monthlyCents),
                   ),
-                  detail: text.changePlan.optionDetail(
-                    option.maxVets,
-                    names.stive,
-                  ),
-                  disabled: overview.vetSeats > option.maxVets,
+                  detail: planHighlights(t.labels, key).join(" · "),
+                  disabled:
+                    overview.vetSeats > option.maxVets ||
+                    (option.maxAssistants !== null &&
+                      overview.assistantSeats > option.maxAssistants),
                 };
               })}
             />
@@ -339,12 +338,7 @@ function phaseLabel(
   const { facts, month } = overview;
   if (!facts || !month) return "";
   const phase = t.billing.phase;
-  if (overview.phase === "trial")
-    return phase.trial(
-      month,
-      TRIAL_MONTHS,
-      formatEuros(monthlyPriceCents(facts, TRIAL_MONTHS + 1), locale),
-    );
+  if (overview.phase === "trial") return phase.trial(month, TRIAL_MONTHS);
   if (facts.cycle === "annual" && facts.annualEndsAt)
     return phase.annualUntil(formatDate(facts.annualEndsAt, locale));
   return phase.monthly(month);

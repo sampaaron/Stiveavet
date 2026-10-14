@@ -9,6 +9,7 @@ export const shell = {
   nav: {
     today: "Aujourd'hui",
     followups: "Suivis",
+    patients: "Animaux",
     alerts: "Alertes",
     agenda: "Agenda",
     stive: "Stive",

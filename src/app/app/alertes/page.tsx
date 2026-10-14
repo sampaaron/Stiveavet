@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { appText } from "@/i18n/app/server";
@@ -25,16 +26,21 @@ export default async function AlertsPage({
   searchParams,
 }: PageProps<"/app/alertes">) {
   const context = await requirePermission("clinical.read");
-  const alerts = await services.alerts().open(context);
+  const { fait, vue } = await searchParams;
+  const history = vue === "historique";
+  const alerts = history
+    ? await services.alerts().history(context)
+    : await services.alerts().open(context);
   const isVet = VET_ROLES.has(context.role);
   const alertPhone = isVet
     ? await services.alerts().myAlertPhone(context)
     : null;
-  const { fait } = await searchParams;
   const { t } = await appText();
   const text = t.alerts;
   const done =
-    fait === "recue" || fait === "close" ? text.done[fait] : undefined;
+    fait === "recue" || fait === "close" || fait === "confiee"
+      ? text.done[fait]
+      : undefined;
   const urgent = alerts.filter((alert) => alert.level === "urgent");
   const watch = alerts.filter((alert) => alert.level === "watch");
 
@@ -49,7 +55,50 @@ export default async function AlertsPage({
           {done}
         </p>
       ) : null}
-      {alerts.length === 0 ? (
+      <nav aria-label={text.views.label} className="mb-4 flex gap-2">
+        {[
+          { href: "/app/alertes", label: text.views.open, active: !history },
+          {
+            href: "/app/alertes?vue=historique",
+            label: text.views.history,
+            active: history,
+          },
+        ].map((view) => (
+          <Link
+            key={view.href}
+            href={view.href}
+            aria-current={view.active ? "page" : undefined}
+            className={
+              view.active
+                ? "inline-flex min-h-11 items-center rounded-full bg-brand-soft px-4 text-sm font-semibold text-brand-ink"
+                : "inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-ink-muted hover:bg-canvas-subtle"
+            }
+          >
+            {view.label}
+          </Link>
+        ))}
+      </nav>
+      {history ? (
+        <SectionCard
+          title={text.history.section}
+          description={text.history.description}
+        >
+          {alerts.length === 0 ? (
+            <EmptyState
+              title={text.history.emptyTitle}
+              description={text.history.emptyDescription}
+            />
+          ) : (
+            <ul className="grid gap-3">
+              {alerts.map((alert) => (
+                <li key={alert.id}>
+                  <AlertCard alert={alert} from="alertes" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      ) : alerts.length === 0 ? (
         <SectionCard title={text.empty.section}>
           <EmptyState
             title={text.empty.title}
@@ -82,7 +131,7 @@ export default async function AlertsPage({
             ))}
         </div>
       )}
-      {isVet ? (
+      {isVet && !history ? (
         <div className="mt-6">
           <SectionCard
             title={text.phone.title}

@@ -1,11 +1,11 @@
-import { ChevronRight, Lock, PawPrint } from "lucide-react";
+import { ChevronRight, Lock, PawPrint, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
-import { ButtonLink } from "@/ui/button";
+import { Button, ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { SpeciesIcon } from "@/ui/followup-card";
 import { formatDate } from "@/ui/format";
@@ -13,6 +13,9 @@ import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 import { StatusBadge } from "@/ui/status-badge";
 
+import { selectClasses } from "../action-message";
+
+import { applyFollowupFilters, followupFilters } from "./filters";
 import { followupBadge } from "./followup-labels";
 import { TestMark } from "./test-mark";
 
@@ -21,13 +24,26 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.followups.title };
 }
 
-export default async function FollowupsPage() {
+export default async function FollowupsPage({
+  searchParams,
+}: PageProps<"/app/suivis">) {
   const context = await requirePermission(
     "followups.read_all",
     "followups.read_own",
     "followups.read_summary",
   );
-  const followups = await services.followups().list(context);
+  const params = await searchParams;
+  const filters = followupFilters.parse({
+    query: params.q,
+    status: params.statut,
+    priority: params.priorite,
+  });
+  const all = await services.followups().list(context);
+  const followups = applyFollowupFilters(all, filters);
+  const filtered =
+    filters.query !== "" ||
+    filters.status !== "all" ||
+    filters.priority !== "all";
   const clinical = context.permissions.has("clinical.read");
   const { t, locale } = await appText();
   const text = t.followups.list;
@@ -50,12 +66,115 @@ export default async function FollowupsPage() {
           ) : null
         }
       />
+      {all.length > 0 ? (
+        <Card className="mb-6 p-4 sm:p-5">
+          <form
+            role="search"
+            aria-label={text.filters.label}
+            action="/app/suivis"
+            className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-end"
+          >
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label
+                htmlFor="recherche-suivi"
+                className="text-sm font-semibold"
+              >
+                {text.filters.search}
+              </label>
+              <input
+                id="recherche-suivi"
+                name="q"
+                type="search"
+                defaultValue={filters.query}
+                maxLength={80}
+                autoComplete="off"
+                placeholder={
+                  clinical
+                    ? text.filters.placeholderClinical
+                    : text.filters.placeholder
+                }
+                className="h-11 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-[15px] text-ink placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="filtre-statut-suivi"
+                className="text-sm font-semibold"
+              >
+                {text.filters.status}
+              </label>
+              <select
+                id="filtre-statut-suivi"
+                name="statut"
+                defaultValue={filters.status}
+                className={selectClasses}
+              >
+                <option value="all">{text.filters.statusAll}</option>
+                <option value="ongoing">{text.filters.statusOngoing}</option>
+                {(
+                  [
+                    "draft",
+                    "active",
+                    "paused",
+                    "human_takeover",
+                    "ended",
+                  ] as const
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {t.labels.followupStatus[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {clinical ? (
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="filtre-priorite"
+                  className="text-sm font-semibold"
+                >
+                  {text.filters.priority}
+                </label>
+                <select
+                  id="filtre-priorite"
+                  name="priorite"
+                  defaultValue={filters.priority}
+                  className={selectClasses}
+                >
+                  <option value="all">{text.filters.priorityAll}</option>
+                  <option value="urgent">{t.labels.triage.urgent}</option>
+                  <option value="watch">{t.labels.triage.watch}</option>
+                </select>
+              </div>
+            ) : null}
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                icon={<Search aria-hidden="true" className="size-4" />}
+              >
+                {text.filters.apply}
+              </Button>
+              {filtered ? (
+                <ButtonLink href="/app/suivis" variant="quiet">
+                  {text.filters.reset}
+                </ButtonLink>
+              ) : null}
+            </div>
+          </form>
+        </Card>
+      ) : null}
       <Card>
         {followups.length === 0 ? (
-          <EmptyState
-            title={text.emptyTitle}
-            description={text.emptyDescription}
-          />
+          filtered ? (
+            <EmptyState
+              title={text.filters.noMatchTitle}
+              description={text.filters.noMatchDescription}
+            />
+          ) : (
+            <EmptyState
+              title={text.emptyTitle}
+              description={text.emptyDescription}
+            />
+          )
         ) : (
           <ul className="divide-y divide-line">
             {followups.map((followup) => {

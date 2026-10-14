@@ -603,6 +603,88 @@ describe("droits, isolation et garde-fous de la base", () => {
     );
   });
 
+  it("confier l'alerte à un vétérinaire qui lit le dossier ; puis l'historique des alertes closes", async () => {
+    const { messageId } = await conversations.receiveOwnerMessage(
+      org,
+      plume,
+      "Elle saigne beaucoup",
+    );
+    const alertId = (await alertOfMessage(messageId)).id;
+    const leo = await actor(ids.vet);
+    const [view] = (await alertsApi.open(leo)).filter(
+      (entry) => entry.id === alertId,
+    );
+    const assignees = view?.assignees.map((vet) => vet.id) ?? [];
+    expect(assignees).toContain(ids.admin);
+    // Zoé ne lit que ses propres dossiers : elle ne peut pas recevoir cette alerte.
+    expect(assignees).not.toContain(ids.vet2);
+    expect(assignees).not.toContain(ids.assistant);
+    // Ni elle, ni une assistante, ni un autre cabinet, ni un identifiant libre.
+    for (const target of [ids.vet2, ids.assistant, ids.outsider, "pas-un-uuid"])
+      expect(await domainError(alertsApi.reassign(leo, alertId, target))).toBe(
+        "invalid_target",
+      );
+    expect(
+      await domainError(
+        alertsApi.reassign(
+          await actor(ids.outsider, other),
+          alertId,
+          ids.admin,
+        ),
+      ),
+    ).toBe("not_found");
+
+    // La base refuse aussi un destinataire qui n'est pas vétérinaire.
+    await expect(
+      admin.query("UPDATE alerts SET target_membership_id = $2 WHERE id = $1", [
+        alertId,
+        ids.assistant,
+      ]),
+    ).rejects.toThrow(/destinataire d'alerte refusé/);
+
+    const before = (await alertById(alertId)).target_membership_id;
+    await alertsApi.reassign(leo, alertId, ids.admin);
+    expect((await alertById(alertId)).target_membership_id).toBe(ids.admin);
+    // Le nouveau destinataire est prévenu par une tâche de notification.
+    expect(
+      (await jobsOf(alertId)).filter((job) => job.kind === "alert.notify"),
+    ).toHaveLength(2);
+    const { rows } = await admin.query(
+      `SELECT metadata FROM audit_events
+       WHERE organization_id = $1 AND action = 'alert.reassigned'`,
+      [org],
+    );
+    expect(rows).toEqual([
+      { metadata: { alertId, from: before, to: ids.admin } },
+    ]);
+
+    await alertsApi.resolve(await actor(ids.admin), alertId);
+    expect(
+      (await alertsApi.open(leo)).some((entry) => entry.id === alertId),
+    ).toBe(false);
+    const [closed] = (await alertsApi.history(leo)).filter(
+      (entry) => entry.id === alertId,
+    );
+    expect(closed).toMatchObject({
+      status: "resolved",
+      resolvedBy: "Dr Lou Admin",
+      canAcknowledge: false,
+      assignees: [],
+    });
+    expect(await domainError(alertsApi.reassign(leo, alertId, ids.vet))).toBe(
+      "invalid_transition",
+    );
+    await expect(
+      admin.query("UPDATE alerts SET target_membership_id = $2 WHERE id = $1", [
+        alertId,
+        ids.vet,
+      ]),
+    ).rejects.toThrow(/alerte close figé/);
+    expect(await alertsApi.history(await actor(ids.outsider, other))).toEqual(
+      [],
+    );
+  });
+
   it("la base refuse une escalade avant l'heure, une réception sans accusé et une alerte rouverte", async () => {
     await expect(
       admin.query(

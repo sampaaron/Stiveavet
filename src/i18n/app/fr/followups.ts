@@ -15,6 +15,21 @@ export const followups = {
     private: "Privé",
     controlOn: (date: string) => `Contrôle le ${date}`,
     controlNone: "Contrôle non programmé",
+    filters: {
+      label: "Filtrer les suivis",
+      search: "Rechercher",
+      placeholder: "Animal, propriétaire ou vétérinaire",
+      placeholderClinical: "Animal, propriétaire, vétérinaire ou intervention",
+      status: "Statut",
+      statusAll: "Tous",
+      statusOngoing: "En cours, en pause ou repris",
+      priority: "Priorité",
+      priorityAll: "Toutes",
+      apply: "Filtrer",
+      reset: "Effacer",
+      noMatchTitle: "Aucun suivi ne correspond",
+      noMatchDescription: "Modifiez la recherche ou les filtres.",
+    },
   },
   /** Suivi test de l'installation. */
   testMark: "Suivi test",
@@ -23,7 +38,7 @@ export const followups = {
     title: "Lancer un suivi",
     back: "Suivis",
     description:
-      "Cherchez l'animal dans dr.veto. Stivea Vet importe en lecture seule le résumé utile, puis vous proposez une fiche de lancement à relire.",
+      "Cherchez l'animal dans le registre du cabinet ou dans dr.veto, ou enregistrez-le. Vous relisez ensuite la fiche de lancement préparée par Stivea Vet.",
     searchLabel: "Animal, propriétaire ou identifiant dr.veto",
     searchPlaceholder: "Ex. Plume, Girard, DV-20481",
     search: "Rechercher",
@@ -43,6 +58,17 @@ export const followups = {
     alreadyOpen: "Suivi déjà ouvert",
     prepareLabel: (name: string) => `Préparer la fiche de ${name}`,
     prepare: "Préparer la fiche",
+    registryTitle: "Dans le registre du cabinet",
+    registryEmpty:
+      "Aucun animal du registre ne correspond. Enregistrez-le s'il est nouveau.",
+    launchFromRegistry: "Lancer",
+    newAnimal: "Nouvel animal",
+    newAnimalTitle: "Un nouveau patient ?",
+    newAnimalBody:
+      "Enregistrez son identité et le numéro WhatsApp de son propriétaire, puis lancez le suivi depuis sa fiche.",
+    draftsTitle: "Fiches en préparation",
+    draftsEmpty: "Aucune fiche en attente de lancement.",
+    drvetoTitle: "Dans dr.veto",
   },
   /** Page de la fiche de lancement. */
   sheet: {

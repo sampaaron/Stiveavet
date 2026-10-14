@@ -6,6 +6,19 @@ export const alerts = {
   done: {
     recue: "Réception confirmée : l'escalade est annulée.",
     close: "Alerte close.",
+    confiee: "Alerte confiée : le vétérinaire choisi est prévenu.",
+  },
+  views: {
+    label: "Afficher",
+    open: "En cours",
+    history: "Historique",
+  },
+  history: {
+    section: "Alertes closes",
+    description:
+      "Les 100 dernières alertes closes des dossiers que vous lisez, avec qui les a closes.",
+    emptyTitle: "Aucune alerte close",
+    emptyDescription: "Les alertes closes apparaîtront ici.",
   },
   empty: {
     section: "Aucune alerte en cours",
@@ -40,11 +53,17 @@ export const alerts = {
       `Sans accusé de réception, toute l'équipe vétérinaire a été alertée${time ? ` à ${time}` : ""}.`,
     acknowledged: (by: string | null, time: string | null) =>
       `Réception confirmée par ${by ?? "un vétérinaire"}${time ? ` à ${time}` : ""}. L'escalade est annulée.`,
-    resolved: "Alerte close.",
+    resolved: (by: string | null, date: string | null) =>
+      `Close par ${by ?? "un vétérinaire"}${date ? ` le ${date}` : ""}.`,
   },
   buttons: {
     acknowledge: "Accuser réception",
     resolve: "Clore l'alerte",
+  },
+  reassign: {
+    label: "Confier à",
+    submit: "Confier",
+    current: (name: string) => `${name} (actuel)`,
   },
   /** Numéro WhatsApp professionnel où le vétérinaire reçoit les urgences (ADR 0024). */
   phone: {

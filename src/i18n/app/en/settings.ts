@@ -79,6 +79,9 @@ export const settings: AppDictionary["settings"] = {
     description:
       "Simulated during this phase: no real WhatsApp number, dr.veto practice or bank account is contacted.",
     simulated: "Simulated",
+    notIncluded:
+      "Included in the Premium plan. Meanwhile, register your patients in Animals: follow-ups work without connected software.",
+    seePlans: "See plans",
     connected: "Connected",
     connectedDetail: (label: string, date: string) =>
       `: ${label}, since ${date}.`,
@@ -116,7 +119,7 @@ export const settings: AppDictionary["settings"] = {
     payment_mandate: {
       title: "Direct debit mandate",
       description:
-        "For the pilot trial at €86 excl. VAT per month. No bank details are requested during this phase.",
+        "For the monthly direct debit of your plan. No bank details are requested during this phase.",
       submit: "Sign the mandate (simulated)",
       submitLive: "Sign the SEPA mandate",
       descriptionLive:

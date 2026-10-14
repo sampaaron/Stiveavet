@@ -18,7 +18,7 @@ import type { BillingProvider } from "@/adapters/billing-provider/types";
 import { auditOrganization as audit } from "@/domains/audit/journal";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
-import { vetSeats } from "@/domains/equipe/service";
+import { assistantSeats, vetSeats } from "@/domains/equipe/service";
 import {
   auditEvents,
   followups,
@@ -47,6 +47,7 @@ import {
   phase,
   subscriptionMonth,
   usageChargeCents,
+  withinFollowupCap,
 } from "./rules";
 import { scheduleAnnualOffers } from "./offre-annuelle";
 import { recordPayment, refreshUnpaid, settleInvoice } from "./paiements";
@@ -95,6 +96,8 @@ export type BillingOverview = {
   commitmentReminder: boolean;
   /** Vétérinaires actifs et invités, comparés à la limite de chaque formule. */
   vetSeats: number;
+  /** Assistants actifs et invités. */
+  assistantSeats: number;
   mandateSigned: boolean;
   /** Prélèvements simulés (poste local) ou réels, par Stripe (ADR 0027). */
   simulated: boolean;
@@ -158,7 +161,8 @@ export async function startSubscription(
 
 /**
  * Enregistre un lancement ou une réactivation, dans la transaction qui la réalise :
- * refusé si les nouveaux suivis sont bloqués, supplément au-delà de 10 suivis actifs.
+ * refusé si les nouveaux suivis sont bloqués ou si le plafond de la formule est atteint,
+ * supplément au-delà des suivis actifs compris dans la formule.
  * Idempotent : une même clé ne compte qu'une fois.
  */
 export async function recordUsage(
@@ -188,7 +192,10 @@ export async function recordUsage(
       ),
     );
   const activeBefore = activity.activeFollowups - (self?.n ?? 0);
-  const amountCents = usageChargeCents(input.kind, activeBefore);
+  const plan = facts?.plan ?? null;
+  if (!withinFollowupCap(plan, activeBefore))
+    throw new DomainError("plan_quota_reached");
+  const amountCents = usageChargeCents(input.kind, activeBefore, plan);
   await tx.insert(usageEvents).values({
     organizationId,
     followupId: input.followupId,
@@ -507,6 +514,7 @@ export function billingService(deps: {
       canCommitAnnual: facts ? canCommitAnnual(facts, now) : false,
       commitmentReminder: facts ? commitmentReminder(facts, now) : false,
       vetSeats: await vetSeats(tx),
+      assistantSeats: await assistantSeats(tx),
       mandateSigned: await mandateSigned(tx),
       simulated: provider.simulated,
     };
@@ -531,12 +539,17 @@ export function billingService(deps: {
     async accessFor(
       context: { organizationId: string; userId: string },
       now = new Date(),
-    ): Promise<{ access: Access; commitmentReminder: boolean }> {
+    ): Promise<{
+      access: Access;
+      commitmentReminder: boolean;
+      plan: Plan | null;
+    }> {
       return withTenant(db, context, async (tx) => {
         const facts = await sync(tx, context.organizationId, now);
         return {
           access: access(facts, now, await followupActivity(tx)),
           commitmentReminder: facts ? commitmentReminder(facts, now) : false,
+          plan: facts?.plan ?? null,
         };
       });
     },
@@ -553,8 +566,21 @@ export function billingService(deps: {
         const facts = await editableFacts(tx, actor.organizationId, now);
         if (facts.plan === parsed.data) return;
         if (facts.cycle === "annual") throw new DomainError("invalid_target");
-        if ((await vetSeats(tx)) > PLAN_CATALOG[parsed.data].maxVets)
+        const target = PLAN_CATALOG[parsed.data];
+        if ((await vetSeats(tx)) > target.maxVets)
           throw new DomainError("plan_vet_limit");
+        if (
+          target.maxAssistants !== null &&
+          (await assistantSeats(tx)) > target.maxAssistants
+        )
+          throw new DomainError("plan_assistant_limit");
+        if (!target.advancedIntegrations) {
+          const [drveto] = await tx
+            .select({ provider: integrationConnections.provider })
+            .from(integrationConnections)
+            .where(eq(integrationConnections.provider, "drveto"));
+          if (drveto) throw new DomainError("plan_integration_connected");
+        }
         await tx.update(subscriptions).set({ plan: parsed.data });
         await audit(
           tx,

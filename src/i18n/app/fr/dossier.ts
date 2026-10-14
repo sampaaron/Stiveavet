@@ -17,6 +17,7 @@ export const dossier = {
     numa: "Numa reprend la conversation.",
     "alerte-recue": "Réception confirmée : l'escalade est annulée.",
     "alerte-close": "Alerte close.",
+    "alerte-confiee": "Alerte confiée : le vétérinaire choisi est prévenu.",
   },
   header: {
     responsible: "Responsable :",

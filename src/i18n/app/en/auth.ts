@@ -79,12 +79,12 @@ export const auth: AppDictionary["auth"] = {
     haveAccount: "Already have an account?",
     signIn: "Sign in",
     plan: {
-      legend: "Plan after the trial",
-      help: (price, months) =>
-        `Pilot trial at ${price} excl. VAT per month for ${months} months, with no commitment. After that, the chosen plan, billed monthly: an annual commitment is never automatic.`,
-      option: (name, price) => `${name} · ${price} excl. VAT per month`,
-      details: (maxVets, annualPrice) =>
-        `${maxVets === 1 ? "1 vet" : `Up to ${maxVets} vets`}. With an annual commitment: ${annualPrice} excl. VAT per month.`,
+      legend: "Your plan",
+      help: "Monthly with no commitment: change plan or cancel at any time. The cheaper annual commitment is offered after six weeks; it is never automatic.",
+      option: (name: string, price: string) =>
+        `${name} · ${price} excl. VAT per month`,
+      details: (summary: string, annualPrice: string) =>
+        `${summary}. With an annual commitment: ${annualPrice} excl. VAT per month.`,
     },
     consents: {
       termsBefore: "I accept the ",
@@ -125,7 +125,7 @@ export const auth: AppDictionary["auth"] = {
     emailRegistered:
       "This address already has a Stivea Vet account. Ask the practice to invite you with a different address.",
     vetLimit:
-      "The practice has reached the number of vets included in its plan. Contact the person who invited you.",
+      "The practice has no seats left in its plan for this role. Contact the person who invited you.",
   },
   validation: {
     email_too_long: "Address too long.",
@@ -138,7 +138,7 @@ export const auth: AppDictionary["auth"] = {
     organization_name_long: "Practice name too long.",
     display_name_required: "Enter your name.",
     display_name_long: "Name too long.",
-    plan_required: "Choose the plan that will follow the trial.",
+    plan_required: "Choose your plan.",
     terms_required: "Accept the terms of use to continue.",
     authority_required:
       "Confirm that you are authorised to subscribe on behalf of the practice.",

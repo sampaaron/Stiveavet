@@ -3,7 +3,8 @@ import { and, asc, desc, eq, gte, inArray, lt, ne } from "drizzle-orm";
 import type { DrVetoConnector } from "@/adapters/drveto/types";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
 import { followupActivity } from "@/domains/facturation/service";
-import { INCLUDED_ACTIVE_FOLLOWUPS } from "@/domains/facturation/rules";
+import { currentPlan } from "@/domains/facturation/limits";
+import { planDefinition } from "@/domains/facturation/rules";
 import type { Actor } from "@/domains/equipe/actor";
 import { parisLocalToDate } from "@/domains/reglages/content";
 import {
@@ -426,7 +427,8 @@ export function todayService(deps: {
             views,
             followups: rows,
             activeFollowups: activity.activeFollowups,
-            includedFollowups: INCLUDED_ACTIVE_FOLLOWUPS,
+            includedFollowups: planDefinition(await currentPlan(tx))
+              .includedActiveFollowups,
             agenda,
             stiveaAppointments,
           };

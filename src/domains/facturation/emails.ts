@@ -24,7 +24,7 @@ export function annualOfferEmail(
 ): EmailMessage {
   const intro =
     details.reason === "offer"
-      ? `L'essai pilote de ${details.organizationName} arrive à sa fin. Vous pouvez dès maintenant choisir l'engagement annuel pour la formule ${details.planName}.`
+      ? `Les deux premiers mois de ${details.organizationName} sur Stivea Vet touchent à leur fin. Vous pouvez dès maintenant choisir l'engagement annuel pour la formule ${details.planName}.`
       : `${details.organizationName} est en formule ${details.planName} sans engagement. Vous pouvez encore passer à l'engagement annuel avant le ${details.decideBefore}.`;
   const lines = [
     `Bonjour ${details.displayName},`,
@@ -38,7 +38,7 @@ export function annualOfferEmail(
     to,
     subject:
       details.reason === "offer"
-        ? "Après votre essai Stivea Vet : engagement annuel ou mensuel ?"
+        ? "Stivea Vet : engagement annuel ou mensuel ?"
         : "Stivea Vet : dernier rappel pour l'engagement annuel",
     text: lines.join("\n\n"),
     html: htmlParagraphs(lines),

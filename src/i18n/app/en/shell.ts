@@ -10,6 +10,7 @@ export const shell: AppDictionary["shell"] = {
   nav: {
     today: "Today",
     followups: "Follow-ups",
+    patients: "Animals",
     alerts: "Alerts",
     agenda: "Calendar",
     stive: "Stive",

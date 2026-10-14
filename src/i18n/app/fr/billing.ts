@@ -22,8 +22,8 @@ export const billing = {
   },
   plan: "Formule",
   phase: {
-    trial: (month: number, months: number, price: string) =>
-      `Essai pilote, mois ${month} sur ${months}, puis ${price} HT par mois`,
+    trial: (month: number, months: number) =>
+      `Découverte, mois ${month} sur ${months}, sans engagement`,
     annualUntil: (date: string) => `Engagement annuel jusqu'au ${date}`,
     monthly: (month: number) =>
       `Sans engagement, mois ${month} de votre abonnement`,
@@ -42,8 +42,13 @@ export const billing = {
   },
   usage: {
     title: "Usage de Numa",
-    description: (included: number, launch: string, reactivation: string) =>
-      `${included} suivis actifs en même temps sont inclus. Au-delà, chaque nouveau suivi coûte ${launch} HT et chaque réactivation ${reactivation} HT, prélevés avec l'abonnement suivant. Un suivi terminé libère sa place ; les suivis test ne comptent pas.`,
+    description: (
+      included: number,
+      max: number,
+      launch: string,
+      reactivation: string,
+    ) =>
+      `${included} suivis actifs en même temps sont inclus dans votre formule. Au-delà, chaque nouveau suivi coûte ${launch} HT et chaque réactivation ${reactivation} HT, prélevés avec l'abonnement suivant, jusqu'à ${max} suivis actifs. Un suivi terminé libère sa place ; les suivis test ne comptent pas.`,
     pending: (launches: number, reactivations: number, amount: string) =>
       `En attente de facturation : ${nombre(launches, "lancement", "lancements")} et ${nombre(reactivations, "réactivation", "réactivations")}, soit ${amount} HT.`,
     nonePending: "Aucun supplément en attente.",
@@ -54,7 +59,7 @@ export const billing = {
       "À choisir avant le 7e mois. Sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.",
     anytime: "Possible à tout moment, sur votre demande uniquement.",
     offer: (trialEnd: string) =>
-      `Votre essai se termine le ${trialEnd}. Vous pouvez choisir dès maintenant ; sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.`,
+      `Vos deux premiers mois se terminent le ${trialEnd}. Vous pouvez choisir dès maintenant ; sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.`,
     prices: (annual: string, monthly: string) =>
       `Avec engagement : ${annual} HT par mois pendant 12 mois. Sans engagement : ${monthly} HT par mois.`,
     stayMonthlyIntro:
@@ -66,11 +71,9 @@ export const billing = {
   },
   changePlan: {
     title: "Changer de formule",
-    description: (vetSeats: number, trialMonths: number | null) =>
-      `La nouvelle formule s'applique à la prochaine échéance${trialMonths ? `, après les ${trialMonths} mois d'essai` : ""}. Votre équipe compte ${nombre(vetSeats, "vétérinaire", "vétérinaires")}, invitations en attente comprises.`,
+    description: (vetSeats: number, assistantSeats: number) =>
+      `La nouvelle formule s'applique à la prochaine échéance. Votre équipe compte ${nombre(vetSeats, "vétérinaire", "vétérinaires")} et ${nombre(assistantSeats, "assistant", "assistants")}, invitations en attente comprises : une formule trop petite pour l'équipe n'est pas proposée.`,
     option: (name: string, price: string) => `${name} · ${price} HT par mois`,
-    optionDetail: (maxVets: number, stive: string) =>
-      `${maxVets === 1 ? "1 vétérinaire" : `Jusqu'à ${maxVets} vétérinaires`}. ${stive}.`,
     legend: "Formule",
     submit: "Changer de formule",
   },

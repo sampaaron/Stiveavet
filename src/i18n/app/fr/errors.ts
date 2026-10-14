@@ -17,6 +17,14 @@ export const errors = {
     already_installed: "Ce modèle est déjà dans les protocoles du cabinet.",
     billing_blocked:
       "Les nouveaux suivis sont suspendus : régularisez le paiement dans Facturation. Les suivis en cours continuent.",
+    plan_quota_reached:
+      "Le plafond de suivis actifs de votre offre est atteint. Terminez un suivi ou passez à l'offre supérieure dans Facturation.",
+    plan_assistant_limit:
+      "Votre offre est au complet en assistants. Passez à l'offre supérieure dans Facturation pour agrandir l'équipe.",
+    plan_feature_missing:
+      "Cette fonction n'est pas comprise dans votre offre. Comparez les offres dans Facturation.",
+    plan_integration_connected:
+      "dr.veto est connecté : déconnectez-le dans Réglages avant de passer à une offre sans intégrations.",
     plan_vet_limit:
       "Cette formule compte moins de vétérinaires que votre équipe actuelle (invitations en attente comprises).",
     on_call_overlap: "Cette garde chevauche une garde déjà prévue.",

@@ -21,6 +21,8 @@ import { billingService } from "@/domains/facturation/service";
 import { billingProviders } from "@/domains/facturation/stripe";
 import type { BillingService } from "@/domains/facturation/service";
 import type { TeamService } from "@/domains/equipe/service";
+import { patientsService } from "@/domains/patients/service";
+import type { PatientsService } from "@/domains/patients/service";
 import { protocolsService } from "@/domains/protocoles/service";
 import type { ProtocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
@@ -28,6 +30,8 @@ import type { SettingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
+import { statsService } from "@/domains/suivis/statistiques";
+import type { StatsService } from "@/domains/suivis/statistiques";
 import { synthesisService } from "@/domains/suivis/synthese";
 import type { SynthesisService } from "@/domains/suivis/synthese";
 import { todayService } from "@/domains/suivis/tableau";
@@ -50,6 +54,7 @@ import { serverEnv } from "@/server/env";
 let team: TeamService | undefined;
 let followups: FollowupsService | undefined;
 let protocols: ProtocolsService | undefined;
+let patients: PatientsService | undefined;
 let settings: SettingsService | undefined;
 let billing: BillingService | undefined;
 let demo: DemoService | undefined;
@@ -62,6 +67,7 @@ let agenda: AgendaService | undefined;
 let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
 let today: TodayService | undefined;
+let stats: StatsService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 declare global {
@@ -94,6 +100,11 @@ export const services = {
   followups(): FollowupsService {
     followups ??= followupsService(appDatabase());
     return followups;
+  },
+  /** Registre des animaux et des propriétaires saisi par le cabinet (ADR 0030). */
+  patients(): PatientsService {
+    patients ??= patientsService(appDatabase());
+    return patients;
   },
   protocols(): ProtocolsService {
     protocols ??= protocolsService(appDatabase());
@@ -174,6 +185,11 @@ export const services = {
       drveto: fakeDrVeto,
     });
     return today;
+  },
+  /** Activité du cabinet en totaux, pour le tableau de bord. */
+  stats(): StatsService {
+    stats ??= statsService(appDatabase());
+    return stats;
   },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement

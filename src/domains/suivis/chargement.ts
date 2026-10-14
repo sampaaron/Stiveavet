@@ -194,6 +194,8 @@ export type LoadedFollowup = {
   responsibleMembershipId: string;
   protocolVersionId: string | null;
   planRevision: number;
+  /** Membres avec qui le dossier est partagé en ce moment. */
+  sharedWith: string[];
   access: FollowupAccess;
 };
 
@@ -248,13 +250,14 @@ export async function loadFollowup(
         or(isNull(followupShares.expiresAt), gt(followupShares.expiresAt, now)),
       ),
     );
+  const sharedWith = shares.map((share) => share.membershipId);
   const access = followupAccess(actor, {
     responsibleMembershipId: row.responsibleMembershipId,
     isPrivate: row.isPrivate,
-    sharedWith: shares.map((share) => share.membershipId),
+    sharedWith,
   });
   if (access === "none") throw new DomainError("not_found");
-  return { ...row, access };
+  return { ...row, sharedWith, access };
 }
 
 /** Protocoles validés, non archivés et lisibles par l'acteur. */

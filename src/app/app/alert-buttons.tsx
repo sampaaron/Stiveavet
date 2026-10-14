@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 
 import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
 
-import { ActionMessage } from "./action-message";
+import { ActionMessage, selectClasses } from "./action-message";
 import { initialActionState } from "./action-state";
 import { alertAction } from "./alertes/actions";
 
@@ -52,6 +52,62 @@ export function AlertButtons({
           aria-busy={pending}
         >
           {t.alerts.buttons.resolve}
+        </Button>
+      </div>
+      <ActionMessage state={state} />
+    </form>
+  );
+}
+
+/** « Confier à » : un autre vétérinaire qui lit le dossier en clinique reçoit l'alerte. */
+export function ReassignForm({
+  alertId,
+  from,
+  options,
+  current,
+}: {
+  alertId: string;
+  from: "alertes" | "dossier";
+  options: { value: string; label: string }[];
+  current: string;
+}) {
+  const t = useAppText();
+  const id = useId();
+  const [state, action, pending] = useActionState(
+    alertAction,
+    initialActionState,
+  );
+  return (
+    <form action={action} className="mt-3 grid gap-2">
+      <input type="hidden" name="alertId" value={alertId} />
+      <input type="hidden" name="from" value={from} />
+      <input type="hidden" name="intent" value="reassign" />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid min-w-0 gap-1">
+          <label htmlFor={`${id}-vet`} className="text-sm font-semibold">
+            {t.alerts.reassign.label}
+          </label>
+          <select
+            id={`${id}-vet`}
+            name="membershipId"
+            defaultValue={current}
+            className={`${selectClasses} max-w-full`}
+          >
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {t.alerts.reassign.submit}
         </Button>
       </div>
       <ActionMessage state={state} />

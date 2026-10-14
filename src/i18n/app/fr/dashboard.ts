@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const dashboard = {
   title: "Aujourd'hui",
@@ -15,6 +17,7 @@ export const dashboard = {
   actions: {
     openAFile: "Ouvrir un dossier",
     launch: "Lancer un suivi",
+    newAnimal: "Enregistrer un animal",
     openFile: "Ouvrir le dossier",
     writeToOwner: "Écrire au propriétaire",
     allFollowups: "Tous les suivis",
@@ -44,6 +47,51 @@ export const dashboard = {
   urgentReportedAt: (animalName: string, time: string) =>
     `${animalName} : urgence signalée à ${time}`,
   urgentOngoing: (animalName: string) => `${animalName} : urgence en cours`,
+  activity: {
+    title: "Activité du cabinet",
+    description: "30 derniers jours, suivis test exclus.",
+    launched: "Suivis lancés",
+    launchedHint: (ongoing: number) =>
+      `${nombre(ongoing, "suivi", "suivis")} en cours`,
+    ended: "Suivis terminés",
+    endedHint: "Contrôle atteint ou arrêt",
+    messages: "Messages reçus",
+    messagesHint: (outbound: number) =>
+      `${nombre(outbound, "envoyé", "envoyés")} par Numa et l'équipe`,
+    response: "Taux de réponse",
+    responseHint: (answered: number, launched: number) =>
+      `${answered} propriétaire${answered > 1 ? "s" : ""} sur ${launched} ont répondu`,
+    responseNone: "Aucun suivi lancé sur la période",
+    alerts: "Alertes",
+    alertsHint: (open: number) =>
+      `${nombre(open, "ouverte", "ouvertes")} en ce moment`,
+    medianAck: (minutes: string) => `Prises en compte en ${minutes} (médiane)`,
+    chartTitle: "Messages des 14 derniers jours",
+    inbound: "Propriétaires",
+    outbound: "Numa et équipe",
+    chartRow: (day: string, inbound: number, outbound: number) =>
+      `${day} : ${inbound} reçu${inbound > 1 ? "s" : ""}, ${outbound} envoyé${outbound > 1 ? "s" : ""}`,
+  },
+  next: {
+    title: "Prochaines actions",
+    drafts: (count: number) =>
+      nombre(count, "fiche à lancer", "fiches à lancer"),
+    unacknowledged: (count: number) =>
+      nombre(
+        count,
+        "alerte sans accusé de réception",
+        "alertes sans accusé de réception",
+      ),
+    controls: (count: number) =>
+      nombre(count, "contrôle cette semaine", "contrôles cette semaine"),
+    consent: (count: number) =>
+      nombre(
+        count,
+        "accord WhatsApp en attente",
+        "accords WhatsApp en attente",
+      ),
+    none: "Rien en attente.",
+  },
   stats: {
     urgent: "Urgences",
     urgentHint: "À traiter maintenant",
@@ -101,6 +149,6 @@ export const dashboard = {
     readOnly: (date: string) => `Cabinet en lecture seule jusqu'au ${date}.`,
     closed: "L'accès au cabinet est terminé.",
     annualChoice:
-      "Après l'essai : choisissez entre l'engagement annuel et le mois. Sans réponse, rien ne bascule.",
+      "Engagement annuel ou mois : à vous de choisir. Sans réponse, rien ne bascule.",
   },
 };

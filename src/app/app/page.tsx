@@ -3,6 +3,7 @@ import {
   FolderOpen,
   MessageSquareText,
   PawPrint,
+  Plus,
 } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -40,6 +41,7 @@ import { EmptyState } from "@/ui/states";
 import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
+import { ActivityPanel, NextActions } from "./activity-panel";
 import { triageReasonText } from "./triage-reason";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -159,7 +161,10 @@ export default async function TodayPage() {
   const text = t.dashboard;
   const now = new Date();
   // Suivis visibles selon les droits ; le détail clinique seulement avec l'accès clinique.
-  const today = await services.today().today(context, now);
+  const [today, stats] = await Promise.all([
+    services.today().today(context, now),
+    services.stats().activity(context, now),
+  ]);
   const { views } = today;
   if (views.length === 0 && today.activeFollowups === 0)
     return (
@@ -294,6 +299,8 @@ export default async function TodayPage() {
           />
         </div>
 
+        <ActivityPanel stats={stats} t={t} locale={locale} />
+
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
             {clinical ? (
@@ -420,6 +427,12 @@ export default async function TodayPage() {
               </SectionCard>
             ) : null}
 
+            <NextActions
+              stats={stats}
+              t={t}
+              links={{ followups: views.length > 0, alerts: clinical }}
+            />
+
             <SectionCard title={text.quickActions}>
               <div className="grid gap-2">
                 {can("followups.launch") ? (
@@ -430,6 +443,16 @@ export default async function TodayPage() {
                   >
                     <PawPrint aria-hidden="true" className="size-4" />
                     {text.actions.launch}
+                  </ButtonLink>
+                ) : null}
+                {can("followups.launch") ? (
+                  <ButtonLink
+                    href="/app/animaux/nouveau"
+                    variant="secondary"
+                    className="justify-start"
+                  >
+                    <Plus aria-hidden="true" className="size-4" />
+                    {text.actions.newAnimal}
                   </ButtonLink>
                 ) : null}
                 {views.length > 0 ? (

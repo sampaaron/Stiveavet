@@ -492,7 +492,7 @@ export function authService({
           await tx.execute(
             sql`SELECT auth.set_initial_password(${userId}, ${passwordHash})`,
           );
-          // Essai pilote de 2 mois, puis la formule choisie (ADR 0011).
+          // Formule choisie, sans engagement possible les 2 premiers mois (ADR 0031).
           await startSubscription(tx, organizationId, input.plan);
           await tx.insert(auditEvents).values([
             {

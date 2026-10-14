@@ -16,6 +16,7 @@ export const dossier: AppDictionary["dossier"] = {
     numa: "Numa is back in the conversation.",
     "alerte-recue": "Receipt confirmed: the escalation is cancelled.",
     "alerte-close": "Alert closed.",
+    "alerte-confiee": "Alert reassigned: the chosen vet has been notified.",
   },
   header: {
     responsible: "Responsible vet:",

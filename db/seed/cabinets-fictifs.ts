@@ -356,7 +356,7 @@ async function seedSettings(
 async function seedSubscription(
   db: Database,
   admin: Actor,
-  plan: "solo" | "clinic",
+  plan: "starter" | "premium",
   {
     monthsAgo,
     daysIntoMonth,
@@ -430,7 +430,7 @@ export async function seedFictionalCabinets(db: Database) {
   );
   await seedSettings(db, claire, [hugoId, inesId]);
   // Clinique au 5e mois : essai terminé, choix de l'engagement annuel encore à faire.
-  await seedSubscription(db, claire, "clinic", {
+  await seedSubscription(db, claire, "premium", {
     monthsAgo: 4,
     daysIntoMonth: 6,
   });
@@ -510,7 +510,7 @@ export async function seedFictionalCabinets(db: Database) {
     await insertFollowupRecord(tx, SEED.martin, martin, sushi, seeded);
   });
 
-  await seedSubscription(db, paul, "solo", {
+  await seedSubscription(db, paul, "starter", {
     monthsAgo: 3,
     daysIntoMonth: 12,
     declineLast: true,
