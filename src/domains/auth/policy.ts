@@ -23,6 +23,8 @@ export const RATE_LIMITS = {
   loginFailuresPerAccount: [5, 15],
   loginPerIp: [30, 15],
   unlockFailuresPerAccount: [5, 15],
+  /** Codes e-mail envoyés : 5 essais chacun, soit 30 essais par heure au plus. */
+  securityCodesPerAccount: [6, 60],
   resetPerAccount: [3, 60],
   resetPerIp: [10, 60],
   signupPerIp: [5, 60],

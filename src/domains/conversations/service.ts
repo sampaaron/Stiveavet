@@ -14,7 +14,7 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AiGateway } from "@/adapters/ai-gateway/types";
+import type { AiGateway, NumaIntent } from "@/adapters/ai-gateway/types";
 import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
 import {
@@ -88,6 +88,7 @@ import type { Database, TenantTransaction } from "@/server/db/tenant";
 import { auditFollowup as audit, systemAuthor } from "@/domains/audit/journal";
 
 import { checkNumaReply, safeFallback } from "./guard";
+import { numaFixedReply } from "./renvois";
 import { ownerKeyword } from "./keywords";
 import { detectLanguage } from "./language";
 import type { SystemNoteCode } from "./schema";
@@ -1074,8 +1075,9 @@ export function conversationHandlers(deps: {
   ) {
     const { language } = wordingFor(ctx, target);
     let text: string;
+    let intent: NumaIntent = "ack";
     try {
-      ({ text } = await ai.numaReply({
+      ({ text, intent } = await ai.numaReply({
         language,
         animalName: ctx.animalName,
         practiceName: ctx.practiceName,
@@ -1092,6 +1094,9 @@ export function conversationHandlers(deps: {
       );
       text = "";
     }
+    // Hors simples nouvelles, Numa répond par un texte fixe validé, jamais par celui du modèle.
+    if (text && intent !== "ack")
+      text = numaFixedReply(intent, { ...ctx, language });
     const verdict = text ? checkNumaReply(text) : null;
     if (verdict && !verdict.ok)
       await audit(

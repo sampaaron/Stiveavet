@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 
 import { serverEnv } from "@/server/env";
 
-/** Pages internes de développement : jamais servies en production. */
+/** Pages internes de développement : servies sur le poste local seulement. */
 export default function InterneLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  if (serverEnv().APP_ENV === "production") notFound();
+  if (serverEnv().APP_ENV !== "local") notFound();
   return children;
 }

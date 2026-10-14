@@ -43,6 +43,7 @@ import {
   sha256Hex,
   sniffAudio,
   sniffImage,
+  stripImageMetadata,
   wavDurationMs,
 } from "./media";
 
@@ -113,10 +114,12 @@ function checkMedia(media: OwnerMedia): CheckedMedia {
       !caption.success
     )
       throw new DomainError("invalid_file");
+    const clean = stripImageMetadata(bytes, contentType);
+    if (!clean) throw new DomainError("invalid_file");
     return {
       kind: "photo",
       from,
-      bytes,
+      bytes: clean,
       caption: caption.data,
       contentType,
       extension: EXTENSIONS[contentType] ?? "bin",

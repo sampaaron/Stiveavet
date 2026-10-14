@@ -6,6 +6,7 @@ import {
   stripeEvent,
 } from "@/domains/facturation/webhook-stripe";
 import { appDatabase } from "@/server/db/client";
+import { readCappedBody } from "@/server/security/capped-body";
 
 /**
  * Webhook de Stripe pour les prélèvements (ADR 0027). Inexistant tant que la facturation est
@@ -22,10 +23,8 @@ function reply(status: number): Response {
 export async function POST(request: Request) {
   const config = configuredBilling();
   if (config.mode !== "stripe") return reply(404);
-  const declared = Number(request.headers.get("content-length") ?? "0");
-  if (declared > STRIPE_WEBHOOK_MAX_BYTES) return reply(413);
-  const body = new Uint8Array(await request.arrayBuffer());
-  if (body.byteLength > STRIPE_WEBHOOK_MAX_BYTES) return reply(413);
+  const body = await readCappedBody(request, STRIPE_WEBHOOK_MAX_BYTES);
+  if (!body) return reply(413);
   if (
     !validStripeSignature(
       body,

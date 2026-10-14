@@ -7,6 +7,7 @@ import {
   webhookPayload,
 } from "@/domains/whatsapp/webhook";
 import { appDatabase } from "@/server/db/client";
+import { readCappedBody } from "@/server/security/capped-body";
 
 /**
  * Webhook de Meta pour WhatsApp (ADR 0024). Inexistant tant que WhatsApp est simulé.
@@ -42,10 +43,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const config = liveConfig();
   if (!config) return reply(404);
-  const declared = Number(request.headers.get("content-length") ?? "0");
-  if (declared > WEBHOOK_MAX_BYTES) return reply(413);
-  const body = new Uint8Array(await request.arrayBuffer());
-  if (body.byteLength > WEBHOOK_MAX_BYTES) return reply(413);
+  const body = await readCappedBody(request, WEBHOOK_MAX_BYTES);
+  if (!body) return reply(413);
   if (
     !validSignature(
       body,

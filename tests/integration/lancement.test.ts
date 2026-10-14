@@ -417,6 +417,37 @@ describe("fiche de lancement", () => {
       ),
     ).toBe("invalid_target");
   });
+
+  it("changer de responsable : jamais avec le lancement, jamais sur le brouillon d'un confrère", async () => {
+    const leo = await actor(ids.vet);
+    const lou = await actor(ids.admin);
+    const input = await sheetInputOf(leo, plume);
+    const reassign = (who: typeof leo, to: string, launch = false) =>
+      service.save(
+        who,
+        plume,
+        { ...input, responsibleMembershipId: to },
+        { launch },
+        NOW,
+      );
+    expect(await domainError(reassign(lou, ids.admin, true))).toBe(
+      "invalid_transition",
+    );
+    await reassign(lou, ids.admin);
+    // Dossier privé du nouveau responsable : invisible ; partagé, la réattribution est refusée.
+    expect(["not_found", "forbidden"]).toContain(
+      await domainError(reassign(leo, ids.vet)),
+    );
+    await reassign(lou, ids.vet);
+    expect((await service.sheet(leo, plume)).followup).toMatchObject({
+      responsibleMembershipId: ids.vet,
+    });
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM audit_events WHERE action = 'followup.reassigned' AND target_id = $1",
+      [plume],
+    );
+    expect(rows[0]).toEqual({ n: 2 });
+  });
 });
 
 describe("lancement", () => {

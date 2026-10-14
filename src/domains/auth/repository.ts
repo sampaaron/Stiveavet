@@ -197,12 +197,8 @@ export function authRepository(db: Database) {
       return row?.allowed === true;
     },
 
-    async rateLimitReached(bucket: string, windowMinutes: number, max: number) {
-      const [row] = await rows<{ reached: boolean }>(
-        db,
-        sql`SELECT auth.rate_limit_reached(${bucket}, ${minutes(windowMinutes)}::interval, ${max}) AS reached`,
-      );
-      return row?.reached === true;
+    async releaseRateLimit(bucket: string) {
+      await db.execute(sql`SELECT auth.release_rate_limit(${bucket})`);
     },
 
     async recordLoginEvent(event: {

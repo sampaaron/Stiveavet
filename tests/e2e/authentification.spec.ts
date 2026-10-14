@@ -111,7 +111,7 @@ test("mot de passe oublié : lien à usage unique, sessions fermées", async ({
     "Si un compte existe pour cette adresse",
   );
 
-  const { Text } = await latestEmail(account.email, since);
+  const { Text } = await latestEmail(account.email, since, /Réinitialiser/);
   const link = /(http\S+jeton=[\w-]+)/.exec(Text)?.[1];
   expect(link).toBeDefined();
   await otherPage.goto(link ?? "");

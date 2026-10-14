@@ -127,6 +127,15 @@ describe("garde-fous", () => {
     ["Ne vous inquiétez pas, c'est normal après une opération.", "reassurance"],
     ["Rien de grave, tout va bien.", "reassurance"],
     ["Don't worry, this is perfectly normal.", "reassurance"],
+    // Formulations relevées par la revue de sécurité (étape 26 bis).
+    ["Vous pouvez lui donner un demi-comprimé de Metacam ce soir.", "dosage"],
+    ["Il peut prendre 250 milligrammes de paracétamol.", "dosage"],
+    ["Vous pouvez arrêter les antibiotiques demain.", "prescription"],
+    ["Elle peut reprendre ses comprimés dès ce soir.", "prescription"],
+    ["Cela ressemble à une infection de la plaie.", "diagnosis"],
+    ["You can give your dog half a tablet of Metacam.", "dosage"],
+    ["You can stop the antibiotics tomorrow.", "prescription"],
+    ["This looks like an infection.", "diagnosis"],
   ])("refuse « %s » (%s)", (text, reason) => {
     expect(checkNumaReply(text)).toEqual({ ok: false, reason });
   });

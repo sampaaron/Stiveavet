@@ -15,8 +15,6 @@ const serverEnvSchema = z
     DATABASE_URL: z.url().optional(),
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
-    // « true » seulement derrière le répartiteur de charge, qui écrit X-Forwarded-For.
-    // Sinon l'en-tête est falsifiable : l'IP est alors ignorée (pas de limite par IP).
     // Clé des liens de lecture signés des fichiers (ADR 0019), 32 caractères au moins.
     // En local, sans valeur, une clé aléatoire est tirée au démarrage (liens perdus au
     // redémarrage, sans conséquence : ils ne vivent que deux minutes).
@@ -26,6 +24,8 @@ const serverEnvSchema = z
       .string()
       .refine((value) => value.startsWith("/"))
       .optional(),
+    // « true » seulement derrière le répartiteur de charge, qui écrit X-Forwarded-For.
+    // Sinon l'en-tête est falsifiable : l'IP est alors ignorée (pas de limite par IP).
     TRUST_PROXY: z
       .enum(["true", "false"])
       .default("false")

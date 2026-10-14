@@ -65,8 +65,9 @@ export async function setChallengeCookie(token: string) {
   );
 }
 
+/** Effacement avec les mêmes attributs : sans `Secure`, un cookie `__Host-` resterait en place. */
 export async function clearAuthCookie(kind: "session" | "challenge") {
-  (await cookies()).delete(COOKIE[kind]());
+  (await cookies()).set(COOKIE[kind](), "", options(0));
 }
 
 /** Accès à la démo : 14 jours, comme la validité côté serveur (migration 0007). */

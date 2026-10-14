@@ -158,6 +158,51 @@ describe("connexion", () => {
     expect(blocked.status).toBe("rate_limited");
   });
 
+  it("des tentatives simultanées ne dépassent pas la limite de 5 échecs", async () => {
+    const { email } = await newAdmin();
+    const statuses = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        service.login({ email, password: "mauvais essai" }, origin),
+      ),
+    );
+    const tried = statuses.filter((result) => result.status === "invalid");
+    expect(tried).toHaveLength(5);
+  });
+
+  it("des échecs venus d'ailleurs ne bloquent pas un appareil de confiance", async () => {
+    const { email, deviceToken } = await newAdmin();
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      await service.login({ email, password: "mauvais essai" }, origin);
+    expect(
+      (await service.login({ email, password: STRONG }, origin)).status,
+    ).toBe("rate_limited");
+    expect(
+      (await service.login({ email, password: STRONG, deviceToken }, origin))
+        .status,
+    ).toBe("signed_in");
+  });
+
+  it("une connexion réussie ne compte pas comme un échec", async () => {
+    const { email, deviceToken } = await newAdmin();
+    for (let attempt = 0; attempt < 8; attempt += 1)
+      expect(
+        (await service.login({ email, password: STRONG, deviceToken }, origin))
+          .status,
+      ).toBe("signed_in");
+  });
+
+  it("limite les codes e-mail envoyés par compte", async () => {
+    const { email } = await newAdmin();
+    const statuses: string[] = [];
+    for (let attempt = 0; attempt < 7; attempt += 1)
+      statuses.push(
+        (await service.login({ email, password: STRONG }, origin)).status,
+      );
+    // L'inscription a déjà envoyé un code : 5 de plus, puis plus aucun dans l'heure.
+    expect(statuses.slice(0, 5).every((s) => s === "code_required")).toBe(true);
+    expect(statuses.slice(5)).toEqual(["rate_limited", "rate_limited"]);
+  });
+
   it("limite les tentatives par adresse IP quand elle est connue", async () => {
     const ip = { ip: "203.0.113.77", userAgent: "vitest" };
     const results: string[] = [];
@@ -364,7 +409,7 @@ describe("réinitialisation du mot de passe", () => {
           origin,
         )
       ).status,
-    ).toBe("signed_in");
+    ).toBe("code_required");
   });
 
   it("lien expiré refusé ; mot de passe faible refusé sans consommer le lien", async () => {

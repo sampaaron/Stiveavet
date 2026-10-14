@@ -11,6 +11,7 @@ import type {
   SendFailure,
   WhatsAppConnector,
 } from "./types";
+import { readCappedBody } from "@/server/security/capped-body";
 
 /**
  * WhatsApp Cloud API de Meta (ADR 0024), pour un numéro de cabinet. Un seul appel par
@@ -85,31 +86,8 @@ async function readCapped(
   response: Response,
   maxBytes: number,
 ): Promise<Uint8Array> {
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (declared > maxBytes) {
-    await response.body?.cancel();
-    throw new WhatsAppMediaError("too_large", "content_length");
-  }
-  if (!response.body) return new Uint8Array();
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new WhatsAppMediaError("too_large", "body");
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+  const bytes = await readCappedBody(response, maxBytes);
+  if (!bytes) throw new WhatsAppMediaError("too_large", "body");
   return bytes;
 }
 

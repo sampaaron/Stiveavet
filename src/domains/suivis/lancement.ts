@@ -1061,6 +1061,16 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             data.responsibleMembershipId &&
             data.responsibleMembershipId !== followup.responsibleMembershipId
           ) {
+            // Changer de responsable et lancer sont deux décisions distinctes (ADR 0015 §6).
+            // Un vétérinaire ne reprend pas le brouillon d'un confrère : seuls l'équipe qui
+            // prépare, le responsable actuel et un administrateur de l'équipe le réattribuent.
+            if (options.launch) throw new DomainError("invalid_transition");
+            if (
+              actor.role !== "assistant" &&
+              actor.membershipId !== followup.responsibleMembershipId &&
+              !actor.permissions.has("team.manage")
+            )
+              throw new DomainError("forbidden");
             const vets = await activeVets(tx);
             if (
               !vets.some(
@@ -1069,6 +1079,10 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             )
               throw new DomainError("invalid_target");
             changes.responsibleMembershipId = data.responsibleMembershipId;
+            await audit(tx, actor, "followup.reassigned", followupId, {
+              from: followup.responsibleMembershipId,
+              to: data.responsibleMembershipId,
+            });
           }
           if (data.firstContactHours !== undefined)
             changes.firstContactAt = firstContactAt(

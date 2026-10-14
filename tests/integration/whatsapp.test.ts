@@ -34,6 +34,7 @@ import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
 import { conversationWorker } from "./support/whatsapp";
+import { fictionalPng } from "../support/png";
 
 /**
  * WhatsApp réel (ADR 0024), de bout en bout contre l'imitation locale de Meta : inscription
@@ -685,9 +686,7 @@ describe("envois et webhooks", () => {
   });
 });
 
-const PNG = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 73, 72, 68, 82,
-]);
+const PNG = fictionalPng(16, 16);
 const OGG = new TextEncoder().encode("OggS\0\u0002vocal fictif de test");
 
 /** Le propriétaire envoie un fichier depuis WhatsApp : Meta le garde, puis le webhook. */
