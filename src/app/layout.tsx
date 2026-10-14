@@ -1,4 +1,5 @@
 import "@fontsource-variable/plus-jakarta-sans";
+import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
 
 import type { Metadata } from "next";

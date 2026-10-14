@@ -7,6 +7,9 @@
 @theme {
   --font-sans:
     "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Relevés et données (heures, jours de suivi, compteurs, identifiants) : lecture « moniteur ». */
+  --font-mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Barre latérale sombre (« chrome », lueurs vertes) ; le contenu reste clair sur « canvas ». */
   --color-chrome: #0b1512;
@@ -35,8 +38,8 @@
   --color-night-soft: #141d2e;
   --color-mint: #8ce8c3;
 
-  --radius-card: 20px;
-  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-control: 10px;
   --radius-panel: 28px;
 
   --shadow-card:
@@ -81,6 +84,18 @@
     opacity: 0.55;
   }
 
+  @keyframes signal-ping {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    80%,
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -91,6 +106,33 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/*
+ * Papier millimétré très léger du panneau de contenu (style relevé clinique).
+ * Décor seulement, sous le contenu.
+ */
+@utility clinical-grid {
+  background-color: var(--color-canvas);
+  background-image:
+    linear-gradient(rgb(11 18 32 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(11 18 32 / 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+
+/* Halo d'un voyant « en direct » (urgence en attente) ; coupé si l'animation est réduite. */
+@utility signal-ping {
+  animation: signal-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Étiquette de section « instrument » : petites capitales espacées, chiffres à chasse fixe. */
+@utility overline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /*

@@ -15,6 +15,15 @@ export const followups = {
     private: "Privé",
     controlOn: (date: string) => `Contrôle le ${date}`,
     controlNone: "Contrôle non programmé",
+    /** Repère au-dessus du titre : nombre de suivis affichés. */
+    count: (count: number) => nombre(count, "suivi affiché", "suivis affichés"),
+    /** En-têtes visuels des colonnes (la liste reste lisible sans eux). */
+    columns: {
+      patient: "Patient",
+      followup: "Suivi",
+      responsible: "Responsable",
+      control: "Contrôle",
+    },
     filters: {
       label: "Filtrer les suivis",
       search: "Rechercher",

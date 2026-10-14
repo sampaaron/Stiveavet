@@ -31,31 +31,31 @@ export type Status =
 const statuses: Record<Status, { icon: LucideIcon; className: string }> = {
   normal: {
     icon: CircleDot,
-    className: "bg-brand-soft text-brand-ink",
+    className: "border-brand/25 bg-brand-soft/70 text-brand-ink",
   },
   watch: {
     icon: Eye,
-    className: "bg-watch-soft text-watch",
+    className: "border-watch/30 bg-watch-soft text-watch",
   },
   urgent: {
     icon: CircleAlert,
-    className: "bg-urgent-soft text-urgent",
+    className: "border-urgent/35 bg-urgent-soft text-urgent",
   },
   paused: {
     icon: CirclePause,
-    className: "bg-canvas-subtle text-ink-muted",
+    className: "border-line bg-canvas-subtle text-ink-muted",
   },
   "consent-pending": {
     icon: Clock,
-    className: "bg-canvas-subtle text-ink-muted",
+    className: "border-line bg-canvas-subtle text-ink-muted",
   },
   "consent-given": {
     icon: CircleCheck,
-    className: "bg-brand-soft text-brand-ink",
+    className: "border-brand/25 bg-brand-soft/70 text-brand-ink",
   },
   "consent-stopped": {
     icon: OctagonX,
-    className: "bg-urgent-soft text-urgent",
+    className: "border-urgent/35 bg-urgent-soft text-urgent",
   },
 };
 
@@ -71,10 +71,17 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[13px] font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[12.5px] font-semibold whitespace-nowrap",
         className,
       )}
     >
+      {status === "urgent" ? (
+        // Voyant « en direct » : la gravité est aussi dite par le libellé et l'icône.
+        <span aria-hidden="true" className="relative flex size-1.5">
+          <span className="signal-ping absolute inset-0 rounded-full bg-urgent" />
+          <span className="relative size-1.5 rounded-full bg-urgent" />
+        </span>
+      ) : null}
       <Icon aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
       {label ?? t.ui.status[status]}
     </span>

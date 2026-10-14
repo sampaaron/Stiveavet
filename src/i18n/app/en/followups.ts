@@ -13,6 +13,14 @@ export const followups: AppDictionary["followups"] = {
     private: "Private",
     controlOn: (date: string) => `Check-up on ${date}`,
     controlNone: "No check-up scheduled",
+    count: (count: number) =>
+      `${count} ${count === 1 ? "follow-up" : "follow-ups"} shown`,
+    columns: {
+      patient: "Patient",
+      followup: "Follow-up",
+      responsible: "Responsible",
+      control: "Check-up",
+    },
     filters: {
       label: "Filter follow-ups",
       search: "Search",

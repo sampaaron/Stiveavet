@@ -38,13 +38,17 @@ export function SectionCard({
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <Card id={id} className={cn("scroll-mt-6 p-5 sm:p-6", className)}>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="-mx-5 mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 pb-4 sm:-mx-6 sm:px-6">
         <div className="min-w-0">
-          <Heading className="text-[17px] font-bold tracking-tight">
+          <Heading className="flex items-center gap-2.5 text-base font-bold tracking-tight">
+            <span
+              aria-hidden="true"
+              className="h-4 w-1 shrink-0 rounded-full bg-brand"
+            />
             {title}
           </Heading>
           {description ? (
-            <p className="mt-0.5 text-sm text-ink-muted">{description}</p>
+            <p className="mt-1 text-sm text-ink-muted">{description}</p>
           ) : null}
         </div>
         {action}
@@ -92,8 +96,8 @@ export function StatTile({
 }: StatCardProps & { className?: string }) {
   return (
     <div className={cn("bg-surface p-5", className)}>
-      <div className="flex items-center justify-between gap-2 text-sm font-medium text-ink-muted">
-        <span>{label}</span>
+      <div className="flex items-center justify-between gap-2 text-ink-muted">
+        <span className="overline">{label}</span>
         {icon ? (
           <span
             aria-hidden="true"
@@ -108,7 +112,7 @@ export function StatTile({
       </div>
       <p
         className={cn(
-          "mt-2 font-display text-[2rem] leading-none font-semibold tracking-tight tabular-nums",
+          "mt-3 font-mono text-[1.875rem] leading-none font-semibold tracking-tight tabular-nums",
           toneClasses[tone],
         )}
       >
