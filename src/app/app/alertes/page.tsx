@@ -116,9 +116,20 @@ export default async function AlertsPage({
               <section key={group.id} aria-labelledby={`alertes-${group.id}`}>
                 <h2
                   id={`alertes-${group.id}`}
-                  className="mb-3 text-lg font-semibold"
+                  className="mb-3 flex items-center gap-2.5 text-base font-bold tracking-tight"
                 >
-                  {group.title} ({group.items.length})
+                  <span
+                    aria-hidden="true"
+                    className={
+                      group.id === "urgences"
+                        ? "size-2 rounded-full bg-urgent"
+                        : "size-2 rounded-full bg-watch"
+                    }
+                  />
+                  {group.title}{" "}
+                  <span className="font-mono text-sm font-semibold text-ink-muted tabular-nums">
+                    ({group.items.length})
+                  </span>
                 </h2>
                 <ul className="grid gap-3">
                   {group.items.map((alert) => (

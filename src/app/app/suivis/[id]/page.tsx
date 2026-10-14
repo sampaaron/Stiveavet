@@ -27,7 +27,7 @@ import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
-import { AnimalAvatar } from "@/ui/animal-avatar";
+import { PatientHeader } from "@/ui/patient-header";
 import {
   formatDate,
   formatDateTime,
@@ -153,52 +153,73 @@ export default async function FollowupPage({
     ]);
   const openAlerts = alerts.filter((alert) => alert.status !== "resolved");
   const primary = record.contacts.find((contact) => contact.role === "primary");
+  const vitals = t.dossier.vitals;
+  const day = daysSince(followup.procedureAt, now);
+  const controlSpan = followup.controlAppointmentAt
+    ? daysSince(followup.procedureAt, followup.controlAppointmentAt)
+    : 0;
 
   return (
     <>
       {back}
       {notice}
-      <header className="mb-6 flex flex-wrap items-start gap-4">
-        <AnimalAvatar
-          name={followup.animalName}
-          species={followup.species}
-          size="lg"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
-              {followup.animalName}
-            </h1>
+      <PatientHeader
+        name={followup.animalName}
+        species={followup.species}
+        badges={
+          <>
             <StatusBadge status={dossierStatus(followup, primary)} />
             <PrivateMark t={t} isPrivate={followup.isPrivate} />
             {followup.isTest ? <TestMark /> : null}
-          </div>
-          <p className="mt-1 text-ink-muted">
-            {[
+          </>
+        }
+        subtitle={
+          <>
+            {followup.procedure} ·{" "}
+            {formatRelativeDayTime(followup.procedureAt, now, locale)}
+          </>
+        }
+        readout={{ label: vitals.postOp, value: t.dossier.header.day(day) }}
+        timeline={
+          controlSpan
+            ? {
+                progress: Math.round((day / controlSpan) * 100),
+                start: vitals.start,
+                end: vitals.controlMark(t.dossier.header.day(controlSpan)),
+              }
+            : undefined
+        }
+        vitals={[
+          {
+            label: vitals.species,
+            value: [
               t.labels.species[followup.species],
               record.facts.animal.breed,
-              ageLabel(t, record.facts.animal.birthDate, now),
-              weightLabel(locale, record.facts.animal.weightGrams),
             ]
               .filter(Boolean)
-              .join(" · ")}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            {followup.procedure} ·{" "}
-            {formatRelativeDayTime(followup.procedureAt, now, locale)} ·{" "}
-            {t.dossier.header.day(daysSince(followup.procedureAt, now))} ·{" "}
-            {t.dossier.header.responsible}{" "}
-            <span className="font-semibold text-ink">
-              {followup.responsibleName}
-            </span>
-          </p>
-          {protocolLink ? (
-            <p className="mt-0.5 text-sm text-ink-muted">
-              {t.dossier.header.protocol} {protocolLink}
-            </p>
-          ) : null}
-        </div>
-      </header>
+              .join(" · "),
+          },
+          {
+            label: vitals.age,
+            value: ageLabel(t, record.facts.animal.birthDate, now) ?? "—",
+            mono: true,
+          },
+          {
+            label: vitals.weight,
+            value: weightLabel(locale, record.facts.animal.weightGrams) ?? "—",
+            mono: true,
+          },
+          { label: vitals.responsible, value: followup.responsibleName },
+          {
+            label: vitals.control,
+            value: followup.controlAppointmentAt
+              ? formatDate(followup.controlAppointmentAt, locale)
+              : t.dossier.basic.notScheduled,
+            mono: Boolean(followup.controlAppointmentAt),
+          },
+          { label: vitals.protocol, value: protocolLink ?? "—" },
+        ]}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -404,30 +425,29 @@ function BasicDossier({
   const text = t.dossier.basic;
   return (
     <>
-      <header className="mb-6 flex flex-wrap items-start gap-4">
-        <AnimalAvatar
-          name={followup.animalName}
-          species={followup.species}
-          size="lg"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
-              {followup.animalName}
-            </h1>
+      <PatientHeader
+        name={followup.animalName}
+        species={followup.species}
+        badges={
+          <>
             {badge ? <StatusBadge status={badge} /> : null}
             <PrivateMark t={t} isPrivate={followup.isPrivate} />
             {followup.isTest ? <TestMark /> : null}
-          </div>
-          <p className="mt-1 text-ink-muted">
-            {t.labels.species[followup.species]} ·{" "}
-            {t.dossier.header.responsible}{" "}
-            <span className="font-semibold text-ink">
-              {followup.responsibleName}
-            </span>
-          </p>
-        </div>
-      </header>
+          </>
+        }
+        subtitle={t.labels.followupStatus[followup.status]}
+        vitals={[
+          {
+            label: t.dossier.vitals.species,
+            value: t.labels.species[followup.species],
+          },
+          {
+            label: t.dossier.vitals.responsible,
+            value: followup.responsibleName,
+          },
+          { label: text.owner, value: followup.ownerName ?? "—" },
+        ]}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">

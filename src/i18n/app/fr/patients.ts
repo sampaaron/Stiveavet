@@ -29,6 +29,12 @@ export const patients = {
   noMatchDescription: "Modifiez la recherche ou les filtres.",
   open: "Ouvrir",
   openLabel: (name: string) => `Ouvrir la fiche de ${name}`,
+  columns: {
+    patient: "Patient",
+    details: "Signalement",
+    owners: "Propriétaires",
+    status: "Statut",
+  },
   noOwner: "Sans propriétaire",
   badges: {
     archived: "Archivé",

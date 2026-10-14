@@ -31,6 +31,12 @@ export const patients: AppDictionary["patients"] = {
   noMatchDescription: "Change the search or the filters.",
   open: "Open",
   openLabel: (name: string) => `Open ${name}'s record`,
+  columns: {
+    patient: "Patient",
+    details: "Details",
+    owners: "Owners",
+    status: "Status",
+  },
   noOwner: "No owner",
   badges: {
     archived: "Archived",

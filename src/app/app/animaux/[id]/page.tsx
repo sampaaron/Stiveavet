@@ -10,10 +10,10 @@ import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
-import { AnimalAvatar } from "@/ui/animal-avatar";
 import { ButtonLink } from "@/ui/button";
 import { SectionCard } from "@/ui/card";
 import { formatDate, formatDateTime, toDateTimeInput } from "@/ui/format";
+import { PatientHeader } from "@/ui/patient-header";
 import { EmptyState } from "@/ui/states";
 
 import { AnimalStatusButtons, LaunchFromAnimalForm } from "../record-forms";
@@ -89,39 +89,40 @@ export default async function AnimalPage({
         {text.back}
       </Link>
 
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <AnimalAvatar name={record.name} species={record.species} size="lg" />
-          <div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight">
-              {record.name}
-            </h1>
-            <p className="text-ink-muted">
-              {t.labels.species[record.species]}
-              {record.breed ? ` · ${record.breed}` : ""}
-              {months !== null ? ` · ${t.patients.age(months)}` : ""}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-start gap-2">
-          {record.archivedAt ? null : (
-            <ButtonLink
-              href={`/app/animaux/${record.id}/modifier`}
-              variant="secondary"
-              size="sm"
-              icon={<Pencil aria-hidden="true" className="size-3.5" />}
-            >
-              {text.edit}
-            </ButtonLink>
-          )}
-          <AnimalStatusButtons
-            animalId={record.id}
-            animalName={record.name}
-            archived={record.archivedAt !== null}
-            canDelete={record.canDelete}
-          />
-        </div>
-      </header>
+      <PatientHeader
+        name={record.name}
+        species={record.species}
+        subtitle={
+          record.owners.length
+            ? t.common.list(record.owners.map((owner) => owner.fullName))
+            : undefined
+        }
+        actions={
+          <>
+            {record.archivedAt ? null : (
+              <ButtonLink
+                href={`/app/animaux/${record.id}/modifier`}
+                variant="secondary"
+                size="sm"
+                icon={<Pencil aria-hidden="true" className="size-3.5" />}
+              >
+                {text.edit}
+              </ButtonLink>
+            )}
+            <AnimalStatusButtons
+              animalId={record.id}
+              animalName={record.name}
+              archived={record.archivedAt !== null}
+              canDelete={record.canDelete}
+            />
+          </>
+        }
+        vitals={facts.map(([label, value]) => ({
+          label,
+          value,
+          mono: label === text.weight || label === text.registered,
+        }))}
+      />
 
       {record.archivedAt ? (
         <div className="mb-6">
@@ -133,17 +134,6 @@ export default async function AnimalPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="grid min-w-0 grid-cols-1 content-start gap-6">
-          <SectionCard title={text.identity}>
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              {facts.map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-ink-muted">{label}</dt>
-                  <dd className="font-medium">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </SectionCard>
-
           <SectionCard title={text.owners}>
             <ul className="grid gap-4">
               {record.owners.map((owner, index) => (

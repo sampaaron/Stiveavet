@@ -25,28 +25,31 @@ function badge(row: RegistryRow, text: AppDictionary["patients"]["badges"]) {
   if (row.archived)
     return {
       label: text.archived,
-      className: "bg-canvas-subtle text-ink-muted",
+      className: "border-line bg-canvas-subtle text-ink-muted",
     };
   switch (row.openFollowup?.status) {
     case undefined:
     case "ended":
       return null;
     case "draft":
-      return { label: text.draft, className: "bg-canvas-subtle text-ink" };
+      return {
+        label: text.draft,
+        className: "border-line bg-canvas-subtle text-ink",
+      };
     case "paused":
       return {
         label: text.paused,
-        className: "bg-canvas-subtle text-ink-muted",
+        className: "border-line bg-canvas-subtle text-ink-muted",
       };
     case "human_takeover":
       return {
         label: text.takeover,
-        className: "bg-brand-soft text-brand-ink",
+        className: "border-brand/25 bg-brand-soft text-brand-ink",
       };
     case "active":
       return {
         label: text.followed,
-        className: "bg-brand-soft text-brand-ink",
+        className: "border-brand/25 bg-brand-soft text-brand-ink",
       };
   }
 }
@@ -174,11 +177,20 @@ export default async function AnimalsPage({
           <>
             <p
               role="status"
-              className="border-b border-line px-5 py-3 text-sm font-medium text-ink-muted"
+              className="border-b border-line px-5 py-3 overline text-ink-muted"
             >
               {text.count(rows.length)}
               {rows.length >= 200 ? ` · ${text.limitNote}` : ""}
             </p>
+            <div
+              aria-hidden="true"
+              className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,1fr)_1rem] gap-4 border-b border-line bg-canvas px-5 py-2 text-ink-muted md:grid"
+            >
+              <span className="overline">{text.columns.patient}</span>
+              <span className="overline">{text.columns.details}</span>
+              <span className="overline">{text.columns.owners}</span>
+              <span className="overline">{text.columns.status}</span>
+            </div>
             <ul className="divide-y divide-line">
               {rows.map((row) => {
                 const months = ageInMonths(row.birthDate, now);
@@ -188,35 +200,54 @@ export default async function AnimalsPage({
                     <Link
                       href={`/app/animaux/${row.id}`}
                       aria-label={text.openLabel(row.name)}
-                      className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 hover:bg-canvas-subtle focus-visible:bg-canvas-subtle"
+                      className="grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-1.5 px-5 py-3.5 transition-colors hover:bg-canvas focus-visible:bg-canvas md:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,1fr)_1rem]"
                     >
-                      <AnimalAvatar name={row.name} species={row.species} />
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">
-                          {row.name}
-                          <span className="font-normal text-ink-muted">
-                            {" "}
-                            · {t.labels.species[row.species]}
-                            {row.breed ? ` · ${row.breed}` : ""}
-                            {months !== null ? ` · ${text.age(months)}` : ""}
+                      <span className="flex min-w-0 items-center gap-4">
+                        <AnimalAvatar name={row.name} species={row.species} />
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">
+                            {row.name}
                           </span>
-                        </p>
-                        <p className="truncate text-sm text-ink-muted">
-                          {row.owners.length
-                            ? t.common.list(row.owners)
-                            : text.noOwner}
-                        </p>
+                          <span className="block truncate text-sm text-ink-muted md:hidden">
+                            {row.owners.length
+                              ? t.common.list(row.owners)
+                              : text.noOwner}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="col-start-1 min-w-0 truncate pl-14 text-sm text-ink-muted md:col-start-auto md:pl-0">
+                        {t.labels.species[row.species]}
+                        {row.breed ? ` · ${row.breed}` : ""}
+                        {months !== null ? (
+                          <span className="font-mono text-xs text-ink">
+                            {" "}
+                            · {text.age(months)}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="hidden min-w-0 truncate text-sm md:block">
+                        {row.owners.length
+                          ? t.common.list(row.owners)
+                          : text.noOwner}
+                      </span>
+                      <span
+                        className={`col-start-1 pl-14 md:col-start-auto md:block md:pl-0 ${status ? "" : "hidden"}`}
+                      >
                         {status ? (
                           <span
-                            className={`mt-1.5 inline-flex rounded-full px-2.5 py-0.5 text-[13px] font-semibold ${status.className}`}
+                            className={`inline-flex rounded-md border px-2 py-0.5 text-[12.5px] font-semibold ${status.className}`}
                           >
                             {status.label}
                           </span>
-                        ) : null}
-                      </div>
+                        ) : (
+                          <span className="font-mono text-xs text-ink-muted">
+                            —
+                          </span>
+                        )}
+                      </span>
                       <ChevronRight
                         aria-hidden="true"
-                        className="size-4 text-ink-muted"
+                        className="col-start-2 row-start-1 size-4 text-ink-muted md:col-start-auto md:row-start-auto"
                       />
                     </Link>
                   </li>

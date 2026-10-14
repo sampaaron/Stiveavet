@@ -80,16 +80,19 @@ export default async function ActivityPage() {
           {actions.length === 0 ? (
             <EmptyState title={t.journal.noActions} />
           ) : (
-            <ol className="grid gap-3">
+            <ol className="relative ml-1 border-l border-line">
               {actions.map((event) => (
-                <li key={event.id} className="flex gap-3 text-sm">
+                <li
+                  key={event.id}
+                  className="relative pb-4 pl-5 text-sm before:absolute before:top-1.5 before:-left-[4.5px] before:size-2 before:rounded-full before:bg-brand before:ring-4 before:ring-surface last:pb-0"
+                >
                   <time
                     dateTime={event.occurredAt.toISOString()}
-                    className="w-28 shrink-0 text-ink-muted tabular-nums"
+                    className="block font-mono text-xs text-ink-muted tabular-nums"
                   >
                     {formatDateTime(event.occurredAt, locale)}
                   </time>
-                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                  <span className="mt-0.5 block min-w-0 [overflow-wrap:anywhere]">
                     {sentence(t, event)}
                   </span>
                 </li>
@@ -101,16 +104,19 @@ export default async function ActivityPage() {
           {logins.length === 0 ? (
             <EmptyState title={t.journal.noLogins} />
           ) : (
-            <ol className="grid gap-3">
+            <ol className="relative ml-1 border-l border-line">
               {logins.map((event) => (
-                <li key={event.id} className="flex gap-3 text-sm">
+                <li
+                  key={event.id}
+                  className="relative pb-4 pl-5 text-sm before:absolute before:top-1.5 before:-left-[4.5px] before:size-2 before:rounded-full before:bg-brand before:ring-4 before:ring-surface last:pb-0"
+                >
                   <time
                     dateTime={event.occurredAt.toISOString()}
-                    className="w-28 shrink-0 text-ink-muted tabular-nums"
+                    className="block font-mono text-xs text-ink-muted tabular-nums"
                   >
                     {formatDateTime(event.occurredAt, locale)}
                   </time>
-                  <span>
+                  <span className="mt-0.5 block">
                     <span className="font-semibold">
                       {event.userId
                         ? (event.userName ?? "—")
