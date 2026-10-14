@@ -7,6 +7,7 @@ import type { Locale } from "@/i18n/locales";
 
 import { AppTopbar } from "./app-topbar";
 import { SidebarNav } from "./sidebar-nav";
+import { initials } from "./format";
 
 type AppShellProps = {
   organizationName: string;
@@ -98,7 +99,7 @@ export function AppShell({
         }
       />
       <div className="min-w-0 lg:py-2 lg:pr-2">
-        <div className="clinical-grid min-h-screen lg:min-h-[calc(100vh-1rem)] lg:rounded-[var(--radius-panel)] lg:border lg:border-line lg:shadow-[var(--shadow-card)]">
+        <div className="min-h-screen clinical-grid lg:min-h-[calc(100vh-1rem)] lg:rounded-[var(--radius-panel)] lg:border lg:border-line lg:shadow-[var(--shadow-card)]">
           <AppTopbar
             canSearch={canSearch}
             canSeeAlerts={permissions.includes("clinical.read")}
@@ -114,13 +115,4 @@ export function AppShell({
       </div>
     </div>
   );
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter((part) => /^\p{L}/u.test(part))
-    .slice(-2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }

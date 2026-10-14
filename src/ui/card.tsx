@@ -97,7 +97,7 @@ export function StatTile({
   return (
     <div className={cn("bg-surface p-5", className)}>
       <div className="flex items-center justify-between gap-2 text-ink-muted">
-        <span className="overline">{label}</span>
+        <span className="tech-label">{label}</span>
         {icon ? (
           <span
             aria-hidden="true"
@@ -128,14 +128,17 @@ export function StatTile({
 export function StatGrid({
   children,
   className,
+  columns = 4,
 }: {
   children: ReactNode;
   className?: string;
+  columns?: 3 | 4;
 }) {
   return (
     <Card
       className={cn(
-        "grid gap-px overflow-hidden bg-line sm:grid-cols-2 xl:grid-cols-4",
+        "grid gap-px overflow-hidden bg-line sm:grid-cols-2",
+        columns === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4",
         className,
       )}
     >

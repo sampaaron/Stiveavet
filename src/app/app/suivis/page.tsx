@@ -183,7 +183,7 @@ export default async function FollowupsPage({
           <>
             <div
               aria-hidden="true"
-              className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1fr)_1rem] gap-4 border-b border-line px-5 py-3 overline text-ink-muted md:grid"
+              className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1fr)_1rem] gap-4 border-b border-line px-5 py-3 tech-label text-ink-muted md:grid"
             >
               <span className="pl-14">{text.columns.patient}</span>
               <span>{text.columns.followup}</span>
@@ -287,7 +287,7 @@ export default async function FollowupsPage({
                       <span className="hidden truncate text-sm md:block">
                         {followup.responsibleName}
                       </span>
-                      <span className="col-start-1 pl-14 font-mono text-xs text-ink-muted md:col-start-auto md:pl-0">
+                      <span className="col-start-1 pl-14 text-sm text-ink-muted tabular-nums md:col-start-auto md:pl-0">
                         {followup.controlAppointmentAt
                           ? text.controlOn(
                               formatDate(followup.controlAppointmentAt, locale),

@@ -30,7 +30,7 @@ const tones: Record<
     icon: CircleAlert,
     className:
       "border-urgent/30 bg-linear-to-r from-urgent-soft to-surface before:bg-urgent",
-    iconClassName: "bg-urgent text-white",
+    iconClassName: "bg-urgent text-white ring-4 ring-urgent/15",
   },
 };
 
@@ -67,15 +67,12 @@ export function AlertBanner({
       <span
         aria-hidden="true"
         className={cn(
-          "relative grid shrink-0 place-items-center rounded-[var(--radius-control)]",
+          "grid shrink-0 place-items-center rounded-[var(--radius-control)]",
           compact ? "size-7" : "size-9",
           iconClassName,
         )}
       >
-        {tone === "urgent" ? (
-          <span className="absolute inset-0 signal-ping rounded-[inherit] bg-urgent" />
-        ) : null}
-        <Icon className={cn("relative", compact ? "size-4" : "size-[18px]")} />
+        <Icon className={compact ? "size-4" : "size-[18px]"} />
       </span>
       <div className={cn("min-w-0 flex-1", compact && "basis-48")}>
         <p className={compact ? "text-sm font-medium" : "font-semibold"}>

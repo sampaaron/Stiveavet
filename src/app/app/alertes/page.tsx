@@ -55,7 +55,10 @@ export default async function AlertsPage({
           {done}
         </p>
       ) : null}
-      <nav aria-label={text.views.label} className="mb-4 flex gap-2">
+      <nav
+        aria-label={text.views.label}
+        className="mb-5 inline-flex gap-1 rounded-[var(--radius-control)] border border-line bg-surface p-1 shadow-[var(--shadow-card)]"
+      >
         {[
           { href: "/app/alertes", label: text.views.open, active: !history },
           {
@@ -70,8 +73,8 @@ export default async function AlertsPage({
             aria-current={view.active ? "page" : undefined}
             className={
               view.active
-                ? "inline-flex min-h-11 items-center rounded-full bg-brand-soft px-4 text-sm font-semibold text-brand-ink"
-                : "inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-ink-muted hover:bg-canvas-subtle"
+                ? "inline-flex min-h-10 items-center rounded-[7px] bg-chrome px-4 text-sm font-semibold text-white"
+                : "inline-flex min-h-10 items-center rounded-[7px] px-4 text-sm font-semibold text-ink-muted hover:bg-canvas-subtle hover:text-ink"
             }
           >
             {view.label}

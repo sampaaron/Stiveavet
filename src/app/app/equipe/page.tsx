@@ -6,8 +6,9 @@ import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
+import { cn } from "@/ui/cn";
 import { Card, SectionCard } from "@/ui/card";
-import { formatDate } from "@/ui/format";
+import { formatDate, initials } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 
 import {
@@ -94,8 +95,18 @@ export default async function TeamPage() {
         ) : null}
 
         <section aria-labelledby="membres" className="grid gap-4">
-          <h2 id="membres" className="text-lg font-bold tracking-tight">
+          <h2
+            id="membres"
+            className="flex items-center gap-2.5 text-base font-bold tracking-tight"
+          >
+            <span
+              aria-hidden="true"
+              className="h-4 w-1 shrink-0 rounded-full bg-brand"
+            />
             {t.team.members.title}
+            <span className="font-mono text-sm font-semibold text-ink-muted tabular-nums">
+              ({members.length})
+            </span>
           </h2>
           {members.map((member) => (
             <MemberCard
@@ -130,21 +141,41 @@ function MemberCard({
   return (
     <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-bold">
-            {member.name}
-            {member.isSelf ? (
-              <span className="font-normal text-ink-muted">
-                {" "}
-                · {t.team.members.you}
-              </span>
-            ) : null}
-          </h3>
-          <p className="text-sm text-ink-muted">
-            {member.email} · {t.labels.roles[member.role]}
-          </p>
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span
+            aria-hidden="true"
+            className={cn(
+              "grid size-10 shrink-0 place-items-center rounded-full font-mono text-[13px] font-semibold",
+              member.active
+                ? "bg-chrome text-mint"
+                : "bg-canvas-subtle text-ink-muted",
+            )}
+          >
+            {initials(member.name)}
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-bold">
+              {member.name}
+              {member.isSelf ? (
+                <span className="font-normal text-ink-muted">
+                  {" "}
+                  · {t.team.members.you}
+                </span>
+              ) : null}
+            </h3>
+            <p className="text-sm [overflow-wrap:anywhere] text-ink-muted">
+              {member.email} · {t.labels.roles[member.role]}
+            </p>
+          </div>
         </div>
-        <p className="text-sm text-ink-muted">
+        <p
+          className={cn(
+            "rounded-md border px-2 py-0.5 text-[12.5px] font-semibold tabular-nums",
+            member.active
+              ? "border-brand/25 bg-brand-soft text-brand-ink"
+              : "border-line bg-canvas-subtle text-ink-muted",
+          )}
+        >
           {member.active
             ? t.team.members.activeFollowups(member.activeFollowups)
             : t.team.members.accessRemoved}

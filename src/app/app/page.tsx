@@ -45,6 +45,7 @@ import type { AppDictionary } from "@/i18n/app/types";
 import type { Locale } from "@/i18n/locales";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
+import { SignalTrace } from "@/ui/patient-header";
 import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
@@ -277,9 +278,10 @@ export default async function TodayPage() {
       <div className="grid gap-6">
         <section
           aria-labelledby="point-de-numa"
-          className="rounded-[var(--radius-panel)] border border-line p-5 shadow-[var(--shadow-card)] assistant-glow sm:p-7"
+          className="relative isolate overflow-hidden rounded-[var(--radius-panel)] border border-line p-5 shadow-[var(--shadow-card)] assistant-glow sm:p-7"
         >
-          <div className="flex items-start gap-4">
+          <SignalTrace className="top-10 h-16 w-1/2 opacity-[0.1]" />
+          <div className="relative flex items-start gap-4">
             <AssistantAvatar
               assistant="numa"
               size={56}

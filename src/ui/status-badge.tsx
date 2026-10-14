@@ -78,7 +78,7 @@ export function StatusBadge({
       {status === "urgent" ? (
         // Voyant « en direct » : la gravité est aussi dite par le libellé et l'icône.
         <span aria-hidden="true" className="relative flex size-1.5">
-          <span className="signal-ping absolute inset-0 rounded-full bg-urgent" />
+          <span className="absolute inset-0 signal-ping rounded-full bg-urgent" />
           <span className="relative size-1.5 rounded-full bg-urgent" />
         </span>
       ) : null}

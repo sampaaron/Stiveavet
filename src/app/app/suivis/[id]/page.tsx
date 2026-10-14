@@ -202,7 +202,6 @@ export default async function FollowupPage({
           {
             label: vitals.age,
             value: ageLabel(t, record.facts.animal.birthDate, now) ?? "—",
-            mono: true,
           },
           {
             label: vitals.weight,
@@ -215,7 +214,6 @@ export default async function FollowupPage({
             value: followup.controlAppointmentAt
               ? formatDate(followup.controlAppointmentAt, locale)
               : t.dossier.basic.notScheduled,
-            mono: Boolean(followup.controlAppointmentAt),
           },
           { label: vitals.protocol, value: protocolLink ?? "—" },
         ]}

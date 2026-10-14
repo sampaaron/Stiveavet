@@ -41,8 +41,8 @@ export function PatientHeader({
 }: PatientHeaderProps) {
   return (
     <header className="mb-6 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-card)]">
-      <div className="relative flex flex-wrap items-start gap-4 p-5 sm:p-6">
-        <Trace />
+      <div className="relative isolate flex flex-wrap items-start gap-4 p-5 sm:p-6">
+        <SignalTrace />
         <AnimalAvatar name={name} species={species} size="lg" />
         <div className="relative min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -55,7 +55,7 @@ export function PatientHeader({
         </div>
         {readout ? (
           <div className="relative rounded-[var(--radius-control)] border border-line bg-canvas px-4 py-2.5 text-right">
-            <p className="overline text-ink-muted">{readout.label}</p>
+            <p className="tech-label text-ink-muted">{readout.label}</p>
             <p className="mt-1 font-mono text-2xl leading-none font-semibold text-brand-ink tabular-nums">
               {readout.value}
             </p>
@@ -100,7 +100,7 @@ export function PatientHeader({
             key={vital.label}
             className="min-w-0 border-t border-l border-line px-5 py-3.5 sm:px-6"
           >
-            <dt className="overline text-ink-muted">{vital.label}</dt>
+            <dt className="tech-label text-ink-muted">{vital.label}</dt>
             <dd
               className={cn(
                 "mt-1 text-sm font-semibold [overflow-wrap:anywhere] text-ink",
@@ -117,13 +117,16 @@ export function PatientHeader({
 }
 
 /** Tracé de moniteur en filigrane, purement décoratif. */
-function Trace() {
+export function SignalTrace({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 320 60"
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-x-0 top-1/2 h-14 w-full -translate-y-1/2 text-brand opacity-[0.07]"
+      className={cn(
+        "pointer-events-none absolute top-1/2 right-0 -z-10 h-14 w-2/3 -translate-y-1/2 [mask-image:linear-gradient(90deg,transparent,#000_55%)] text-brand opacity-[0.08]",
+        className,
+      )}
     >
       <path
         d="M0 30 H120 L130 30 L138 12 L146 50 L154 22 L160 30 H200 L208 26 L214 30 H320"

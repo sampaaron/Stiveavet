@@ -177,7 +177,7 @@ export default async function AnimalsPage({
           <>
             <p
               role="status"
-              className="border-b border-line px-5 py-3 overline text-ink-muted"
+              className="border-b border-line px-5 py-3 tech-label text-ink-muted"
             >
               {text.count(rows.length)}
               {rows.length >= 200 ? ` · ${text.limitNote}` : ""}
@@ -186,10 +186,10 @@ export default async function AnimalsPage({
               aria-hidden="true"
               className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,1fr)_1rem] gap-4 border-b border-line bg-canvas px-5 py-2 text-ink-muted md:grid"
             >
-              <span className="overline">{text.columns.patient}</span>
-              <span className="overline">{text.columns.details}</span>
-              <span className="overline">{text.columns.owners}</span>
-              <span className="overline">{text.columns.status}</span>
+              <span className="tech-label">{text.columns.patient}</span>
+              <span className="tech-label">{text.columns.details}</span>
+              <span className="tech-label">{text.columns.owners}</span>
+              <span className="tech-label">{text.columns.status}</span>
             </div>
             <ul className="divide-y divide-line">
               {rows.map((row) => {
@@ -219,7 +219,7 @@ export default async function AnimalsPage({
                         {t.labels.species[row.species]}
                         {row.breed ? ` · ${row.breed}` : ""}
                         {months !== null ? (
-                          <span className="font-mono text-xs text-ink">
+                          <span className="tabular-nums">
                             {" "}
                             · {text.age(months)}
                           </span>

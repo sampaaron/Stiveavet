@@ -166,3 +166,13 @@ export function shortPersonName(displayName: string): string {
     return `${parts[0]} ${parts.at(-1)}`;
   return displayName.trim();
 }
+
+/** Initiales des deux derniers mots d'un nom : « Dr Claire Fontaine » donne « CF ». */
+export function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter((part) => /^\p{L}/u.test(part))
+    .slice(-2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}

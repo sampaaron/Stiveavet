@@ -22,7 +22,7 @@ export function PageHeader({
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         {eyebrow ? (
-          <p className="overline mb-2 flex items-center gap-2 text-brand-ink">
+          <p className="mb-2 flex items-center gap-2 tech-label text-brand-ink">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-brand"

@@ -20,7 +20,7 @@ import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { ButtonLink } from "@/ui/button";
 import { CapacityMeter } from "@/ui/capacity-meter";
-import { Card, SectionCard } from "@/ui/card";
+import { Card, SectionCard, StatGrid, StatTile } from "@/ui/card";
 import { formatDate, formatEuros } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { planHighlights } from "@/ui/plan-summary";
@@ -100,27 +100,22 @@ export default async function BillingPage() {
           </AlertBanner>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">{text.plan}</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight">
-              {planText.name}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {phaseLabel(overview, t, locale)}
-            </p>
-          </Card>
-          <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">
-              {text.next.title}
-            </p>
-            <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
-              {overview.nextPriceCents !== null
+        <StatGrid columns={3}>
+          <StatTile
+            label={text.plan}
+            value={planText.name}
+            hint={phaseLabel(overview, t, locale)}
+            tone="brand"
+          />
+          <StatTile
+            label={text.next.title}
+            value={
+              overview.nextPriceCents !== null
                 ? text.exclVat(euros(overview.nextPriceCents))
-                : text.next.none}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {overview.nextPriceCents !== null && overview.period
+                : text.next.none
+            }
+            hint={
+              overview.nextPriceCents !== null && overview.period
                 ? overview.pending.amountCents
                   ? text.next.onWithSurcharges(
                       date(overview.period.end),
@@ -129,27 +124,23 @@ export default async function BillingPage() {
                   : text.next.on(date(overview.period.end))
                 : facts.endsAt
                   ? text.next.cancelled(date(facts.endsAt))
-                  : ""}
-            </p>
-          </Card>
-          <Card className="p-5 sm:col-span-2 xl:col-span-1">
-            <p className="text-sm font-medium text-ink-muted">
-              {text.activeFollowups.title}
-            </p>
-            <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
-              {text.activeFollowups.count(
-                overview.activeFollowups,
-                plan.includedActiveFollowups,
-              )}
-            </p>
-            <div className="mt-3">
-              <CapacityMeter
-                used={overview.activeFollowups}
-                included={plan.includedActiveFollowups}
-              />
-            </div>
-          </Card>
-        </div>
+                  : undefined
+            }
+          />
+          <StatTile
+            label={text.activeFollowups.title}
+            value={text.activeFollowups.count(
+              overview.activeFollowups,
+              plan.includedActiveFollowups,
+            )}
+            className="sm:col-span-2 xl:col-span-1"
+          >
+            <CapacityMeter
+              used={overview.activeFollowups}
+              included={plan.includedActiveFollowups}
+            />
+          </StatTile>
+        </StatGrid>
 
         <SectionCard
           title={text.usage.title}
