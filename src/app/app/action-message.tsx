@@ -15,4 +15,4 @@ export function ActionMessage({ state }: { state: ActionState }) {
 }
 
 export const selectClasses =
-  "h-11 rounded-[var(--radius-control)] border border-line bg-surface pr-10 pl-3 text-[15px] text-ink focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand";
+  "h-11 w-full min-w-0 rounded-[var(--radius-control)] border border-line bg-surface pr-9 pl-3 text-[15px] text-ink focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand";

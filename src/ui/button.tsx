@@ -20,8 +20,8 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  md: "min-h-11 px-5 py-2 text-sm leading-tight",
-  sm: "min-h-9 px-3.5 py-1.5 text-[13px] leading-tight",
+  md: "min-h-11 px-4 py-2 text-sm leading-tight",
+  sm: "min-h-9 px-3 py-1.5 text-[13px] leading-tight",
 };
 
 type StyleProps = { variant?: Variant; size?: Size; icon?: ReactNode };
