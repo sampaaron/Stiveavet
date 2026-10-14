@@ -8,6 +8,7 @@ import {
 } from "@/domains/protocoles/content";
 
 import { foldText } from "@/domains/commun";
+import { nombre } from "@/i18n/pluriel";
 
 /**
  * Fiche de lancement d'un suivi (cahier des charges §4) : règles pures, sans base de données.
@@ -25,7 +26,7 @@ const text = (min: number, max: number, label: string) =>
   z
     .string()
     .trim()
-    .min(min, `${label} : ${min} caractère(s) minimum.`)
+    .min(min, `${label} : ${nombre(min, "caractère", "caractères")} minimum.`)
     .max(max, `${label} : ${max} caractères maximum.`);
 
 const treatmentInput = z.object({

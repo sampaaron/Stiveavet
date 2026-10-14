@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const billing = {
   title: "Facturation",
@@ -43,7 +45,7 @@ export const billing = {
     description: (included: number, launch: string, reactivation: string) =>
       `${included} suivis actifs en même temps sont inclus. Au-delà, chaque nouveau suivi coûte ${launch} HT et chaque réactivation ${reactivation} HT, prélevés avec l'abonnement suivant. Un suivi terminé libère sa place ; les suivis test ne comptent pas.`,
     pending: (launches: number, reactivations: number, amount: string) =>
-      `En attente de facturation : ${launches} lancement(s) et ${reactivations} réactivation(s), soit ${amount} HT.`,
+      `En attente de facturation : ${nombre(launches, "lancement", "lancements")} et ${nombre(reactivations, "réactivation", "réactivations")}, soit ${amount} HT.`,
     nonePending: "Aucun supplément en attente.",
   },
   annual: {
@@ -65,7 +67,7 @@ export const billing = {
   changePlan: {
     title: "Changer de formule",
     description: (vetSeats: number, trialMonths: number | null) =>
-      `La nouvelle formule s'applique à la prochaine échéance${trialMonths ? `, après les ${trialMonths} mois d'essai` : ""}. Votre équipe compte ${vetSeats} vétérinaire(s), invitations en attente comprises.`,
+      `La nouvelle formule s'applique à la prochaine échéance${trialMonths ? `, après les ${trialMonths} mois d'essai` : ""}. Votre équipe compte ${nombre(vetSeats, "vétérinaire", "vétérinaires")}, invitations en attente comprises.`,
     option: (name: string, price: string) => `${name} · ${price} HT par mois`,
     optionDetail: (maxVets: number, stive: string) =>
       `${maxVets === 1 ? "1 vétérinaire" : `Jusqu'à ${maxVets} vétérinaires`}. ${stive}.`,
@@ -98,7 +100,7 @@ export const billing = {
   },
   access: {
     graceTitle: (days: number) =>
-      `Prélèvement refusé : ${days} jour(s) pour régulariser`,
+      `Prélèvement refusé : ${nombre(days, "jour", "jours")} pour régulariser`,
     graceBody: (date: string) =>
       `Après le ${date}, les nouveaux suivis seront suspendus. Les suivis en cours continuent dans tous les cas.`,
     blockedTitle: "Nouveaux suivis suspendus",

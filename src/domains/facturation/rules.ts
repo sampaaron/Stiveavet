@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /**
  * Règles de facturation (cahier des charges §13), sans accès à la base ni à l'horloge :
  * chaque fonction reçoit l'instant `now`. Montants en centimes d'euro, hors taxes.
@@ -304,7 +306,7 @@ export function draftInvoice(
     );
     if (!charged.length) continue;
     lines.push({
-      label: `${charged.length} ${kind === "launch" ? "lancement(s)" : "réactivation(s)"} au-delà de ${INCLUDED_ACTIVE_FOLLOWUPS} suivis actifs`,
+      label: `${kind === "launch" ? nombre(charged.length, "lancement", "lancements") : nombre(charged.length, "réactivation", "réactivations")} au-delà de ${INCLUDED_ACTIVE_FOLLOWUPS} suivis actifs`,
       amountCents: charged.reduce((sum, event) => sum + event.amountCents, 0),
     });
   }

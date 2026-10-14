@@ -327,11 +327,11 @@ describe("factures", () => {
         amountCents: 24_600,
       },
       {
-        label: "2 lancement(s) au-delà de 10 suivis actifs",
+        label: "2 lancements au-delà de 10 suivis actifs",
         amountCents: 500,
       },
       {
-        label: "1 réactivation(s) au-delà de 10 suivis actifs",
+        label: "1 réactivation au-delà de 10 suivis actifs",
         amountCents: 126,
       },
     ]);

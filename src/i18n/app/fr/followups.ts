@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const followups = {
   title: "Suivis",
@@ -183,10 +185,10 @@ export const followups = {
     alertLong: (max: number) => `Signe d'alerte : ${max} caractères maximum.`,
     tooManyTreatments: (max: number) => `${max} traitements au maximum.`,
     treatmentShort: (min: number) =>
-      `Traitement : ${min} caractère(s) minimum.`,
+      `Traitement : ${nombre(min, "caractère", "caractères")} minimum.`,
     treatmentLong: (max: number) => `Traitement : ${max} caractères maximum.`,
     instructionsShort: (min: number) =>
-      `Posologie : ${min} caractère(s) minimum.`,
+      `Posologie : ${nombre(min, "caractère", "caractères")} minimum.`,
     instructionsLong: (max: number) => `Posologie : ${max} caractères maximum.`,
   },
 };

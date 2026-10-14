@@ -169,9 +169,11 @@ export const followups: AppDictionary["followups"] = {
     alertShort: (min: number) => `Warning sign: at least ${min} characters.`,
     alertLong: (max: number) => `Warning sign: ${max} characters at most.`,
     tooManyTreatments: (max: number) => `${max} treatments at most.`,
-    treatmentShort: (min: number) => `Treatment: at least ${min} character(s).`,
+    treatmentShort: (min: number) =>
+      `Treatment: at least ${min} ${min === 1 ? "character" : "characters"}.`,
     treatmentLong: (max: number) => `Treatment: ${max} characters at most.`,
-    instructionsShort: (min: number) => `Dosage: at least ${min} character(s).`,
+    instructionsShort: (min: number) =>
+      `Dosage: at least ${min} ${min === 1 ? "character" : "characters"}.`,
     instructionsLong: (max: number) => `Dosage: ${max} characters at most.`,
   },
 };

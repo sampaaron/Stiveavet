@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const settings = {
   title: "Numa, urgences et garde",
@@ -173,7 +175,7 @@ export const settings = {
     description:
       "Huit étapes, de cinq à quinze minutes avec les réglages de départ. Chaque réglage reste modifiable ensuite.",
     progress: (done: number, total: number) =>
-      `${done} étape(s) terminée(s) sur ${total}`,
+      `${nombre(done, "étape terminée", "étapes terminées")} sur ${total}`,
     ready: {
       title: "Votre cabinet est prêt.",
       body: "Vous pouvez lancer vos premiers suivis.",

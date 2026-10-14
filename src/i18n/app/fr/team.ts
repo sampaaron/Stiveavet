@@ -1,8 +1,10 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const team = {
   title: "Équipe et droits",
   description: (vets: number, limit: number) =>
-    `${vets} vétérinaire(s) sur ${limit} avec votre formule, invitations en attente comprises. Les assistants ne sont pas limités.`,
+    `${nombre(vets, "vétérinaire", "vétérinaires")} sur ${limit} avec votre formule, invitations en attente comprises. Les assistants ne sont pas limités.`,
   invite: {
     title: "Inviter un membre",
     description:
@@ -21,7 +23,8 @@ export const team = {
   members: {
     title: "Membres",
     you: "vous",
-    activeFollowups: (count: number) => `${count} suivi(s) en cours`,
+    activeFollowups: (count: number) =>
+      `${nombre(count, "suivi", "suivis")} en cours`,
     accessRemoved: "Accès retiré",
     adminHasAll:
       "Un vétérinaire administrateur a tous les droits. Changez son rôle pour les restreindre.",
