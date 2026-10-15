@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { TRIAL_MONTHLY_CENTS } from "@/domains/facturation/rules";
+import { STARTING_PRICE_CENTS } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
 import type { Locale } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
@@ -26,18 +26,19 @@ const NAV = [
 
 export function trialCta(locale: Locale, t: SiteDictionary): string {
   return fill(t.common.ctaTrial, {
-    price: formatPrice(TRIAL_MONTHLY_CENTS, locale),
+    price: formatPrice(STARTING_PRICE_CENTS, locale),
   });
 }
 
 const CTA_TONES = {
   primary: "bg-brand text-white hover:bg-brand-strong",
   onDark: "border border-white/25 text-white hover:bg-white/10",
+  outline: "border border-brand text-brand-ink hover:bg-brand-soft",
 } as const;
 
 /**
  * Bouton-lien du site public : hauteur minimale de 44 px et texte qui peut passer à la ligne
- * (le libellé « Commencer l'essai à 86 € HT » doit tenir dans 320 px).
+ * (le libellé « Démarrer dès 79 € HT par mois » doit tenir dans 320 px).
  */
 export function CtaLink({
   href,

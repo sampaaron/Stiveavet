@@ -17,6 +17,14 @@ export const errors = {
     already_installed: "Ce modèle est déjà dans les protocoles du cabinet.",
     billing_blocked:
       "Les nouveaux suivis sont suspendus : régularisez le paiement dans Facturation. Les suivis en cours continuent.",
+    plan_quota_reached:
+      "Le plafond de suivis actifs de votre offre est atteint. Terminez un suivi ou passez à l'offre supérieure dans Facturation.",
+    plan_assistant_limit:
+      "Votre offre est au complet en assistants. Passez à l'offre supérieure dans Facturation pour agrandir l'équipe.",
+    plan_feature_missing:
+      "Cette fonction n'est pas comprise dans votre offre. Comparez les offres dans Facturation.",
+    plan_integration_connected:
+      "dr.veto est connecté : déconnectez-le dans Réglages avant de passer à une offre sans intégrations.",
     plan_vet_limit:
       "Cette formule compte moins de vétérinaires que votre équipe actuelle (invitations en attente comprises).",
     on_call_overlap: "Cette garde chevauche une garde déjà prévue.",
@@ -36,5 +44,13 @@ export const errors = {
       "Fichier refusé : envoyez une image JPEG, PNG ou WebP de 5 Mo au plus (ou un message vocal).",
     capture_unreadable:
       "Aucun créneau libre n'a pu être lu sur cette capture. Elle a été supprimée ; réessayez avec une capture plus nette.",
+    whatsapp_signup_failed:
+      "Meta n'a pas confirmé la connexion du numéro. Recommencez depuis le bouton ; vérifiez le code PIN si le numéro en avait déjà un.",
+    whatsapp_number_taken:
+      "Ce numéro WhatsApp est déjà relié à un autre cabinet sur Stivea Vet.",
+    optin_missing:
+      "Cochez l'accord du propriétaire pour WhatsApp, recueilli au cabinet, avant de lancer le suivi.",
+    payment_provider_unavailable:
+      "Le service de prélèvement ne répond pas pour le moment. Rien n'a été prélevé ; réessayez dans quelques minutes.",
   },
 };

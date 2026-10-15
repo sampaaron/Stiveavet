@@ -26,6 +26,14 @@ export const journal: AppDictionary["journal"] = {
       `${actor} changed the role of ${member}`,
   },
   byMember: {
+    "animal.created": (actor: string) => `${actor} registered an animal`,
+    "animal.updated": (actor: string) => `${actor} edited an animal's record`,
+    "animal.viewed": (actor: string) => `${actor} viewed an animal's record`,
+    "animal.archived": (actor: string) => `${actor} archived an animal`,
+    "animal.restored": (actor: string) =>
+      `${actor} restored an archived animal`,
+    "animal.deleted": (actor: string) =>
+      `${actor} deleted an animal that was never followed`,
     "organization.created": (actor: string) => `${actor} created the practice`,
     "invitation.created": (actor: string) => `${actor} sent an invitation`,
     "invitation.revoked": (actor: string) => `${actor} cancelled an invitation`,
@@ -44,6 +52,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} edited a follow-up's launch sheet`,
     "followup.treatments_validated": (actor: string) =>
       `${actor} validated imported treatments`,
+    "followup.whatsapp_optin": (actor: string) =>
+      `${actor} recorded the owner's WhatsApp agreement`,
     "followup.launched": (actor: string) => `${actor} launched a follow-up`,
     "followup.paused": (actor: string) => `${actor} paused a follow-up`,
     "followup.resumed": (actor: string) => `${actor} resumed a follow-up`,
@@ -80,6 +90,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} changed the appointment durations`,
     "alert.acknowledged": (actor: string) => `${actor} acknowledged an alert`,
     "alert.resolved": (actor: string) => `${actor} closed an alert`,
+    "alert.reassigned": (actor: string) =>
+      `${actor} assigned an alert to another vet`,
     "job.retried": (actor: string) => `${actor} retried a failed task`,
     "job.cancelled": (actor: string) => `${actor} abandoned a failed task`,
     "followup.test_created": (actor: string) =>
@@ -112,6 +124,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} removed an on-call shift`,
     "integration.connected": (actor) =>
       `${actor} connected a service (WhatsApp, dr.veto or direct debit)`,
+    "alert_phone.changed": (actor: string) =>
+      `${actor} changed their WhatsApp alert number`,
     "integration.disconnected": (actor) =>
       `${actor} disconnected a service (WhatsApp, dr.veto or direct debit)`,
     "onboarding.step_completed": (actor) =>
@@ -125,8 +139,14 @@ export const journal: AppDictionary["journal"] = {
       `${actor} retried a failed direct debit`,
   },
   automatic: {
+    "animal.purged":
+      "A register animal with no follow-up for fifteen months was deleted",
+    "numa.ai_unavailable":
+      "AI service unavailable: Numa referred the owner to the team, without a drafted reply",
     "numa.reply_blocked":
       "Safeguard: a reply from Numa was replaced with a referral to the vet",
+    "whatsapp.media_refused":
+      "A file sent on WhatsApp was refused (too large, unsupported format or unavailable)",
     "attachment.purged":
       "A file that reached the end of its retention period was deleted",
     "photo.observation_blocked":
@@ -147,6 +167,8 @@ export const journal: AppDictionary["journal"] = {
     "alert.escalated":
       "Urgent case not acknowledged: the whole veterinary team was alerted",
     "invoice.issued": "Invoice issued",
+    "billing.annual_offer_sent":
+      "Annual commitment offer e-mailed to whoever manages billing",
     "invoice.paid": "Invoice direct debit succeeded",
     "invoice.payment_failed": "Invoice direct debit failed",
   },
@@ -158,6 +180,8 @@ export const journal: AppDictionary["journal"] = {
     actor: string,
   ) =>
     `Numa's language corrected for the ${owner === "secondary" ? "second owner" : "owner"} by ${actor}: ${language}`,
+  preparedManually: (actor: string) =>
+    `${actor} prepared a follow-up from the practice register`,
   logins: {
     login_succeeded: "Sign-in succeeded",
     login_failed: "Sign-in refused",

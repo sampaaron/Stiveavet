@@ -7,6 +7,9 @@ import {
   stepInput,
 } from "@/domains/protocoles/content";
 
+import { foldText } from "@/domains/commun";
+import { nombre } from "@/i18n/pluriel";
+
 /**
  * Fiche de lancement d'un suivi (cahier des charges §4) : règles pures, sans base de données.
  * Les délais des étapes comptent en heures après l'intervention, comme dans les protocoles.
@@ -23,10 +26,10 @@ const text = (min: number, max: number, label: string) =>
   z
     .string()
     .trim()
-    .min(min, `${label} : ${min} caractère(s) minimum.`)
+    .min(min, `${label} : ${nombre(min, "caractère", "caractères")} minimum.`)
     .max(max, `${label} : ${max} caractères maximum.`);
 
-export const treatmentInput = z.object({
+const treatmentInput = z.object({
   name: text(1, 120, "Traitement"),
   instructions: text(1, 300, "Posologie"),
 });
@@ -48,6 +51,11 @@ export const sheetInput = z.object({
    * alors aussi son accord ; le groupe se crée quand les deux ont accepté (lot 18).
    */
   secondContactActive: z.boolean().optional(),
+  /**
+   * Brouillon seulement : le cabinet a recueilli l'accord du ou des propriétaires pour être
+   * contactés sur WhatsApp (politique de WhatsApp, ADR 0024). Exigé pour lancer le suivi.
+   */
+  whatsappOptIn: z.boolean().optional(),
   controlAppointmentAt: z.date().nullable(),
   /** Étapes à venir (les étapes passées d'un suivi en cours ne sont jamais renvoyées). */
   steps: z.array(stepInput).max(MAX_STEPS, `${MAX_STEPS} étapes au maximum.`),
@@ -86,12 +94,6 @@ export function firstContactHours(procedureAt: Date, at: Date): number {
 }
 
 /** Minuscules sans accents. */
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-}
 
 export type ProtocolCandidate = {
   versionId: string;
@@ -118,13 +120,13 @@ export function suggestProtocol(
   species: "dog" | "cat",
   candidates: readonly ProtocolCandidate[],
 ): string | null {
-  const words = normalize(procedure)
+  const words = foldText(procedure)
     .split(/[^a-z]+/)
     .filter((word) => word.length >= 5);
   let best: { versionId: string; score: number } | null = null;
   for (const candidate of candidates) {
     if (!fitsSpecies(candidate, species)) continue;
-    const haystack = normalize(`${candidate.name} ${candidate.description}`);
+    const haystack = foldText(`${candidate.name} ${candidate.description}`);
     const matches = words.filter((word) => haystack.includes(word)).length;
     if (matches === 0) continue;
     const score = matches * 2 + (candidate.species === species ? 1 : 0);
@@ -132,9 +134,4 @@ export function suggestProtocol(
       best = { versionId: candidate.versionId, score };
   }
   return best?.versionId ?? null;
-}
-
-/** Numéro masqué pour l'écran : seuls les deux derniers chiffres restent lisibles. */
-export function maskedPhone(phone: string): string {
-  return `•• •• •• •• ${phone.replace(/\D/g, "").slice(-2)}`;
 }

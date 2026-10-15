@@ -44,6 +44,11 @@ export type AuthDependencies = {
   db: Database;
   email: EmailSender;
   appUrl: string;
+  /**
+   * Travail fait après la réponse (lien de réinitialisation) : la durée de la réponse ne
+   * révèle pas si l'adresse a un compte. Par défaut, exécuté sur place (tests).
+   */
+  defer?: (task: () => Promise<void>) => Promise<void>;
 };
 
 export type SignedIn = {
@@ -70,7 +75,12 @@ export type RegisterResult =
 
 const VET_ROLES: ReadonlySet<MemberRole> = new Set(["admin_vet", "vet"]);
 
-export function authService({ db, email, appUrl }: AuthDependencies) {
+export function authService({
+  db,
+  email,
+  appUrl,
+  defer = (task) => task(),
+}: AuthDependencies) {
   const repo = authRepository(db);
 
   /** Compte une tentative et indique si elle reste dans la limite. Sans sujet connu, pas de compteur. */
@@ -84,14 +94,16 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
     );
   }
 
-  /** Limite atteinte, sans compter de tentative : seuls les échecs sont comptés ensuite. */
-  async function blocked(name: RateLimitName, subject: string) {
-    const [max, windowMinutes] = RATE_LIMITS[name];
-    return repo.rateLimitReached(
-      rateLimitBucket(name, subject),
-      windowMinutes,
-      max,
-    );
+  /**
+   * Limite d'échecs : la tentative réserve sa place avant toute vérification, si bien que
+   * des requêtes simultanées ne la dépassent jamais ; une réussite rend la place.
+   */
+  async function reserveFailure(name: RateLimitName, subject: string) {
+    const ok = await allowed(name, subject);
+    return {
+      ok,
+      release: () => repo.releaseRateLimit(rateLimitBucket(name, subject)),
+    };
   }
 
   function eventOrigin(origin: RequestOrigin) {
@@ -117,7 +129,9 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
     };
   }
 
+  /** Nouveau code, dans la limite par compte : `null` si elle est atteinte. */
   async function sendSecurityCode(userId: string, to: string) {
+    if (!(await allowed("securityCodesPerAccount", userId))) return null;
     const challengeToken = createToken();
     const code = createSecurityCode();
     await repo.createLoginChallenge(
@@ -137,16 +151,34 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
       origin: RequestOrigin,
     ): Promise<LoginResult> {
       const address = input.email.trim().toLowerCase();
-      const ipAllowed = await allowed("loginPerIp", origin.ip);
-      if (!ipAllowed || (await blocked("loginFailuresPerAccount", address))) {
+      const rateLimited = async (userId?: string) => {
         await repo.recordLoginEvent({
           kind: "login_rate_limited",
+          userId,
           ...eventOrigin(origin),
         });
-        return { status: "rate_limited" };
-      }
+        return { status: "rate_limited" } as const;
+      };
+      if (!(await allowed("loginPerIp", origin.ip))) return rateLimited();
 
       const credentials = await repo.credentialsByEmail(address);
+      // Un appareil de confiance a son propre compteur d'échecs : des essais venus d'ailleurs
+      // ne bloquent pas le vétérinaire sur son poste habituel.
+      const trusted =
+        credentials && isWellFormedToken(input.deviceToken)
+          ? await repo.isTrustedDevice(
+              tokenHash(input.deviceToken),
+              credentials.userId,
+            )
+          : false;
+      const failures = await reserveFailure(
+        "loginFailuresPerAccount",
+        trusted && input.deviceToken
+          ? `${address}:${tokenHash(input.deviceToken).toString("hex")}`
+          : address,
+      );
+      if (!failures.ok) return rateLimited(credentials?.userId);
+
       const passwordOk = await verifyPassword(
         credentials?.passwordHash ?? null,
         input.password,
@@ -157,7 +189,6 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
           : [];
       const membership = memberships[0];
       if (!credentials || !passwordOk || !membership) {
-        await allowed("loginFailuresPerAccount", address);
         await repo.recordLoginEvent({
           kind: "login_failed",
           userId: credentials?.userId,
@@ -166,19 +197,15 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         return { status: "invalid" };
       }
 
+      await failures.release();
+
       const needsCode = memberships.some((m) => VET_ROLES.has(m.role));
-      const trusted =
-        needsCode && isWellFormedToken(input.deviceToken)
-          ? await repo.isTrustedDevice(
-              tokenHash(input.deviceToken),
-              credentials.userId,
-            )
-          : false;
       if (needsCode && !trusted) {
         const challengeToken = await sendSecurityCode(
           credentials.userId,
           address,
         );
+        if (!challengeToken) return rateLimited(credentials.userId);
         await repo.recordLoginEvent({
           kind: "code_sent",
           userId: credentials.userId,
@@ -283,7 +310,11 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
       const hash = tokenHash(input.sessionToken);
       if (!session.locked) return "unlocked";
 
-      if (await blocked("unlockFailuresPerAccount", session.userId)) {
+      const failures = await reserveFailure(
+        "unlockFailuresPerAccount",
+        session.userId,
+      );
+      if (!failures.ok) {
         await repo.revokeSession(hash);
         await repo.recordLoginEvent({
           kind: "login_rate_limited",
@@ -303,10 +334,8 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         organizationId: session.organizationId,
         ...eventOrigin(origin),
       });
-      if (!ok) {
-        await allowed("unlockFailuresPerAccount", session.userId);
-        return "invalid";
-      }
+      if (!ok) return "invalid";
+      await failures.release();
       await repo.unlockSession(hash);
       return "unlocked";
     },
@@ -326,7 +355,7 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         });
     },
 
-    /** Réponse identique que le compte existe ou non. */
+    /** Réponse identique, et de même durée, que le compte existe ou non. */
     async requestPasswordReset(
       input: { email: string },
       origin: RequestOrigin,
@@ -336,8 +365,9 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
       const accountAllowed = await allowed("resetPerAccount", address);
       if (!ipAllowed || !accountAllowed) return "rate_limited";
 
-      const credentials = await repo.credentialsByEmail(address);
-      if (credentials) {
+      await defer(async () => {
+        const credentials = await repo.credentialsByEmail(address);
+        if (!credentials) return;
         const token = createToken();
         await repo.createPasswordReset(
           tokenHash(token),
@@ -346,13 +376,18 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
         );
         const url = new URL("/mot-de-passe/nouveau", appUrl);
         url.searchParams.set("jeton", token);
-        await email.send(passwordResetEmail(address, url.toString()));
         await repo.recordLoginEvent({
           kind: "password_reset_requested",
           userId: credentials.userId,
           ...eventOrigin(origin),
         });
-      }
+        // Un échec d'envoi ne se voit pas dans la réponse ; la personne refait la demande.
+        await email
+          .send(passwordResetEmail(address, url.toString()))
+          .catch(() =>
+            console.error("Envoi du lien de réinitialisation impossible."),
+          );
+      });
       return "sent";
     },
 
@@ -457,7 +492,7 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
           await tx.execute(
             sql`SELECT auth.set_initial_password(${userId}, ${passwordHash})`,
           );
-          // Essai pilote de 2 mois, puis la formule choisie (ADR 0011).
+          // Formule choisie, sans engagement possible les 2 premiers mois (ADR 0031).
           await startSubscription(tx, organizationId, input.plan);
           await tx.insert(auditEvents).values([
             {
@@ -489,6 +524,7 @@ export function authService({ db, email, appUrl }: AuthDependencies) {
       }
 
       const challengeToken = await sendSecurityCode(userId, address);
+      if (!challengeToken) return { status: "rate_limited" };
       await repo.recordLoginEvent({
         kind: "signup_completed",
         userId,

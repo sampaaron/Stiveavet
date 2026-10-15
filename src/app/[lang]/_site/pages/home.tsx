@@ -1,6 +1,6 @@
 import { ArrowRight, Check, Lock } from "lucide-react";
 
-import { TRIAL_MONTHLY_CENTS } from "@/domains/facturation/rules";
+import { STARTING_PRICE_CENTS } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
 import { fill } from "@/i18n/site";
@@ -21,7 +21,7 @@ import { FloatingAlert, PhoneDemo } from "../showcase";
 
 export function HomePage({ locale, t }: SiteProps) {
   const home = t.home;
-  const price = formatPrice(TRIAL_MONTHLY_CENTS, locale);
+  const price = formatPrice(STARTING_PRICE_CENTS, locale);
   return (
     <>
       <section
@@ -63,7 +63,7 @@ export function HomePage({ locale, t }: SiteProps) {
           </div>
           <div className="relative pb-6 lg:pb-0">
             <PhoneDemo t={t} />
-            <div className="mt-6 flex justify-center lg:absolute lg:-bottom-10 lg:-left-28 lg:mt-0 lg:block">
+            <div className="mt-6 flex justify-center lg:absolute lg:-bottom-10 lg:-left-12 lg:mt-0 lg:block">
               <FloatingAlert t={t} />
             </div>
           </div>

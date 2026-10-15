@@ -71,7 +71,9 @@ export default async function ProtocolPage({
 
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">{content.name}</h1>
+          <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
+            {content.name}
+          </h1>
           <ValidationBadge validated={protocol.version.validatedAt !== null} />
           {protocol.archived ? (
             <span className="text-xs font-semibold text-ink-muted">
@@ -231,12 +233,16 @@ function Versions({
   const text = t.protocols.versions;
   return (
     <SectionCard title={text.title} description={text.description}>
-      <ol className="grid gap-3">
+      <ol className="relative grid gap-4 before:absolute before:top-2 before:bottom-2 before:left-[5px] before:w-px before:bg-line">
         {protocol.versions.map((entry) => {
           const selected =
             entry.versionNumber === protocol.version.versionNumber;
           return (
-            <li key={entry.id} className="text-sm">
+            <li key={entry.id} className="relative pl-6 text-sm">
+              <span
+                aria-hidden="true"
+                className={`absolute top-1.5 left-0 size-[11px] rounded-full border-2 ${selected ? "border-[var(--section-accent)] bg-[var(--section-accent)] shadow-[0_0_0_4px_color-mix(in_oklab,var(--section-glow)_45%,transparent)]" : "border-line bg-surface"}`}
+              />
               <Link
                 href={`/app/protocoles/${protocol.id}?version=${entry.versionNumber}`}
                 aria-current={selected ? "page" : undefined}

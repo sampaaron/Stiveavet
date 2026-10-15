@@ -5,6 +5,30 @@ export const dashboard: AppDictionary["dashboard"] = {
   greeting: (firstName: string) => `Hello ${firstName}`,
   headline: (day: string, urgent: number, watch: number) =>
     `${day} · ${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
+  headlineShort: (urgent: number, watch: number) =>
+    `${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
+  briefing: {
+    title: "Numa's update",
+    clinical: (active: number, urgent: number, watch: number) => {
+      const parts = [
+        urgent
+          ? `${urgent} ${urgent === 1 ? "emergency is" : "emergencies are"} waiting for a vet`
+          : null,
+        watch
+          ? `${watch} ${watch === 1 ? "case needs" : "cases need"} watching`
+          : null,
+      ].filter((part): part is string => part !== null);
+      const signals = parts.length
+        ? `${parts.join(" and ")}.`
+        : "No alert pending.";
+      const first = signals.charAt(0).toUpperCase() + signals.slice(1);
+      return `I'm following ${active} ${active === 1 ? "animal" : "animals"} right now. ${first} I never make a diagnosis: the decision is always yours.`;
+    },
+    summary: (active: number) =>
+      `I'm following ${active} ${active === 1 ? "animal" : "animals"} for the practice. I never make a diagnosis and I refer every medical question to the team.`,
+    searchPlaceholder: "Search for an animal, an owner, a procedure…",
+    searchSubmit: "Search follow-ups",
+  },
   empty: {
     title: "No follow-ups yet",
     admin:
@@ -15,6 +39,7 @@ export const dashboard: AppDictionary["dashboard"] = {
   actions: {
     openAFile: "Open a file",
     launch: "Launch a follow-up",
+    newAnimal: "Register an animal",
     openFile: "Open the file",
     writeToOwner: "Write to the owner",
     allFollowups: "All follow-ups",
@@ -41,6 +66,41 @@ export const dashboard: AppDictionary["dashboard"] = {
   urgentReportedAt: (animalName: string, time: string) =>
     `${animalName}: emergency reported at ${time}`,
   urgentOngoing: (animalName: string) => `${animalName}: ongoing emergency`,
+  activity: {
+    title: "Practice activity",
+    description: "Last 30 days, test follow-ups excluded.",
+    launched: "Follow-ups started",
+    launchedHint: (ongoing: number) =>
+      `${ongoing} ${ongoing === 1 ? "follow-up" : "follow-ups"} running`,
+    ended: "Follow-ups ended",
+    endedHint: "Check-up reached or stopped",
+    messages: "Messages received",
+    messagesHint: (outbound: number) => `${outbound} sent by Numa and the team`,
+    response: "Response rate",
+    responseHint: (answered: number, launched: number) =>
+      `${answered} of ${launched} owners replied`,
+    responseNone: "No follow-ups started in this period",
+    alerts: "Alerts",
+    alertsHint: (open: number) => `${open} open right now`,
+    medianAck: (minutes: string) => `Acknowledged within ${minutes} (median)`,
+    chartTitle: "Messages over the last 14 days",
+    inbound: "Owners",
+    outbound: "Numa and team",
+    chartRow: (day: string, inbound: number, outbound: number) =>
+      `${day}: ${inbound} received, ${outbound} sent`,
+  },
+  next: {
+    title: "Next actions",
+    drafts: (count: number) =>
+      `${count} ${count === 1 ? "sheet" : "sheets"} to launch`,
+    unacknowledged: (count: number) =>
+      `${count} unacknowledged ${count === 1 ? "alert" : "alerts"}`,
+    controls: (count: number) =>
+      `${count} ${count === 1 ? "check-up" : "check-ups"} this week`,
+    consent: (count: number) =>
+      `${count} WhatsApp ${count === 1 ? "consent" : "consents"} pending`,
+    none: "Nothing pending.",
+  },
   stats: {
     urgent: "Emergencies",
     urgentHint: "To handle now",
@@ -95,5 +155,7 @@ export const dashboard: AppDictionary["dashboard"] = {
       "New follow-ups are suspended. Ongoing follow-ups continue until they end.",
     readOnly: (date: string) => `Practice in read-only mode until ${date}.`,
     closed: "Access to the practice has ended.",
+    annualChoice:
+      "Annual commitment or monthly billing: your choice. If you do not answer, nothing switches.",
   },
 };

@@ -19,18 +19,13 @@ import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
-import { domainFailure } from "../domain-messages";
+import { domainFailure, invalidRequest } from "../domain-messages";
 
 /**
  * Conversation d'un suivi (ADR 0016). Chaque action refait toute la garde : session, membre
  * actif, permissions relues en base ; le service vérifie l'accès au dossier, l'accord du
  * propriétaire et le rôle. Le texte d'un message n'apparaît dans aucun journal.
  */
-
-async function invalid(): Promise<ActionState> {
-  const { t } = await appText();
-  return { error: t.common.invalidRequest };
-}
 
 type Validation = AppDictionary["dossier"]["validation"];
 
@@ -80,7 +75,7 @@ export async function writeToOwnerAction(
   form: FormData,
 ): Promise<ActionState> {
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return invalid();
+  if (!id.success) return invalidRequest();
   const body = ownerMessageInput.safeParse(text(form, "body"));
   if (!body.success) return messageError(body.error);
   const context = await memberContext();
@@ -100,7 +95,7 @@ export async function resumeNumaAction(
   form: FormData,
 ): Promise<ActionState> {
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return invalid();
+  if (!id.success) return invalidRequest();
   const context = await memberContext();
   const result = await guarded(() =>
     services.conversations().resumeNuma(context, id.data),
@@ -135,11 +130,11 @@ export async function simulateOwnerAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return invalid();
+  if (!id.success) return invalidRequest();
   const body = ownerMessageInput.safeParse(text(form, "body"));
   if (!body.success) return messageError(body.error);
   const role = simulatedRole(form);
-  if (!role.success) return invalid();
+  if (!role.success) return invalidRequest();
   const context = await memberContext();
   const result = await guarded(async () => {
     await services
@@ -160,7 +155,7 @@ export async function runDueNowAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return invalid();
+  if (!id.success) return invalidRequest();
   const context = await memberContext();
   const result = await guarded(async () => {
     await services.conversations().makeDueNow(context, id.data);
@@ -178,7 +173,7 @@ export async function simulateOwnerPhotoAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return invalid();
+  if (!id.success) return invalidRequest();
   const file = form.get("photo");
   if (!(file instanceof File) || file.size === 0) {
     const { t } = await appText();
@@ -195,7 +190,7 @@ export async function simulateOwnerPhotoAction(
       tooLong: v.captionTooLong,
     }));
   const role = simulatedRole(form);
-  if (!role.success) return invalid();
+  if (!role.success) return invalidRequest();
   const bytes = new Uint8Array(await file.arrayBuffer());
   const context = await memberContext();
   const result = await guarded(async () => {
@@ -224,7 +219,7 @@ export async function simulateOwnerVoiceAction(
 ): Promise<ActionState> {
   assertLocal();
   const id = followupId.safeParse(text(form, "followupId"));
-  if (!id.success) return invalid();
+  if (!id.success) return invalidRequest();
   const spoken = spokenInput.safeParse(text(form, "spoken"));
   if (!spoken.success)
     return fieldError(spoken.error, (v) => ({
@@ -232,7 +227,7 @@ export async function simulateOwnerVoiceAction(
       tooLong: v.spokenTooLong,
     }));
   const role = simulatedRole(form);
-  if (!role.success) return invalid();
+  if (!role.success) return invalidRequest();
   const context = await memberContext();
   const result = await guarded(async () => {
     await services.media().simulateOwnerMedia(context, id.data, {

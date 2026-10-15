@@ -33,6 +33,24 @@ describe("buildContentSecurityPolicy", () => {
     expect(directives.get("style-src-attr")).toEqual(["'unsafe-inline'"]);
   });
 
+  it("n'ouvre les domaines de Meta qu'à la demande, pour l'inscription WhatsApp", () => {
+    const strict = parseDirectives(buildContentSecurityPolicy("abc123", false));
+    const meta = parseDirectives(
+      buildContentSecurityPolicy("abc123", false, { metaSignup: true }),
+    );
+
+    expect(strict.has("frame-src")).toBe(false);
+    expect(meta.get("frame-src")).toContain("https://www.facebook.com");
+    expect(meta.get("connect-src")).toContain("https://graph.facebook.com");
+    // Le reste ne change pas : toujours ni inline, ni eval, ni autre domaine.
+    expect(meta.get("script-src")).not.toContain("'unsafe-inline'");
+    expect(meta.get("frame-ancestors")).toEqual(["'none'"]);
+    for (const values of meta.values())
+      for (const value of values)
+        if (value.startsWith("https://"))
+          expect(value).toMatch(/^https:\/\/[a-z]+\.facebook\.(com|net)$/);
+  });
+
   it("accepte unsafe-eval uniquement en développement", () => {
     expect(buildContentSecurityPolicy("abc123", true)).toContain(
       "'unsafe-eval'",

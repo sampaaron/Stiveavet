@@ -79,6 +79,9 @@ export const settings: AppDictionary["settings"] = {
     description:
       "Simulated during this phase: no real WhatsApp number, dr.veto practice or bank account is contacted.",
     simulated: "Simulated",
+    notIncluded:
+      "Included in the Premium plan. Meanwhile, register your patients in Animals: follow-ups work without connected software.",
+    seePlans: "See plans",
     connected: "Connected",
     connectedDetail: (label: string, date: string) =>
       `: ${label}, since ${date}.`,
@@ -90,6 +93,20 @@ export const settings: AppDictionary["settings"] = {
       submit: "Connect the number (simulated)",
       field: "WhatsApp Business number",
       hint: "Only the last two digits are kept.",
+      live: {
+        description:
+          "Connect the practice's WhatsApp Business number with your Meta account. Numa will write from this number; Stivea Vet never sees your password.",
+        pin: "Two-step verification PIN",
+        pinHint:
+          "6 digits. If the number already has one, enter it; otherwise choose one and keep it safe. Stivea Vet does not store it.",
+        submit: "Connect with Meta",
+        waiting: "Meta window open: follow the steps, then come back here.",
+        finishing: "Connecting the number…",
+        cancelled:
+          "Connection interrupted in the Meta window. You can start again.",
+        unavailable:
+          "The Meta window could not open. Allow pop-ups for this site, then try again.",
+      },
     },
     drveto: {
       title: "dr.veto",
@@ -102,8 +119,11 @@ export const settings: AppDictionary["settings"] = {
     payment_mandate: {
       title: "Direct debit mandate",
       description:
-        "For the pilot trial at €86 excl. VAT per month. No bank details are requested during this phase.",
+        "For the monthly direct debit of your plan. No bank details are requested during this phase.",
       submit: "Sign the mandate (simulated)",
+      submitLive: "Sign the SEPA mandate",
+      descriptionLive:
+        "SEPA direct debit of your invoices. You enter your IBAN on Stripe's secure page: Stivea Vet never sees it.",
     },
   },
   notices: {
@@ -128,6 +148,7 @@ export const settings: AppDictionary["settings"] = {
     onCallEnded: "This on-call shift has already ended.",
     onCallTooLong: "An on-call shift lasts 14 days at most.",
     drvetoCode: "dr.veto practice code: 3 to 32 letters, digits or hyphens.",
+    whatsappPin: "The PIN has exactly 6 digits.",
     chooseProtocol: "Choose a validated protocol.",
     invalidInput: "Check the values entered.",
   },

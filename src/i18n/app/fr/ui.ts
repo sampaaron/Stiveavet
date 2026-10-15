@@ -1,7 +1,7 @@
 /** Composants partagés (src/ui) : badges, conversation, compteurs. */
 export const ui = {
   status: {
-    normal: "Normal",
+    normal: "Rien à signaler",
     watch: "À surveiller",
     urgent: "Urgent",
     paused: "En pause",

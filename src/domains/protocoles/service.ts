@@ -3,12 +3,10 @@ import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import {
   alertRules,
-  auditEvents,
   followups,
   memberships,
   protocolSteps,
@@ -16,8 +14,9 @@ import {
   protocols,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditProtocol as audit } from "@/domains/audit/journal";
 
 import { protocolContentInput } from "./content";
 import type { ProtocolContent } from "./content";
@@ -91,23 +90,6 @@ export type ProtocolDetail = {
 };
 
 const uuid = z.uuid();
-
-function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  protocolId: string,
-  metadata: AuditMetadata = {},
-) {
-  return tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "protocol",
-    targetId: protocolId,
-    metadata,
-  });
-}
 
 /** Écrit une version complète (contenu, étapes, signes d'alerte) ; elle ne changera plus. */
 async function writeVersion(
@@ -232,12 +214,7 @@ function parseContent(content: unknown): ProtocolContent {
 const changeNoteSchema = z.string().trim().max(500);
 
 export function protocolsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   /** Protocole lisible par l'acteur, sinon « inexistant » (404). */
   async function loadReadable(

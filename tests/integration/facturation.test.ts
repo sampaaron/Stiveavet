@@ -5,11 +5,15 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
+import { fakeDrVeto } from "@/adapters/drveto/fake";
+import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
+import { settingsService } from "@/domains/reglages/service";
 import { vetLimit } from "@/domains/facturation/limits";
 import { addMonths } from "@/domains/facturation/rules";
+import type { Plan } from "@/domains/facturation/rules";
 import {
   billingService,
   recordUsage,
@@ -60,8 +64,8 @@ async function domainError(promise: Promise<unknown>) {
 /** Cabinet neuf abonné depuis `startedAt`, avec un administrateur, un vétérinaire et un assistant. */
 async function cabinet(
   startedAt: Date,
-  plan: "solo" | "clinic" = "clinic",
-  options: { mandate?: boolean; vets?: number } = {},
+  plan: Plan = "premium",
+  options: { mandate?: boolean; vets?: number; assistants?: number } = {},
 ) {
   const org = randomUUID();
   const tag = org.slice(0, 8);
@@ -84,11 +88,11 @@ async function cabinet(
             },
           ]
         : []),
-      {
-        email: `fas-${tag}@essai.test`,
+      ...Array.from({ length: options.assistants ?? 1 }, (_, index) => ({
+        email: `fas${index}-${tag}@essai.test`,
         displayName: "Fred Asv",
-        role: "assistant",
-      },
+        role: "assistant" as const,
+      })),
     ],
   );
   const [adminId] = members;
@@ -189,18 +193,18 @@ describe("échéances et prélèvements simulés", () => {
     expect(new Set(first.invoices.map((invoice) => invoice.number)).size).toBe(
       4,
     );
-    // 86 € HT pendant l'essai, puis la formule Clinique sans engagement ; TVA 20 %.
+    // Prix de la formule Premium sans engagement dès le 1er mois ; TVA 20 %.
     expect(first.invoices.map((invoice) => invoice.subtotalCents)).toEqual([
-      24_600, 24_600, 8_600, 8_600,
+      19_900, 19_900, 19_900, 19_900,
     ]);
-    expect(first.invoices[3]?.totalCents).toBe(10_320);
+    expect(first.invoices[3]?.totalCents).toBe(23_880);
     expect(first.access).toEqual({ kind: "full" });
     expect(first.commitmentReminder).toBe(true);
-    expect(first.nextPriceCents).toBe(24_600);
+    expect(first.nextPriceCents).toBe(19_900);
   });
 
   it("sans mandat signé, les factures restent à prélever, sans impayé", async () => {
-    const { owner } = await cabinet(addMonths(new Date(), -1), "clinic", {
+    const { owner } = await cabinet(addMonths(new Date(), -1), "premium", {
       mandate: false,
     });
     const overview = await paying.overview(owner);
@@ -229,7 +233,7 @@ describe("échéances et prélèvements simulés", () => {
     ).toBe(true);
     expect(overview.access.kind).toBe("grace");
     const later = new Date(Date.now() + 31 * day);
-    expect(await declining.accessFor(owner, later)).toEqual({
+    expect((await declining.accessFor(owner, later)).access).toEqual({
       kind: "blocked",
       reason: "unpaid",
     });
@@ -238,21 +242,23 @@ describe("échéances et prélèvements simulés", () => {
       "billing_blocked",
     );
 
-    expect(await paying.settle(owner)).toBe(true);
+    expect(await paying.settle(owner)).toBe("paid");
     const settled = await paying.overview(owner);
     expect(settled.access).toEqual({ kind: "full" });
     expect(settled.invoices.every((invoice) => invoice.status === "paid")).toBe(
       true,
     );
-    expect(await paying.accessFor(owner, later)).toEqual({ kind: "full" });
+    expect((await paying.accessFor(owner, later)).access).toEqual({
+      kind: "full",
+    });
     expect(await domainError(paying.settle(owner))).toBe("invalid_target");
   });
 });
 
 describe("suppléments d'usage", () => {
-  it("10 suivis actifs inclus ; le 11e lancement coûte 2,50 €, une réactivation 1,26 €", async () => {
-    const { owner } = await cabinet(addMonths(new Date(), -3));
-    await addFollowups(owner, 10);
+  it("Starter : 15 suivis actifs inclus ; le 16e lancement coûte 2,50 €, une réactivation 1,26 €", async () => {
+    const { owner } = await cabinet(addMonths(new Date(), -3), "starter");
+    await addFollowups(owner, 15);
     await addFollowups(owner, 2, "active", true); // suivis test : jamais comptés
     const [eleventh] = await addFollowups(owner, 1, "draft");
     const [old] = await addFollowups(owner, 1, "ended");
@@ -270,7 +276,7 @@ describe("suppléments d'usage", () => {
     });
 
     const overview = await paying.overview(owner);
-    expect(overview.activeFollowups).toBe(10);
+    expect(overview.activeFollowups).toBe(15);
     expect(overview.pending).toEqual({
       launches: 1,
       reactivations: 1,
@@ -282,7 +288,7 @@ describe("suppléments d'usage", () => {
     const billed = await paying.overview(owner, new Date(next.getTime() + 1));
     const latest = billed.invoices[0];
     expect(latest?.lines.map((line) => line.amountCents)).toEqual([
-      24_600, 250, 126,
+      7_900, 250, 126,
     ]);
     expect(billed.pending.amountCents).toBe(0);
     const { rows } = await admin.query(
@@ -292,40 +298,81 @@ describe("suppléments d'usage", () => {
     expect(rows[0]).toEqual({ n: 2 });
   });
 
-  it("en dessous de 10 suivis actifs, un lancement est inclus", async () => {
+  it("en dessous des suivis inclus, un lancement est compris", async () => {
     const { owner } = await cabinet(new Date());
     const [first] = await addFollowups(owner, 1);
     if (!first) throw new Error("suivi");
     // Le suivi lancé ne se compte pas lui-même.
     expect(await usage(owner, first, "launch")).toEqual({ amountCents: 0 });
   });
+
+  it("au plafond de la formule, aucun nouveau lancement (dépassement maîtrisé)", async () => {
+    const { owner } = await cabinet(new Date(), "starter");
+    await addFollowups(owner, 30);
+    const [extra] = await addFollowups(owner, 1, "draft");
+    if (!extra) throw new Error("suivi");
+    expect(await domainError(usage(owner, extra, "launch"))).toBe(
+      "plan_quota_reached",
+    );
+    // Passer à Pro relève aussitôt le plafond (80) et les suivis inclus (40).
+    await paying.changePlan(owner, "pro");
+    expect(await usage(owner, extra, "launch")).toEqual({ amountCents: 0 });
+  });
 });
 
 describe("formule et engagement", () => {
-  it("l'engagement annuel se demande à partir du mois 3, jamais pendant l'essai", async () => {
-    const trial = await cabinet(new Date());
-    expect(await domainError(paying.chooseCycle(trial.owner, "annual"))).toBe(
+  it("l'engagement annuel est proposé à 45 jours d'essai et commence après l'essai", async () => {
+    const day = 86_400_000;
+    const early = await cabinet(new Date(Date.now() - 40 * day));
+    expect(await domainError(paying.chooseCycle(early.owner, "annual"))).toBe(
       "invalid_target",
     );
-    // La base refuse aussi un engagement annuel pendant l'essai.
+    // La base refuse aussi un engagement pris avant le 45e jour…
     const code = await errorCode(
-      asApp(app, trial.org, (client) =>
+      asApp(app, early.org, (client) =>
         client.query(
-          "UPDATE subscriptions SET cycle = 'annual', cycle_chosen_at = now(), annual_ends_at = now() + interval '1 year'",
+          "UPDATE subscriptions SET cycle = 'annual', cycle_chosen_at = now(), annual_ends_at = started_at + interval '14 months'",
         ),
       ),
     );
     expect(code).toBe("23514");
 
+    // … et un engagement qui couvrirait l'essai.
+    const offered = await cabinet(new Date(Date.now() - 46 * day));
+    expect(
+      await errorCode(
+        asApp(app, offered.org, (client) =>
+          client.query(
+            "UPDATE subscriptions SET cycle = 'annual', cycle_chosen_at = now(), annual_ends_at = now() + interval '1 year'",
+          ),
+        ),
+      ),
+    ).toBe("23514");
+    const trial = await paying.overview(offered.owner);
+    expect(trial.phase).toBe("trial");
+    expect(trial.canCommitAnnual).toBe(true);
+    expect(trial.commitmentReminder).toBe(true);
+    expect((await paying.accessFor(offered.owner)).commitmentReminder).toBe(
+      true,
+    );
+    await paying.chooseCycle(offered.owner, "annual");
+    const committed = await paying.overview(offered.owner);
+    expect(committed.facts?.cycle).toBe("annual");
+    // Prix sans engagement jusqu'à la fin des 2 premiers mois, puis le tarif annuel pendant 12 mois.
+    expect(committed.nextPriceCents).toBe(16_900);
+    const startedAt = committed.facts?.startedAt ?? new Date();
+    expect(committed.facts?.annualEndsAt).toEqual(addMonths(startedAt, 14));
+    expect(committed.commitmentReminder).toBe(false);
+
     const flexible = await cabinet(addMonths(new Date(), -2));
     await paying.chooseCycle(flexible.owner, "annual");
     const overview = await paying.overview(flexible.owner);
     expect(overview.facts?.cycle).toBe("annual");
-    expect(overview.nextPriceCents).toBe(21_600);
+    expect(overview.nextPriceCents).toBe(16_900);
     expect(overview.commitmentReminder).toBe(false);
-    expect(
-      await domainError(paying.changePlan(flexible.owner, "clinic_pro")),
-    ).toBe("invalid_target");
+    expect(await domainError(paying.changePlan(flexible.owner, "pro"))).toBe(
+      "invalid_target",
+    );
   });
 
   it("rester au mois est un choix explicite, qui arrête le rappel", async () => {
@@ -339,18 +386,24 @@ describe("formule et engagement", () => {
     );
   });
 
-  it("une formule solo n'accepte qu'un vétérinaire", async () => {
-    const { org, owner } = await cabinet(new Date(), "clinic", { vets: 2 });
-    expect(await domainError(paying.changePlan(owner, "solo"))).toBe(
+  it("une formule trop petite pour l'équipe est refusée", async () => {
+    const { org, owner } = await cabinet(new Date(), "premium", { vets: 2 });
+    expect(await domainError(paying.changePlan(owner, "starter"))).toBe(
       "plan_vet_limit",
     );
     expect(await domainError(paying.changePlan(owner, "illimité"))).toBe(
       "invalid_target",
     );
-    await paying.changePlan(owner, "clinic_pro");
-    expect((await paying.overview(owner)).facts?.plan).toBe("clinic_pro");
+    await paying.changePlan(owner, "pro");
+    expect((await paying.overview(owner)).facts?.plan).toBe("pro");
 
-    const solo = await cabinet(new Date(), "solo");
+    const team = await cabinet(new Date(), "premium", { assistants: 2 });
+    expect(await domainError(paying.changePlan(team.owner, "starter"))).toBe(
+      "plan_assistant_limit",
+    );
+    expect((await paying.overview(team.owner)).assistantSeats).toBe(2);
+
+    const solo = await cabinet(new Date(), "starter");
     expect(
       await withTenant(appDb, { organizationId: solo.org }, (tx) =>
         vetLimit(tx),
@@ -358,7 +411,38 @@ describe("formule et engagement", () => {
     ).toBe(1);
     expect(
       await withTenant(appDb, { organizationId: org }, (tx) => vetLimit(tx)),
-    ).toBe(3);
+    ).toBe(2);
+  });
+});
+
+describe("intégrations avancées (dr.veto)", () => {
+  const settings = settingsService({
+    db: appDb,
+    whatsapp: { live: false },
+    drveto: fakeDrVeto,
+    payments: fakePaymentMandate,
+  });
+
+  it("réservées à Premium, vérifiées côté serveur", async () => {
+    const { owner } = await cabinet(new Date(), "pro");
+    expect(
+      await domainError(settings.connect(owner, "drveto", "CAB-1234")),
+    ).toBe("plan_feature_missing");
+    // L'étape du démarrage guidé est alors sans objet.
+    const onboarding = await settings.onboarding(owner);
+    expect(onboarding.advancedIntegrations).toBe(false);
+    expect(onboarding.steps.drveto).toBe(true);
+    expect((await settings.get(owner)).advancedIntegrations).toBe(false);
+
+    const premium = await cabinet(new Date(), "premium");
+    await settings.connect(premium.owner, "drveto", "CAB-1234");
+    // Pas de retour à une offre sans intégrations tant que dr.veto est connecté.
+    expect(await domainError(paying.changePlan(premium.owner, "pro"))).toBe(
+      "plan_integration_connected",
+    );
+    await settings.disconnect(premium.owner, "drveto");
+    await paying.changePlan(premium.owner, "pro");
+    expect((await paying.overview(premium.owner)).facts?.plan).toBe("pro");
   });
 });
 
@@ -377,7 +461,7 @@ describe("résiliation", () => {
     );
 
     const after = new Date(endsAt.getTime() + day);
-    expect(await paying.accessFor(owner, after)).toEqual({
+    expect((await paying.accessFor(owner, after)).access).toEqual({
       kind: "blocked",
       reason: "canceled",
     });
@@ -394,16 +478,18 @@ describe("résiliation", () => {
         .where(eq(followups.id, running)),
     );
     expect(
-      await paying.accessFor(owner, new Date(after.getTime() + day)),
+      (await paying.accessFor(owner, new Date(after.getTime() + day))).access,
     ).toEqual({
       kind: "read_only",
       reason: "canceled",
       until: addMonths(after, 3),
     });
-    expect(await paying.accessFor(owner, addMonths(after, 3))).toEqual({
-      kind: "closed",
-      reason: "canceled",
-    });
+    expect((await paying.accessFor(owner, addMonths(after, 3))).access).toEqual(
+      {
+        kind: "closed",
+        reason: "canceled",
+      },
+    );
   });
 });
 
@@ -430,12 +516,19 @@ describe("droits et intégrité", () => {
     const unpaid = await errorCode(
       asApp(app, org, (client) =>
         client.query(
-          "UPDATE invoices SET status = 'failed', paid_at = NULL WHERE id = $1",
+          "UPDATE invoices SET status = 'open', paid_at = NULL WHERE id = $1",
           [invoiceId],
         ),
       ),
     );
     expect(unpaid).toBe("42501");
+    // Seule évolution d'une facture payée : une contestation bancaire la repasse en refusée.
+    await asApp(app, org, (client) =>
+      client.query(
+        "UPDATE invoices SET status = 'failed', paid_at = NULL WHERE id = $1",
+        [invoiceId],
+      ),
+    );
     for (const table of [
       "invoices",
       "subscriptions",

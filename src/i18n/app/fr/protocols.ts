@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const protocols = {
   title: "Protocoles",
@@ -17,7 +19,7 @@ export const protocols = {
     archived: "Archivés",
     version: (versionNumber: number) => `version ${versionNumber}`,
     owner: (name: string) => `de ${name}`,
-    followups: (count: number) => `${count} suivi(s)`,
+    followups: (count: number) => nombre(count, "suivi", "suivis"),
   },
   /** Bibliothèque de départ : son contenu clinique reste rédigé en français. */
   library: {
@@ -75,7 +77,8 @@ export const protocols = {
     version: (versionNumber: number) => `Version ${versionNumber}`,
     validatedBy: (name: string) => `Validée par ${name}`,
     notValidated: "Non validée",
-    followups: (count: number) => ` · ${count} suivi(s) lancé(s) avec elle`,
+    followups: (count: number) =>
+      ` · ${nombre(count, "suivi lancé", "suivis lancés")} avec elle`,
     removedMember: "Membre retiré",
     /** Notes écrites par l'application (enregistrées telles quelles en base). */
     systemNotes: {

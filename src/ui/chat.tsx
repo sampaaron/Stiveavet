@@ -34,7 +34,7 @@ export function ChatThread({ messages }: { messages: Message[] }) {
   );
 }
 
-export function ChatBubble({ message }: { message: Message }) {
+function ChatBubble({ message }: { message: Message }) {
   const t = useAppText();
   if (message.author === "system") {
     return (

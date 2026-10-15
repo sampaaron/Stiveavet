@@ -18,6 +18,7 @@ import { billing } from "./billing";
 import { journal } from "./journal";
 import { tasks } from "./tasks";
 import { agenda } from "./agenda";
+import { patients } from "./patients";
 
 export const en: AppDictionary = {
   common,
@@ -37,4 +38,5 @@ export const en: AppDictionary = {
   journal,
   tasks,
   agenda,
+  patients,
 };

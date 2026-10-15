@@ -2,13 +2,10 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
-import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
-import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
+import { configuredAiGateway } from "@/adapters/ai-gateway";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { emailSender, marketingEmailSender } from "@/adapters/email";
 import { lazyObjectStorage } from "@/adapters/object-storage";
-import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
 import { agendaService } from "@/domains/agenda/captures";
 import type { AgendaService } from "@/domains/agenda/captures";
 import { appointmentsService } from "@/domains/agenda/demandes";
@@ -21,8 +18,11 @@ import { teamService } from "@/domains/equipe/service";
 import { mediaService } from "@/domains/fichiers/service";
 import type { MediaService } from "@/domains/fichiers/service";
 import { billingService } from "@/domains/facturation/service";
+import { billingProviders } from "@/domains/facturation/stripe";
 import type { BillingService } from "@/domains/facturation/service";
 import type { TeamService } from "@/domains/equipe/service";
+import { patientsService } from "@/domains/patients/service";
+import type { PatientsService } from "@/domains/patients/service";
 import { protocolsService } from "@/domains/protocoles/service";
 import type { ProtocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
@@ -30,15 +30,22 @@ import type { SettingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
+import { statsService } from "@/domains/suivis/statistiques";
+import type { StatsService } from "@/domains/suivis/statistiques";
 import { synthesisService } from "@/domains/suivis/synthese";
 import type { SynthesisService } from "@/domains/suivis/synthese";
 import { todayService } from "@/domains/suivis/tableau";
 import type { TodayService } from "@/domains/suivis/tableau";
-import { JOB_HANDLERS, OUTBOX_ROUTES } from "@/domains/taches/registry";
+import { OUTBOX_ROUTES, jobRegistry } from "@/domains/taches/registry";
 import { jobsService } from "@/domains/taches/service";
 import { createWorker } from "@/domains/taches/worker";
 import { alertsService } from "@/domains/urgences/service";
 import type { AlertsService } from "@/domains/urgences/service";
+import {
+  configuredWhatsApp,
+  providerFor,
+  setupFor,
+} from "@/domains/whatsapp/connexion";
 import type { JobsService } from "@/domains/taches/service";
 import type { FollowupsService } from "@/domains/suivis/service";
 import { appDatabase } from "@/server/db/client";
@@ -47,6 +54,7 @@ import { serverEnv } from "@/server/env";
 let team: TeamService | undefined;
 let followups: FollowupsService | undefined;
 let protocols: ProtocolsService | undefined;
+let patients: PatientsService | undefined;
 let settings: SettingsService | undefined;
 let billing: BillingService | undefined;
 let demo: DemoService | undefined;
@@ -59,6 +67,7 @@ let agenda: AgendaService | undefined;
 let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
 let today: TodayService | undefined;
+let stats: StatsService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 declare global {
@@ -92,25 +101,33 @@ export const services = {
     followups ??= followupsService(appDatabase());
     return followups;
   },
+  /** Registre des animaux et des propriétaires saisi par le cabinet (ADR 0030). */
+  patients(): PatientsService {
+    patients ??= patientsService(appDatabase());
+    return patients;
+  },
   protocols(): ProtocolsService {
     protocols ??= protocolsService(appDatabase());
     return protocols;
   },
-  /** Connecteurs simulés uniquement en phase 1 (ADR 0004). */
+  /**
+   * dr.veto simulé (ADR 0004) ; WhatsApp (ADR 0024) et mandat de prélèvement (ADR 0027)
+   * simulés ou réels selon la configuration.
+   */
   settings(): SettingsService {
     settings ??= settingsService({
       db: appDatabase(),
-      whatsapp: fakeWhatsApp,
+      whatsapp: setupFor(configuredWhatsApp()),
       drveto: fakeDrVeto,
-      payments: fakePaymentMandate,
+      payments: billingProviders().payments,
     });
     return settings;
   },
-  /** Prélèvements simulés uniquement en phase 1 (ADR 0011). */
+  /** Prélèvements simulés en local, par Stripe ailleurs (ADR 0011, 0027). */
   billing(): BillingService {
     billing ??= billingService({
       db: appDatabase(),
-      provider: fakeBillingProvider(),
+      provider: billingProviders().billing,
     });
     return billing;
   },
@@ -143,7 +160,7 @@ export const services = {
     agenda ??= agendaService({
       db: appDatabase(),
       storage: lazyObjectStorage,
-      ai: fakeAiGateway,
+      ai: configuredAiGateway(),
     });
     return agenda;
   },
@@ -154,7 +171,10 @@ export const services = {
   },
   /** Synthèse pré-consultation, rédaction simulée sous garde-fous (ADR 0020). */
   synthesis(): SynthesisService {
-    synthesis ??= synthesisService({ db: appDatabase(), ai: fakeAiGateway });
+    synthesis ??= synthesisService({
+      db: appDatabase(),
+      ai: configuredAiGateway(),
+    });
     return synthesis;
   },
   /** Tableau de bord « Aujourd'hui », lu dans la base ; agenda dr.veto simulé (ADR 0020). */
@@ -166,15 +186,25 @@ export const services = {
     });
     return today;
   },
+  /** Activité du cabinet en totaux, pour le tableau de bord. */
+  stats(): StatsService {
+    stats ??= statsService(appDatabase());
+    return stats;
+  },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement
    * (l'appelant le vérifie) : mêmes exécutants que `pnpm worker`.
    */
   simulatorWorker() {
+    const registry = jobRegistry({
+      whatsapp: providerFor(configuredWhatsApp()),
+      ai: configuredAiGateway(),
+    });
     simulatorWorker ??= createWorker({
       db: appDatabase(),
       workerId: "app-simulateur",
-      handlers: JOB_HANDLERS,
+      handlers: registry.handlers,
+      deadHandlers: registry.dead,
       routes: OUTBOX_ROUTES,
     });
     return simulatorWorker;

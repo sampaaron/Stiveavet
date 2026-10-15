@@ -3,7 +3,8 @@ import { and, asc, desc, eq, gte, inArray, lt, ne } from "drizzle-orm";
 import type { DrVetoConnector } from "@/adapters/drveto/types";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
 import { followupActivity } from "@/domains/facturation/service";
-import { INCLUDED_ACTIVE_FOLLOWUPS } from "@/domains/facturation/rules";
+import { currentPlan } from "@/domains/facturation/limits";
+import { planDefinition } from "@/domains/facturation/rules";
 import type { Actor } from "@/domains/equipe/actor";
 import { parisLocalToDate } from "@/domains/reglages/content";
 import {
@@ -140,7 +141,7 @@ function excerpt(text: string): string {
 }
 
 /** Bornes du jour de Paris qui contient `now`. */
-export function parisDayBounds(now: Date): { start: Date; end: Date } {
+function parisDayBounds(now: Date): { start: Date; end: Date } {
   const iso = (index: number) =>
     new Date(index * 86_400_000).toISOString().slice(0, 10);
   const today = parisDayIndex(now);
@@ -426,7 +427,8 @@ export function todayService(deps: {
             views,
             followups: rows,
             activeFollowups: activity.activeFollowups,
-            includedFollowups: INCLUDED_ACTIVE_FOLLOWUPS,
+            includedFollowups: planDefinition(await currentPlan(tx))
+              .includedActiveFollowups,
             agenda,
             stiveaAppointments,
           };

@@ -17,7 +17,11 @@ async function freshPage(browser: Browser): Promise<Page> {
 }
 
 const progress = (page: Page, done: number) =>
-  expect(page.getByText(`${done} étape(s) terminée(s) sur 8`)).toBeVisible();
+  expect(
+    page.getByText(
+      `${done} ${done >= 2 ? "étapes terminées" : "étape terminée"} sur 8`,
+    ),
+  ).toBeVisible();
 
 test.describe("nouveau cabinet", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -25,7 +29,8 @@ test.describe("nouveau cabinet", () => {
   test("installation guidée complète, avec des connexions simulées", async ({
     page,
   }) => {
-    await signUp(page);
+    // dr.veto (intégration avancée) n'est compris qu'en Premium.
+    await signUp(page, "Premium");
     await expect(
       page.getByRole("heading", { level: 1, name: "Démarrage guidé" }),
     ).toBeVisible();

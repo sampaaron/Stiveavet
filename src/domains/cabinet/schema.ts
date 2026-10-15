@@ -48,5 +48,7 @@ export const memberships = pgTable("memberships", {
   userId: uuid("user_id").notNull(),
   role: memberRole("role").notNull(),
   deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
+  /** Migration 0017 : numéro WhatsApp professionnel des alertes urgentes (format E.164). */
+  alertPhone: text("alert_phone"),
   ...timestamps,
 });

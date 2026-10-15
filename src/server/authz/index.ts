@@ -14,7 +14,6 @@ import { appDatabase } from "@/server/db/client";
 import { membershipPermissions } from "@/server/db/schema";
 import { services } from "@/server/services";
 import { withTenant } from "@/server/db/tenant";
-import type { TenantTransaction } from "@/server/db/tenant";
 
 /**
  * Garde serveur unique (architecture §6), dans l'ordre : personne authentifiée → membre actif
@@ -25,6 +24,8 @@ import type { TenantTransaction } from "@/server/db/tenant";
 export type MemberContext = Actor & {
   /** Accès du cabinet selon sa facturation (impayé, résiliation, lecture seule). */
   billing: Access;
+  /** Choix entre engagement annuel et mensuel à faire (ADR 0023). */
+  commitmentReminder: boolean;
 };
 
 export const memberContext = cache(async (): Promise<MemberContext> => {
@@ -39,8 +40,12 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
         .where(eq(membershipPermissions.membershipId, session.membershipId)),
   );
   // En lecture seule ou après la fin de l'accès, seuls les droits de consultation restent
-  // effectifs ; les droits en base ne changent pas et reviennent après régularisation.
-  const billing = await services.billing().accessFor({
+  // effectifs, et Stive suit l'offre ; les droits en base ne changent pas.
+  const {
+    access: billing,
+    commitmentReminder,
+    plan,
+  } = await services.billing().accessFor({
     organizationId: session.organizationId,
     userId: session.userId,
   });
@@ -52,8 +57,10 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
     permissions: restrictPermissions(
       new Set(rows.map((row) => row.permission).filter(isPermissionKey)),
       billing,
+      plan,
     ),
     billing,
+    commitmentReminder,
   };
 });
 
@@ -65,16 +72,4 @@ export async function requirePermission(
   if (!anyOf.some((permission) => context.permissions.has(permission)))
     notFound();
   return context;
-}
-
-/** Transaction sous le cabinet et la personne du contexte (RLS). */
-export function withMember<T>(
-  context: MemberContext,
-  run: (tx: TenantTransaction) => Promise<T>,
-): Promise<T> {
-  return withTenant(
-    appDatabase(),
-    { organizationId: context.organizationId, userId: context.userId },
-    run,
-  );
 }

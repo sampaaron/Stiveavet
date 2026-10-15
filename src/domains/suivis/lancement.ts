@@ -1,46 +1,40 @@
 import { randomUUID } from "node:crypto";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
-import { and, asc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
-import { z } from "zod";
-
-import type { DrVetoAnimalHit, DrVetoConnector } from "@/adapters/drveto/types";
-import type { AuditMetadata } from "@/domains/audit/schema";
+import type { DrVetoConnector } from "@/adapters/drveto/types";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { recordUsage } from "@/domains/facturation/service";
-import { canReadProtocol } from "@/domains/protocoles/policies";
 import { MAX_STEPS } from "@/domains/protocoles/content";
-import { emit, enqueue } from "@/domains/taches/queue";
+import { emit } from "@/domains/taches/queue";
+import { maskPhone } from "@/domains/whatsapp/numero";
+import { currentContacts } from "@/domains/patients/service";
+import { manualFollowupInput } from "@/domains/patients/content";
+import type { ManualFollowupInput } from "@/domains/patients/content";
 import {
   alertRules,
   animalOwners,
   animals,
-  auditEvents,
-  consents,
   followupAlertRules,
   followupContacts,
   followupImports,
-  followupShares,
   followupSteps,
   followupTreatments,
   followups,
-  integrationConnections,
   memberships,
   ownerContacts,
   owners,
   protocolSteps,
   protocolVersions,
-  protocols,
   scheduledJobs,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditFollowup as audit } from "@/domains/audit/journal";
 
-import { nextSendTime } from "./envoi";
 import {
-  messageWindows,
   programmeOf,
   scheduleAutomaticEnd,
   scheduleReminders,
@@ -53,7 +47,6 @@ import {
   firstContactHours,
   fitsSpecies,
   isPastStep,
-  maskedPhone,
   sheetInput,
   stepDueAt,
   suggestProtocol,
@@ -62,9 +55,44 @@ import {
   canLaunchFollowup,
   canPrepareFollowup,
   canSteerFollowup,
-  followupAccess,
 } from "./policies";
-import type { FollowupAccess } from "./policies";
+import type {
+  DrVetoSearchHit,
+  LaunchSheet,
+  SheetStep,
+  StatusChange,
+} from "./chargement";
+import {
+  activeVets,
+  copyProtocolPlan,
+  currentAlerts,
+  currentSteps,
+  drVetoRef,
+  isConnected,
+  loadFollowup,
+  protocolChoices,
+  scheduleIntro,
+  searchQuery,
+  setStatusReason,
+  TRANSITIONS,
+  upsertOwner,
+  uuid,
+} from "./chargement";
+
+export {
+  setStatusReason,
+  loadFollowup,
+  copyProtocolPlan,
+  reminderTreatments,
+} from "./chargement";
+export type {
+  StatusChange,
+  DrVetoSearchHit,
+  SheetStep,
+  SheetTreatment,
+  LaunchSheet,
+  LoadedFollowup,
+} from "./chargement";
 
 /**
  * Lancement manuel d'un suivi (cahier des charges §4 et §5, ADR 0015) :
@@ -77,486 +105,9 @@ import type { FollowupAccess } from "./policies";
  * Chaque étape est journalisée ; le journal ne garde que des identifiants et des compteurs.
  */
 
-type Status = "draft" | "active" | "paused" | "human_takeover" | "ended";
-
-export type StatusChange = "pause" | "resume" | "stop" | "reactivate";
-
-export type DrVetoSearchHit = DrVetoAnimalHit & {
-  /** Suivi en préparation ou en cours pour cet animal, s'il existe. */
-  openFollowupId: string | null;
-};
-
-export type SheetStep = {
-  offsetHours: number;
-  kind: "message" | "question" | "photo_request" | "reminder" | "control";
-  content: string;
-  dueAt: Date;
-  /** Heure passée sur un suivi lancé : l'étape ne se modifie plus. */
-  locked: boolean;
-};
-
-export type SheetTreatment = {
-  id: string;
-  source: "drveto" | "vet";
-  name: string;
-  instructions: string;
-  validatedBy: string | null;
-  validatedAt: Date | null;
-};
-
-export type LaunchSheet = {
-  followup: {
-    id: string;
-    status: Status;
-    isTest: boolean;
-    animalName: string;
-    species: "dog" | "cat";
-    breed: string | null;
-    procedure: string;
-    procedureAt: Date;
-    controlAppointmentAt: Date | null;
-    firstContactAt: Date | null;
-    firstContactHours: number;
-    startedAt: Date | null;
-    responsibleMembershipId: string;
-    responsibleName: string;
-    planRevision: number;
-  };
-  imported: {
-    externalRef: string;
-    importedAt: Date;
-    allergies: string[];
-    antecedents: string[];
-  } | null;
-  contacts: {
-    name: string;
-    role: "primary" | "secondary";
-    active: boolean;
-    phone: string;
-    language: "fr" | "en";
-  }[];
-  treatments: SheetTreatment[];
-  protocol: {
-    protocolId: string;
-    versionId: string;
-    name: string;
-    versionNumber: number;
-  } | null;
-  steps: SheetStep[];
-  alerts: { level: "watch" | "urgent"; description: string }[];
-  /** Brouillon : protocoles validés applicables à l'espèce. */
-  protocolOptions: {
-    protocolId: string;
-    name: string;
-    versionNumber: number;
-  }[];
-  /** Brouillon : vétérinaires actifs pouvant être responsables. */
-  vetOptions: { membershipId: string; name: string }[];
-  /** Heure de construction de la fiche (étapes passées, premier message immédiat). */
-  generatedAt: Date;
-  rights: {
-    /** Modifier la fiche (brouillon : préparation ; suivi lancé : vétérinaire). */
-    canEdit: boolean;
-    /** Valider ou retirer un traitement, pause, arrêt, reprise. */
-    canSteer: boolean;
-    canLaunch: boolean;
-  };
-};
-
-const uuid = z.uuid();
-const searchQuery = z.string().trim().min(2).max(80);
-const drVetoRef = z.string().regex(/^[A-Za-z0-9-]{3,64}$/);
-
-const TRANSITIONS: Record<
-  StatusChange,
-  { from: readonly Status[]; to: Status; reason: string; action: string }
-> = {
-  pause: {
-    from: ["active", "human_takeover"],
-    to: "paused",
-    reason: "vet_paused",
-    action: "followup.paused",
-  },
-  resume: {
-    from: ["paused"],
-    to: "active",
-    reason: "vet_resumed",
-    action: "followup.resumed",
-  },
-  stop: {
-    from: ["active", "paused", "human_takeover"],
-    to: "ended",
-    reason: "vet_stopped",
-    action: "followup.stopped",
-  },
-  reactivate: {
-    from: ["ended"],
-    to: "active",
-    reason: "vet_reactivated",
-    action: "followup.reactivated",
-  },
-};
-
-async function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
-}
-
-async function isConnected(
-  tx: TenantTransaction,
-  provider: "whatsapp" | "drveto",
-): Promise<boolean> {
-  const [row] = await tx
-    .select({ provider: integrationConnections.provider })
-    .from(integrationConnections)
-    .where(eq(integrationConnections.provider, provider));
-  return Boolean(row);
-}
-
-export async function setStatusReason(tx: TenantTransaction, reason: string) {
-  await tx.execute(
-    sql`SELECT set_config('app.status_reason', ${reason}, true)`,
-  );
-}
-
-export type LoadedFollowup = {
-  id: string;
-  status: Status;
-  isTest: boolean;
-  isPrivate: boolean;
-  animalId: string;
-  animalName: string;
-  species: "dog" | "cat";
-  breed: string | null;
-  procedure: string;
-  procedureAt: Date;
-  controlAppointmentAt: Date | null;
-  firstContactAt: Date | null;
-  startedAt: Date | null;
-  responsibleMembershipId: string;
-  protocolVersionId: string | null;
-  planRevision: number;
-  access: FollowupAccess;
-};
-
-/**
- * Suivi et niveau d'accès de l'acteur. Inexistant, autre cabinet ou invisible : not_found,
- * comme partout ailleurs. `lock` verrouille la ligne pour un changement d'état.
- */
-export async function loadFollowup(
-  tx: TenantTransaction,
-  actor: Actor,
-  followupId: string,
-  lock = false,
-): Promise<LoadedFollowup> {
-  if (!uuid.safeParse(followupId).success) throw new DomainError("not_found");
-  if (lock)
-    await tx
-      .select({ id: followups.id })
-      .from(followups)
-      .where(eq(followups.id, followupId))
-      .for("update");
-  const [row] = await tx
-    .select({
-      id: followups.id,
-      status: followups.status,
-      isTest: followups.isTest,
-      isPrivate: followups.isPrivate,
-      animalId: followups.animalId,
-      animalName: animals.name,
-      species: animals.species,
-      breed: animals.breed,
-      procedure: followups.procedure,
-      procedureAt: followups.procedureAt,
-      controlAppointmentAt: followups.controlAppointmentAt,
-      firstContactAt: followups.firstContactAt,
-      startedAt: followups.startedAt,
-      responsibleMembershipId: followups.responsibleMembershipId,
-      protocolVersionId: followups.protocolVersionId,
-      planRevision: followups.planRevision,
-    })
-    .from(followups)
-    .innerJoin(animals, eq(animals.id, followups.animalId))
-    .where(eq(followups.id, followupId));
-  if (!row) throw new DomainError("not_found");
-  const now = new Date();
-  const shares = await tx
-    .select({ membershipId: followupShares.membershipId })
-    .from(followupShares)
-    .where(
-      and(
-        eq(followupShares.followupId, followupId),
-        isNull(followupShares.revokedAt),
-        or(isNull(followupShares.expiresAt), gt(followupShares.expiresAt, now)),
-      ),
-    );
-  const access = followupAccess(actor, {
-    responsibleMembershipId: row.responsibleMembershipId,
-    isPrivate: row.isPrivate,
-    sharedWith: shares.map((share) => share.membershipId),
-  });
-  if (access === "none") throw new DomainError("not_found");
-  return { ...row, access };
-}
-
-/** Protocoles validés, non archivés et lisibles par l'acteur. */
-async function protocolChoices(tx: TenantTransaction, actor: Actor) {
-  const rows = await tx
-    .select({
-      protocolId: protocols.id,
-      ownerMembershipId: protocols.ownerMembershipId,
-      versionId: protocolVersions.id,
-      versionNumber: protocolVersions.versionNumber,
-      name: protocolVersions.name,
-      description: protocolVersions.description,
-      species: protocolVersions.species,
-      validatedAt: protocolVersions.validatedAt,
-    })
-    .from(protocols)
-    .innerJoin(
-      protocolVersions,
-      eq(protocolVersions.id, protocols.currentVersionId),
-    )
-    .where(isNull(protocols.archivedAt))
-    .orderBy(asc(protocolVersions.name));
-  return rows.filter(
-    (row) => row.validatedAt !== null && canReadProtocol(actor, row),
-  );
-}
-
-async function activeVets(tx: TenantTransaction) {
-  return tx
-    .select({ membershipId: memberships.id, name: users.displayName })
-    .from(memberships)
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .where(
-      and(
-        isNull(memberships.deactivatedAt),
-        inArray(memberships.role, ["admin_vet", "vet"]),
-      ),
-    )
-    .orderBy(asc(users.displayName));
-}
-
-/** Copie les étapes et signes d'alerte d'une version de protocole dans une nouvelle révision. */
-export async function copyProtocolPlan(
-  tx: TenantTransaction,
-  organizationId: string,
-  followupId: string,
-  versionId: string,
-  revision: number,
-  now: Date,
-) {
-  await tx
-    .update(followupSteps)
-    .set({ supersededAt: now })
-    .where(
-      and(
-        eq(followupSteps.followupId, followupId),
-        isNull(followupSteps.supersededAt),
-      ),
-    );
-  await tx
-    .update(followupAlertRules)
-    .set({ supersededAt: now })
-    .where(
-      and(
-        eq(followupAlertRules.followupId, followupId),
-        isNull(followupAlertRules.supersededAt),
-      ),
-    );
-  const steps = await tx
-    .select()
-    .from(protocolSteps)
-    .where(eq(protocolSteps.protocolVersionId, versionId))
-    .orderBy(asc(protocolSteps.position));
-  const rules = await tx
-    .select()
-    .from(alertRules)
-    .where(eq(alertRules.protocolVersionId, versionId))
-    .orderBy(asc(alertRules.position));
-  if (steps.length)
-    await tx.insert(followupSteps).values(
-      steps.map((step, index) => ({
-        organizationId,
-        followupId,
-        revision,
-        position: index + 1,
-        offsetHours: step.offsetHours,
-        kind: step.kind,
-        content: step.content,
-      })),
-    );
-  if (rules.length)
-    await tx.insert(followupAlertRules).values(
-      rules.map((rule, index) => ({
-        organizationId,
-        followupId,
-        revision,
-        position: index + 1,
-        level: rule.level,
-        description: rule.description,
-      })),
-    );
-  return { steps: steps.length, alerts: rules.length };
-}
-
-async function currentSteps(tx: TenantTransaction, followupId: string) {
-  return tx
-    .select()
-    .from(followupSteps)
-    .where(
-      and(
-        eq(followupSteps.followupId, followupId),
-        isNull(followupSteps.supersededAt),
-      ),
-    )
-    .orderBy(asc(followupSteps.offsetHours), asc(followupSteps.position));
-}
-
-async function currentAlerts(tx: TenantTransaction, followupId: string) {
-  return tx
-    .select()
-    .from(followupAlertRules)
-    .where(
-      and(
-        eq(followupAlertRules.followupId, followupId),
-        isNull(followupAlertRules.supersededAt),
-      ),
-    )
-    .orderBy(asc(followupAlertRules.position));
-}
-
-/**
- * Traitements qu'un rappel peut citer : validés par un vétérinaire et non retirés. Un
- * traitement importé de dr.veto n'est jamais rappelé avant cette validation.
- */
-export async function reminderTreatments(
-  tx: TenantTransaction,
-  followupId: string,
-) {
-  return tx
-    .select({
-      id: followupTreatments.id,
-      name: followupTreatments.name,
-      instructions: followupTreatments.instructions,
-    })
-    .from(followupTreatments)
-    .where(
-      and(
-        eq(followupTreatments.followupId, followupId),
-        isNull(followupTreatments.removedAt),
-        sql`${followupTreatments.validatedAt} IS NOT NULL`,
-      ),
-    )
-    .orderBy(asc(followupTreatments.createdAt));
-}
-
-/** Propriétaire déjà rattaché à l'animal (même nom), sinon nouveau ; contact WhatsApp assuré. */
-async function upsertOwner(
-  tx: TenantTransaction,
-  organizationId: string,
-  animalId: string,
-  owner: { fullName: string; phone: string; language: "fr" | "en" },
-) {
-  const [existing] = await tx
-    .select({ id: owners.id })
-    .from(owners)
-    .innerJoin(animalOwners, eq(animalOwners.ownerId, owners.id))
-    .where(
-      and(
-        eq(animalOwners.animalId, animalId),
-        eq(owners.fullName, owner.fullName),
-      ),
-    );
-  let ownerId = existing?.id;
-  if (!ownerId) {
-    const [created] = await tx
-      .insert(owners)
-      .values({
-        organizationId,
-        fullName: owner.fullName,
-        preferredLanguage: owner.language,
-      })
-      .returning({ id: owners.id });
-    if (!created) throw new Error("Propriétaire non créé");
-    ownerId = created.id;
-    await tx.insert(animalOwners).values({ organizationId, animalId, ownerId });
-  }
-  await tx
-    .insert(ownerContacts)
-    .values({ organizationId, ownerId, kind: "whatsapp", value: owner.phone })
-    .onConflictDoNothing();
-  const [contact] = await tx
-    .select({ id: ownerContacts.id })
-    .from(ownerContacts)
-    .where(
-      and(
-        eq(ownerContacts.ownerId, ownerId),
-        eq(ownerContacts.kind, "whatsapp"),
-        eq(ownerContacts.value, owner.phone),
-      ),
-    );
-  if (!contact) throw new Error("Contact non créé");
-  return { ownerId, ownerContactId: contact.id };
-}
-
-/**
- * Planifie le premier message de Numa : à l'heure choisie par le vétérinaire, ou tout de
- * suite si elle est passée, toujours dans la plage d'envoi du cabinet (cahier des charges
- * §3.5). Rien ne part pour un suivi test. `attempt` distingue une replanification après une
- * pause ou une réactivation ; le message lui-même reste unique (clé du message, ADR 0016).
- */
-async function scheduleIntro(
-  tx: TenantTransaction,
-  organizationId: string,
-  followup: { id: string; firstContactAt: Date | null },
-  now: Date,
-  attempt?: string,
-) {
-  // Premier message déjà envoyé : une demande d'accord existe.
-  const [sent] = await tx
-    .select({ id: consents.id })
-    .from(consents)
-    .where(eq(consents.followupId, followup.id))
-    .limit(1);
-  if (sent) return;
-  const wanted =
-    followup.firstContactAt && followup.firstContactAt.getTime() > now.getTime()
-      ? followup.firstContactAt
-      : now;
-  await enqueue(tx, {
-    organizationId,
-    kind: "followup.message",
-    idempotencyKey: attempt
-      ? `followup:${followup.id}:intro:${attempt}`
-      : `followup:${followup.id}:intro`,
-    runAt: nextSendTime(await messageWindows(tx), wanted),
-    followupId: followup.id,
-    payload: { step: "intro" },
-  });
-}
-
 export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
   const { db, drveto } = deps;
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   /** Préparer une fiche demande le droit de lancement et la lecture clinique (allergies…). */
   function assertCanPrepare(actor: Actor) {
@@ -594,6 +145,21 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     // Un suivi test n'envoie rien : il ne demande ni WhatsApp ni facturation.
     if (!followup.isTest && !(await isConnected(tx, "whatsapp")))
       throw new DomainError("integration_missing");
+    // Pas de premier message sans l'accord pour WhatsApp, recueilli au cabinet.
+    if (!followup.isTest) {
+      const [missing] = await tx
+        .select({ id: followupContacts.id })
+        .from(followupContacts)
+        .where(
+          and(
+            eq(followupContacts.followupId, followupId),
+            eq(followupContacts.active, true),
+            isNull(followupContacts.whatsappOptinAt),
+          ),
+        )
+        .limit(1);
+      if (missing) throw new DomainError("optin_missing");
+    }
 
     await setStatusReason(tx, "launched");
     await tx
@@ -628,6 +194,76 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
       alerts: alerts.length,
       test: followup.isTest,
     });
+  }
+
+  /**
+   * Brouillon commun aux deux entrées (dr.veto, registre du cabinet) : premier message
+   * suggéré, contacts (le second n'écrit que si le vétérinaire l'active, lot 18) et plan du
+   * protocole proposé.
+   */
+  async function insertDraft(
+    tx: TenantTransaction,
+    actor: Actor,
+    draft: {
+      animalId: string;
+      responsible: string;
+      procedure: string;
+      procedureAt: Date;
+      controlAppointmentAt: Date | null;
+      versionId: string | null;
+      contacts: {
+        ownerId: string;
+        ownerContactId: string;
+        language: "fr" | "en";
+      }[];
+    },
+  ): Promise<string> {
+    const organizationId = actor.organizationId;
+    const followupId = randomUUID();
+    await tx.insert(followups).values({
+      id: followupId,
+      organizationId,
+      animalId: draft.animalId,
+      responsibleMembershipId: draft.responsible,
+      procedure: draft.procedure.slice(0, 160),
+      procedureAt: draft.procedureAt,
+      controlAppointmentAt: draft.controlAppointmentAt,
+      firstContactAt: firstContactAt(
+        draft.procedureAt,
+        FIRST_CONTACT_SUGGESTION_HOURS,
+      ),
+      status: "draft",
+      protocolVersionId: draft.versionId,
+      planRevision: draft.versionId ? 1 : 0,
+    });
+    for (const [index, contact] of draft.contacts.slice(0, 2).entries())
+      await tx.insert(followupContacts).values({
+        organizationId,
+        followupId,
+        ownerId: contact.ownerId,
+        ownerContactId: contact.ownerContactId,
+        role: index === 0 ? "primary" : "secondary",
+        active: index === 0,
+        language: contact.language,
+      });
+    if (draft.versionId)
+      await copyProtocolPlan(
+        tx,
+        organizationId,
+        followupId,
+        draft.versionId,
+        1,
+        new Date(),
+      );
+    return followupId;
+  }
+
+  /** Vétérinaire responsable proposé : l'acteur s'il l'est, sinon le premier actif. */
+  async function defaultResponsible(tx: TenantTransaction, actor: Actor) {
+    if (VET_ROLES.has(actor.role)) return actor.membershipId;
+    const [first] = await activeVets(tx);
+    if (!first) throw new DomainError("invalid_target");
+    return first.membershipId;
   }
 
   return {
@@ -677,11 +313,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
         if (!record) throw new DomainError("invalid_target");
         const organizationId = actor.organizationId;
 
-        const vets = await activeVets(tx);
-        const responsible = VET_ROLES.has(actor.role)
-          ? actor.membershipId
-          : vets[0]?.membershipId;
-        if (!responsible) throw new DomainError("invalid_target");
+        const responsible = await defaultResponsible(tx, actor);
 
         const [known] = await tx
           .select({ id: animals.id })
@@ -706,6 +338,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
               breed: record.animal.breed,
               birthDate: record.animal.birthDate,
               weightGrams: record.animal.weightGrams,
+              archivedAt: null,
             })
             .where(eq(animals.id, animalId));
         } else {
@@ -733,22 +366,20 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           record.animal.species,
           choices,
         );
-        const followupId = randomUUID();
-        await tx.insert(followups).values({
-          id: followupId,
-          organizationId,
+        const contacts = [];
+        for (const owner of record.owners.slice(0, 2))
+          contacts.push({
+            ...(await upsertOwner(tx, organizationId, animalId, owner)),
+            language: owner.language,
+          });
+        const followupId = await insertDraft(tx, actor, {
           animalId,
-          responsibleMembershipId: responsible,
-          procedure: record.procedure.label.slice(0, 160),
+          responsible,
+          procedure: record.procedure.label,
           procedureAt: record.procedure.at,
           controlAppointmentAt: record.controlAppointmentAt,
-          firstContactAt: firstContactAt(
-            record.procedure.at,
-            FIRST_CONTACT_SUGGESTION_HOURS,
-          ),
-          status: "draft",
-          protocolVersionId: versionId,
-          planRevision: versionId ? 1 : 0,
+          versionId,
+          contacts,
         });
         await tx.insert(followupImports).values({
           followupId,
@@ -759,19 +390,6 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           antecedents: record.antecedents,
           importedByMembershipId: actor.membershipId,
         });
-        for (const [index, owner] of record.owners.slice(0, 2).entries()) {
-          const ids = await upsertOwner(tx, organizationId, animalId, owner);
-          await tx.insert(followupContacts).values({
-            organizationId,
-            followupId,
-            ownerId: ids.ownerId,
-            ownerContactId: ids.ownerContactId,
-            role: index === 0 ? "primary" : "secondary",
-            // Le second contact n'écrit que si le vétérinaire l'active (lot 18).
-            active: index === 0,
-            language: owner.language,
-          });
-        }
         const treatments = record.treatments.slice(0, MAX_TREATMENTS);
         if (treatments.length)
           await tx.insert(followupTreatments).values(
@@ -783,18 +401,113 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
               instructions: treatment.instructions.slice(0, 300),
             })),
           );
-        if (versionId)
-          await copyProtocolPlan(
-            tx,
-            organizationId,
-            followupId,
-            versionId,
-            1,
-            new Date(),
-          );
         await audit(tx, actor, "followup.prepared", followupId, {
           source: "drveto_simulated",
           treatments: treatments.length,
+          protocolSuggested: versionId !== null,
+        });
+        return followupId;
+      });
+    },
+
+    /** Protocoles validés que l'acteur peut appliquer à cette espèce. */
+    async protocolOptions(actor: Actor, species: "dog" | "cat") {
+      assertCanPrepare(actor);
+      return run(actor, async (tx) =>
+        (await protocolChoices(tx, actor))
+          .filter((choice) => fitsSpecies(choice, species))
+          .map((choice) => ({ id: choice.protocolId, name: choice.name })),
+      );
+    },
+
+    /**
+     * Crée le brouillon depuis la fiche d'un animal du registre (sans dr.veto) : intervention
+     * saisie, protocole choisi ou proposé, propriétaires de l'animal comme contacts.
+     */
+    async prepareFromAnimal(
+      actor: Actor,
+      animalId: string,
+      input: ManualFollowupInput,
+    ): Promise<string> {
+      assertCanPrepare(actor);
+      const parsed = manualFollowupInput.safeParse(input);
+      if (!uuid.safeParse(animalId).success || !parsed.success)
+        throw new DomainError("invalid_target");
+      const draft = parsed.data;
+      return run(actor, async (tx) => {
+        const [animal] = await tx
+          .select({
+            species: animals.species,
+            archivedAt: animals.archivedAt,
+          })
+          .from(animals)
+          .where(eq(animals.id, animalId))
+          .for("update");
+        if (!animal) throw new DomainError("not_found");
+        if (animal.archivedAt) throw new DomainError("invalid_transition");
+        const [open] = await tx
+          .select({ id: followups.id })
+          .from(followups)
+          .where(
+            and(
+              eq(followups.animalId, animalId),
+              ne(followups.status, "ended"),
+            ),
+          );
+        if (open) throw new DomainError("already_followed");
+
+        const choices = (await protocolChoices(tx, actor)).filter((choice) =>
+          fitsSpecies(choice, animal.species),
+        );
+        let versionId: string | null;
+        if (draft.protocolId) {
+          const chosen = choices.find(
+            (choice) => choice.protocolId === draft.protocolId,
+          );
+          if (!chosen) throw new DomainError("invalid_target");
+          versionId = chosen.versionId;
+        } else
+          versionId = suggestProtocol(draft.procedure, animal.species, choices);
+
+        const ownerRows = await tx
+          .select({
+            ownerId: animalOwners.ownerId,
+            language: owners.preferredLanguage,
+          })
+          .from(animalOwners)
+          .innerJoin(owners, eq(owners.id, animalOwners.ownerId))
+          .where(eq(animalOwners.animalId, animalId))
+          .orderBy(asc(animalOwners.createdAt));
+        const numbers = await currentContacts(
+          tx,
+          ownerRows.map((row) => row.ownerId),
+        );
+        const contacts = ownerRows.flatMap((row) => {
+          const whatsapp = numbers.get(row.ownerId)?.whatsapp;
+          return whatsapp
+            ? [
+                {
+                  ownerId: row.ownerId,
+                  ownerContactId: whatsapp.id,
+                  language: row.language,
+                },
+              ]
+            : [];
+        });
+        if (!contacts.length) throw new DomainError("invalid_target");
+
+        const followupId = await insertDraft(tx, actor, {
+          animalId,
+          responsible: await defaultResponsible(tx, actor),
+          procedure: draft.procedure,
+          procedureAt: draft.procedureAt,
+          controlAppointmentAt: draft.controlAppointmentAt,
+          versionId,
+          contacts,
+        });
+        await audit(tx, actor, "followup.prepared", followupId, {
+          source: "manual",
+          treatments: 0,
           protocolSuggested: versionId !== null,
         });
         return followupId;
@@ -828,6 +541,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             active: followupContacts.active,
             phone: ownerContacts.value,
             language: followupContacts.language,
+            optinAt: followupContacts.whatsappOptinAt,
           })
           .from(followupContacts)
           .innerJoin(owners, eq(owners.id, followupContacts.ownerId))
@@ -959,8 +673,9 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             name: contact.name,
             role: contact.role,
             active: contact.active,
-            phone: maskedPhone(contact.phone),
+            phone: maskPhone(contact.phone),
             language: contact.language,
+            optedIn: contact.optinAt !== null,
           })),
           treatments: treatments.map((treatment) => ({
             ...treatment,
@@ -1065,6 +780,16 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             data.responsibleMembershipId &&
             data.responsibleMembershipId !== followup.responsibleMembershipId
           ) {
+            // Changer de responsable et lancer sont deux décisions distinctes (ADR 0015 §6).
+            // Un vétérinaire ne reprend pas le brouillon d'un confrère : seuls l'équipe qui
+            // prépare, le responsable actuel et un administrateur de l'équipe le réattribuent.
+            if (options.launch) throw new DomainError("invalid_transition");
+            if (
+              actor.role !== "assistant" &&
+              actor.membershipId !== followup.responsibleMembershipId &&
+              !actor.permissions.has("team.manage")
+            )
+              throw new DomainError("forbidden");
             const vets = await activeVets(tx);
             if (
               !vets.some(
@@ -1073,6 +798,10 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             )
               throw new DomainError("invalid_target");
             changes.responsibleMembershipId = data.responsibleMembershipId;
+            await audit(tx, actor, "followup.reassigned", followupId, {
+              from: followup.responsibleMembershipId,
+              to: data.responsibleMembershipId,
+            });
           }
           if (data.firstContactHours !== undefined)
             changes.firstContactAt = firstContactAt(
@@ -1093,6 +822,33 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             if (data.secondContactActive && !updated.length)
               throw new DomainError("invalid_target");
           }
+          if (data.whatsappOptIn !== undefined)
+            await tx
+              .update(followupContacts)
+              .set(
+                data.whatsappOptIn
+                  ? {
+                      whatsappOptinAt: now,
+                      whatsappOptinByMembershipId: actor.membershipId,
+                    }
+                  : {
+                      whatsappOptinAt: null,
+                      whatsappOptinByMembershipId: null,
+                    },
+              )
+              .where(
+                and(
+                  eq(followupContacts.followupId, followupId),
+                  // Accord déjà noté : sa date et son auteur restent ceux d'origine.
+                  data.whatsappOptIn
+                    ? isNull(followupContacts.whatsappOptinAt)
+                    : sql`true`,
+                ),
+              );
+          if (data.whatsappOptIn !== undefined)
+            await audit(tx, actor, "followup.whatsapp_optin", followupId, {
+              given: data.whatsappOptIn,
+            });
         }
 
         // Traitements : décisions de vétérinaire.

@@ -11,6 +11,7 @@ import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
+import { PageSections } from "@/ui/page-sections";
 import { formatDateTime, formatMinutes, toDateTimeInput } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 
@@ -54,7 +55,20 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title={text.title} description={text.description} />
-      <div className="grid gap-6">
+      <PageSections
+        label={t.shell.onThisPage}
+        sections={(
+          [
+            ["horaires", text.messageWindows.title],
+            ["rendez-vous", text.appointments.title],
+            ["consignes", text.instructions.title],
+            ["contacts", text.contacts.title],
+            ["regles-alerte", text.alerts.title],
+            ["garde", text.onCall.title],
+            ["connexions", text.integrations.title],
+          ] as const
+        ).map(([id, title]) => ({ id, title }))}
+      >
         {unconfigured ? (
           <AlertBanner
             tone="watch"
@@ -66,6 +80,7 @@ export default async function SettingsPage() {
         ) : null}
 
         <SectionCard
+          id="horaires"
           title={text.messageWindows.title}
           description={text.messageWindows.description}
         >
@@ -84,6 +99,7 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="rendez-vous"
           title={text.appointments.title}
           description={text.appointments.description}
         >
@@ -112,6 +128,7 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="consignes"
           title={text.instructions.title}
           description={text.instructions.description}
         >
@@ -128,6 +145,7 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="contacts"
           title={text.contacts.title}
           description={text.contacts.description}
         >
@@ -155,6 +173,7 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="regles-alerte"
           title={text.alerts.title}
           description={text.alerts.description}
         >
@@ -169,6 +188,7 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="garde"
           title={text.onCall.title}
           description={text.onCall.description}
         >
@@ -212,12 +232,16 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="connexions"
           title={text.integrations.title}
           description={text.integrations.description}
         >
-          <IntegrationList integrations={settings.integrations} />
+          <IntegrationList
+            integrations={settings.integrations}
+            advancedIntegrations={settings.advancedIntegrations}
+          />
         </SectionCard>
-      </div>
+      </PageSections>
     </>
   );
 }

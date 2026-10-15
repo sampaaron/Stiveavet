@@ -95,7 +95,7 @@ test.describe("pages du site", () => {
   }) => {
     await page.goto("/fr");
     await expect(
-      page.getByRole("link", { name: "Commencer l'essai à 86 € HT" }).first(),
+      page.getByRole("link", { name: "Démarrer dès 79 € HT par mois" }).first(),
     ).toBeVisible();
     await expect(
       page.getByRole("img", { name: "Numa, Assistante IA" }),
@@ -108,10 +108,14 @@ test.describe("pages du site", () => {
 
   test("tarifs : les prix HT du cahier des charges", async ({ page }) => {
     await page.goto("/fr/tarifs");
-    for (const price of ["109 €", "149 €", "216 €", "279 €", "139 €", "309 €"])
+    for (const price of ["79 €", "129 €", "199 €"])
       await expect(
         page.getByText(price, { exact: true }).first(),
       ).toBeVisible();
+    await expect(page.getByText("Offre phare")).toBeVisible();
+    await expect(
+      page.getByText(/^109\s€ HT \/ mois avec engagement/),
+    ).toBeVisible();
     await expect(page.getByText("Plus de 3 vétérinaires")).toBeVisible();
     await expect(page.getByText(/2,50\s€ HT/)).toBeVisible();
     await expect(page.getByText(/1,26\s€ HT/)).toBeVisible();

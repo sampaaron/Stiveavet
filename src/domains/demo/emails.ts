@@ -1,5 +1,6 @@
+import { escapeHtml } from "@/adapters/email/html";
 import type { EmailMessage } from "@/adapters/email/types";
-import { TRIAL_MONTHLY_CENTS, TRIAL_MONTHS } from "@/domains/facturation/rules";
+import { PLAN_CATALOG } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
 import type { Locale } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
@@ -41,7 +42,7 @@ function templates(
   cabinetName: string,
   accessUrl?: string,
 ): Record<DemoStep, Template> {
-  const trial = formatPrice(TRIAL_MONTHLY_CENTS, locale);
+  const from = formatPrice(PLAN_CATALOG.starter.monthlyCents, locale);
   if (locale === "en")
     return {
       1: {
@@ -87,13 +88,13 @@ function templates(
         ],
       },
       5: {
-        subject: `Start the pilot trial at ${trial} excl. VAT`,
+        subject: `Start Stivea Vet from ${from} excl. VAT per month`,
         blocks: [
           "Hello,",
-          `The pilot trial lasts ${TRIAL_MONTHS} months at ${trial} excl. VAT per month, in real use and without commitment: you can stop it at any time.`,
+          `Three plans, Starter, Pro and Premium, from ${from} excl. VAT per month, without commitment: you can stop at any time.`,
           "Afterwards you move to the plan chosen at sign-up. No annual commitment is ever created automatically during the first six months.",
           "The guided setup is designed to take between 5 and 15 minutes.",
-          { label: `Start the trial at ${trial} excl. VAT`, page: "trial" },
+          { label: "Choose my plan", page: "trial" },
           "This is the last e-mail of this series.",
         ],
       },
@@ -143,25 +144,17 @@ function templates(
       ],
     },
     5: {
-      subject: `Démarrer l'essai pilote à ${trial} HT`,
+      subject: `Démarrer Stivea Vet à partir de ${from} HT par mois`,
       blocks: [
         "Bonjour,",
-        `L'essai pilote dure ${TRIAL_MONTHS} mois à ${trial} HT par mois, en usage réel et sans engagement : vous pouvez l'arrêter à tout moment.`,
+        `Trois formules, Starter, Pro et Premium, à partir de ${from} HT par mois, sans engagement : vous pouvez arrêter à tout moment.`,
         "Ensuite, vous passez à la formule choisie à l'inscription. Aucun engagement annuel n'est créé automatiquement pendant les six premiers mois.",
         "L'installation guidée est pensée pour prendre entre 5 et 15 minutes.",
-        { label: `Commencer l'essai à ${trial} HT`, page: "trial" },
+        { label: "Choisir ma formule", page: "trial" },
         "C'est le dernier e-mail de cette série.",
       ],
     },
   };
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 export function demoEmail(

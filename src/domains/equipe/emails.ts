@@ -1,12 +1,5 @@
+import { htmlParagraphs } from "@/adapters/email/html";
 import type { EmailMessage } from "@/adapters/email/types";
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
 export function invitationEmail(
   to: string,
@@ -28,6 +21,6 @@ export function invitationEmail(
     to,
     subject: `Invitation à rejoindre ${details.organizationName} sur Stivea Vet`,
     text: lines.join("\n\n"),
-    html: lines.map((line) => `<p>${escapeHtml(line)}</p>`).join(""),
+    html: htmlParagraphs(lines),
   };
 }

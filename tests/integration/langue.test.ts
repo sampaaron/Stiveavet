@@ -7,23 +7,18 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import { createWorker } from "@/domains/taches/worker";
 import { users } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Langues (lot 19, ADR 0022) : langue de l'interface par personne, langue de Numa reconnue
@@ -42,30 +37,20 @@ const launches = launchService({ db: appDb, drveto });
 const conversations = conversationsService(appDb);
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
 const protocols = protocolsService(appDb);
 
-const sent: string[] = [];
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  async sendMessage(input) {
-    sent.push(input.body);
-    return fakeWhatsApp.sendMessage(input);
-  },
-};
-const handlers = conversationHandlers({ whatsapp, ai: fakeAiGateway });
-const worker = createWorker({
+const whatsapp = recordingWhatsApp();
+const { sent } = whatsapp;
+const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-langue",
-  handlers: {
-    "followup.message": async (context) => {
-      const handler = handlers["followup.message"];
-      if (handler && context.job.organizationId === org) await handler(context);
-    },
-  },
+  organizationId: () => org,
+  whatsapp,
+  ai: fakeAiGateway,
 });
 
 const org = randomUUID();
@@ -188,6 +173,7 @@ beforeAll(async () => {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );
@@ -250,7 +236,7 @@ describe("langue de Numa avec le propriétaire", () => {
       language_source: "detected",
     });
     await runDue();
-    expect(sent.at(-1)).toMatch(/^Thank you for the news about Gaston/);
+    expect(sent.at(-1)?.body).toMatch(/^Thank you for the news about Gaston/);
     const { rows } = await admin.query(
       `SELECT actor_membership_id, metadata FROM audit_events
        WHERE target_id = $1 AND action = 'followup.owner_language_detected'`,
@@ -321,7 +307,7 @@ describe("langue de Numa avec le propriétaire", () => {
       language_source: "vet",
     });
     await runDue();
-    expect(sent.at(-1)).toMatch(/^Merci pour ces nouvelles de Gaston/);
+    expect(sent.at(-1)?.body).toMatch(/^Merci pour ces nouvelles de Gaston/);
     const view = await conversations.view(await actor(ids.vet), followupId);
     expect(view.contacts[0]).toMatchObject({
       language: "fr",

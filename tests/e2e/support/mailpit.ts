@@ -4,8 +4,11 @@ const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8025";
 
 type Summary = { ID: string; Subject: string; Created: string };
 
-/** Dernier e-mail reçu par `to` après `since` (Mailpit capture tout, rien ne sort). */
-export async function latestEmail(to: string, since: Date) {
+/**
+ * Dernier e-mail reçu par `to` après `since` (Mailpit capture tout, rien ne sort), dont
+ * l'objet correspond à `subject` s'il est donné : certains partent après la réponse.
+ */
+export async function latestEmail(to: string, since: Date, subject?: RegExp) {
   let found: Summary | undefined;
   await expect
     .poll(
@@ -15,7 +18,9 @@ export async function latestEmail(to: string, since: Date) {
         );
         const body = (await response.json()) as { messages: Summary[] };
         found = body.messages.find(
-          (message) => new Date(message.Created) >= since,
+          (message) =>
+            new Date(message.Created) >= since &&
+            (!subject || subject.test(message.Subject)),
         );
         return Boolean(found);
       },

@@ -56,6 +56,7 @@ export default async function OnboardingPage() {
       <IntegrationPanel
         provider="drveto"
         connection={view.integrations.drveto}
+        included={onboarding.advancedIntegrations}
       />
     ),
     rules: (

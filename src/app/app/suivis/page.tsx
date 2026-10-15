@@ -1,18 +1,21 @@
-import { ChevronRight, Lock, PawPrint } from "lucide-react";
+import { ChevronRight, Lock, PawPrint, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
-import { ButtonLink } from "@/ui/button";
+import { Button, ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
-import { SpeciesIcon } from "@/ui/followup-card";
+import { AnimalAvatar } from "@/ui/animal-avatar";
 import { formatDate } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 import { StatusBadge } from "@/ui/status-badge";
 
+import { selectClasses } from "../action-message";
+
+import { applyFollowupFilters, followupFilters } from "./filters";
 import { followupBadge } from "./followup-labels";
 import { TestMark } from "./test-mark";
 
@@ -21,13 +24,26 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.followups.title };
 }
 
-export default async function FollowupsPage() {
+export default async function FollowupsPage({
+  searchParams,
+}: PageProps<"/app/suivis">) {
   const context = await requirePermission(
     "followups.read_all",
     "followups.read_own",
     "followups.read_summary",
   );
-  const followups = await services.followups().list(context);
+  const params = await searchParams;
+  const filters = followupFilters.parse({
+    query: params.q,
+    status: params.statut,
+    priority: params.priorite,
+  });
+  const all = await services.followups().list(context);
+  const followups = applyFollowupFilters(all, filters);
+  const filtered =
+    filters.query !== "" ||
+    filters.status !== "all" ||
+    filters.priority !== "all";
   const clinical = context.permissions.has("clinical.read");
   const { t, locale } = await appText();
   const text = t.followups.list;
@@ -50,27 +66,129 @@ export default async function FollowupsPage() {
           ) : null
         }
       />
-      <Card>
+      {all.length > 0 ? (
+        <Card className="mb-8 rounded-[28px] border-white/70 bg-surface/75 p-3 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_18px_40px_-24px_rgb(11_18_32/0.25)] sm:p-4">
+          <form
+            role="search"
+            aria-label={text.filters.label}
+            action="/app/suivis"
+            className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-end"
+          >
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label
+                htmlFor="recherche-suivi"
+                className="text-sm font-semibold"
+              >
+                {text.filters.search}
+              </label>
+              <input
+                id="recherche-suivi"
+                name="q"
+                type="search"
+                defaultValue={filters.query}
+                maxLength={80}
+                autoComplete="off"
+                placeholder={
+                  clinical
+                    ? text.filters.placeholderClinical
+                    : text.filters.placeholder
+                }
+                className="h-11 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-[15px] text-ink placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="filtre-statut-suivi"
+                className="text-sm font-semibold"
+              >
+                {text.filters.status}
+              </label>
+              <select
+                id="filtre-statut-suivi"
+                name="statut"
+                defaultValue={filters.status}
+                className={selectClasses}
+              >
+                <option value="all">{text.filters.statusAll}</option>
+                <option value="ongoing">{text.filters.statusOngoing}</option>
+                {(
+                  [
+                    "draft",
+                    "active",
+                    "paused",
+                    "human_takeover",
+                    "ended",
+                  ] as const
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {t.labels.followupStatus[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {clinical ? (
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="filtre-priorite"
+                  className="text-sm font-semibold"
+                >
+                  {text.filters.priority}
+                </label>
+                <select
+                  id="filtre-priorite"
+                  name="priorite"
+                  defaultValue={filters.priority}
+                  className={selectClasses}
+                >
+                  <option value="all">{text.filters.priorityAll}</option>
+                  <option value="urgent">{t.labels.triage.urgent}</option>
+                  <option value="watch">{t.labels.triage.watch}</option>
+                </select>
+              </div>
+            ) : null}
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                icon={<Search aria-hidden="true" className="size-4" />}
+              >
+                {text.filters.apply}
+              </Button>
+              {filtered ? (
+                <ButtonLink href="/app/suivis" variant="quiet">
+                  {text.filters.reset}
+                </ButtonLink>
+              ) : null}
+            </div>
+          </form>
+        </Card>
+      ) : null}
+      <Card bare={followups.length > 0}>
         {followups.length === 0 ? (
-          <EmptyState
-            title={text.emptyTitle}
-            description={text.emptyDescription}
-          />
+          filtered ? (
+            <EmptyState
+              title={text.filters.noMatchTitle}
+              description={text.filters.noMatchDescription}
+            />
+          ) : (
+            <EmptyState
+              title={text.emptyTitle}
+              description={text.emptyDescription}
+            />
+          )
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="grid grid-cols-1 gap-2.5">
             {followups.map((followup) => {
               const badge = followupBadge(followup);
               return (
                 <li key={followup.id}>
                   <Link
                     href={`/app/suivis/${followup.id}`}
-                    className="flex items-center gap-4 px-5 py-4 hover:bg-canvas-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                    className={`group relative flex items-center gap-4 overflow-hidden rounded-[18px] border border-line/80 bg-surface/90 py-4 pr-5 pl-6 shadow-[0_1px_2px_rgb(11_18_32/0.04)] backdrop-blur transition-all duration-200 before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full hover:-translate-y-0.5 hover:border-[var(--section-accent)]/30 hover:shadow-[0_14px_30px_-18px_rgb(11_18_32/0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${badge === "urgent" ? "before:bg-urgent" : badge === "watch" ? "before:bg-watch" : "before:bg-[var(--section-accent)]/35"}`}
                   >
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-canvas-subtle text-ink-muted">
-                      <SpeciesIcon
-                        species={followup.species === "cat" ? "chat" : "chien"}
-                      />
-                    </span>
+                    <AnimalAvatar
+                      name={followup.animalName}
+                      species={followup.species}
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold">

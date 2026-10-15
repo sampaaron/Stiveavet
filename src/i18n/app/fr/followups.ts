@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const followups = {
   title: "Suivis",
@@ -13,6 +15,21 @@ export const followups = {
     private: "Privé",
     controlOn: (date: string) => `Contrôle le ${date}`,
     controlNone: "Contrôle non programmé",
+    filters: {
+      label: "Filtrer les suivis",
+      search: "Rechercher",
+      placeholder: "Animal, propriétaire ou vétérinaire",
+      placeholderClinical: "Animal, propriétaire, vétérinaire ou intervention",
+      status: "Statut",
+      statusAll: "Tous",
+      statusOngoing: "En cours, en pause ou repris",
+      priority: "Priorité",
+      priorityAll: "Toutes",
+      apply: "Filtrer",
+      reset: "Effacer",
+      noMatchTitle: "Aucun suivi ne correspond",
+      noMatchDescription: "Modifiez la recherche ou les filtres.",
+    },
   },
   /** Suivi test de l'installation. */
   testMark: "Suivi test",
@@ -21,7 +38,7 @@ export const followups = {
     title: "Lancer un suivi",
     back: "Suivis",
     description:
-      "Cherchez l'animal dans dr.veto. Stivea Vet importe en lecture seule le résumé utile, puis vous proposez une fiche de lancement à relire.",
+      "Cherchez l'animal dans le registre du cabinet ou dans dr.veto, ou enregistrez-le. Vous relisez ensuite la fiche de lancement préparée par Stivea Vet.",
     searchLabel: "Animal, propriétaire ou identifiant dr.veto",
     searchPlaceholder: "Ex. Plume, Girard, DV-20481",
     search: "Rechercher",
@@ -41,6 +58,17 @@ export const followups = {
     alreadyOpen: "Suivi déjà ouvert",
     prepareLabel: (name: string) => `Préparer la fiche de ${name}`,
     prepare: "Préparer la fiche",
+    registryTitle: "Dans le registre du cabinet",
+    registryEmpty:
+      "Aucun animal du registre ne correspond. Enregistrez-le s'il est nouveau.",
+    launchFromRegistry: "Lancer",
+    newAnimal: "Nouvel animal",
+    newAnimalTitle: "Un nouveau patient ?",
+    newAnimalBody:
+      "Enregistrez son identité et le numéro WhatsApp de son propriétaire, puis lancez le suivi depuis sa fiche.",
+    draftsTitle: "Fiches en préparation",
+    draftsEmpty: "Aucune fiche en attente de lancement.",
+    drvetoTitle: "Dans dr.veto",
   },
   /** Page de la fiche de lancement. */
   sheet: {
@@ -113,7 +141,13 @@ export const followups = {
       "Numa écrit en son nom ; c'est lui ou elle qui lance le suivi.",
     includeSecond: (name: string) => `Inclure ${name}, second propriétaire`,
     secondHint:
-      "Numa lui demande aussi son accord. Dès que les deux ont accepté, un groupe WhatsApp réunit les propriétaires et Numa ; chacun peut le quitter par STOP.",
+      "Numa lui demande aussi son accord. Chacun échange avec Numa (dans un groupe commun si le numéro du cabinet le permet) et peut tout arrêter par STOP ; l'équipe lit tout.",
+    optInLabel: (count: number) =>
+      count > 1
+        ? "Les propriétaires ont accepté au cabinet d'être contactés sur WhatsApp"
+        : "Le propriétaire a accepté au cabinet d'être contacté sur WhatsApp",
+    optInHint:
+      "Obligatoire pour lancer : WhatsApp interdit d'écrire à quelqu'un qui ne l'a pas accepté. Numa demandera ensuite l'accord au suivi lui-même.",
     stepsTitle: "Étapes et questions de Numa",
     stepsDraft:
       "Reprises du protocole. Modifiez-les pour cet animal : le protocole du cabinet ne change pas.",
@@ -177,10 +211,10 @@ export const followups = {
     alertLong: (max: number) => `Signe d'alerte : ${max} caractères maximum.`,
     tooManyTreatments: (max: number) => `${max} traitements au maximum.`,
     treatmentShort: (min: number) =>
-      `Traitement : ${min} caractère(s) minimum.`,
+      `Traitement : ${nombre(min, "caractère", "caractères")} minimum.`,
     treatmentLong: (max: number) => `Traitement : ${max} caractères maximum.`,
     instructionsShort: (min: number) =>
-      `Posologie : ${min} caractère(s) minimum.`,
+      `Posologie : ${nombre(min, "caractère", "caractères")} minimum.`,
     instructionsLong: (max: number) => `Posologie : ${max} caractères maximum.`,
   },
 };

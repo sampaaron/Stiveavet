@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const dashboard = {
   title: "Aujourd'hui",
@@ -5,6 +7,32 @@ export const dashboard = {
   /** Sous-titre avec accès clinique : la date, puis les urgences et les cas à surveiller. */
   headline: (day: string, urgent: number, watch: number) =>
     `${day} · ${urgent} urgence${urgent > 1 ? "s" : ""} et ${watch} cas à surveiller`,
+  /** Sous-titre court (la date est au-dessus du titre). */
+  headlineShort: (urgent: number, watch: number) =>
+    `${nombre(urgent, "urgence", "urgences")} et ${watch} cas à surveiller`,
+  /** Le point de Numa, en tête du tableau de bord : des décomptes, jamais un avis médical. */
+  briefing: {
+    title: "Le point de Numa",
+    clinical: (active: number, urgent: number, watch: number) => {
+      const parts = [
+        urgent
+          ? `${nombre(urgent, "urgence attend", "urgences attendent")} un vétérinaire`
+          : null,
+        watch
+          ? nombre(watch, "cas est à surveiller", "cas sont à surveiller")
+          : null,
+      ].filter((part): part is string => part !== null);
+      const signals = parts.length
+        ? `${parts.join(" et ")}.`
+        : "Aucune alerte en attente.";
+      return `J'accompagne ${nombre(active, "animal", "animaux")} en ce moment. ${signals} Je ne pose jamais de diagnostic : la décision reste la vôtre.`;
+    },
+    summary: (active: number) =>
+      `J'accompagne ${nombre(active, "animal", "animaux")} pour le cabinet. Je ne pose jamais de diagnostic et je renvoie toute question médicale à l'équipe.`,
+    searchPlaceholder:
+      "Rechercher un animal, un propriétaire, une intervention…",
+    searchSubmit: "Rechercher dans les suivis",
+  },
   empty: {
     title: "Aucun suivi pour l'instant",
     admin:
@@ -15,6 +43,7 @@ export const dashboard = {
   actions: {
     openAFile: "Ouvrir un dossier",
     launch: "Lancer un suivi",
+    newAnimal: "Enregistrer un animal",
     openFile: "Ouvrir le dossier",
     writeToOwner: "Écrire au propriétaire",
     allFollowups: "Tous les suivis",
@@ -44,6 +73,51 @@ export const dashboard = {
   urgentReportedAt: (animalName: string, time: string) =>
     `${animalName} : urgence signalée à ${time}`,
   urgentOngoing: (animalName: string) => `${animalName} : urgence en cours`,
+  activity: {
+    title: "Activité du cabinet",
+    description: "30 derniers jours, suivis test exclus.",
+    launched: "Suivis lancés",
+    launchedHint: (ongoing: number) =>
+      `${nombre(ongoing, "suivi", "suivis")} en cours`,
+    ended: "Suivis terminés",
+    endedHint: "Contrôle atteint ou arrêt",
+    messages: "Messages reçus",
+    messagesHint: (outbound: number) =>
+      `${nombre(outbound, "envoyé", "envoyés")} par Numa et l'équipe`,
+    response: "Taux de réponse",
+    responseHint: (answered: number, launched: number) =>
+      `${answered} propriétaire${answered > 1 ? "s" : ""} sur ${launched} ont répondu`,
+    responseNone: "Aucun suivi lancé sur la période",
+    alerts: "Alertes",
+    alertsHint: (open: number) =>
+      `${nombre(open, "ouverte", "ouvertes")} en ce moment`,
+    medianAck: (minutes: string) => `Prises en compte en ${minutes} (médiane)`,
+    chartTitle: "Messages des 14 derniers jours",
+    inbound: "Propriétaires",
+    outbound: "Numa et équipe",
+    chartRow: (day: string, inbound: number, outbound: number) =>
+      `${day} : ${inbound} reçu${inbound > 1 ? "s" : ""}, ${outbound} envoyé${outbound > 1 ? "s" : ""}`,
+  },
+  next: {
+    title: "Prochaines actions",
+    drafts: (count: number) =>
+      nombre(count, "fiche à lancer", "fiches à lancer"),
+    unacknowledged: (count: number) =>
+      nombre(
+        count,
+        "alerte sans accusé de réception",
+        "alertes sans accusé de réception",
+      ),
+    controls: (count: number) =>
+      nombre(count, "contrôle cette semaine", "contrôles cette semaine"),
+    consent: (count: number) =>
+      nombre(
+        count,
+        "accord WhatsApp en attente",
+        "accords WhatsApp en attente",
+      ),
+    none: "Rien en attente.",
+  },
   stats: {
     urgent: "Urgences",
     urgentHint: "À traiter maintenant",
@@ -100,5 +174,7 @@ export const dashboard = {
       "Nouveaux suivis suspendus. Les suivis en cours continuent jusqu'à leur fin.",
     readOnly: (date: string) => `Cabinet en lecture seule jusqu'au ${date}.`,
     closed: "L'accès au cabinet est terminé.",
+    annualChoice:
+      "Engagement annuel ou mois : à vous de choisir. Sans réponse, rien ne bascule.",
   },
 };

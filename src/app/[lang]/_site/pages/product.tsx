@@ -112,7 +112,7 @@ export function NumaPage({ locale, t }: SiteProps) {
     <>
       <PageIntro title={numa.title} lead={numa.lead}>
         <div className="mt-8">
-          <AssistantPortrait assistant="numa" t={t} size={88} />
+          <AssistantPortrait assistant="numa" t={t} size={88} onDark />
         </div>
       </PageIntro>
       <Section labelledBy="numa-fait">
@@ -153,7 +153,7 @@ export function StivePage({ locale, t }: SiteProps) {
     <>
       <PageIntro title={stive.title} lead={stive.lead}>
         <div className="mt-8">
-          <AssistantPortrait assistant="stive" t={t} size={88} />
+          <AssistantPortrait assistant="stive" t={t} size={88} onDark />
         </div>
       </PageIntro>
       <Section labelledBy="stive-prepare">

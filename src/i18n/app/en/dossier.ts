@@ -16,6 +16,7 @@ export const dossier: AppDictionary["dossier"] = {
     numa: "Numa is back in the conversation.",
     "alerte-recue": "Receipt confirmed: the escalation is cancelled.",
     "alerte-close": "Alert closed.",
+    "alerte-confiee": "Alert reassigned: the chosen vet has been notified.",
   },
   header: {
     responsible: "Responsible vet:",
@@ -190,7 +191,11 @@ export const dossier: AppDictionary["dossier"] = {
     title: "WhatsApp conversation",
     aiNotice:
       "Numa is an AI: she does not diagnose, does not change any treatment and refers every medical question to the vet.",
-    delivery: { queued: "sending", failed: "not sent" },
+    delivery: {
+      queued: "sending",
+      awaiting_reply: "will be sent when the owner replies",
+      failed: "not sent",
+    },
     deletedPhoto: "Photo deleted (retention period reached)",
     deletedVoice: "Voice note deleted (retention period reached)",
     photo: "Photo",
@@ -208,6 +213,7 @@ export const dossier: AppDictionary["dossier"] = {
     contactState: (name, state) => `${name}: ${state}`,
     groupOpen: "WhatsApp group open",
     groupLater: "Group created once both have accepted",
+    fileSent: "File sent on WhatsApp",
     notes: {
       group_created: (names) =>
         `Follow-up WhatsApp group created with ${names} (simulated).`,
@@ -216,6 +222,8 @@ export const dossier: AppDictionary["dossier"] = {
         `${name} left the group; nobody is left in it, so it is closed.`,
       group_stopped: (name) =>
         `Group closed: ${name} asked to stop the follow-up.`,
+      file_refused: (name) =>
+        `File from ${name} not received: too large or unsupported format. Numa asked them to send it again or describe the situation.`,
     },
     states: {
       stoppedByOwner:

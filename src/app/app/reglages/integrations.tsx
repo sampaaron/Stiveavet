@@ -1,8 +1,11 @@
 import type { Integration, SettingsView } from "@/domains/reglages/service";
 import { appText } from "@/i18n/app/server";
+import { services } from "@/server/services";
+import { ButtonLink } from "@/ui/button";
 import { formatDate } from "@/ui/format";
 
-import { ConnectForm, DisconnectForm } from "./settings-forms";
+import { ConnectForm, DisconnectForm, MandateForm } from "./settings-forms";
+import { WhatsAppSignup } from "./whatsapp-signup";
 
 /** Champ à saisir pour chaque connexion simulée ; aucun pour le mandat. */
 const FIELD_TYPES: Record<Integration, "tel" | "text" | null> = {
@@ -13,7 +16,7 @@ const FIELD_TYPES: Record<Integration, "tel" | "text" | null> = {
 
 const PROVIDERS = Object.keys(FIELD_TYPES) as Integration[];
 
-export function SimulatedBadge({ label }: { label: string }) {
+function SimulatedBadge({ label }: { label: string }) {
   return (
     <span className="rounded-full bg-watch-soft px-2 py-0.5 text-[12px] font-semibold text-watch">
       {label}
@@ -25,10 +28,13 @@ export function SimulatedBadge({ label }: { label: string }) {
 export async function IntegrationPanel({
   provider,
   connection,
+  included = true,
   headingLevel = 3,
 }: {
   provider: Integration;
   connection: SettingsView["integrations"][Integration];
+  /** Faux : la formule ne comprend pas cette connexion (dr.veto hors Premium). */
+  included?: boolean;
   headingLevel?: 2 | 3;
 }) {
   const { t, locale } = await appText();
@@ -40,14 +46,26 @@ export async function IntegrationPanel({
       ? { label: copy.field, type: fieldType, hint: copy.hint }
       : undefined;
   const Heading = headingLevel === 2 ? "h2" : "h3";
+  // WhatsApp réel (ADR 0024) : connexion par l'inscription intégrée de Meta.
+  const signup =
+    provider === "whatsapp" ? services.settings().whatsappSignup() : null;
+  // Mandat réel (ADR 0027) : signature sur la page de Stripe.
+  const mandateLive =
+    provider === "payment_mandate" && services.settings().mandateLive();
+  const simulated = connection ? !connection.live : !signup && !mandateLive;
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Heading className="flex items-center gap-2 font-semibold">
-            {copy.title} <SimulatedBadge label={text.simulated} />
+            {copy.title}{" "}
+            {simulated ? <SimulatedBadge label={text.simulated} /> : null}
           </Heading>
-          <p className="text-sm text-ink-muted">{copy.description}</p>
+          <p className="text-sm text-ink-muted">
+            {mandateLive && "descriptionLive" in copy
+              ? copy.descriptionLive
+              : copy.description}
+          </p>
         </div>
         {connection ? (
           <DisconnectForm provider={provider} label={copy.title} />
@@ -61,6 +79,19 @@ export async function IntegrationPanel({
             formatDate(connection.connectedAt, locale),
           )}
         </p>
+      ) : !included ? (
+        <div className="grid gap-3 text-sm">
+          <p>{text.notIncluded}</p>
+          <div>
+            <ButtonLink href="/app/facturation" variant="secondary" size="sm">
+              {text.seePlans}
+            </ButtonLink>
+          </div>
+        </div>
+      ) : signup ? (
+        <WhatsAppSignup appId={signup.appId} configId={signup.configId} />
+      ) : mandateLive && "submitLive" in copy ? (
+        <MandateForm submitLabel={copy.submitLive} />
       ) : (
         <ConnectForm
           provider={provider}
@@ -74,8 +105,10 @@ export async function IntegrationPanel({
 
 export function IntegrationList({
   integrations,
+  advancedIntegrations,
 }: {
   integrations: SettingsView["integrations"];
+  advancedIntegrations: boolean;
 }) {
   return (
     <div className="grid gap-6">
@@ -87,6 +120,7 @@ export function IntegrationList({
           <IntegrationPanel
             provider={provider}
             connection={integrations[provider]}
+            included={provider !== "drveto" || advancedIntegrations}
           />
         </div>
       ))}

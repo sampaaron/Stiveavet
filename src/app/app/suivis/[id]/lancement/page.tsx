@@ -68,7 +68,7 @@ export default async function LaunchSheetPage({
       </Link>
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
             {draft
               ? text.draftHeading(followup.animalName)
               : text.editHeading(followup.animalName)}

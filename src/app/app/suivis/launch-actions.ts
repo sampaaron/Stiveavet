@@ -13,7 +13,7 @@ import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
-import { domainFailure } from "../domain-messages";
+import { domainFailure, invalidRequest } from "../domain-messages";
 
 /**
  * Lancement d'un suivi (ADR 0015). Chaque action refait toute la garde : session, membre actif,
@@ -21,11 +21,6 @@ import { domainFailure } from "../domain-messages";
  */
 
 const MAX_PAYLOAD = 100_000;
-
-async function invalid(): Promise<ActionState> {
-  const { t } = await appText();
-  return { error: t.common.invalidRequest };
-}
 
 function text(form: FormData, name: string): string {
   const value = form.get(name);
@@ -63,7 +58,7 @@ export async function prepareFollowupAction(
     .string()
     .regex(/^[A-Za-z0-9-]{3,64}$/)
     .safeParse(text(form, "ref"));
-  if (!ref.success) return invalid();
+  if (!ref.success) return invalidRequest();
   const context = await memberContext();
   let followupId = "";
   const failure = await guarded(async () => {
@@ -141,7 +136,7 @@ export async function saveSheetAction(
   const intent = z.enum(["save", "launch"]).safeParse(text(form, "intent"));
   const payload = text(form, "payload");
   if (!followupId.success || !intent.success || payload.length > MAX_PAYLOAD)
-    return invalid();
+    return invalidRequest();
   const { t } = await appText();
   const parsed = sheetPayload.safeParse(parseJson(payload));
   if (!parsed.success) {
@@ -233,7 +228,7 @@ export async function changeStatusAction(
       followupId: text(form, "followupId"),
       change: text(form, "change"),
     });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const { followupId, change } = parsed.data;
   const context = await memberContext();
   const failure = await guarded(() =>

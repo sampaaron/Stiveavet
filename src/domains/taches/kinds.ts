@@ -7,6 +7,8 @@
 export const JOB_ERROR_CODES = [
   "provider_unavailable",
   "provider_rejected",
+  "provider_account",
+  "recipient_unreachable",
   "invalid_payload",
   "target_missing",
   "lease_expired",
@@ -21,10 +23,18 @@ export function jobErrorCode(code: string | null): JobErrorCode {
     : "unexpected_error";
 }
 
-/** Échec voulu par un exécutant : seul le code est enregistré. */
+/**
+ * Échec voulu par un exécutant : seul le code est enregistré. `final` : inutile de
+ * réessayer (numéro injoignable, compte à reconnecter) ; la tâche passe tout de suite en échec.
+ */
 export class JobError extends Error {
-  constructor(readonly code: JobErrorCode) {
+  readonly final: boolean;
+  constructor(
+    readonly code: JobErrorCode,
+    options: { final?: boolean } = {},
+  ) {
     super(code);
+    this.final = options.final ?? false;
   }
 }
 

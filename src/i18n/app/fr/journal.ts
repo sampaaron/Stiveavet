@@ -29,6 +29,17 @@ export const journal = {
       `${actor} a changé le rôle de ${member}`,
   },
   byMember: {
+    "animal.created": (actor: string) =>
+      `${actor} a enregistré un animal dans le registre`,
+    "animal.updated": (actor: string) =>
+      `${actor} a modifié la fiche d'un animal`,
+    "animal.viewed": (actor: string) =>
+      `${actor} a consulté la fiche d'un animal`,
+    "animal.archived": (actor: string) => `${actor} a archivé un animal`,
+    "animal.restored": (actor: string) =>
+      `${actor} a restauré un animal archivé`,
+    "animal.deleted": (actor: string) =>
+      `${actor} a supprimé un animal jamais suivi`,
     "organization.created": (actor: string) => `${actor} a créé le cabinet`,
     "invitation.created": (actor: string) => `${actor} a envoyé une invitation`,
     "invitation.revoked": (actor: string) => `${actor} a annulé une invitation`,
@@ -48,6 +59,8 @@ export const journal = {
       `${actor} a modifié la fiche d'un suivi`,
     "followup.treatments_validated": (actor: string) =>
       `${actor} a validé des traitements importés`,
+    "followup.whatsapp_optin": (actor: string) =>
+      `${actor} a noté l'accord du propriétaire pour WhatsApp`,
     "followup.launched": (actor: string) => `${actor} a lancé un suivi`,
     "followup.paused": (actor: string) => `${actor} a mis un suivi en pause`,
     "followup.resumed": (actor: string) => `${actor} a repris un suivi`,
@@ -84,6 +97,8 @@ export const journal = {
     "alert.acknowledged": (actor: string) =>
       `${actor} a accusé réception d'une alerte`,
     "alert.resolved": (actor: string) => `${actor} a clos une alerte`,
+    "alert.reassigned": (actor: string) =>
+      `${actor} a confié une alerte à un autre vétérinaire`,
     "job.retried": (actor: string) => `${actor} a relancé une tâche en échec`,
     "job.cancelled": (actor: string) =>
       `${actor} a abandonné une tâche en échec`,
@@ -117,6 +132,8 @@ export const journal = {
       `${actor} a retiré une garde`,
     "integration.connected": (actor: string) =>
       `${actor} a connecté un service (WhatsApp, dr.veto ou prélèvement)`,
+    "alert_phone.changed": (actor: string) =>
+      `${actor} a modifié son numéro d'alerte WhatsApp`,
     "integration.disconnected": (actor: string) =>
       `${actor} a déconnecté un service (WhatsApp, dr.veto ou prélèvement)`,
     "onboarding.step_completed": (actor: string) =>
@@ -131,8 +148,14 @@ export const journal = {
       `${actor} a relancé un prélèvement refusé`,
   },
   automatic: {
+    "animal.purged":
+      "Un animal du registre resté sans suivi pendant quinze mois a été effacé",
+    "numa.ai_unavailable":
+      "Service d'IA indisponible : Numa a renvoyé le propriétaire vers l'équipe, sans réponse rédigée",
     "numa.reply_blocked":
       "Garde-fou : une réponse de Numa a été remplacée par un renvoi au vétérinaire",
+    "whatsapp.media_refused":
+      "Un fichier envoyé par WhatsApp a été refusé (trop lourd, format non pris en charge ou indisponible)",
     "attachment.purged":
       "Un fichier arrivé à sa date limite de conservation a été supprimé",
     "photo.observation_blocked":
@@ -154,6 +177,8 @@ export const journal = {
     "alert.escalated":
       "Urgence sans accusé de réception : toute l'équipe vétérinaire a été alertée",
     "invoice.issued": "Facture émise",
+    "billing.annual_offer_sent":
+      "Offre d'engagement annuel envoyée par e-mail à qui gère la facturation",
     "invoice.paid": "Prélèvement d'une facture réussi",
     "invoice.payment_failed": "Prélèvement d'une facture refusé",
   },
@@ -166,6 +191,8 @@ export const journal = {
     actor: string,
   ) =>
     `Langue de Numa corrigée pour le ${owner === "secondary" ? "second propriétaire" : "propriétaire"} par ${actor} : ${language.toLowerCase()}`,
+  preparedManually: (actor: string) =>
+    `${actor} a préparé un suivi depuis le registre du cabinet`,
   logins: {
     login_succeeded: "Connexion réussie",
     login_failed: "Connexion refusée",

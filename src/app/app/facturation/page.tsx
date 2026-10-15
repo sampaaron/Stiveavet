@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 
 import type { Access } from "@/domains/facturation/rules";
 import {
-  INCLUDED_ACTIVE_FOLLOWUPS,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
   REACTIVATION_SURCHARGE_CENTS,
   TRIAL_MONTHS,
+  annualStartsAt,
+  billingPeriod,
   cancellationEffectiveAt,
 } from "@/domains/facturation/rules";
 import type { BillingOverview } from "@/domains/facturation/service";
@@ -22,6 +23,7 @@ import { CapacityMeter } from "@/ui/capacity-meter";
 import { Card, SectionCard } from "@/ui/card";
 import { formatDate, formatEuros } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
+import { planHighlights } from "@/ui/plan-summary";
 import { EmptyState } from "@/ui/states";
 
 import {
@@ -71,9 +73,19 @@ export default async function BillingPage() {
 
   return (
     <>
-      <PageHeader title={text.title} description={text.description} />
+      <PageHeader
+        title={text.title}
+        description={
+          overview.simulated ? text.description : text.descriptionLive
+        }
+      />
       <div className="grid gap-6">
-        <AccessBanner access={overview.access} t={t} locale={locale} />
+        <AccessBanner
+          access={overview.access}
+          simulated={overview.simulated}
+          t={t}
+          locale={locale}
+        />
         {!overview.mandateSigned ? (
           <AlertBanner
             tone="watch"
@@ -89,20 +101,30 @@ export default async function BillingPage() {
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">{text.plan}</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight">
-              {planText.name}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {phaseLabel(overview, t, locale)}
-            </p>
-          </Card>
+          <div className="relative isolate flex min-h-44 flex-col justify-between overflow-hidden rounded-[22px] bg-[linear-gradient(135deg,#0b1512_0%,#123326_55%,#1d4a37_100%)] p-6 text-white shadow-[0_24px_48px_-24px_rgb(8_60_40/0.8)]">
+            <span
+              aria-hidden="true"
+              className="absolute -top-16 -right-12 -z-10 size-48 rounded-full bg-[conic-gradient(from_120deg,#f3d27a,#8ce8c3,#c9b8ff,#f3d27a)] opacity-40 blur-2xl"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 bg-[repeating-linear-gradient(115deg,rgb(255_255_255/0.035)_0_1px,transparent_1px_14px)]"
+            />
+            <p className="text-sm font-medium text-white/70">{text.plan}</p>
+            <div>
+              <p className="font-display text-[2rem] leading-tight font-semibold tracking-tight">
+                {planText.name}
+              </p>
+              <p className="mt-1 text-sm text-white/75">
+                {phaseLabel(overview, t, locale)}
+              </p>
+            </div>
+          </div>
           <Card className="p-5">
             <p className="text-sm font-medium text-ink-muted">
               {text.next.title}
             </p>
-            <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+            <p className="mt-2 font-display text-[1.75rem] leading-tight font-semibold tracking-tight tabular-nums">
               {overview.nextPriceCents !== null
                 ? text.exclVat(euros(overview.nextPriceCents))
                 : text.next.none}
@@ -124,16 +146,16 @@ export default async function BillingPage() {
             <p className="text-sm font-medium text-ink-muted">
               {text.activeFollowups.title}
             </p>
-            <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+            <p className="mt-2 font-display text-[1.75rem] leading-tight font-semibold tracking-tight tabular-nums">
               {text.activeFollowups.count(
                 overview.activeFollowups,
-                INCLUDED_ACTIVE_FOLLOWUPS,
+                plan.includedActiveFollowups,
               )}
             </p>
             <div className="mt-3">
               <CapacityMeter
                 used={overview.activeFollowups}
-                included={INCLUDED_ACTIVE_FOLLOWUPS}
+                included={plan.includedActiveFollowups}
               />
             </div>
           </Card>
@@ -142,7 +164,8 @@ export default async function BillingPage() {
         <SectionCard
           title={text.usage.title}
           description={text.usage.description(
-            INCLUDED_ACTIVE_FOLLOWUPS,
+            plan.includedActiveFollowups,
+            plan.maxActiveFollowups,
             euros(LAUNCH_SURCHARGE_CENTS),
             euros(REACTIVATION_SURCHARGE_CENTS),
           )}
@@ -163,9 +186,13 @@ export default async function BillingPage() {
           <SectionCard
             title={text.annual.title}
             description={
-              overview.commitmentReminder
-                ? text.annual.reminder
-                : text.annual.anytime
+              overview.phase === "trial"
+                ? text.annual.offer(
+                    date(billingPeriod(facts, TRIAL_MONTHS).end),
+                  )
+                : overview.commitmentReminder
+                  ? text.annual.reminder
+                  : text.annual.anytime
             }
           >
             <div className="grid gap-6 lg:grid-cols-2">
@@ -179,6 +206,7 @@ export default async function BillingPage() {
                 {overview.canCommitAnnual ? (
                   <CommitAnnualForm
                     priceLabel={euros(plan.annualMonthlyCents)}
+                    startsOnLabel={date(annualStartsAt(facts, now))}
                   />
                 ) : null}
               </div>
@@ -197,25 +225,24 @@ export default async function BillingPage() {
             title={text.changePlan.title}
             description={text.changePlan.description(
               overview.vetSeats,
-              overview.phase === "trial" ? TRIAL_MONTHS : null,
+              overview.assistantSeats,
             )}
           >
             <PlanForm
               current={facts.plan}
               options={PLANS.map((key) => {
                 const option = PLAN_CATALOG[key];
-                const names = t.labels.plans[key];
                 return {
                   value: key,
                   label: text.changePlan.option(
-                    names.name,
+                    t.labels.plans[key].name,
                     euros(option.monthlyCents),
                   ),
-                  detail: text.changePlan.optionDetail(
-                    option.maxVets,
-                    names.stive,
-                  ),
-                  disabled: overview.vetSeats > option.maxVets,
+                  detail: planHighlights(t.labels, key).join(" · "),
+                  disabled:
+                    overview.vetSeats > option.maxVets ||
+                    (option.maxAssistants !== null &&
+                      overview.assistantSeats > option.maxAssistants),
                 };
               })}
             />
@@ -224,7 +251,11 @@ export default async function BillingPage() {
 
         <SectionCard
           title={text.invoices.title}
-          description={text.invoices.description}
+          description={
+            overview.simulated
+              ? text.invoices.description
+              : text.invoices.descriptionLive
+          }
         >
           {overview.invoices.length ? (
             <ul className="grid gap-3">
@@ -317,12 +348,7 @@ function phaseLabel(
   const { facts, month } = overview;
   if (!facts || !month) return "";
   const phase = t.billing.phase;
-  if (overview.phase === "trial")
-    return phase.trial(
-      month,
-      TRIAL_MONTHS,
-      formatEuros(PLAN_CATALOG[facts.plan].monthlyCents, locale),
-    );
+  if (overview.phase === "trial") return phase.trial(month, TRIAL_MONTHS);
   if (facts.cycle === "annual" && facts.annualEndsAt)
     return phase.annualUntil(formatDate(facts.annualEndsAt, locale));
   return phase.monthly(month);
@@ -330,10 +356,12 @@ function phaseLabel(
 
 function AccessBanner({
   access,
+  simulated,
   t,
   locale,
 }: {
   access: Access;
+  simulated: boolean;
   t: AppDictionary;
   locale: Locale;
 }) {
@@ -346,7 +374,7 @@ function AccessBanner({
         <AlertBanner
           tone="watch"
           title={text.graceTitle(access.daysLeft)}
-          action={<SettleForm />}
+          action={<SettleForm simulated={simulated} />}
         >
           {text.graceBody(formatDate(access.blockedAt, locale))}
         </AlertBanner>
@@ -356,7 +384,11 @@ function AccessBanner({
         <AlertBanner
           tone="urgent"
           title={text.blockedTitle}
-          action={access.reason === "unpaid" ? <SettleForm /> : undefined}
+          action={
+            access.reason === "unpaid" ? (
+              <SettleForm simulated={simulated} />
+            ) : undefined
+          }
         >
           {access.reason === "unpaid"
             ? text.blockedUnpaid
@@ -368,7 +400,11 @@ function AccessBanner({
         <AlertBanner
           tone="info"
           title={text.readOnlyTitle(formatDate(access.until, locale))}
-          action={access.reason === "unpaid" ? <SettleForm /> : undefined}
+          action={
+            access.reason === "unpaid" ? (
+              <SettleForm simulated={simulated} />
+            ) : undefined
+          }
         >
           {text.readOnlyBody}
         </AlertBanner>

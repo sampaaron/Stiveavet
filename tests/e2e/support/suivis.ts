@@ -1,6 +1,9 @@
 import { expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+/** Accord du ou des propriétaires pour WhatsApp, recueilli au cabinet (lot 21). */
+export const OPT_IN = /accepté au cabinet d'être contactés? sur WhatsApp/;
+
 /** Prépare puis lance le suivi d'un animal de dr.veto simulé ; renvoie l'adresse du dossier. */
 export async function launchFollowup(
   page: Page,
@@ -39,6 +42,7 @@ export async function launchFollowup(
         name: new RegExp(`^Inclure ${secondOwner}, second propriétaire`),
       })
       .check();
+  await page.getByRole("checkbox", { name: OPT_IN }).check();
   await page.getByRole("button", { name: "Lancer le suivi" }).click();
   await expect(page).toHaveURL(/\/app\/suivis\/[0-9a-f-]+\?fait=lance$/);
   return page.url().replace(/\?.*$/, "");

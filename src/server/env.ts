@@ -7,7 +7,7 @@ import { z } from "zod";
  * Aucune valeur secrète n'a de défaut dans le code : elles viennent de `.env` en local
  * et du gestionnaire de secrets Scaleway en staging/production.
  */
-export const serverEnvSchema = z
+const serverEnvSchema = z
   .object({
     APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
     APP_URL: z.url().default("http://localhost:3000"),
@@ -15,8 +15,6 @@ export const serverEnvSchema = z
     DATABASE_URL: z.url().optional(),
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
-    // « true » seulement derrière le répartiteur de charge, qui écrit X-Forwarded-For.
-    // Sinon l'en-tête est falsifiable : l'IP est alors ignorée (pas de limite par IP).
     // Clé des liens de lecture signés des fichiers (ADR 0019), 32 caractères au moins.
     // En local, sans valeur, une clé aléatoire est tirée au démarrage (liens perdus au
     // redémarrage, sans conséquence : ils ne vivent que deux minutes).
@@ -26,6 +24,8 @@ export const serverEnvSchema = z
       .string()
       .refine((value) => value.startsWith("/"))
       .optional(),
+    // « true » seulement derrière le répartiteur de charge, qui écrit X-Forwarded-For.
+    // Sinon l'en-tête est falsifiable : l'IP est alors ignorée (pas de limite par IP).
     TRUST_PROXY: z
       .enum(["true", "false"])
       .default("false")

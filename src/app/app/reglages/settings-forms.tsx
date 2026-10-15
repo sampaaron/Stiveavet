@@ -18,6 +18,7 @@ import {
   createTestFollowupAction,
   disconnectAction,
   removeContactAction,
+  startMandateAction,
   removeOnCallAction,
   saveAlertSettingsAction,
   saveAppointmentDurationsAction,
@@ -475,6 +476,24 @@ export function ConnectForm({
           className="max-w-sm"
         />
       ) : null}
+      <ActionMessage state={state} />
+      <div>
+        <SubmitButton pending={pending} variant="primary">
+          {submitLabel}
+        </SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+/** Mandat SEPA réel : envoie vers la page de signature de Stripe. */
+export function MandateForm({ submitLabel }: { submitLabel: string }) {
+  const [state, action, pending] = useActionState(
+    startMandateAction,
+    initialActionState,
+  );
+  return (
+    <form action={action} className="grid gap-3">
       <ActionMessage state={state} />
       <div>
         <SubmitButton pending={pending} variant="primary">

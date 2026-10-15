@@ -8,6 +8,7 @@ import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { ROLE_PERMISSIONS } from "@/domains/equipe/permissions";
 import { followupsService } from "@/domains/suivis/service";
+import { statsService } from "@/domains/suivis/statistiques";
 import { synthesisService } from "@/domains/suivis/synthese";
 import { todayService } from "@/domains/suivis/tableau";
 import { followups as fixtureFollowups } from "@/fixtures/cabinet-tilleuls";
@@ -32,6 +33,7 @@ const today = todayService({
   drveto: createFakeDrVeto(),
 });
 const syntheses = synthesisService({ db: appDb, ai: fakeAiGateway });
+const stats = statsService(appDb);
 
 const idOf = (name: string) => {
   const found = fixtureFollowups.find((entry) => entry.animal.name === name);
@@ -136,7 +138,7 @@ describe("tableau de bord « Aujourd'hui »", () => {
   it("compteur de capacité : total du cabinet ; agenda : dr.veto simulé et rendez-vous Stivea", async () => {
     const view = await today.today(claire);
     expect(view.activeFollowups).toBeGreaterThanOrEqual(7);
-    expect(view.includedFollowups).toBe(10);
+    expect(view.includedFollowups).toBe(100); // formule Premium
     const agenda = view.agenda ?? [];
     const control = agenda.find(
       (item) =>
@@ -320,5 +322,27 @@ describe("synthèse pré-consultation", () => {
       },
     });
     expect(JSON.stringify(rows)).not.toContain("infection");
+  });
+});
+
+describe("activité du cabinet (totaux du tableau de bord)", () => {
+  it("compte suivis, messages, réponses et alertes du seul cabinet, sans suivi test", async () => {
+    const tilleuls = await stats.activity(claire);
+    expect(tilleuls.ongoing).toBeGreaterThanOrEqual(7);
+    expect(tilleuls.ownerMessages).toBeGreaterThan(0);
+    expect(tilleuls.outboundMessages).toBeGreaterThan(0);
+    expect(tilleuls.alerts.open).toBeGreaterThanOrEqual(1);
+    expect(tilleuls.response.answered).toBeLessThanOrEqual(
+      tilleuls.response.launched,
+    );
+    expect(tilleuls.daily).toHaveLength(14);
+    expect(
+      tilleuls.daily.reduce((sum, day) => sum + day.inbound, 0),
+    ).toBeLessThanOrEqual(tilleuls.ownerMessages);
+
+    // Un autre cabinet ne voit pas ces totaux ; l'assistante voit les mêmes que l'administratrice.
+    const martin = await stats.activity(paul);
+    expect(martin.ongoing).toBeLessThan(tilleuls.ongoing);
+    expect((await stats.activity(lea)).ongoing).toBe(tilleuls.ongoing);
   });
 });

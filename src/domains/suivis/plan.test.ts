@@ -6,7 +6,6 @@ import {
   firstContactAt,
   firstContactHours,
   isPastStep,
-  maskedPhone,
   sheetInput,
   suggestProtocol,
 } from "./plan";
@@ -67,10 +66,6 @@ describe("fiche de lancement", () => {
       suggestProtocol("Détartrage sous anesthésie", "dog", candidates),
     ).toBe("dents");
     expect(suggestProtocol("Radiographie", "dog", candidates)).toBeNull();
-  });
-
-  it("masque les numéros", () => {
-    expect(maskedPhone("+33639980101")).toBe("•• •• •• •• 01");
   });
 });
 

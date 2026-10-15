@@ -37,7 +37,6 @@ import { simulatedAgendaReading } from "../../src/adapters/ai-gateway/fake";
 import { fakeBillingProvider } from "../../src/adapters/billing-provider/fake";
 import { fakeDrVeto } from "../../src/adapters/drveto/fake";
 import { fakePaymentMandate } from "../../src/adapters/payments/fake";
-import { fakeWhatsApp } from "../../src/adapters/whatsapp/fake";
 import { withTenant } from "../../src/server/db/tenant";
 
 import { controlOf, insertFollowupRecord } from "./dossiers-fictifs";
@@ -300,7 +299,7 @@ async function seedSettings(
 ) {
   const service = settingsService({
     db,
-    whatsapp: fakeWhatsApp,
+    whatsapp: { live: false },
     drveto: fakeDrVeto,
     payments: fakePaymentMandate,
   });
@@ -357,7 +356,7 @@ async function seedSettings(
 async function seedSubscription(
   db: Database,
   admin: Actor,
-  plan: "solo" | "clinic",
+  plan: "starter" | "premium",
   {
     monthsAgo,
     daysIntoMonth,
@@ -431,7 +430,7 @@ export async function seedFictionalCabinets(db: Database) {
   );
   await seedSettings(db, claire, [hugoId, inesId]);
   // Clinique au 5e mois : essai terminé, choix de l'engagement annuel encore à faire.
-  await seedSubscription(db, claire, "clinic", {
+  await seedSubscription(db, claire, "premium", {
     monthsAgo: 4,
     daysIntoMonth: 6,
   });
@@ -476,7 +475,7 @@ export async function seedFictionalCabinets(db: Database) {
   const paul = await seedActor(db, SEED.martin, martin);
   await settingsService({
     db,
-    whatsapp: fakeWhatsApp,
+    whatsapp: { live: false },
     drveto: fakeDrVeto,
     payments: fakePaymentMandate,
   }).connect(paul, "payment_mandate", "");
@@ -511,7 +510,7 @@ export async function seedFictionalCabinets(db: Database) {
     await insertFollowupRecord(tx, SEED.martin, martin, sushi, seeded);
   });
 
-  await seedSubscription(db, paul, "solo", {
+  await seedSubscription(db, paul, "starter", {
     monthsAgo: 3,
     daysIntoMonth: 12,
     declineLast: true,

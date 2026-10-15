@@ -1,8 +1,12 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const billing = {
   title: "Facturation",
   description:
     "Prix hors taxes, facturés au cabinet et prélevés chaque mois. Prélèvements simulés pendant cette phase : aucun compte bancaire n'est débité.",
+  descriptionLive:
+    "Prix hors taxes, facturés au cabinet et prélevés chaque mois par prélèvement SEPA, via Stripe.",
   /** Montant hors taxes ou toutes taxes comprises ; `amount` est déjà mis en forme. */
   exclVat: (amount: string) => `${amount} HT`,
   inclVat: (amount: string) => `${amount} TTC`,
@@ -18,8 +22,8 @@ export const billing = {
   },
   plan: "Formule",
   phase: {
-    trial: (month: number, months: number, price: string) =>
-      `Essai pilote, mois ${month} sur ${months}, puis ${price} HT par mois`,
+    trial: (month: number, months: number) =>
+      `Découverte, mois ${month} sur ${months}, sans engagement`,
     annualUntil: (date: string) => `Engagement annuel jusqu'au ${date}`,
     monthly: (month: number) =>
       `Sans engagement, mois ${month} de votre abonnement`,
@@ -38,10 +42,15 @@ export const billing = {
   },
   usage: {
     title: "Usage de Numa",
-    description: (included: number, launch: string, reactivation: string) =>
-      `${included} suivis actifs en même temps sont inclus. Au-delà, chaque nouveau suivi coûte ${launch} HT et chaque réactivation ${reactivation} HT, prélevés avec l'abonnement suivant. Un suivi terminé libère sa place ; les suivis test ne comptent pas.`,
+    description: (
+      included: number,
+      max: number,
+      launch: string,
+      reactivation: string,
+    ) =>
+      `${included} suivis actifs en même temps sont inclus dans votre formule. Au-delà, chaque nouveau suivi coûte ${launch} HT et chaque réactivation ${reactivation} HT, prélevés avec l'abonnement suivant, jusqu'à ${max} suivis actifs. Un suivi terminé libère sa place ; les suivis test ne comptent pas.`,
     pending: (launches: number, reactivations: number, amount: string) =>
-      `En attente de facturation : ${launches} lancement(s) et ${reactivations} réactivation(s), soit ${amount} HT.`,
+      `En attente de facturation : ${nombre(launches, "lancement", "lancements")} et ${nombre(reactivations, "réactivation", "réactivations")}, soit ${amount} HT.`,
     nonePending: "Aucun supplément en attente.",
   },
   annual: {
@@ -49,22 +58,22 @@ export const billing = {
     reminder:
       "À choisir avant le 7e mois. Sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.",
     anytime: "Possible à tout moment, sur votre demande uniquement.",
+    offer: (trialEnd: string) =>
+      `Vos deux premiers mois se terminent le ${trialEnd}. Vous pouvez choisir dès maintenant ; sans réponse, vous restez au mois, au tarif sans engagement : rien ne bascule automatiquement.`,
     prices: (annual: string, monthly: string) =>
       `Avec engagement : ${annual} HT par mois pendant 12 mois. Sans engagement : ${monthly} HT par mois.`,
     stayMonthlyIntro:
       "Vous préférez garder la liberté de résilier chaque mois.",
-    confirm: (price: string) =>
-      `Je m'engage pour 12 mois à ${price} HT par mois, prélevés chaque mois.`,
+    confirm: (price: string, startsOn: string) =>
+      `Je m'engage pour 12 mois à ${price} HT par mois, prélevés chaque mois à partir du ${startsOn}.`,
     submit: "Passer à l'engagement annuel",
     stayMonthly: "Rester au mois",
   },
   changePlan: {
     title: "Changer de formule",
-    description: (vetSeats: number, trialMonths: number | null) =>
-      `La nouvelle formule s'applique à la prochaine échéance${trialMonths ? `, après les ${trialMonths} mois d'essai` : ""}. Votre équipe compte ${vetSeats} vétérinaire(s), invitations en attente comprises.`,
+    description: (vetSeats: number, assistantSeats: number) =>
+      `La nouvelle formule s'applique à la prochaine échéance. Votre équipe compte ${nombre(vetSeats, "vétérinaire", "vétérinaires")} et ${nombre(assistantSeats, "assistant", "assistants")}, invitations en attente comprises : une formule trop petite pour l'équipe n'est pas proposée.`,
     option: (name: string, price: string) => `${name} · ${price} HT par mois`,
-    optionDetail: (maxVets: number, stive: string) =>
-      `${maxVets === 1 ? "1 vétérinaire" : `Jusqu'à ${maxVets} vétérinaires`}. ${stive}.`,
     legend: "Formule",
     submit: "Changer de formule",
   },
@@ -72,9 +81,11 @@ export const billing = {
     title: "Factures",
     description:
       "Montants hors taxes et TVA à 20 %. Factures simulées pendant cette phase.",
+    descriptionLive: "Montants hors taxes et TVA à 20 %.",
     period: (start: string, end: string) => `du ${start} au ${end}`,
     status: {
       paid: "Payée",
+      processing: "Prélèvement en cours",
       open: "À prélever",
       failed: "Prélèvement refusé",
     },
@@ -92,7 +103,7 @@ export const billing = {
   },
   access: {
     graceTitle: (days: number) =>
-      `Prélèvement refusé : ${days} jour(s) pour régulariser`,
+      `Prélèvement refusé : ${nombre(days, "jour", "jours")} pour régulariser`,
     graceBody: (date: string) =>
       `Après le ${date}, les nouveaux suivis seront suspendus. Les suivis en cours continuent dans tous les cas.`,
     blockedTitle: "Nouveaux suivis suspendus",
@@ -108,6 +119,7 @@ export const billing = {
       "La période de lecture seule est terminée. Contactez le support pour toute demande d'export.",
   },
   settle: "Relancer le prélèvement (simulé)",
+  settleLive: "Relancer le prélèvement",
   notices: {
     confirmRequired: "Cochez la case de confirmation pour continuer.",
     planChanged: "Formule modifiée. Elle s'applique à la prochaine échéance.",
@@ -117,6 +129,8 @@ export const billing = {
     cancelled: (date: string) =>
       `Résiliation enregistrée. Elle prend effet le ${date} ; vos suivis en cours continuent jusqu'à leur fin.`,
     settled: "Prélèvement réussi (simulé). Merci, tout est en ordre.",
+    settleProcessing:
+      "Prélèvement envoyé. Votre banque le confirme sous quelques jours ouvrés ; la facture reste « en cours » d'ici là.",
     settleFailed:
       "Le prélèvement a de nouveau échoué. Vérifiez le mandat ou contactez le support.",
   },

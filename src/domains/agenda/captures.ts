@@ -17,12 +17,12 @@ import { enqueue } from "@/domains/taches/queue";
 import {
   agendaFreeSlots,
   attachments,
-  auditEvents,
   memberships,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditAttachment as audit, recordAudit } from "@/domains/audit/journal";
 
 /**
  * Capture d'écran d'agenda (cahier des charges §8, architecture §7, ADR 0019), en attendant
@@ -81,29 +81,7 @@ export function agendaService(deps: {
   ai: AiGateway;
 }) {
   const { db, storage, ai } = deps;
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
-
-  async function audit(
-    tx: TenantTransaction,
-    actor: Actor,
-    action: string,
-    targetId: string,
-    metadata: Record<string, string | number>,
-  ) {
-    await tx.insert(auditEvents).values({
-      organizationId: actor.organizationId,
-      actorMembershipId: actor.membershipId,
-      action,
-      targetType: "attachment",
-      targetId,
-      metadata,
-    });
-  }
+  const run = tenantRunner(db);
 
   /** Vétérinaires actifs du cabinet, dont l'agenda peut être capturé. */
   function vetsQuery(tx: TenantTransaction) {
@@ -278,14 +256,13 @@ export function agendaService(deps: {
           .where(eq(agendaFreeSlots.id, slotId))
           .returning({ id: agendaFreeSlots.id });
         if (removed.length === 0) throw new DomainError("not_found");
-        await tx.insert(auditEvents).values({
-          organizationId: actor.organizationId,
-          actorMembershipId: actor.membershipId,
-          action: "agenda.slot_removed",
-          targetType: "agenda_slot",
-          targetId: slotId,
-          metadata: {},
-        });
+        await recordAudit(
+          tx,
+          actor,
+          "agenda.slot_removed",
+          { type: "agenda_slot", id: slotId },
+          {},
+        );
       });
     },
   };

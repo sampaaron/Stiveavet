@@ -6,7 +6,6 @@ import type { Actor } from "@/domains/equipe/actor";
 import {
   animalOwners,
   animals,
-  auditEvents,
   followupShares,
   followups,
   memberships,
@@ -14,11 +13,12 @@ import {
   protocolVersions,
   users,
 } from "@/server/db/schema";
-import type { AuditMetadata } from "@/domains/audit/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { auditFollowup as audit } from "@/domains/audit/journal";
 
 import { canManageFollowupAccess, followupAccess } from "./policies";
+import type { FollowupAccess, Viewer } from "./policies";
 import { loadFollowupRecord } from "./record";
 
 type Status = "draft" | "active" | "paused" | "human_takeover" | "ended";
@@ -190,6 +190,32 @@ async function activeShares(tx: TenantTransaction, followupIds: string[]) {
   return byFollowup;
 }
 
+/** Accès de l'acteur à chacun de ces suivis (historique d'un animal, registre). */
+export async function followupAccessMap(
+  tx: TenantTransaction,
+  viewer: Viewer,
+  rows: readonly {
+    id: string;
+    responsibleMembershipId: string;
+    isPrivate: boolean;
+  }[],
+): Promise<Map<string, FollowupAccess>> {
+  const shares = await activeShares(
+    tx,
+    rows.map((row) => row.id),
+  );
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      followupAccess(viewer, {
+        responsibleMembershipId: row.responsibleMembershipId,
+        isPrivate: row.isPrivate,
+        sharedWith: (shares.get(row.id) ?? []).map((s) => s.membershipId),
+      }),
+    ]),
+  );
+}
+
 async function firstOwners(tx: TenantTransaction, animalIds: string[]) {
   if (!animalIds.length) return new Map<string, string>();
   const rows = await tx
@@ -204,30 +230,8 @@ async function firstOwners(tx: TenantTransaction, animalIds: string[]) {
   return result;
 }
 
-async function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
-}
-
 export function followupsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   /** Suivi et faits d'accès ; null si absent du cabinet. */
   async function load(tx: TenantTransaction, followupId: string) {

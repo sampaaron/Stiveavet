@@ -6,13 +6,27 @@ export const shell = {
   mainNavigation: "Navigation principale",
   lock: "Verrouiller",
   logout: "Déconnexion",
+  newFollowup: "Nouveau suivi",
+  search: {
+    label: "Rechercher un suivi",
+    placeholder: "Animal, propriétaire, intervention…",
+    shortcut: "Appuyez sur / pour rechercher",
+  },
+  /** Cloche des alertes : un simple décompte, sans contenu clinique. */
+  alertsNone: "Alertes : aucune en attente",
+  alertsPending: (count: number) =>
+    `Alertes : ${count} sans accusé de réception`,
+  onThisPage: "Sur cette page",
+  workspace: "Espace du cabinet",
   nav: {
     today: "Aujourd'hui",
     followups: "Suivis",
+    patients: "Animaux",
     alerts: "Alertes",
     agenda: "Agenda",
     stive: "Stive",
     practice: "Cabinet",
+    assistants: "Assistants IA",
     protocols: "Protocoles",
     settings: "Numa, urgences et garde",
     team: "Équipe et droits",

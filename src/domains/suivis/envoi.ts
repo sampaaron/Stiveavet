@@ -4,6 +4,8 @@ import {
   parisWallMinutes,
 } from "@/domains/reglages/content";
 
+import { minutesOfDay } from "@/domains/commun";
+
 /**
  * Plage d'envoi des messages programmés (cahier des charges §3.5) : un message programmé ne
  * part que dans la plage du jour, à l'heure de Paris ; sinon au début de la plage suivante.
@@ -12,11 +14,6 @@ import {
 export type SendWindow = { weekday: number; startsAt: string; endsAt: string };
 
 const DAY_MINUTES = 24 * 60;
-
-function minutesOf(time: string): number {
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -32,10 +29,10 @@ export function nextSendTime(windows: readonly SendWindow[], at: Date): Date {
     const weekday = ((day.getUTCDay() + 6) % 7) + 1;
     const windowsOfDay = plan
       .filter((window) => window.weekday === weekday)
-      .sort((a, b) => minutesOf(a.startsAt) - minutesOf(b.startsAt));
+      .sort((a, b) => minutesOfDay(a.startsAt) - minutesOfDay(b.startsAt));
     for (const window of windowsOfDay) {
-      const start = minutesOf(window.startsAt);
-      const end = minutesOf(window.endsAt);
+      const start = minutesOfDay(window.startsAt);
+      const end = minutesOfDay(window.endsAt);
       if (offset === 0 && minuteOfDay >= start && minuteOfDay < end) return at;
       if (offset > 0 || minuteOfDay < start) {
         const local = `${day.getUTCFullYear()}-${pad(day.getUTCMonth() + 1)}-${pad(day.getUTCDate())}T${window.startsAt}`;

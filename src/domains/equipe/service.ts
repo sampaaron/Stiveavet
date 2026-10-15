@@ -34,10 +34,10 @@ import {
   organizations,
   users,
 } from "@/server/db/schema";
-import type { AuditMetadata } from "@/domains/audit/schema";
-import { vetLimit } from "@/domains/facturation/limits";
-import { withTenant } from "@/server/db/tenant";
+import { assistantLimit, vetLimit } from "@/domains/facturation/limits";
+import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import { recordAudit as audit } from "@/domains/audit/journal";
 
 import { DomainError, assertPermission } from "./actor";
 import type { Actor } from "./actor";
@@ -50,7 +50,7 @@ import {
 } from "./permissions";
 import type { PermissionKey } from "./permissions";
 
-export const INVITATION_DAYS = 7;
+const INVITATION_DAYS = 7;
 
 export type TeamMember = {
   membershipId: string;
@@ -74,34 +74,17 @@ export type PendingInvitation = {
 
 const uuid = z.uuid();
 
-function audit(
+/** Places occupées pour ces rôles : membres actifs et, par défaut, invitations en attente. */
+async function seats(
   tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  target: { type: string; id: string },
-  metadata: AuditMetadata = {},
+  roles: MemberRole[],
+  includePending: boolean,
 ) {
-  return tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: target.type,
-    targetId: target.id,
-    metadata,
-  });
-}
-
-/** Vétérinaires actifs et invitations de vétérinaires en attente (limite de 3 par cabinet). */
-/** Places de vétérinaires occupées : membres actifs et, par défaut, invitations en attente. */
-export async function vetSeats(tx: TenantTransaction, includePending = true) {
   const [active] = await tx
     .select({ n: count() })
     .from(memberships)
     .where(
-      and(
-        isNull(memberships.deactivatedAt),
-        inArray(memberships.role, ["admin_vet", "vet"]),
-      ),
+      and(isNull(memberships.deactivatedAt), inArray(memberships.role, roles)),
     );
   if (!includePending) return active?.n ?? 0;
   const [pending] = await tx
@@ -112,10 +95,39 @@ export async function vetSeats(tx: TenantTransaction, includePending = true) {
         isNull(invitations.acceptedAt),
         isNull(invitations.revokedAt),
         gt(invitations.expiresAt, new Date()),
-        inArray(invitations.role, ["admin_vet", "vet"]),
+        inArray(invitations.role, roles),
       ),
     );
   return (active?.n ?? 0) + (pending?.n ?? 0);
+}
+
+/** Places de vétérinaires occupées (limite de la formule, 3 au plus par cabinet). */
+export function vetSeats(tx: TenantTransaction, includePending = true) {
+  return seats(tx, ["admin_vet", "vet"], includePending);
+}
+
+/** Places d'assistants occupées. */
+export function assistantSeats(tx: TenantTransaction, includePending = true) {
+  return seats(tx, ["assistant"], includePending);
+}
+
+/**
+ * Refuse une place de plus pour ce rôle si l'offre est au complet : vétérinaires
+ * (`vet_limit`) ou assistants (`plan_assistant_limit`).
+ */
+async function assertSeat(
+  tx: TenantTransaction,
+  role: MemberRole,
+  includePending = true,
+) {
+  if (VET_ROLES.has(role)) {
+    if ((await vetSeats(tx, includePending)) >= (await vetLimit(tx)))
+      throw new DomainError("vet_limit");
+    return;
+  }
+  const limit = await assistantLimit(tx);
+  if (limit !== null && (await assistantSeats(tx, includePending)) >= limit)
+    throw new DomainError("plan_assistant_limit");
 }
 
 async function memberOf(tx: TenantTransaction, membershipId: string) {
@@ -153,12 +165,9 @@ export function teamService(deps: {
   appUrl: string;
 }) {
   const { db, email, appUrl } = deps;
+  const inTenant = tenantRunner(db);
   const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    ).catch(translateDbError);
+    inTenant(actor, fn).catch(translateDbError);
 
   return {
     async members(actor: Actor): Promise<TeamMember[]> {
@@ -257,11 +266,7 @@ export function teamService(deps: {
             and(eq(users.email, address), isNull(memberships.deactivatedAt)),
           );
         if (existing) throw new DomainError("already_member");
-        if (
-          VET_ROLES.has(input.role) &&
-          (await vetSeats(tx)) >= (await vetLimit(tx))
-        )
-          throw new DomainError("vet_limit");
+        await assertSeat(tx, input.role);
 
         const id = randomUUID();
         try {
@@ -407,12 +412,8 @@ export function teamService(deps: {
           throw new DomainError("self_action");
         if (member.deactivatedAt) throw new DomainError("invalid_target");
         if (member.role === role) return;
-        if (
-          VET_ROLES.has(role) &&
-          !VET_ROLES.has(member.role) &&
-          (await vetSeats(tx)) >= (await vetLimit(tx))
-        )
-          throw new DomainError("vet_limit");
+        if (VET_ROLES.has(role) !== VET_ROLES.has(member.role))
+          await assertSeat(tx, role);
         // Un assistant ne peut pas rester responsable de suivis.
         if (role === "assistant") {
           const [open] = await tx
@@ -540,11 +541,7 @@ export function teamService(deps: {
       await run(actor, async (tx) => {
         const member = await memberOf(tx, membershipId);
         if (!member.deactivatedAt) return;
-        if (
-          VET_ROLES.has(member.role) &&
-          (await vetSeats(tx)) >= (await vetLimit(tx))
-        )
-          throw new DomainError("vet_limit");
+        await assertSeat(tx, member.role);
         await tx
           .update(memberships)
           .set({ deactivatedAt: null })
@@ -729,11 +726,7 @@ export async function acceptInvitation(
           .returning({ invitedBy: invitations.invitedByMembershipId });
         const invitedBy = consumed[0]?.invitedBy;
         if (!invitedBy) return "expired" as const;
-        if (
-          VET_ROLES.has(invitation.role) &&
-          (await vetSeats(tx, false)) >= (await vetLimit(tx))
-        )
-          throw new DomainError("vet_limit");
+        await assertSeat(tx, invitation.role, false);
 
         await tx.insert(users).values({
           id: userId,
@@ -750,19 +743,24 @@ export async function acceptInvitation(
         await tx.execute(
           sql`SELECT auth.set_initial_password(${userId}, ${input.passwordHash})`,
         );
-        await tx.insert(auditEvents).values({
-          organizationId: invitation.organization_id,
-          actorMembershipId: invitedBy,
-          action: "membership.created",
-          targetType: "membership",
-          targetId: membershipId,
-          metadata: { role: invitation.role, source: "invitation" },
-        });
+        await audit(
+          tx,
+          {
+            organizationId: invitation.organization_id,
+            membershipId: invitedBy,
+          },
+          "membership.created",
+          { type: "membership", id: membershipId },
+          { role: invitation.role, source: "invitation" },
+        );
         return "accepted" as const;
       },
     );
   } catch (error) {
-    if (error instanceof DomainError && error.code === "vet_limit")
+    if (
+      error instanceof DomainError &&
+      (error.code === "vet_limit" || error.code === "plan_assistant_limit")
+    )
       return "vet_limit";
     const code =
       (error as { code?: string }).code ??

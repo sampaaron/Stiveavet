@@ -35,7 +35,7 @@ function ConfirmBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function SettleForm() {
+export function SettleForm({ simulated }: { simulated: boolean }) {
   const [state, action, pending] = useActionState(
     settleAction,
     initialActionState,
@@ -45,7 +45,7 @@ export function SettleForm() {
     <form action={action} className="grid gap-2">
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          {t.billing.settle}
+          {simulated ? t.billing.settle : t.billing.settleLive}
         </Button>
       </div>
       <ActionMessage state={state} />
@@ -104,7 +104,13 @@ export function PlanForm({
   );
 }
 
-export function CommitAnnualForm({ priceLabel }: { priceLabel: string }) {
+export function CommitAnnualForm({
+  priceLabel,
+  startsOnLabel,
+}: {
+  priceLabel: string;
+  startsOnLabel: string;
+}) {
   const [state, action, pending] = useActionState(
     chooseCycleAction,
     initialActionState,
@@ -113,7 +119,9 @@ export function CommitAnnualForm({ priceLabel }: { priceLabel: string }) {
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="cycle" value="annual" />
-      <ConfirmBox>{t.billing.annual.confirm(priceLabel)}</ConfirmBox>
+      <ConfirmBox>
+        {t.billing.annual.confirm(priceLabel, startsOnLabel)}
+      </ConfirmBox>
       <ActionMessage state={state} />
       <div>
         <Button type="submit" disabled={pending} aria-busy={pending}>

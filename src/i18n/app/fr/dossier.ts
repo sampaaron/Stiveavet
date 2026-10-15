@@ -17,6 +17,7 @@ export const dossier = {
     numa: "Numa reprend la conversation.",
     "alerte-recue": "Réception confirmée : l'escalade est annulée.",
     "alerte-close": "Alerte close.",
+    "alerte-confiee": "Alerte confiée : le vétérinaire choisi est prévenu.",
   },
   header: {
     responsible: "Responsable :",
@@ -194,7 +195,11 @@ export const dossier = {
     title: "Conversation WhatsApp",
     aiNotice:
       "Numa est une IA : elle ne pose pas de diagnostic, ne modifie aucun traitement et renvoie toute question médicale au vétérinaire.",
-    delivery: { queued: "envoi en cours", failed: "non envoyé" },
+    delivery: {
+      queued: "envoi en cours",
+      awaiting_reply: "partira à la réponse du propriétaire",
+      failed: "non envoyé",
+    },
     deletedPhoto: "Photo supprimée (durée de conservation atteinte)",
     deletedVoice: "Message vocal supprimé (durée de conservation atteinte)",
     photo: "Photo",
@@ -212,6 +217,8 @@ export const dossier = {
     contactState: (name: string, state: string) => `${name} : ${state}`,
     groupOpen: "Groupe WhatsApp ouvert",
     groupLater: "Groupe créé quand les deux auront accepté",
+    /** Message du propriétaire fait d'un fichier seul, avant sa réception ou après un refus. */
+    fileSent: "Fichier envoyé par WhatsApp",
     /** Traces du groupe (messages « système »), selon leur code. */
     notes: {
       group_created: (names: string) =>
@@ -221,6 +228,8 @@ export const dossier = {
         `${name} a quitté le groupe ; plus personne n'y reste, il est fermé.`,
       group_stopped: (name: string) =>
         `Groupe fermé : ${name} a demandé l'arrêt du suivi.`,
+      file_refused: (name: string) =>
+        `Fichier de ${name} non reçu : trop lourd ou format non pris en charge. Numa lui a demandé de le renvoyer ou de décrire la situation.`,
     },
     states: {
       stoppedByOwner:

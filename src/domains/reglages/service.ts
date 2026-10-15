@@ -4,23 +4,29 @@ import { and, asc, count, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
+import { BillingUnavailableError } from "@/adapters/billing-provider/types";
 import type { PaymentMandateProvider } from "@/adapters/payments/types";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
+import { StripeError } from "@/adapters/stripe/api";
+import { simulatedNumberLabel } from "@/adapters/whatsapp/fake";
+import { SignupError, signupInput } from "@/adapters/whatsapp/inscription";
 import {
   APPOINTMENT_KINDS,
   DEFAULT_APPOINTMENT_MINUTES,
 } from "@/domains/agenda/rendez-vous";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
-import type { AuditMetadata } from "@/domains/audit/schema";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
+import { currentPlan } from "@/domains/facturation/limits";
+import { planDefinition } from "@/domains/facturation/rules";
 import { canReadProtocol } from "@/domains/protocoles/policies";
+import { tokenContext } from "@/domains/whatsapp/connexion";
+import { maskPhone } from "@/domains/whatsapp/numero";
+import type { WhatsAppSetup } from "@/domains/whatsapp/connexion";
 import {
   animalOwners,
   animals,
   appointmentDurations,
-  auditEvents,
   availabilityWindows,
   emergencyContacts,
   emergencyInstructions,
@@ -35,9 +41,14 @@ import {
   protocolVersions,
   protocols,
   users,
+  whatsappAccounts,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import {
+  auditOrganization as audit,
+  recordAudit,
+} from "@/domains/audit/journal";
 
 import {
   DEFAULT_APPOINTMENT_WINDOWS,
@@ -84,12 +95,19 @@ export type SettingsView = {
   }[];
   onCallCandidates: { membershipId: string; name: string }[];
   integrations: Partial<
-    Record<Integration, { displayLabel: string; connectedAt: Date }>
+    Record<
+      Integration,
+      { displayLabel: string; connectedAt: Date; live: boolean }
+    >
   >;
+  /** La formule comprend-elle les intégrations avancées (dr.veto) ? */
+  advancedIntegrations: boolean;
 };
 
 export type OnboardingView = {
   steps: Record<OnboardingStep, boolean>;
+  /** dr.veto n'est compris qu'en Premium ; l'étape est alors sans objet. */
+  advancedIntegrations: boolean;
   completed: number;
   /** Protocoles validés du cabinet, pour le suivi test. */
   validatedProtocols: { id: string; name: string }[];
@@ -102,22 +120,6 @@ const ON_CALL_MAX_DAYS = 14;
 /** `08:00:00` (PostgreSQL) → `08:00`. */
 const hhmm = (value: string) => value.slice(0, 5);
 
-function audit(
-  tx: TenantTransaction,
-  actor: Actor,
-  action: string,
-  metadata: AuditMetadata = {},
-) {
-  return tx.insert(auditEvents).values({
-    organizationId: actor.organizationId,
-    actorMembershipId: actor.membershipId,
-    action,
-    targetType: "organization",
-    targetId: actor.organizationId,
-    metadata,
-  });
-}
-
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw new DomainError("invalid_target");
@@ -126,18 +128,15 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 
 export function settingsService(deps: {
   db: Database;
-  whatsapp: WhatsAppConnector;
+  whatsapp: WhatsAppSetup;
   drveto: DrVetoConnector;
   payments: PaymentMandateProvider;
 }) {
   const { db } = deps;
+  const inTenant = tenantRunner(db);
   const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) => {
     assertPermission(actor, "organization.settings");
-    return withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+    return inTenant(actor, fn);
   };
 
   async function upsertSettings(
@@ -282,9 +281,15 @@ export function settingsService(deps: {
           integrations: Object.fromEntries(
             integrations.map((row) => [
               row.provider,
-              { displayLabel: row.displayLabel, connectedAt: row.connectedAt },
+              {
+                displayLabel: row.displayLabel,
+                connectedAt: row.connectedAt,
+                live: row.mode === "live",
+              },
             ]),
           ),
+          advancedIntegrations: planDefinition(await currentPlan(tx))
+            .advancedIntegrations,
         };
       });
     },
@@ -298,6 +303,7 @@ export function settingsService(deps: {
               .from(integrationConnections)
           ).map((row) => row.provider),
         );
+        const { advancedIntegrations } = planDefinition(await currentPlan(tx));
         const [windows] = await tx
           .select({ n: count() })
           .from(availabilityWindows)
@@ -338,7 +344,7 @@ export function settingsService(deps: {
         const steps: Record<OnboardingStep, boolean> = {
           organization: true,
           whatsapp: integrations.has("whatsapp"),
-          drveto: integrations.has("drveto"),
+          drveto: integrations.has("drveto") || !advancedIntegrations,
           rules:
             (windows?.n ?? 0) > 0 &&
             (contacts?.n ?? 0) > 0 &&
@@ -350,6 +356,7 @@ export function settingsService(deps: {
         };
         return {
           steps,
+          advancedIntegrations,
           completed: Object.values(steps).filter(Boolean).length,
           validatedProtocols,
         };
@@ -596,10 +603,16 @@ export function settingsService(deps: {
     async connect(actor: Actor, provider: Integration, input: string) {
       let displayLabel: string;
       if (provider === "whatsapp") {
-        const phone = parse(contactInput.shape.phone, input);
-        displayLabel = (await deps.whatsapp.connectBusinessNumber(phone))
-          .displayLabel;
+        // WhatsApp réel : le numéro se connecte par l'inscription intégrée de Meta.
+        if (deps.whatsapp.live) throw new DomainError("invalid_target");
+        displayLabel = simulatedNumberLabel(
+          parse(contactInput.shape.phone, input),
+        );
       } else if (provider === "drveto") {
+        // Intégrations avancées : formule Premium uniquement, vérifié côté serveur.
+        const plan = await run(actor, (tx) => currentPlan(tx));
+        if (!planDefinition(plan).advancedIntegrations)
+          throw new DomainError("plan_feature_missing");
         const code = parse(
           z
             .string()
@@ -609,6 +622,8 @@ export function settingsService(deps: {
         );
         displayLabel = (await deps.drveto.connectPractice(code)).displayLabel;
       } else {
+        // Mandat réel : il passe par la page Stripe (`startMandate`), jamais par ce formulaire.
+        if (!deps.payments.simulated) throw new DomainError("invalid_target");
         displayLabel = (await deps.payments.signMandate(actor.organizationId))
           .displayLabel;
       }
@@ -629,8 +644,130 @@ export function settingsService(deps: {
       });
     },
 
-    async disconnect(actor: Actor, provider: Integration) {
+    /** Vrai si le mandat se signe chez Stripe (ADR 0027) plutôt qu'en simulation. */
+    mandateLive(): boolean {
+      return !deps.payments.simulated;
+    },
+
+    /** Identifiants publics du bouton d'inscription de Meta, si WhatsApp est réel. */
+    whatsappSignup(): { appId: string; configId: string } | null {
+      const setup = deps.whatsapp;
+      return setup.live
+        ? { appId: setup.appId, configId: setup.configId }
+        : null;
+    },
+
+    /**
+     * Numéro WhatsApp réel du cabinet, par l'inscription intégrée de Meta (ADR 0024) : le
+     * code reçu dans le navigateur est échangé ici, le jeton du cabinet est chiffré avant
+     * d'être enregistré, et seul un libellé masqué est affiché. Le PIN n'est jamais gardé.
+     */
+    async connectWhatsApp(actor: Actor, raw: unknown) {
+      assertPermission(actor, "organization.settings");
+      const setup = deps.whatsapp;
+      if (!setup.live) throw new DomainError("invalid_target");
+      const input = parse(signupInput, raw);
+      let result: { accessToken: string; displayPhone: string };
+      try {
+        // Appels à Meta hors de toute transaction.
+        result = await setup.signup.complete(input);
+      } catch (error) {
+        if (error instanceof SignupError)
+          throw new DomainError("whatsapp_signup_failed");
+        throw error;
+      }
+      const sealed = setup.box.seal(
+        result.accessToken,
+        tokenContext(actor.organizationId),
+      );
       await run(actor, async (tx) => {
+        // Un numéro ne sert qu'à un cabinet : la base le garantit (index unique).
+        const taken = await tx.execute<{ org: string | null }>(
+          sql`SELECT app.whatsapp_organization(${input.phoneNumberId}) AS org`,
+        );
+        const owner = taken.rows[0]?.org ?? null;
+        if (owner && owner !== actor.organizationId)
+          throw new DomainError("whatsapp_number_taken");
+        const account = {
+          wabaId: input.wabaId,
+          phoneNumberId: input.phoneNumberId,
+          accessTokenSealed: sealed,
+          connectedByMembershipId: actor.membershipId,
+          connectedAt: new Date(),
+        };
+        await tx
+          .insert(whatsappAccounts)
+          .values({ organizationId: actor.organizationId, ...account })
+          .onConflictDoUpdate({
+            target: whatsappAccounts.organizationId,
+            set: account,
+          });
+        const displayLabel = maskPhone(result.displayPhone);
+        await tx
+          .insert(integrationConnections)
+          .values({
+            organizationId: actor.organizationId,
+            provider: "whatsapp",
+            mode: "live",
+            displayLabel,
+            connectedByMembershipId: actor.membershipId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              integrationConnections.organizationId,
+              integrationConnections.provider,
+            ],
+            set: { mode: "live", displayLabel },
+          });
+        await audit(tx, actor, "integration.connected", {
+          provider: "whatsapp",
+          simulated: false,
+        });
+      });
+    },
+
+    /**
+     * Mandat SEPA réel (ADR 0027) : adresse de la page Stripe où le cabinet saisit son IBAN.
+     * Le mandat n'est connecté qu'à la réception de l'événement signé de Stripe.
+     */
+    async startMandate(actor: Actor, locale: "fr" | "en"): Promise<string> {
+      const payments = deps.payments;
+      if (payments.simulated) throw new DomainError("invalid_target");
+      return run(actor, async (tx) => {
+        const [organization] = await tx
+          .select({ name: organizations.name })
+          .from(organizations);
+        if (!organization) throw new DomainError("not_found");
+        let url: string;
+        try {
+          url = await payments.startMandate(tx, {
+            organizationId: actor.organizationId,
+            organizationName: organization.name,
+            membershipId: actor.membershipId,
+            locale,
+          });
+        } catch (error) {
+          // Stripe injoignable ou compte refusé : message simple, rien n'est enregistré.
+          if (
+            error instanceof StripeError ||
+            error instanceof BillingUnavailableError
+          )
+            throw new DomainError("payment_provider_unavailable");
+          throw error;
+        }
+        await audit(tx, actor, "integration.mandate_started");
+        return url;
+      });
+    },
+
+    async disconnect(actor: Actor, provider: Integration) {
+      const payments = deps.payments;
+      await run(actor, async (tx) => {
+        // Le jeton chiffré du cabinet est effacé avec la connexion.
+        if (provider === "whatsapp") await tx.delete(whatsappAccounts);
+        // Mandat réel : retiré chez Stripe avant d'être effacé ici.
+        if (provider === "payment_mandate" && !payments.simulated)
+          await payments.revokeMandate(tx);
         await tx
           .delete(integrationConnections)
           .where(eq(integrationConnections.provider, provider));
@@ -715,14 +852,13 @@ export function settingsService(deps: {
           protocolVersionId: protocol.versionId,
           isTest: true,
         });
-        await tx.insert(auditEvents).values({
-          organizationId: actor.organizationId,
-          actorMembershipId: actor.membershipId,
-          action: "followup.test_created",
-          targetType: "followup",
-          targetId: followupId,
-          metadata: {},
-        });
+        await recordAudit(
+          tx,
+          actor,
+          "followup.test_created",
+          { type: "followup", id: followupId },
+          {},
+        );
         return followupId;
       });
     },

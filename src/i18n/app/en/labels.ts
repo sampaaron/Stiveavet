@@ -37,7 +37,7 @@ export const labels: AppDictionary["labels"] = {
     ended: "Ended",
   },
   species: { dog: "Dog", cat: "Cat", both: "Dog and cat" },
-  triage: { normal: "Normal", watch: "To watch", urgent: "Urgent" },
+  triage: { normal: "Nothing flagged", watch: "To watch", urgent: "Urgent" },
   protocolCategories: {
     surgery: "Surgery",
     dental: "Dental",
@@ -73,13 +73,34 @@ export const labels: AppDictionary["labels"] = {
     holiday: "On public holidays",
   },
   plans: {
-    solo: { name: "Solo", stive: "Limited Stive" },
-    solo_pro: { name: "Solo Pro", stive: "Fuller Stive" },
-    clinic: { name: "Clinic", stive: "One Stive per vet, with a lower limit" },
-    clinic_pro: {
-      name: "Clinic Pro",
-      stive: "A fuller personal Stive for each vet",
+    starter: {
+      name: "Starter",
+      pitch: "For a vet getting started with follow-ups",
+      stive: "No Stive",
     },
+    pro: {
+      name: "Pro",
+      pitch: "The plan most practices choose",
+      stive: "Stive included",
+    },
+    premium: {
+      name: "Premium",
+      pitch: "The whole team, with the practice software connected",
+      stive: "Stive for every vet",
+    },
+  },
+  planFeatured: "Most popular",
+  planQuota: {
+    vets: (count: number) => (count === 1 ? "1 vet" : `Up to ${count} vets`),
+    assistants: (count: number | null) =>
+      count === null
+        ? "Unlimited assistants"
+        : count === 1
+          ? "1 assistant"
+          : `Up to ${count} assistants`,
+    followups: (included: number, max: number) =>
+      `${included} active follow-ups included, up to ${max}`,
+    integrations: "Practice software connection (dr.veto)",
   },
   triageReasons: {
     red_flag: "Emergency signal recognised in the owner's message.",

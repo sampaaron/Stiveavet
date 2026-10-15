@@ -15,6 +15,25 @@ export const staticSecurityHeaders = [
     value:
       "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
   },
-  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ] as const satisfies ReadonlyArray<{ key: string; value: string }>;
+
+/**
+ * Isolation des fenêtres : stricte partout, sauf sur les pages de connexion du numéro
+ * WhatsApp, où la fenêtre de Meta ouverte par la page doit pouvoir lui répondre (ADR 0024).
+ */
+export const openerPolicyRules = [
+  {
+    source: "/((?!app/reglages$|app/demarrage$).*)",
+    headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin" }],
+  },
+  {
+    source: "/app/:page(reglages|demarrage)",
+    headers: [
+      {
+        key: "Cross-Origin-Opener-Policy",
+        value: "same-origin-allow-popups",
+      },
+    ],
+  },
+];

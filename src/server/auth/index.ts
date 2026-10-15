@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cache } from "react";
 
 import { emailSender } from "@/adapters/email";
@@ -19,6 +20,7 @@ export function auth(): AuthService {
     // Résolu au premier envoi : lire une session n'exige pas de configuration e-mail.
     email: { send: (message) => emailSender().send(message) },
     appUrl: serverEnv().APP_URL,
+    defer: async (task) => after(task),
   });
   return service;
 }

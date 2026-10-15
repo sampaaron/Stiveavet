@@ -22,8 +22,8 @@ test.describe("Clinique des Tilleuls (Claire)", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Facturation" }),
     ).toBeVisible();
-    await expect(page.getByText("Clinique", { exact: true })).toBeVisible();
-    await expect(page.getByText(/^\d+ \/ 10 inclus$/)).toBeVisible();
+    await expect(page.getByText("Premium", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^\d+ \/ 100 inclus$/)).toBeVisible();
     await expect(page.getByText("Payée").first()).toBeVisible();
     await expectAccessible(page);
 
@@ -39,6 +39,15 @@ test.describe("Clinique des Tilleuls (Claire)", () => {
     ).toBeVisible();
     // Choix enregistré une fois pour toutes : vérifié sur un seul format d'écran.
     if (test.info().project.name !== "desktop") return;
+    // Tant que le choix est à faire, il est rappelé sur tout l'espace cabinet (ADR 0023),
+    // sauf sur l'écran Facturation qui le présente en détail (ADR 0032).
+    const notice = page.getByText(
+      "Engagement annuel ou mois : à vous de choisir. Sans réponse, rien ne bascule.",
+    );
+    await expect(notice).toHaveCount(0);
+    await page.goto("/app");
+    await expect(notice).toBeVisible();
+    await page.goto("/app/facturation");
     await page.getByRole("button", { name: "Rester au mois" }).click();
     await expect(
       page.getByText("Possible à tout moment, sur votre demande uniquement."),
@@ -46,6 +55,8 @@ test.describe("Clinique des Tilleuls (Claire)", () => {
     await expect(
       page.getByRole("button", { name: "Rester au mois" }),
     ).toHaveCount(0);
+    await page.goto("/app");
+    await expect(notice).toHaveCount(0);
   });
 });
 
@@ -77,14 +88,14 @@ test.describe("cabinet du Dr Martin, en impayé", () => {
 test.describe("nouveau cabinet", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("formule Solo choisie à l'inscription, limite et résiliation", async ({
+  test("formule Starter choisie à l'inscription, limite et résiliation", async ({
     page,
   }) => {
-    await signUp(page, "Solo");
+    await signUp(page, "Starter");
     await page.goto("/app/facturation");
-    await expect(page.getByText("Solo", { exact: true })).toBeVisible();
+    await expect(page.getByText("Starter", { exact: true })).toBeVisible();
     await expect(
-      page.getByText(/^Essai pilote, mois 1 sur 2, puis/),
+      page.getByText("Découverte, mois 1 sur 2, sans engagement"),
     ).toBeVisible();
     // Sans mandat signé, la première facture attend.
     await expect(page.getByText("À prélever", { exact: true })).toBeVisible();
@@ -93,7 +104,7 @@ test.describe("nouveau cabinet", () => {
     ).toBeVisible();
     await expectAccessible(page);
 
-    // Solo : un seul vétérinaire.
+    // Starter : un seul vétérinaire.
     await page.goto("/app/equipe");
     await page.getByLabel("Nom").fill("Dr Victor Invité");
     await page.getByLabel("Adresse e-mail").fill("victor-solo@essai.test");

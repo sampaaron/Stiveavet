@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 
 import { LEA, PHRASE } from "./support/accounts";
 import { expectAccessible, login } from "./support/flows";
+import { OPT_IN } from "./support/suivis";
 
 /**
  * Lancement manuel d'un suivi depuis dr.veto simulé (lot 12). Chaque projet (ordinateur,
@@ -75,9 +76,17 @@ test("une vétérinaire lance, modifie, met en pause, reprend et arrête un suiv
     .getByLabel(/^Je valide ce traitement/)
     .first()
     .check();
+  // Sans l'accord du propriétaire pour WhatsApp, rien ne part.
+  await page.getByRole("button", { name: "Lancer le suivi" }).click();
+  await expect(
+    page.getByText(/Cochez l'accord du propriétaire pour WhatsApp/),
+  ).toBeVisible();
+  await page.getByRole("checkbox", { name: OPT_IN }).check();
   await page.getByRole("button", { name: "Lancer le suivi" }).click();
   await expect(page).toHaveURL(/\/app\/suivis\/[0-9a-f-]+\?fait=lance$/);
-  await expect(page.getByRole("status").first()).toContainText("Suivi lancé");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Suivi lancé" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Pilotage du suivi" }),
   ).toBeVisible();
@@ -116,7 +125,9 @@ test("une vétérinaire lance, modifie, met en pause, reprend et arrête un suiv
   await page.getByRole("button", { name: "Arrêter le suivi" }).click();
   await page.getByRole("button", { name: "Confirmer l'arrêt" }).click();
   await expect(page).toHaveURL(/\?fait=arret$/);
-  await expect(page.getByRole("status").first()).toContainText("Suivi arrêté");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Suivi arrêté" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Réactiver le suivi" }),
   ).toBeVisible();

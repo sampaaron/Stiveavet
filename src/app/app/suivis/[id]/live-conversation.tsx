@@ -71,6 +71,14 @@ export function messageText(
   message: ConversationMessage,
 ): string {
   const note = message.note;
+  // Fichier seul (en cours de réception, ou refusé : la trace suivante le dit).
+  if (
+    !note &&
+    !message.body &&
+    message.author === "owner" &&
+    !message.attachment
+  )
+    return t.dossier.conversation.fileSent;
   if (!note) return message.body;
   const notes = t.dossier.conversation.notes;
   return note.code === "group_created"
@@ -82,7 +90,9 @@ function deliveryNote(
   text: Text,
   delivery: ConversationMessage["delivery"],
 ): string | undefined {
-  return delivery === "queued" || delivery === "failed"
+  return delivery === "queued" ||
+    delivery === "awaiting_reply" ||
+    delivery === "failed"
     ? text.delivery[delivery]
     : undefined;
 }

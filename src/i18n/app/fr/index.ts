@@ -16,6 +16,7 @@ import { billing } from "./billing";
 import { journal } from "./journal";
 import { tasks } from "./tasks";
 import { agenda } from "./agenda";
+import { patients } from "./patients";
 
 export const fr = {
   common,
@@ -35,4 +36,5 @@ export const fr = {
   journal,
   tasks,
   agenda,
+  patients,
 };

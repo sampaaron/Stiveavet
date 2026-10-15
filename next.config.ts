@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
-import { staticSecurityHeaders } from "./src/server/security/headers";
+import {
+  openerPolicyRules,
+  staticSecurityHeaders,
+} from "./src/server/security/headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -26,6 +29,7 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: staticSecurityHeaders.map((header) => ({ ...header })),
       },
+      ...openerPolicyRules,
     ];
   },
 };

@@ -35,7 +35,7 @@ export const fr = {
     pricing: {
       title: "Tarifs",
       description:
-        "Essai pilote à 86 € HT par mois pendant 2 mois, puis Solo, Solo Pro, Clinique ou Clinique Pro. Prix HT, par cabinet.",
+        "Trois formules par cabinet, Starter, Pro et Premium, sans engagement. Prix hors taxes.",
     },
     security: {
       title: "Sécurité et données",
@@ -51,9 +51,9 @@ export const fr = {
       description: "Pannes et maintenances de Stivea Vet.",
     },
     trial: {
-      title: "Commencer l'essai",
+      title: "Démarrer Stivea Vet",
       description:
-        "Essai pilote de 2 mois à 86 € HT par mois, en usage réel et sans engagement.",
+        "Créez votre cabinet, choisissez votre formule et lancez un premier suivi test, sans engagement.",
     },
     demo: {
       title: "Demander la démo",
@@ -81,7 +81,7 @@ export const fr = {
   common: {
     brandVet: "vet",
     skipToContent: "Aller au contenu",
-    ctaTrial: "Commencer l'essai à {price} HT",
+    ctaTrial: "Démarrer dès {price} HT par mois",
     ctaDemo: "Voir la démo",
     login: "Connexion",
     numaAi: "Assistante IA",
@@ -91,7 +91,6 @@ export const fr = {
     soon: "Bientôt disponible",
     atLaunch: "Au lancement",
     fictionalData: "Données fictives",
-    appInFrench: "",
   },
 
   nav: {
@@ -117,7 +116,7 @@ export const fr = {
     legal: "Informations",
     links: {
       demo: "Démo",
-      trial: "Essai pilote",
+      trial: "Démarrer",
       help: "Centre d'aide",
       status: "État du service",
       login: "Connexion",
@@ -136,8 +135,8 @@ export const fr = {
       titleAccent: "sans alourdir votre journée.",
       lead: "Numa, assistante IA, échange avec les propriétaires sur le WhatsApp professionnel du cabinet. Elle suit votre protocole, repère les signes d'alerte et vous prépare une synthèse. La décision médicale reste toujours la vôtre.",
       points: [
-        "2 mois d'essai en usage réel",
-        "Sans engagement pendant l'essai",
+        "Sur vos vrais suivis, dès le premier jour",
+        "Sans engagement, résiliable chaque mois",
         "Installation guidée",
       ],
     },
@@ -287,8 +286,8 @@ export const fr = {
           a: "Non. Stivea Vet se connecte à dr.veto au lancement, en lecture seule, et n'y écrit jamais. Vétocom et Vetup arrivent ensuite.",
         },
         {
-          q: "Combien coûte l'essai ?",
-          a: "{price} HT par mois pendant 2 mois, en usage réel, résiliable à tout moment. Aucun engagement annuel n'est créé automatiquement.",
+          q: "Combien coûte Stivea Vet ?",
+          a: "À partir de {price} HT par mois avec la formule Starter, sans engagement et résiliable à tout moment. Aucun engagement annuel n'est créé automatiquement.",
         },
         {
           q: "Que se passe-t-il la nuit et le week-end ?",
@@ -298,7 +297,7 @@ export const fr = {
     },
     finalCta: {
       title: "Essayez Stivea Vet sur vos vrais suivis",
-      body: "2 mois à {price} HT par mois, sans engagement. Vous pouvez aussi découvrir d'abord la démo, sur un cabinet fictif.",
+      body: "À partir de {price} HT par mois, sans engagement. Vous pouvez aussi découvrir d'abord la démo, sur un cabinet fictif.",
     },
   },
 
@@ -447,38 +446,38 @@ export const fr = {
 
   pricing: {
     title: "Des tarifs simples, par cabinet",
-    lead: "Tous les prix sont hors taxes, facturés par cabinet et prélevés chaque mois. Les factures sont envoyées par e-mail.",
-    trial: {
-      badge: "Pour commencer",
-      name: "Essai pilote",
-      price: "{price} HT par mois pendant {months} mois",
-      points: [
-        "Usage réel, sur vos vrais suivis",
-        "Sans engagement, résiliable à tout moment",
-        "Puis la formule choisie à l'inscription",
-      ],
-    },
-    plansTitle: "Après l'essai",
-    annual: "avec engagement annuel",
-    monthly: "sans engagement",
+    lead: "Trois formules, sans engagement. Les prix sont hors taxes, par cabinet, prélevés chaque mois ; les factures sont envoyées par e-mail.",
+    plansTitle: "Les formules",
+    featured: "Offre phare",
+    annual:
+      "{price} HT / mois avec engagement annuel, possible à partir du 3e mois",
     perMonthExclVat: "HT / mois",
+    monthly: "sans engagement",
     plans: {
-      solo: { name: "Solo", vets: "1 vétérinaire", stive: "Stive limité" },
-      solo_pro: {
-        name: "Solo Pro",
-        vets: "1 vétérinaire",
-        stive: "Stive plus complet",
+      starter: {
+        name: "Starter",
+        pitch: "Pour le vétérinaire qui démarre le suivi de ses patients.",
       },
-      clinic: {
-        name: "Clinique",
-        vets: "Jusqu'à 3 vétérinaires",
-        stive: "Un Stive par vétérinaire, avec une limite plus basse",
+      pro: {
+        name: "Pro",
+        pitch:
+          "Pour le cabinet qui suit ses patients au quotidien, avec Stive.",
       },
-      clinic_pro: {
-        name: "Clinique Pro",
-        vets: "Jusqu'à 3 vétérinaires",
-        stive: "Un Stive personnel plus complet par vétérinaire",
+      premium: {
+        name: "Premium",
+        pitch: "Pour l'équipe complète, connectée au logiciel du cabinet.",
       },
+    },
+    quota: {
+      vet: "1 vétérinaire",
+      vets: "Jusqu'à {count} vétérinaires",
+      assistant: "1 assistant",
+      assistants: "Jusqu'à {count} assistants",
+      assistantsUnlimited: "Assistants sans limite",
+      followups: "{included} suivis actifs inclus, jusqu'à {max}",
+      stive: "Stive, l'assistant IA de l'équipe",
+      noStive: "Sans Stive",
+      integrations: "Connexion au logiciel du cabinet (dr.veto)",
     },
     larger: {
       name: "Plus de 3 vétérinaires",
@@ -486,15 +485,15 @@ export const fr = {
     },
     usageTitle: "Suivis Numa",
     usage: [
-      "{included} suivis actifs en même temps sont inclus dans chaque formule.",
-      "Au-delà, chaque nouveau suivi lancé coûte {launch} HT.",
-      "Réactiver un ancien suivi alors que {included} suivis sont actifs coûte {reactivation} HT.",
+      "Chaque formule inclut un nombre de suivis actifs en même temps.",
+      "Au-delà, chaque nouveau suivi lancé coûte {launch} HT, jusqu'au plafond de la formule.",
+      "Réactiver un ancien suivi au-delà des suivis inclus coûte {reactivation} HT.",
       "Le supplément est prélevé avec l'abonnement suivant. Quand un suivi se termine, une place se libère.",
     ],
     rulesTitle: "Les règles de l'abonnement",
     rules: [
-      "Les six premiers mois ne créent jamais d'engagement annuel automatique.",
-      "À partir du 3e mois, vous pouvez demander l'engagement annuel. Avant le 7e mois, vous choisissez : engagement annuel ou formule mensuelle.",
+      "Les deux premiers mois sont sans engagement possible : vous découvrez Stivea Vet sur vos vrais suivis.",
+      "À partir du 3e mois, vous pouvez demander l'engagement annuel. Avant le 7e mois, vous choisissez : engagement annuel ou formule mensuelle. Rien ne bascule automatiquement.",
       "Après un prélèvement échoué, vous avez 30 jours pour régulariser avant le blocage des nouveaux suivis.",
       "Après une résiliation ou un impayé, les suivis en cours continuent toujours, puis vous gardez un accès en lecture seule pendant 3 mois.",
     ],
@@ -546,7 +545,7 @@ export const fr = {
 
   help: {
     title: "Centre d'aide",
-    lead: "Les guides et vidéos arrivent avec l'ouverture de l'essai pilote. Ils seront aussi disponibles dans le logiciel.",
+    lead: "Les guides et vidéos arrivent avec l'ouverture du service. Ils seront aussi disponibles dans le logiciel.",
     topics: [
       "Installer Stivea Vet pas à pas",
       "Lancer et suivre un premier suivi",
@@ -574,17 +573,17 @@ export const fr = {
   },
 
   trial: {
-    title: "Commencer l'essai pilote",
-    lead: "{months} mois à {price} HT par mois, sur vos vrais suivis, sans engagement.",
+    title: "Démarrer Stivea Vet",
+    lead: "À partir de {price} HT par mois, sur vos vrais suivis, sans engagement.",
     stepsTitle: "Comment ça se passe",
     steps: [
-      "Vous créez le cabinet et votre compte de vétérinaire administrateur, et choisissez la formule qui suivra l'essai.",
+      "Vous créez le cabinet et votre compte de vétérinaire administrateur, et choisissez votre formule : Starter, Pro ou Premium.",
       "Vous acceptez les conditions d'utilisation et confirmez être autorisé à souscrire au nom du cabinet.",
       "Vous arrivez directement dans l'installation guidée : WhatsApp, dr.veto, horaires, équipe, protocoles, mandat de prélèvement et premier suivi test.",
     ],
     reassuranceTitle: "Bon à savoir",
     reassurance: [
-      "L'essai est résiliable à tout moment.",
+      "L'abonnement est résiliable chaque mois.",
       "Aucun engagement annuel n'est créé automatiquement pendant les six premiers mois.",
       "Un suivi en cours n'est jamais interrompu, même en cas de résiliation.",
     ],
@@ -662,8 +661,8 @@ export const fr = {
         body: "Le vétérinaire garde toujours la décision médicale. Le cabinet est responsable de ses protocoles, de ses signes d'alerte et de ses consignes d'urgence. Numa et Stive ne posent aucun diagnostic et ne modifient aucun traitement.",
       },
       {
-        title: "Essai, formules et paiement",
-        body: "L'essai pilote dure 2 mois et reste résiliable à tout moment. Les prix sont hors taxes, par cabinet, prélevés chaque mois. Aucun engagement annuel n'est créé automatiquement pendant les six premiers mois.",
+        title: "Formules et paiement",
+        body: "L'abonnement est mensuel et résiliable à tout moment. Les prix sont hors taxes, par cabinet, prélevés chaque mois. L'engagement annuel n'existe que sur votre demande, à partir du 3e mois : il n'est jamais créé automatiquement.",
       },
       {
         title: "Impayé et résiliation",
@@ -689,7 +688,7 @@ export const fr = {
       },
       {
         title: "Demandes de démo",
-        body: "Pour la démo, nous conservons votre adresse e-mail, le nom du cabinet, le nombre de vétérinaires et la langue, pendant un an au maximum. Ils servent à ouvrir la démo et à envoyer cinq e-mails sur deux semaines, auxquels vous pouvez vous désinscrire à tout moment. La séquence s'arrête dès le démarrage d'un essai.",
+        body: "Pour la démo, nous conservons votre adresse e-mail, le nom du cabinet, le nombre de vétérinaires et la langue, pendant un an au maximum. Ils servent à ouvrir la démo et à envoyer cinq e-mails sur deux semaines, auxquels vous pouvez vous désinscrire à tout moment. La séquence s'arrête dès la création d'un cabinet.",
       },
       {
         title: "Vos droits",

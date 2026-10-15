@@ -52,6 +52,11 @@ export const animals = pgTable("animals", {
   externalRef: text("external_ref"),
   createdAt,
   updatedAt,
+  /** Migration 0021 : registre des animaux saisi par le cabinet. */
+  sex: text("sex").$type<"female" | "male">(),
+  neutered: boolean("neutered"),
+  notes: text("notes"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
 });
 
 export const owners = pgTable("owners", {
@@ -73,6 +78,8 @@ export const ownerContacts = pgTable("owner_contacts", {
   ownerId: uuid("owner_id").notNull(),
   kind: contactKind("kind").notNull(),
   value: text("value").notNull(),
+  /** Migration 0017 : identifiant WhatsApp propre au cabinet, quand le webhook l'a donné. */
+  whatsappUserId: text("whatsapp_user_id"),
   createdAt,
 });
 
@@ -162,6 +169,9 @@ export const followupContacts = pgTable("followup_contacts", {
   leftGroupAt: timestamp("left_group_at", { withTimezone: true }),
   /** Migration 0014 : STOP écrit dans le groupe, clarification en cours. */
   stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
+  /** Migration 0017 : accord recueilli au cabinet pour être contacté sur WhatsApp. */
+  whatsappOptinAt: timestamp("whatsapp_optin_at", { withTimezone: true }),
+  whatsappOptinByMembershipId: uuid("whatsapp_optin_by_membership_id"),
   createdAt,
   updatedAt,
 });

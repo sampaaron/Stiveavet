@@ -9,7 +9,7 @@ import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
-import { attempt } from "../domain-messages";
+import { attempt, invalidRequest } from "../domain-messages";
 
 const role = z.enum(["admin_vet", "vet", "assistant"]);
 
@@ -37,12 +37,6 @@ const deactivateInput = z.object({
   membershipId: z.uuid(),
   reassignTo: z.union([z.uuid(), z.literal("")]),
 });
-
-/** Refus d'une entrée mal formée (identifiant manipulé, page périmée). */
-async function invalid(): Promise<ActionState> {
-  const { t } = await appText();
-  return { error: t.common.invalidRequest };
-}
 
 type ValidationCode = Exclude<
   keyof AppDictionary["team"]["validation"],
@@ -99,7 +93,7 @@ export async function revokeInvitationAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
@@ -119,7 +113,7 @@ export async function setPermissionsAction(
       .getAll("permissions")
       .filter((value) => typeof value === "string"),
   });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
@@ -144,7 +138,7 @@ export async function changeRoleAction(
     membershipId: text(form, "membershipId"),
     role: text(form, "role"),
   });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
@@ -165,7 +159,7 @@ export async function deactivateAction(
     membershipId: text(form, "membershipId"),
     reassignTo: text(form, "reassignTo"),
   });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(
@@ -187,7 +181,7 @@ export async function reactivateAction(
   form: FormData,
 ): Promise<ActionState> {
   const parsed = idInput.safeParse({ id: text(form, "id") });
-  if (!parsed.success) return invalid();
+  if (!parsed.success) return invalidRequest();
   const [context, { t }] = await Promise.all([memberContext(), appText()]);
   return finish(
     await attempt(

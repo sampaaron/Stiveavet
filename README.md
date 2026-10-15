@@ -55,6 +55,7 @@ pnpm test:integration    # PostgreSQL réel ; requiert TEST_DATABASE_ADMIN_URL
 
 ## Organisation
 
-- `src/app` : routes Next.js ; `src/domains` : logique métier par domaine ; `src/server` : sécurité, configuration, accès aux données ; `src/adapters` : connecteurs externes simulés.
-- `src/i18n` : langues, adresses et textes du site public (français de référence, anglais typé sur le français).
+- `src/app` : routes Next.js ; `src/domains` : logique métier par domaine ; `src/server` : sécurité, configuration, accès aux données ; `src/adapters` : connecteurs externes (simulés en local).
+- `src/i18n` : dictionnaires (français de référence, anglais typé sur le français).
+- `docs/DEVELOPPEMENT.md` : **guide du développeur** (carte du code, trajet d'une requête, file de tâches, migrations, débogage).
 - `docs/adr` : décisions d'architecture ; `docs/securite` : règles de sécurité.

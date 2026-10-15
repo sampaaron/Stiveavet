@@ -28,7 +28,7 @@ const placeholders = (text: string) =>
   [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
 // Textes volontairement vides en français : notes propres à l'anglais.
-const ENGLISH_ONLY = new Set(["common.appInFrench", "demo.space.languageNote"]);
+const ENGLISH_ONLY = new Set(["demo.space.languageNote"]);
 
 describe("dictionnaires du site", () => {
   it("le français et l'anglais ont exactement la même structure", () => {

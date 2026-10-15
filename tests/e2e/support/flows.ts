@@ -7,6 +7,8 @@ import type { Page } from "@playwright/test";
 import { securityCode } from "./mailpit";
 
 export async function expectAccessible(page: Page) {
+  // Après une navigation côté client, le titre arrive avec les métadonnées, un peu après.
+  await expect(page).toHaveTitle(/\S/);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();

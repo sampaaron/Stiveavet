@@ -15,39 +15,49 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
-import type { AuditMetadata } from "@/domains/audit/schema";
+import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
-import { VET_ROLES } from "@/domains/equipe/permissions";
+import type { PermissionKey } from "@/domains/equipe/permissions";
+import { VET_ROLES, isPermissionKey } from "@/domains/equipe/permissions";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { loadFollowup } from "@/domains/suivis/lancement";
 import { followupAccess } from "@/domains/suivis/policies";
 import { messageWindows } from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
+import type { JobErrorCode } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
-import type { JobHandler } from "@/domains/taches/worker";
+import type { DeadJobHandler, JobHandler } from "@/domains/taches/worker";
+import type { WhatsAppProvider } from "@/domains/whatsapp/connexion";
+import { renderTemplate } from "@/domains/whatsapp/modeles";
+import { alertPhoneInput, maskPhone } from "@/domains/whatsapp/numero";
 import {
   acknowledgements,
   alerts,
   animals,
-  auditEvents,
   emergencyContacts,
   emergencyInstructions,
   followupAlertRules,
   followupShares,
   followups,
+  membershipPermissions,
   memberships,
   notificationDeliveries,
   onCallSchedules,
   organizationSettings,
+  organizations,
   scheduledJobs,
   triageEvents,
   users,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
+import {
+  auditFollowup as audit,
+  recordAudit,
+  systemAuthor,
+} from "@/domains/audit/journal";
 
 import { triageReason, triageReasonColumns, triageRuleJoin } from "./reason";
 import type { TriageReason } from "./reason";
@@ -88,11 +98,28 @@ export type AlertView = {
   escalatedAt: Date | null;
   acknowledgedBy: string | null;
   acknowledgedAt: Date | null;
+  resolvedBy: string | null;
+  resolvedAt: Date | null;
   canAcknowledge: boolean;
+  /** Vétérinaires à qui confier l'alerte (accès clinique au dossier), destinataire compris. */
+  assignees: { id: string; name: string }[];
+  targetMembershipId: string;
 };
+
+/** Alertes en cours, ou historique des alertes closes. */
+export type AlertListView = "open" | "resolved";
 
 const uuid = z.uuid();
 const alertPayload = z.object({ alertId: z.uuid() });
+const deliveryPayload = z.object({ deliveryId: z.uuid() });
+
+const ALERT_DELIVERY_JOB = "alert.deliver";
+
+/**
+ * Numéro fictif des alertes simulées, quand le vétérinaire n'a pas encore donné le sien :
+ * en simulation, rien ne sort. Avec WhatsApp réel, l'alerte exige son numéro.
+ */
+const SIMULATED_ALERT_PHONE = "+33600000000";
 
 /** Vétérinaire prévenu en premier : responsable aux heures du cabinet, sinon la garde. */
 async function recipientFor(
@@ -261,9 +288,9 @@ export async function triageOwnerMessage(
     .returning({ id: alerts.id });
   if (!alert) throw new Error("Alerte non enregistrée");
   // Traçabilité sans contenu clinique : le niveau et l'identifiant suffisent.
-  await auditSystem(
+  await audit(
     tx,
-    input.organizationId,
+    systemAuthor(input.organizationId),
     "alert.raised",
     input.followupId,
     {
@@ -324,33 +351,32 @@ export async function emergencyGuidance(
   };
 }
 
-async function auditSystem(
-  tx: TenantTransaction,
-  organizationId: string,
-  action: string,
-  followupId: string,
-  metadata: AuditMetadata = {},
-) {
-  await tx.insert(auditEvents).values({
-    organizationId,
-    actorMembershipId: null,
-    action,
-    targetType: "followup",
-    targetId: followupId,
-    metadata,
-  });
-}
+/**
+ * Tâches `alert.notify`, `alert.escalate` et `alert.deliver`. Chaque alerte WhatsApp à un
+ * vétérinaire est une livraison, envoyée par sa propre tâche (un seul appel au prestataire
+ * par tentative, ADR 0024) : le modèle `alerte_urgente` ou `alerte_escalade`, sans aucun
+ * détail médical, au numéro professionnel réglé dans son profil.
+ */
+/** Motif d'échec d'une livraison d'alerte selon le code de la tâche abandonnée. */
+const DELIVERY_FAILURES: Partial<Record<JobErrorCode, string>> = {
+  target_missing: "no_alert_phone",
+  recipient_unreachable: "whatsapp_unreachable",
+  provider_rejected: "whatsapp_rejected",
+  provider_account: "whatsapp_account",
+};
 
-/** Tâches `alert.notify` et `alert.escalate`. */
 export function alertHandlers(deps: {
-  whatsapp: WhatsAppConnector;
+  whatsapp: WhatsAppProvider;
   clock?: () => Date;
-}): Record<string, JobHandler> {
+}): {
+  handlers: Record<string, JobHandler>;
+  dead: Record<string, DeadJobHandler>;
+} {
   const { whatsapp, clock = () => new Date() } = deps;
 
   async function notify(
     tx: TenantTransaction,
-    alert: { id: string; organizationId: string },
+    alert: { id: string; organizationId: string; followupId: string },
     membershipId: string,
     channel: "whatsapp" | "desktop",
     kind: "urgent" | "escalation",
@@ -379,23 +405,131 @@ export function alertHandlers(deps: {
       .from(notificationDeliveries)
       .where(eq(notificationDeliveries.idempotencyKey, key));
     if (!delivery || delivery.status !== "pending") return;
+    if (channel === "whatsapp") {
+      await enqueue(tx, {
+        organizationId: alert.organizationId,
+        kind: ALERT_DELIVERY_JOB,
+        idempotencyKey: `alert-deliver:${delivery.id}`,
+        // Tout de suite, quelle que soit l'heure métier de l'alerte.
+        runAt: new Date(),
+        followupId: alert.followupId,
+        payload: { deliveryId: delivery.id, kind },
+      });
+      return;
+    }
     // Sur l'ordinateur : l'alerte s'affiche dans Stivea Vet, rien ne sort.
-    let externalRef: string | null = null;
-    if (channel === "whatsapp")
-      try {
-        ({ externalRef } = await whatsapp.sendStaffAlert({
-          membershipId,
-          kind,
-          idempotencyKey: key,
-        }));
-      } catch {
+    await tx
+      .update(notificationDeliveries)
+      .set({ status: "sent", sentAt: clock() })
+      .where(eq(notificationDeliveries.id, delivery.id));
+  }
+
+  async function markFailed(
+    tx: TenantTransaction,
+    deliveryId: string,
+    errorCode: string,
+  ) {
+    await tx
+      .update(notificationDeliveries)
+      .set({ status: "failed", failedAt: clock(), errorCode })
+      .where(
+        and(
+          eq(notificationDeliveries.id, deliveryId),
+          eq(notificationDeliveries.status, "pending"),
+        ),
+      );
+  }
+
+  const deliverHandler: JobHandler = async ({ tx, job }) => {
+    const parsed = deliveryPayload
+      .extend({ kind: z.enum(["urgent", "escalation"]) })
+      .safeParse(job.payload);
+    if (!parsed.success) throw new JobError("invalid_payload");
+    const [delivery] = await tx
+      .select({
+        id: notificationDeliveries.id,
+        status: notificationDeliveries.status,
+        alertStatus: alerts.status,
+        phone: memberships.alertPhone,
+        locale: users.uiLocale,
+        practiceName: organizations.name,
+      })
+      .from(notificationDeliveries)
+      .innerJoin(alerts, eq(alerts.id, notificationDeliveries.alertId))
+      .innerJoin(
+        memberships,
+        eq(memberships.id, notificationDeliveries.recipientMembershipId),
+      )
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .innerJoin(
+        organizations,
+        eq(organizations.id, notificationDeliveries.organizationId),
+      )
+      .where(eq(notificationDeliveries.id, parsed.data.deliveryId))
+      .for("update", { of: notificationDeliveries });
+    if (!delivery) throw new JobError("target_missing");
+    if (delivery.status !== "pending") return;
+    // Close entre-temps : l'alerte n'a plus lieu d'être envoyée.
+    if (delivery.alertStatus === "resolved") {
+      await markFailed(tx, delivery.id, "alert_closed");
+      return;
+    }
+    const phone =
+      delivery.phone ?? (whatsapp.live ? null : SIMULATED_ALERT_PHONE);
+    // Aucun numéro d'alerte choisi : échec visible tout de suite, l'alerte reste dans Stivea Vet.
+    if (!phone) throw new JobError("target_missing", { final: true });
+    const alert = renderTemplate(
+      parsed.data.kind === "urgent" ? "alerte_urgente" : "alerte_escalade",
+      delivery.locale,
+      { practice: delivery.practiceName },
+    );
+    let externalRef: string;
+    try {
+      const connector = await whatsapp.connectorFor(tx);
+      ({ externalRef } = await connector.send({
+        to: { kind: "phone", phone },
+        content: {
+          kind: "template",
+          key: alert.key,
+          language: delivery.locale,
+          params: alert.params,
+        },
+        reference: delivery.id,
+      }));
+    } catch (error) {
+      if (!(error instanceof WhatsAppSendError))
         throw new JobError("provider_unavailable");
+      switch (error.failure) {
+        case "retry":
+        case "unknown":
+          throw new JobError("provider_unavailable");
+        case "account":
+          throw new JobError("provider_account", { final: true });
+        case "unreachable":
+          throw new JobError("recipient_unreachable", { final: true });
+        default:
+          throw new JobError("provider_rejected", { final: true });
       }
+    }
     await tx
       .update(notificationDeliveries)
       .set({ status: "sent", sentAt: clock(), externalRef })
       .where(eq(notificationDeliveries.id, delivery.id));
-  }
+  };
+
+  /**
+   * Alerte abandonnée : la livraison est marquée en échec ; l'alerte reste dans Stivea Vet.
+   * Une tâche qui échoue annule ce qu'elle a écrit : le motif vient du code de la tâche.
+   */
+  const deliverDead: DeadJobHandler = async ({ tx, job, code }) => {
+    const parsed = deliveryPayload.safeParse(job.payload);
+    if (!parsed.success) return;
+    await markFailed(
+      tx,
+      parsed.data.deliveryId,
+      DELIVERY_FAILURES[code] ?? "whatsapp_failed",
+    );
+  };
 
   async function loadAlert(tx: TenantTransaction, payload: unknown) {
     const parsed = alertPayload.safeParse(payload);
@@ -454,9 +588,9 @@ export function alertHandlers(deps: {
       );
     for (const other of others)
       await notify(tx, alert, other.id, "whatsapp", "escalation");
-    await auditSystem(
+    await audit(
       tx,
-      alert.organizationId,
+      systemAuthor(alert.organizationId),
       "alert.escalated",
       alert.followupId,
       {
@@ -466,33 +600,18 @@ export function alertHandlers(deps: {
     );
   };
 
-  return { "alert.notify": notifyHandler, "alert.escalate": escalateHandler };
+  return {
+    handlers: {
+      "alert.notify": notifyHandler,
+      "alert.escalate": escalateHandler,
+      [ALERT_DELIVERY_JOB]: deliverHandler,
+    },
+    dead: { [ALERT_DELIVERY_JOB]: deliverDead },
+  };
 }
 
 export function alertsService(db: Database) {
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
-
-  async function audit(
-    tx: TenantTransaction,
-    actor: Actor,
-    action: string,
-    followupId: string,
-    metadata: AuditMetadata,
-  ) {
-    await tx.insert(auditEvents).values({
-      organizationId: actor.organizationId,
-      actorMembershipId: actor.membershipId,
-      action,
-      targetType: "followup",
-      targetId: followupId,
-      metadata,
-    });
-  }
+  const run = tenantRunner(db);
 
   /** Alerte visible et modifiable par un vétérinaire ayant l'accès clinique au dossier. */
   async function lockAlert(
@@ -539,10 +658,64 @@ export function alertsService(db: Database) {
       );
   }
 
+  /** Vétérinaires actifs du cabinet et leurs droits, pour choisir à qui confier une alerte. */
+  async function activeVets(tx: TenantTransaction) {
+    const rows = await tx
+      .select({
+        id: memberships.id,
+        name: users.displayName,
+        permission: membershipPermissions.permission,
+      })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(
+        membershipPermissions,
+        eq(membershipPermissions.membershipId, memberships.id),
+      )
+      .where(
+        and(
+          inArray(memberships.role, [...VET_ROLES]),
+          isNull(memberships.deactivatedAt),
+        ),
+      )
+      .orderBy(asc(users.displayName));
+    const vets = new Map<
+      string,
+      { id: string; name: string; permissions: Set<PermissionKey> }
+    >();
+    for (const row of rows) {
+      const vet = vets.get(row.id) ?? {
+        id: row.id,
+        name: row.name,
+        permissions: new Set<PermissionKey>(),
+      };
+      if (row.permission && isPermissionKey(row.permission))
+        vet.permissions.add(row.permission);
+      vets.set(row.id, vet);
+    }
+    return [...vets.values()];
+  }
+
+  /** Seul un vétérinaire qui lit le dossier en clinique peut recevoir l'alerte. */
+  function assigneesOf(
+    vets: Awaited<ReturnType<typeof activeVets>>,
+    facts: Parameters<typeof followupAccess>[1],
+  ) {
+    return vets
+      .filter(
+        (vet) =>
+          followupAccess(
+            { membershipId: vet.id, permissions: vet.permissions },
+            facts,
+          ) === "clinical",
+      )
+      .map(({ id, name }) => ({ id, name }));
+  }
+
   async function listAlerts(
     tx: TenantTransaction,
     actor: Actor,
-    filter: { followupId?: string; openOnly: boolean },
+    filter: { followupId?: string; view: AlertListView | "all" },
   ): Promise<AlertView[]> {
     const rows = await tx
       .select({
@@ -556,6 +729,9 @@ export function alertsService(db: Database) {
         createdAt: alerts.createdAt,
         escalateAt: alerts.escalateAt,
         escalatedAt: alerts.escalatedAt,
+        resolvedAt: alerts.resolvedAt,
+        resolvedByMembershipId: alerts.resolvedByMembershipId,
+        targetMembershipId: alerts.targetMembershipId,
         responsibleMembershipId: followups.responsibleMembershipId,
         isPrivate: followups.isPrivate,
       })
@@ -571,10 +747,17 @@ export function alertsService(db: Database) {
           filter.followupId
             ? eq(alerts.followupId, filter.followupId)
             : undefined,
-          filter.openOnly ? ne(alerts.status, "resolved") : undefined,
+          filter.view === "open" ? ne(alerts.status, "resolved") : undefined,
+          filter.view === "resolved"
+            ? eq(alerts.status, "resolved")
+            : undefined,
         ),
       )
-      .orderBy(desc(alerts.createdAt))
+      .orderBy(
+        filter.view === "resolved"
+          ? desc(alerts.resolvedAt)
+          : desc(alerts.createdAt),
+      )
       .limit(100);
     if (!rows.length) return [];
     const now = new Date();
@@ -614,19 +797,36 @@ export function alertsService(db: Database) {
       )
       .orderBy(asc(acknowledgements.acknowledgedAt));
     const isVet = VET_ROLES.has(actor.role);
+    const vets = await activeVets(tx);
+    const resolverIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          row.resolvedByMembershipId ? [row.resolvedByMembershipId] : [],
+        ),
+      ),
+    ];
+    const resolvers = new Map(
+      (resolverIds.length
+        ? await tx
+            .select({ id: memberships.id, name: users.displayName })
+            .from(memberships)
+            .innerJoin(users, eq(users.id, memberships.userId))
+            .where(inArray(memberships.id, resolverIds))
+        : []
+      ).map((row) => [row.id, row.name]),
+    );
+    const factsOf = (row: (typeof rows)[number]) => ({
+      responsibleMembershipId: row.responsibleMembershipId,
+      isPrivate: row.isPrivate,
+      sharedWith: shares
+        .filter((share) => share.followupId === row.followupId)
+        .map((share) => share.membershipId),
+    });
     return rows
-      .filter(
-        (row) =>
-          followupAccess(actor, {
-            responsibleMembershipId: row.responsibleMembershipId,
-            isPrivate: row.isPrivate,
-            sharedWith: shares
-              .filter((share) => share.followupId === row.followupId)
-              .map((share) => share.membershipId),
-          }) === "clinical",
-      )
+      .filter((row) => followupAccess(actor, factsOf(row)) === "clinical")
       .map((row) => {
         const ack = acks.find((entry) => entry.alertId === row.id);
+        const open = row.status !== "resolved";
         return {
           id: row.id,
           followupId: row.followupId,
@@ -640,16 +840,63 @@ export function alertsService(db: Database) {
           escalatedAt: row.escalatedAt,
           acknowledgedBy: ack?.name ?? null,
           acknowledgedAt: ack?.at ?? null,
-          canAcknowledge: isVet && row.status !== "resolved",
+          resolvedBy: row.resolvedByMembershipId
+            ? (resolvers.get(row.resolvedByMembershipId) ?? null)
+            : null,
+          resolvedAt: row.resolvedAt,
+          canAcknowledge: isVet && open,
+          assignees: isVet && open ? assigneesOf(vets, factsOf(row)) : [],
+          targetMembershipId: row.targetMembershipId,
         };
       });
   }
 
   return {
+    /** Numéro d'alerte WhatsApp du vétérinaire connecté, masqué ; null s'il n'en a pas. */
+    async myAlertPhone(actor: Actor): Promise<string | null> {
+      if (!VET_ROLES.has(actor.role)) return null;
+      return run(actor, async (tx) => {
+        const [row] = await tx
+          .select({ phone: memberships.alertPhone })
+          .from(memberships)
+          .where(eq(memberships.id, actor.membershipId));
+        return row?.phone ? maskPhone(row.phone) : null;
+      });
+    },
+
+    /**
+     * Chaque vétérinaire choisit son numéro WhatsApp professionnel pour les alertes urgentes
+     * (cahier des charges §4) ; vide, il le retire. Le numéro n'entre pas dans le journal.
+     */
+    async setAlertPhone(actor: Actor, raw: unknown) {
+      if (!VET_ROLES.has(actor.role)) throw new DomainError("forbidden");
+      const parsed = alertPhoneInput.safeParse(raw);
+      if (!parsed.success) throw new DomainError("invalid_target");
+      await run(actor, async (tx) => {
+        await tx
+          .update(memberships)
+          .set({ alertPhone: parsed.data })
+          .where(eq(memberships.id, actor.membershipId));
+        await recordAudit(
+          tx,
+          actor,
+          "alert_phone.changed",
+          { type: "membership", id: actor.membershipId },
+          { removed: parsed.data === null },
+        );
+      });
+    },
+
     /** Alertes non closes des dossiers que l'acteur peut lire en clinique. */
     async open(actor: Actor): Promise<AlertView[]> {
       if (!actor.permissions.has("clinical.read")) return [];
-      return run(actor, (tx) => listAlerts(tx, actor, { openOnly: true }));
+      return run(actor, (tx) => listAlerts(tx, actor, { view: "open" }));
+    },
+
+    /** Historique : les 100 dernières alertes closes, avec qui les a closes. */
+    async history(actor: Actor): Promise<AlertView[]> {
+      if (!actor.permissions.has("clinical.read")) return [];
+      return run(actor, (tx) => listAlerts(tx, actor, { view: "resolved" }));
     },
 
     /** Alertes d'un dossier, closes comprises. */
@@ -658,7 +905,7 @@ export function alertsService(db: Database) {
       return run(actor, async (tx) => {
         const followup = await loadFollowup(tx, actor, followupId);
         if (followup.access !== "clinical") throw new DomainError("not_found");
-        return listAlerts(tx, actor, { followupId, openOnly: false });
+        return listAlerts(tx, actor, { followupId, view: "all" });
       });
     },
 
@@ -678,6 +925,44 @@ export function alertsService(db: Database) {
           alertId: alert.id,
           level: alert.level,
           escalated: alert.status === "escalated",
+        });
+        return alert.followupId;
+      });
+    },
+
+    /**
+     * Confier l'alerte à un autre vétérinaire qui lit le dossier en clinique. Il est prévenu
+     * comme le premier destinataire (WhatsApp pour une urgence) ; l'escalade prévue continue.
+     */
+    async reassign(actor: Actor, alertId: string, membershipId: string) {
+      assertPermission(actor, "clinical.read");
+      if (!uuid.safeParse(membershipId).success)
+        throw new DomainError("invalid_target");
+      return run(actor, async (tx) => {
+        const alert = await lockAlert(tx, actor, alertId);
+        if (alert.status === "resolved")
+          throw new DomainError("invalid_transition");
+        if (alert.targetMembershipId === membershipId) return alert.followupId;
+        const followup = await loadFollowup(tx, actor, alert.followupId);
+        const assignees = assigneesOf(await activeVets(tx), followup);
+        if (!assignees.some((vet) => vet.id === membershipId))
+          throw new DomainError("invalid_target");
+        await tx
+          .update(alerts)
+          .set({ targetMembershipId: membershipId })
+          .where(eq(alerts.id, alert.id));
+        await enqueue(tx, {
+          organizationId: actor.organizationId,
+          kind: "alert.notify",
+          idempotencyKey: `alert:${alert.id}:notify:${membershipId}`,
+          runAt: new Date(),
+          followupId: alert.followupId,
+          payload: { alertId: alert.id },
+        });
+        await audit(tx, actor, "alert.reassigned", alert.followupId, {
+          alertId: alert.id,
+          from: alert.targetMembershipId,
+          to: membershipId,
         });
         return alert.followupId;
       });

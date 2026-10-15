@@ -76,4 +76,3 @@ export const ROLE_LABELS: Record<MemberRole, string> = {
 
 /** Rôles comptés dans la limite de 3 vétérinaires par cabinet (cahier des charges §1). */
 export const VET_ROLES: ReadonlySet<MemberRole> = new Set(["admin_vet", "vet"]);
-export const MAX_VETS_PER_ORGANIZATION = 3;

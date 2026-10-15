@@ -17,7 +17,10 @@ import type { EnqueueInput } from "./queue";
  * 1. publie les événements de l'outbox en tâches (idempotent) ;
  * 2. prend les tâches dues qu'il sait exécuter (`jobs.claim`, jamais deux fois la même) ;
  * 3. exécute chacune dans la transaction de son cabinet, puis la marque réussie dans cette
- *    même transaction ; en cas d'échec, programme la tentative suivante ou la met en échec.
+ *    même transaction ; en cas d'échec, programme la tentative suivante ou la met en échec
+ *    (tout de suite pour un échec définitif), et prévient l'exécutant d'échec du type ;
+ * 4. reprend les tâches devenues dues entre-temps (un envoi inscrit par un message), en
+ *    quelques tours au plus.
  * Les journaux du worker ne contiennent que des identifiants, des types et des codes.
  */
 
@@ -47,6 +50,16 @@ export type OutboxEvent = {
   createdAt: Date;
 };
 
+/**
+ * Appelé dans la transaction du cabinet quand une tâche passe en échec (après la dernière
+ * tentative ou un échec définitif) : par exemple, prévenir le vétérinaire (§15).
+ */
+export type DeadJobHandler = (context: {
+  tx: TenantTransaction;
+  job: ClaimedJob;
+  code: JobErrorCode;
+}) => Promise<void>;
+
 /** Tâches à créer pour un événement ; la clé d'idempotence est dérivée de l'événement. */
 export type OutboxRoute = (
   event: OutboxEvent,
@@ -59,10 +72,13 @@ export type WorkerOptions = {
   db: Database;
   workerId: string;
   handlers: Readonly<Record<string, JobHandler>>;
+  deadHandlers?: Readonly<Record<string, DeadJobHandler>>;
   routes?: Readonly<Record<string, OutboxRoute>>;
   planners?: readonly JobPlanner[];
   batchSize?: number;
   leaseSeconds?: number;
+  /** Tours de prise par passage : une tâche inscrite par une autre part dans le même passage. */
+  rounds?: number;
 };
 
 export type PassResult = {
@@ -98,14 +114,20 @@ function errorCodeOf(error: unknown): JobErrorCode {
   return error instanceof JobError ? error.code : "unexpected_error";
 }
 
+function isFinal(error: unknown): boolean {
+  return error instanceof JobError && error.final;
+}
+
 export function createWorker(options: WorkerOptions) {
   const {
     db,
     handlers,
+    deadHandlers = {},
     routes = {},
     planners = [],
     batchSize = 20,
     leaseSeconds = 300,
+    rounds = 5,
   } = options;
   const workerId = workerIdSchema.parse(options.workerId);
   const kinds = Object.keys(handlers);
@@ -197,10 +219,25 @@ export function createWorker(options: WorkerOptions) {
         db,
         { organizationId: job.organizationId },
         async (tx) => {
-          const result = await tx.execute<{ status: string | null }>(
-            sql`SELECT jobs.fail(${job.id}, ${workerId}, ${job.attempt}, ${code}) AS status`,
-          );
-          return result.rows[0]?.status ?? null;
+          const result = isFinal(error)
+            ? await tx.execute<{ status: string | null }>(
+                sql`SELECT CASE WHEN jobs.give_up(${job.id}, ${workerId}, ${job.attempt}, ${code}) THEN 'dead' END AS status`,
+              )
+            : await tx.execute<{ status: string | null }>(
+                sql`SELECT jobs.fail(${job.id}, ${workerId}, ${job.attempt}, ${code}) AS status`,
+              );
+          const next = result.rows[0]?.status ?? null;
+          const onDead = deadHandlers[job.kind];
+          if (next === "dead" && onDead) {
+            // Un exécutant d'échec en panne n'empêche pas la tâche de passer en échec.
+            await tx.execute(sql`SAVEPOINT dead_job_handler`);
+            try {
+              await onDead({ tx, job, code });
+            } catch {
+              await tx.execute(sql`ROLLBACK TO SAVEPOINT dead_job_handler`);
+            }
+          }
+          return next;
         },
       );
       if (status === "pending") return "retried";
@@ -223,7 +260,11 @@ export function createWorker(options: WorkerOptions) {
         dead: 0,
         lost: 0,
       };
-      for (const job of await claim()) result[await run(job)] += 1;
+      for (let round = 0; round < rounds; round += 1) {
+        const batch = await claim();
+        if (batch.length === 0) break;
+        for (const job of batch) result[await run(job)] += 1;
+      }
       return result;
     },
   };

@@ -52,9 +52,7 @@ test.describe("protocoles du cabinet des Tilleuls (Claire)", () => {
       }),
     ).toBeVisible();
     // Au moins le dossier de Caramel (d'autres tests lancent des suivis avec elle).
-    await expect(
-      page.getByText(/\d+ suivi\(s\) lancé\(s\) avec elle/),
-    ).toBeVisible();
+    await expect(page.getByText(/\d+ suivis? lancés? avec elle/)).toBeVisible();
   });
 });
 

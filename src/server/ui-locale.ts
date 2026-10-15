@@ -32,7 +32,7 @@ export async function setUiLocaleCookie(locale: Locale): Promise<void> {
 }
 
 /** Langue enregistrée dans le compte de la personne (lue sous RLS). */
-export async function storedUiLocale(person: Person): Promise<Locale> {
+async function storedUiLocale(person: Person): Promise<Locale> {
   return withTenant(appDatabase(), person, async (tx) => {
     const [row] = await tx
       .select({ uiLocale: users.uiLocale })

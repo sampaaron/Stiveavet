@@ -1,5 +1,9 @@
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const auth = {
+  /** Panneau de marque des écrans d'accès (grand écran). */
+  brandTitle: "Le suivi post-consultation, sans alourdir vos journées.",
+  brandBody:
+    "Numa, assistante IA, prend des nouvelles des animaux sur WhatsApp et vous signale ce qui compte. La décision médicale reste toujours la vôtre.",
   /** Mention sous la carte, uniquement en environnement local. */
   localNotice:
     "Environnement local : données fictives uniquement. Les e-mails sont capturés par Mailpit et ne quittent pas la machine.",
@@ -81,12 +85,11 @@ export const auth = {
     haveAccount: "Déjà un compte ?",
     signIn: "Se connecter",
     plan: {
-      legend: "Formule après l'essai",
-      help: (price: string, months: number) =>
-        `Essai pilote à ${price} HT par mois pendant ${months} mois, sans engagement. Ensuite, la formule choisie, au mois : l'engagement annuel n'est jamais automatique.`,
+      legend: "Votre offre",
+      help: "Au mois et sans engagement : vous changez d'offre ou résiliez à tout moment. L'engagement annuel, moins cher, vous est proposé après un mois et demi ; il n'est jamais automatique.",
       option: (name: string, price: string) => `${name} · ${price} HT par mois`,
-      details: (maxVets: number, annualPrice: string) =>
-        `${maxVets === 1 ? "1 vétérinaire" : `Jusqu'à ${maxVets} vétérinaires`}. Avec engagement annuel : ${annualPrice} HT par mois.`,
+      details: (summary: string, annualPrice: string) =>
+        `${summary}. Avec engagement annuel : ${annualPrice} HT par mois.`,
     },
     /** Phrase des conditions découpée autour de ses deux liens. */
     consents: {
@@ -129,7 +132,7 @@ export const auth = {
     emailRegistered:
       "Cette adresse a déjà un compte Stivea Vet. Demandez au cabinet de vous inviter avec une autre adresse.",
     vetLimit:
-      "Le cabinet a atteint le nombre de vétérinaires de sa formule. Contactez la personne qui vous a invité.",
+      "Le cabinet a atteint le nombre de places de son offre pour ce rôle. Contactez la personne qui vous a invité.",
   },
   /** Codes des schémas de `src/domains/auth/validators.ts`. */
   validation: {
@@ -143,7 +146,7 @@ export const auth = {
     organization_name_long: "Nom du cabinet trop long.",
     display_name_required: "Indiquez votre nom.",
     display_name_long: "Nom trop long.",
-    plan_required: "Choisissez la formule qui suivra l'essai.",
+    plan_required: "Choisissez votre offre.",
     terms_required: "Acceptez les conditions d'utilisation pour continuer.",
     authority_required:
       "Confirmez que vous êtes autorisé à souscrire au nom du cabinet.",

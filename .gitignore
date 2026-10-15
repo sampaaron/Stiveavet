@@ -52,3 +52,8 @@ tests/e2e/.auth/
 
 # Stockage objet local (photos, vocaux, captures) : jamais versionné
 /.data/
+
+# Terraform : état, variables locales et fournisseurs téléchargés
+/infra/**/.terraform/
+/infra/**/*.tfstate*
+/infra/**/*.tfvars

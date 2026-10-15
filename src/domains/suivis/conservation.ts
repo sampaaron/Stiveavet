@@ -1,11 +1,12 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { recordAudit } from "@/domains/audit/journal";
 import { z } from "zod";
 
 import type { ObjectStorage } from "@/adapters/object-storage";
 import { JobError } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
-import { attachments, auditEvents, followups } from "@/server/db/schema";
+import { animals, attachments, followups } from "@/server/db/schema";
 import type { Database } from "@/server/db/tenant";
 
 /**
@@ -20,10 +21,11 @@ import type { Database } from "@/server/db/tenant";
  */
 
 export const SWEEP_KIND = "retention.sweep";
-export const FOLLOWUP_PURGE_KIND = "followup.purge";
+const FOLLOWUP_PURGE_KIND = "followup.purge";
 
 /** Suivis traités par balayage ; le suivant reprend le reste. */
 const SWEEP_BATCH = 200;
+const IDLE_ANIMAL_RETENTION = "15 months";
 
 const purgePayload = z.object({ followupId: z.uuid() });
 
@@ -57,6 +59,30 @@ export function retentionHandlers(deps: {
         followupId: null,
         payload: { followupId: id },
       });
+    // Animaux du registre restés sans suivi (migration 0021) : effacés quinze mois après leur
+    // saisie, comme un suivi jamais terminé. La fonction revérifie tout avec son horloge.
+    const idle = await tx
+      .select({ id: animals.id })
+      .from(animals)
+      .where(
+        and(
+          sql`${animals.createdAt} <= now() - ${IDLE_ANIMAL_RETENTION}::interval`,
+          sql`NOT EXISTS (SELECT 1 FROM followups f WHERE f.animal_id = ${animals.id})`,
+        ),
+      )
+      .limit(SWEEP_BATCH);
+    for (const { id } of idle) {
+      const result = await tx.execute<{ deleted: boolean }>(
+        sql`SELECT app.delete_unused_animal(${id}, ${IDLE_ANIMAL_RETENTION}::interval) AS deleted`,
+      );
+      if (result.rows[0]?.deleted)
+        await recordAudit(
+          tx,
+          { organizationId: job.organizationId, membershipId: null },
+          "animal.purged",
+          { type: "animal", id },
+        );
+    }
   };
 
   const purge: JobHandler = async ({ tx, job }) => {
@@ -95,14 +121,13 @@ export function retentionHandlers(deps: {
       sql`SELECT app.purge_followup(${followupId}) AS purged`,
     );
     if (!result.rows[0]?.purged) return;
-    await tx.insert(auditEvents).values({
-      organizationId: job.organizationId,
-      actorMembershipId: null,
-      action: "followup.purged",
-      targetType: "followup",
-      targetId: followupId,
-      metadata: { files: files.length },
-    });
+    await recordAudit(
+      tx,
+      { organizationId: job.organizationId, membershipId: null },
+      "followup.purged",
+      { type: "followup", id: followupId },
+      { files: files.length },
+    );
   };
 
   return { [SWEEP_KIND]: sweep, [FOLLOWUP_PURGE_KIND]: purge };

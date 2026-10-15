@@ -10,12 +10,15 @@ import { hostname } from "node:os";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { aiConfig, aiGatewayFor } from "../src/adapters/ai-gateway";
+import { wakeChannel } from "../src/adapters/queue/config";
 import {
-  JOB_HANDLERS,
   JOB_PLANNERS,
   OUTBOX_ROUTES,
+  jobRegistry,
 } from "../src/domains/taches/registry";
 import { createWorker } from "../src/domains/taches/worker";
+import { providerFor, whatsappConfig } from "../src/domains/whatsapp/connexion";
 import * as schema from "../src/server/db/schema";
 
 const url = process.env.DATABASE_URL;
@@ -31,11 +34,28 @@ const workerId = `worker-${
     .slice(0, 40) || "local"
 }-${process.pid}`;
 
+let registry: ReturnType<typeof jobRegistry>;
+let wake: ReturnType<typeof wakeChannel>;
+try {
+  wake = wakeChannel(process.env);
+  registry = jobRegistry({
+    whatsapp: providerFor(whatsappConfig(process.env)),
+    ai: aiGatewayFor(aiConfig(process.env)),
+  });
+} catch (error) {
+  // Le message ne cite que des noms de variables, jamais leurs valeurs.
+  console.error(
+    error instanceof Error ? error.message : "Configuration invalide",
+  );
+  process.exit(1);
+}
+
 const pool = new Pool({ connectionString: url, max: 4 });
 const worker = createWorker({
   db: drizzle(pool, { schema }),
   workerId,
-  handlers: JOB_HANDLERS,
+  handlers: registry.handlers,
+  deadHandlers: registry.dead,
   routes: OUTBOX_ROUTES,
   planners: JOB_PLANNERS,
 });
@@ -66,7 +86,8 @@ if (process.argv.includes("--once")) await pass();
 else
   while (!stopping) {
     await pass();
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    // Jusqu'au prochain signal de Scaleway Queues, ou l'intervalle fixe sans file.
+    await wake.wait(intervalMs);
   }
 await pool.end();
 console.warn("Worker arrêté.");

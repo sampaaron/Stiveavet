@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { staticSecurityHeaders } from "./headers";
+import { openerPolicyRules, staticSecurityHeaders } from "./headers";
 
 describe("staticSecurityHeaders", () => {
   const byName = new Map(
@@ -21,5 +21,19 @@ describe("staticSecurityHeaders", () => {
     for (const feature of ["camera", "microphone", "geolocation", "payment"]) {
       expect(policy).toContain(`${feature}=()`);
     }
+  });
+});
+
+describe("openerPolicyRules", () => {
+  it("isole les fenêtres partout, sauf pour la fenêtre de Meta des pages de connexion", () => {
+    const [strict, signup] = openerPolicyRules;
+    const matches = (source: string, path: string) =>
+      new RegExp(`^${source.replace(":page", "")}$`).test(path);
+
+    expect(strict?.headers[0]?.value).toBe("same-origin");
+    expect(signup?.headers[0]?.value).toBe("same-origin-allow-popups");
+    for (const path of ["/app", "/app/suivis/1", "/app/reglages/x", "/"])
+      expect(matches(strict?.source ?? "", path)).toBe(true);
+    expect(matches(strict?.source ?? "", "/app/reglages")).toBe(false);
   });
 });

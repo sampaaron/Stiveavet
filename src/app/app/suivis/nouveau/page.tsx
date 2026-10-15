@@ -1,4 +1,4 @@
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, ChevronRight, Plus, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,7 +11,7 @@ import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { Button, ButtonLink } from "@/ui/button";
 import { Card, SectionCard } from "@/ui/card";
-import { SpeciesIcon } from "@/ui/followup-card";
+import { AnimalAvatar } from "@/ui/animal-avatar";
 import { formatDateTime } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
@@ -45,7 +45,18 @@ export default async function NewFollowupPage({
   if (!context.permissions.has("clinical.read")) notFound();
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim().slice(0, 80) : "";
-  const hits = query.length >= 2 ? await searchDrVeto(context, query) : [];
+  const [hits, registry, drafts] = await Promise.all([
+    query.length >= 2 ? searchDrVeto(context, query) : [],
+    query.length >= 2
+      ? services.patients().list(context, { query, status: "active" })
+      : [],
+    query.length >= 2
+      ? []
+      : services
+          .followups()
+          .list(context)
+          .then((views) => views.filter((view) => view.status === "draft")),
+  ]);
   const { t, locale } = await appText();
   const text = t.followups.create;
 
@@ -96,6 +107,116 @@ export default async function NewFollowupPage({
           <p className="mt-3 text-xs text-ink-muted">{text.simulatedNote}</p>
         </Card>
 
+        {query.length >= 2 ? (
+          <SectionCard
+            title={text.registryTitle}
+            action={
+              <ButtonLink
+                href="/app/animaux/nouveau"
+                variant="secondary"
+                size="sm"
+                icon={<Plus aria-hidden="true" className="size-3.5" />}
+              >
+                {text.newAnimal}
+              </ButtonLink>
+            }
+          >
+            {registry.length === 0 ? (
+              <p className="text-sm text-ink-muted">{text.registryEmpty}</p>
+            ) : (
+              <ul className="-mx-2 grid">
+                {registry.slice(0, 8).map((animal) => (
+                  <li key={animal.id}>
+                    <Link
+                      href={
+                        animal.openFollowup?.visible
+                          ? `/app/suivis/${animal.openFollowup.id}`
+                          : `/app/animaux/${animal.id}`
+                      }
+                      className="flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2.5 hover:bg-canvas-subtle"
+                    >
+                      <AnimalAvatar
+                        name={animal.name}
+                        species={animal.species}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">
+                          {animal.name}
+                          <span className="font-normal text-ink-muted">
+                            {" "}
+                            · {t.labels.species[animal.species]}
+                          </span>
+                        </span>
+                        <span className="block truncate text-sm text-ink-muted">
+                          {t.common.list(animal.owners)}
+                        </span>
+                      </span>
+                      <span className="text-sm font-semibold text-brand-ink">
+                        {animal.openFollowup
+                          ? text.alreadyOpen
+                          : text.launchFromRegistry}
+                      </span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="size-4 text-ink-muted"
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <SectionCard title={text.draftsTitle}>
+              {drafts.length === 0 ? (
+                <p className="text-sm text-ink-muted">{text.draftsEmpty}</p>
+              ) : (
+                <ul className="-mx-2 grid">
+                  {drafts.map((draft) => (
+                    <li key={draft.id}>
+                      <Link
+                        href={`/app/suivis/${draft.id}/lancement`}
+                        className="flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2.5 hover:bg-canvas-subtle"
+                      >
+                        <AnimalAvatar
+                          name={draft.animalName}
+                          species={draft.species}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">
+                            {draft.animalName}
+                          </span>
+                          <span className="block truncate text-sm text-ink-muted">
+                            {draft.access === "clinical"
+                              ? draft.procedure
+                              : draft.responsibleName}
+                          </span>
+                        </span>
+                        <ChevronRight
+                          aria-hidden="true"
+                          className="size-4 text-ink-muted"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SectionCard>
+            <SectionCard
+              title={text.newAnimalTitle}
+              description={text.newAnimalBody}
+            >
+              <ButtonLink
+                href="/app/animaux/nouveau"
+                icon={<Plus aria-hidden="true" className="size-4" />}
+              >
+                {text.newAnimal}
+              </ButtonLink>
+            </SectionCard>
+          </div>
+        )}
+
         {hits === null ? (
           <AlertBanner
             tone="watch"
@@ -110,7 +231,8 @@ export default async function NewFollowupPage({
           </AlertBanner>
         ) : query.length >= 2 ? (
           <SectionCard
-            title={hits.length ? text.found(hits.length) : text.noResults}
+            title={text.drvetoTitle}
+            description={hits.length ? text.found(hits.length) : text.noResults}
           >
             {hits.length === 0 ? (
               <EmptyState
@@ -124,10 +246,8 @@ export default async function NewFollowupPage({
                     key={hit.ref}
                     className="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
                   >
-                    <span className="hidden size-10 place-items-center rounded-xl bg-canvas-subtle text-ink-muted sm:grid">
-                      <SpeciesIcon
-                        species={hit.species === "cat" ? "chat" : "chien"}
-                      />
+                    <span className="hidden sm:block">
+                      <AnimalAvatar name={hit.name} species={hit.species} />
                     </span>
                     <div className="min-w-0">
                       <p className="font-semibold">

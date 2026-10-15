@@ -27,7 +27,7 @@ import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
-import { SpeciesIcon } from "@/ui/followup-card";
+import { AnimalAvatar } from "@/ui/animal-avatar";
 import {
   formatDate,
   formatDateTime,
@@ -159,15 +159,14 @@ export default async function FollowupPage({
       {back}
       {notice}
       <header className="mb-6 flex flex-wrap items-start gap-4">
-        <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-surface text-ink-muted shadow-[var(--shadow-card)]">
-          <SpeciesIcon
-            species={followup.species === "cat" ? "chat" : "chien"}
-            className="size-7"
-          />
-        </span>
+        <AnimalAvatar
+          name={followup.animalName}
+          species={followup.species}
+          size="lg"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
               {followup.animalName}
             </h1>
             <StatusBadge status={dossierStatus(followup, primary)} />
@@ -406,15 +405,14 @@ function BasicDossier({
   return (
     <>
       <header className="mb-6 flex flex-wrap items-start gap-4">
-        <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-surface text-ink-muted shadow-[var(--shadow-card)]">
-          <SpeciesIcon
-            species={followup.species === "cat" ? "chat" : "chien"}
-            className="size-7"
-          />
-        </span>
+        <AnimalAvatar
+          name={followup.animalName}
+          species={followup.species}
+          size="lg"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-[2rem]">
               {followup.animalName}
             </h1>
             {badge ? <StatusBadge status={badge} /> : null}

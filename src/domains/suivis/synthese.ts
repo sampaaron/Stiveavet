@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { AiGateway, SynthesisEvent } from "@/adapters/ai-gateway/types";
+import { auditFollowup } from "@/domains/audit/journal";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import {
@@ -15,7 +16,6 @@ import {
   acknowledgements,
   alerts,
   attachments,
-  auditEvents,
   followupAlertRules,
   followupSyntheses,
   memberships,
@@ -25,7 +25,7 @@ import {
   users,
   voiceTranscripts,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import { daysSince } from "./calendrier";
@@ -211,12 +211,7 @@ export type SynthesisService = ReturnType<typeof synthesisService>;
 
 export function synthesisService(deps: { db: Database; ai: AiGateway }) {
   const { db, ai } = deps;
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) =>
-    withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
+  const run = tenantRunner(db);
 
   return {
     /**
@@ -297,18 +292,11 @@ export function synthesisService(deps: { db: Database; ai: AiGateway }) {
             target: followupSyntheses.followupId,
             set: { content, sourceDigest: read.sources.digest, generatedAt },
           });
-        await tx.insert(auditEvents).values({
-          organizationId: actor.organizationId,
-          actorMembershipId: actor.membershipId,
-          action: "synthesis.generated",
-          targetType: "followup",
-          targetId: followupId,
-          // Motifs des lignes écartées seulement : jamais leur contenu.
-          metadata: {
-            engine: "simulated",
-            withheld: content.withheld,
-            reasons: [...new Set(reasons)],
-          },
+        // Motifs des lignes écartées seulement : jamais leur contenu.
+        await auditFollowup(tx, actor, "synthesis.generated", followupId, {
+          engine: "simulated",
+          withheld: content.withheld,
+          reasons: [...new Set(reasons)],
         });
       });
       return view(content, generatedAt);

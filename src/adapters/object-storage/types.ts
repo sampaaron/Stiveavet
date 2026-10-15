@@ -19,7 +19,7 @@ export type ObjectStorage = {
 };
 
 /** Clé d'objet : même contrainte qu'en base (`attachments.storage_key`), sans « .. ». */
-export const STORAGE_KEY_PATTERN = /^[a-z0-9][a-z0-9/_.-]{7,254}$/;
+const STORAGE_KEY_PATTERN = /^[a-z0-9][a-z0-9/_.-]{7,254}$/;
 
 export function assertStorageKey(key: string): void {
   if (

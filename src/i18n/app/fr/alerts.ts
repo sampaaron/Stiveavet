@@ -6,6 +6,19 @@ export const alerts = {
   done: {
     recue: "Réception confirmée : l'escalade est annulée.",
     close: "Alerte close.",
+    confiee: "Alerte confiée : le vétérinaire choisi est prévenu.",
+  },
+  views: {
+    label: "Afficher",
+    open: "En cours",
+    history: "Historique",
+  },
+  history: {
+    section: "Alertes closes",
+    description:
+      "Les 100 dernières alertes closes des dossiers que vous lisez, avec qui les a closes.",
+    emptyTitle: "Aucune alerte close",
+    emptyDescription: "Les alertes closes apparaîtront ici.",
   },
   empty: {
     section: "Aucune alerte en cours",
@@ -40,10 +53,29 @@ export const alerts = {
       `Sans accusé de réception, toute l'équipe vétérinaire a été alertée${time ? ` à ${time}` : ""}.`,
     acknowledged: (by: string | null, time: string | null) =>
       `Réception confirmée par ${by ?? "un vétérinaire"}${time ? ` à ${time}` : ""}. L'escalade est annulée.`,
-    resolved: "Alerte close.",
+    resolved: (by: string | null, date: string | null) =>
+      `Close par ${by ?? "un vétérinaire"}${date ? ` le ${date}` : ""}.`,
   },
   buttons: {
     acknowledge: "Accuser réception",
     resolve: "Clore l'alerte",
+  },
+  reassign: {
+    label: "Confier à",
+    submit: "Confier",
+    current: (name: string) => `${name} (actuel)`,
+  },
+  /** Numéro WhatsApp professionnel où le vétérinaire reçoit les urgences (ADR 0024). */
+  phone: {
+    title: "Mon numéro pour les alertes urgentes",
+    description:
+      "Numéro WhatsApp professionnel où Stivea Vet vous prévient d'une urgence, sans aucun détail médical. Il n'est utilisé que pour ces alertes.",
+    current: (masked: string) => `Numéro enregistré : ${masked}.`,
+    none: "Aucun numéro : les urgences n'apparaissent que dans Stivea Vet.",
+    label: "Numéro WhatsApp",
+    hint: "Par exemple 06 12 34 56 78, ou +32… pour un numéro étranger. Laissez vide pour le retirer.",
+    submit: "Enregistrer le numéro",
+    saved: "Numéro d'alerte enregistré.",
+    invalid: "Numéro invalide : indiquez un numéro mobile complet.",
   },
 };

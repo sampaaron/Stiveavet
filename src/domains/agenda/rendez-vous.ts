@@ -1,4 +1,7 @@
+import { foldText, minutesOfDay } from "@/domains/commun";
 import { parisWallMinutes } from "@/domains/reglages/content";
+import { renderTemplate } from "@/domains/whatsapp/modeles";
+import type { RenderedTemplate } from "@/domains/whatsapp/modeles";
 
 /**
  * Rendez-vous proposés par Numa (cahier des charges §8, ADR 0021) : règles pures, sans base.
@@ -28,8 +31,8 @@ export const DEFAULT_APPOINTMENT_MINUTES: Record<AppointmentKind, number> = {
 };
 
 /** Créneaux proposés au plus, délai minimal avant le rendez-vous, horizon de recherche. */
-export const MAX_OFFERED_SLOTS = 3;
-export const MIN_LEAD_MINUTES = 60;
+const MAX_OFFERED_SLOTS = 3;
+const MIN_LEAD_MINUTES = 60;
 export const SEARCH_HORIZON_DAYS = 14;
 
 export type Interval = { startsAt: Date; endsAt: Date };
@@ -40,11 +43,6 @@ export type ApprovedWindow = {
 };
 
 const DAY_MINUTES = 24 * 60;
-
-function minutesOf(time: string): number {
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
 
 /** Le créneau tient-il, le même jour, dans une plage approuvée (heure de Paris) ? */
 export function inApprovedWindow(
@@ -63,8 +61,8 @@ export function inApprovedWindow(
   return windows.some(
     (window) =>
       window.weekday === weekday &&
-      minutesOf(window.startsAt) <= from &&
-      minutesOf(window.endsAt) >= to,
+      minutesOfDay(window.startsAt) <= from &&
+      minutesOfDay(window.endsAt) >= to,
   );
 }
 
@@ -113,27 +111,19 @@ export function fitSlots(input: {
   return chosen;
 }
 
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[’`]/g, "'");
-}
-
 const APPOINTMENT_REQUEST =
   /(rendez[- ]?vous|\brdv\b|prendre (un )?creneau|un creneau|faire controler|passer au cabinet|venir au cabinet|appointment|book (a )?(visit|slot)|come (in|to the clinic))/;
 
 /** Le propriétaire demande-t-il un rendez-vous ? (simple reconnaissance, sans IA) */
 export function wantsAppointment(text: string): boolean {
-  return APPOINTMENT_REQUEST.test(normalize(text));
+  return APPOINTMENT_REQUEST.test(foldText(text));
 }
 
 /** Choix d'un créneau proposé : « 2 », « le 2 », « créneau 2 », « option 2 ». */
 export function slotChoice(text: string): number | null {
   const match =
     /^\s*(?:(?:le|la|creneau|choix|option|n°|no|numero|number)\s*)?([1-3])\s*[.!)]?\s*$/.exec(
-      normalize(text),
+      foldText(text),
     );
   return match ? Number(match[1]) : null;
 }
@@ -192,9 +182,7 @@ export function appointmentMessage(
     | { kind: "offer"; slots: readonly Date[] }
     | { kind: "callback" }
     | { kind: "chosen"; at: Date }
-    | { kind: "unavailable" }
-    | { kind: "confirmed"; at: Date }
-    | { kind: "declined"; at: Date },
+    | { kind: "unavailable" },
   c: AppointmentWording,
 ): string {
   const en = c.language === "en";
@@ -222,13 +210,27 @@ export function appointmentMessage(
       return en
         ? `Sorry, this slot is no longer available.`
         : `Désolée, ce créneau n'est plus disponible.`;
-    case "confirmed":
-      return en
-        ? `The appointment for ${c.animalName} is confirmed on ${slotLabel(step.at, "en")} with ${c.vetName}. See you soon at ${c.practiceName}!`
-        : `Le rendez-vous de ${c.animalName} est confirmé le ${slotLabel(step.at, "fr")} avec ${c.vetName}. À bientôt à ${c.practiceName} !`;
-    case "declined":
-      return en
-        ? `The slot on ${slotLabel(step.at, "en")} could not be kept. The ${c.practiceName} team will contact you to set another appointment.`
-        : `Le créneau du ${slotLabel(step.at, "fr")} n'a pas pu être retenu. L'équipe de ${c.practiceName} vous recontactera pour fixer un autre rendez-vous.`;
   }
+}
+
+/**
+ * Décision du cabinet, souvent plusieurs heures après la demande : envoyée comme modèle
+ * WhatsApp, elle part même hors de la fenêtre de 24 h (ADR 0024).
+ */
+export function appointmentDecisionMessage(
+  step: { kind: "confirmed" | "declined"; at: Date },
+  c: AppointmentWording,
+): RenderedTemplate {
+  const date = slotLabel(step.at, c.language);
+  return step.kind === "confirmed"
+    ? renderTemplate("rdv_confirme", c.language, {
+        animal: c.animalName,
+        date,
+        vet: c.vetName,
+        practice: c.practiceName,
+      })
+    : renderTemplate("rdv_annule", c.language, {
+        date,
+        practice: c.practiceName,
+      });
 }

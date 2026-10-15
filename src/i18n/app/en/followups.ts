@@ -13,13 +13,28 @@ export const followups: AppDictionary["followups"] = {
     private: "Private",
     controlOn: (date: string) => `Check-up on ${date}`,
     controlNone: "No check-up scheduled",
+    filters: {
+      label: "Filter follow-ups",
+      search: "Search",
+      placeholder: "Animal, owner or vet",
+      placeholderClinical: "Animal, owner, vet or procedure",
+      status: "Status",
+      statusAll: "All",
+      statusOngoing: "Running, paused or taken over",
+      priority: "Priority",
+      priorityAll: "All",
+      apply: "Filter",
+      reset: "Clear",
+      noMatchTitle: "No matching follow-ups",
+      noMatchDescription: "Change the search or the filters.",
+    },
   },
   testMark: "Test follow-up",
   create: {
     title: "Start a follow-up",
     back: "Follow-ups",
     description:
-      "Search for the animal in dr.veto. Stivea Vet imports the relevant summary read-only, then suggests a launch sheet for you to review.",
+      "Search for the animal in the practice register or in dr.veto, or register it. You then review the launch sheet prepared by Stivea Vet.",
     searchLabel: "Animal, owner or dr.veto ID",
     searchPlaceholder: "E.g. Plume, Girard, DV-20481",
     search: "Search",
@@ -36,6 +51,17 @@ export const followups: AppDictionary["followups"] = {
     alreadyOpen: "Follow-up already open",
     prepareLabel: (name: string) => `Prepare the sheet for ${name}`,
     prepare: "Prepare the sheet",
+    registryTitle: "In the practice register",
+    registryEmpty:
+      "No animal in the register matches. Register it if it is new.",
+    launchFromRegistry: "Start",
+    newAnimal: "New animal",
+    newAnimalTitle: "A new patient?",
+    newAnimalBody:
+      "Register its details and the owner's WhatsApp number, then start the follow-up from its record.",
+    draftsTitle: "Sheets in progress",
+    draftsEmpty: "No sheets waiting to be launched.",
+    drvetoTitle: "In dr.veto",
   },
   sheet: {
     title: "Launch sheet",
@@ -103,7 +129,13 @@ export const followups: AppDictionary["followups"] = {
       "Numa writes on their behalf; they are the one who launches the follow-up.",
     includeSecond: (name: string) => `Include ${name}, second owner`,
     secondHint:
-      "Numa also asks for their consent. Once both have accepted, a WhatsApp group brings the owners and Numa together; anyone can leave it by sending STOP.",
+      "Numa also asks for their consent. Each owner talks with Numa (in a shared group if the practice number allows it) and can stop everything by sending STOP; the team reads everything.",
+    optInLabel: (count: number) =>
+      count > 1
+        ? "The owners agreed at the practice to be contacted on WhatsApp"
+        : "The owner agreed at the practice to be contacted on WhatsApp",
+    optInHint:
+      "Required to launch: WhatsApp forbids messaging anyone who has not agreed to it. Numa will then ask for consent to the follow-up itself.",
     stepsTitle: "Numa's steps and questions",
     stepsDraft:
       "Taken from the protocol. Adjust them for this animal: the practice's protocol stays unchanged.",
@@ -163,9 +195,11 @@ export const followups: AppDictionary["followups"] = {
     alertShort: (min: number) => `Warning sign: at least ${min} characters.`,
     alertLong: (max: number) => `Warning sign: ${max} characters at most.`,
     tooManyTreatments: (max: number) => `${max} treatments at most.`,
-    treatmentShort: (min: number) => `Treatment: at least ${min} character(s).`,
+    treatmentShort: (min: number) =>
+      `Treatment: at least ${min} ${min === 1 ? "character" : "characters"}.`,
     treatmentLong: (max: number) => `Treatment: ${max} characters at most.`,
-    instructionsShort: (min: number) => `Dosage: at least ${min} character(s).`,
+    instructionsShort: (min: number) =>
+      `Dosage: at least ${min} ${min === 1 ? "character" : "characters"}.`,
     instructionsLong: (max: number) => `Dosage: ${max} characters at most.`,
   },
 };

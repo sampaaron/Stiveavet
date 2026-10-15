@@ -36,7 +36,15 @@ export class DomainError extends Error {
       | "past_step"
       | "consent_missing"
       | "invalid_file"
-      | "capture_unreadable",
+      | "capture_unreadable"
+      | "whatsapp_signup_failed"
+      | "whatsapp_number_taken"
+      | "optin_missing"
+      | "payment_provider_unavailable"
+      | "plan_quota_reached"
+      | "plan_assistant_limit"
+      | "plan_feature_missing"
+      | "plan_integration_connected",
   ) {
     super(code);
   }

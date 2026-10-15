@@ -18,6 +18,14 @@ export const errors: AppDictionary["errors"] = {
     already_installed: "This template is already in the practice's protocols.",
     billing_blocked:
       "New follow-ups are suspended: settle the payment in Billing. Ongoing follow-ups continue.",
+    plan_quota_reached:
+      "Your plan's active follow-up cap is reached. End a follow-up or upgrade in Billing.",
+    plan_assistant_limit:
+      "Your plan has no assistant seats left. Upgrade in Billing to grow the team.",
+    plan_feature_missing:
+      "This feature is not included in your plan. Compare plans in Billing.",
+    plan_integration_connected:
+      "dr.veto is connected: disconnect it in Settings before moving to a plan without integrations.",
     plan_vet_limit:
       "This plan has fewer vet seats than your current team (pending invitations included).",
     on_call_overlap: "This on-call shift overlaps one already planned.",
@@ -37,5 +45,13 @@ export const errors: AppDictionary["errors"] = {
       "File rejected: send a JPEG, PNG or WebP image of 5 MB at most (or a voice note).",
     capture_unreadable:
       "No free slot could be read from this screenshot. It has been deleted; try again with a sharper screenshot.",
+    whatsapp_signup_failed:
+      "Meta did not confirm the number connection. Start again from the button; check the PIN if the number already had one.",
+    whatsapp_number_taken:
+      "This WhatsApp number is already linked to another practice on Stivea Vet.",
+    optin_missing:
+      "Tick the owner's WhatsApp agreement, collected at the practice, before launching the follow-up.",
+    payment_provider_unavailable:
+      "The direct debit service is not responding right now. Nothing was charged; try again in a few minutes.",
   },
 };

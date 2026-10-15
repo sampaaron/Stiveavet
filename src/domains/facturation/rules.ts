@@ -1,61 +1,105 @@
+import { nombre } from "@/i18n/pluriel";
+
 /**
  * Règles de facturation (cahier des charges §13), sans accès à la base ni à l'horloge :
  * chaque fonction reçoit l'instant `now`. Montants en centimes d'euro, hors taxes.
  * Couvert à 100 % par `rules.test.ts`.
  */
 
-export const PLANS = ["solo", "solo_pro", "clinic", "clinic_pro"] as const;
+export const PLANS = ["starter", "pro", "premium"] as const;
 export type Plan = (typeof PLANS)[number];
 export type BillingCycle = "monthly" | "annual";
 
+/**
+ * Formule et quotas. Tout se règle ici : prix, places, suivis actifs inclus et plafond des
+ * dépassements, fonctions incluses. Le serveur applique ces limites ; l'écran ne fait que
+ * les afficher.
+ */
 export type PlanDefinition = {
   label: string;
-  /** Prix mensuel avec engagement annuel. */
-  annualMonthlyCents: number;
   /** Prix mensuel sans engagement. */
   monthlyCents: number;
+  /** Prix mensuel avec engagement annuel. */
+  annualMonthlyCents: number;
   maxVets: number;
-  stive: string;
+  /** Assistants vétérinaires ; null : sans limite. */
+  maxAssistants: number | null;
+  /** Suivis actifs compris dans le prix ; au-delà, chaque lancement est facturé. */
+  includedActiveFollowups: number;
+  /** Plafond des suivis actifs : au-delà, aucun nouveau lancement (dépassement maîtrisé). */
+  maxActiveFollowups: number;
+  /** Stive, l'assistant IA interne de l'équipe. */
+  stive: boolean;
+  /** Intégrations avancées : connexion au logiciel du cabinet (dr.veto). */
+  advancedIntegrations: boolean;
 };
 
 export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
-  solo: {
-    label: "Solo",
+  starter: {
+    label: "Starter",
+    monthlyCents: 7_900,
+    annualMonthlyCents: 6_700,
+    maxVets: 1,
+    maxAssistants: 1,
+    includedActiveFollowups: 15,
+    maxActiveFollowups: 30,
+    stive: false,
+    advancedIntegrations: false,
+  },
+  pro: {
+    label: "Pro",
+    monthlyCents: 12_900,
     annualMonthlyCents: 10_900,
-    monthlyCents: 13_900,
-    maxVets: 1,
-    stive: "Stive limité",
+    maxVets: 2,
+    maxAssistants: 3,
+    includedActiveFollowups: 40,
+    maxActiveFollowups: 80,
+    stive: true,
+    advancedIntegrations: false,
   },
-  solo_pro: {
-    label: "Solo Pro",
-    annualMonthlyCents: 14_900,
-    monthlyCents: 17_900,
-    maxVets: 1,
-    stive: "Stive plus complet",
-  },
-  clinic: {
-    label: "Clinique",
-    annualMonthlyCents: 21_600,
-    monthlyCents: 24_600,
+  premium: {
+    label: "Premium",
+    monthlyCents: 19_900,
+    annualMonthlyCents: 16_900,
     maxVets: 3,
-    stive: "Un Stive par vétérinaire, avec une limite plus basse",
-  },
-  clinic_pro: {
-    label: "Clinique Pro",
-    annualMonthlyCents: 27_900,
-    monthlyCents: 30_900,
-    maxVets: 3,
-    stive: "Un Stive personnel plus complet par vétérinaire",
+    maxAssistants: null,
+    includedActiveFollowups: 100,
+    maxActiveFollowups: 200,
+    stive: true,
+    advancedIntegrations: true,
   },
 };
 
-export const TRIAL_MONTHLY_CENTS = 8_600;
+/** Offre mise en avant (inscription, tarifs). */
+export const FEATURED_PLAN: Plan = "pro";
+
+/** Prix d'entrée affiché sur le site (« à partir de »). */
+export const STARTING_PRICE_CENTS = Math.min(
+  ...PLANS.map((plan) => PLAN_CATALOG[plan].monthlyCents),
+);
+
+/** Cabinet antérieur aux abonnements : limites de la formule la plus complète. */
+const LEGACY_PLAN: Plan = "premium";
+
+export function planDefinition(plan: Plan | null): PlanDefinition {
+  return PLAN_CATALOG[plan ?? LEGACY_PLAN];
+}
+
+/**
+ * Deux premiers mois sans engagement possible (ADR 0023) ; l'engagement annuel est proposé
+ * vers un mois et demi et ne commence qu'au 3e mois.
+ */
 export const TRIAL_MONTHS = 2;
-/** Mois à partir duquel un engagement annuel peut être demandé (mois 3 à 6 : sur demande). */
-export const ANNUAL_FROM_MONTH = 3;
+/**
+ * Jour de l'essai où l'engagement annuel est proposé (décision d'Aaron du 8 octobre 2026,
+ * ADR 0023) : vers un mois et demi, pour le prélèvement suivant. L'engagement ne commence
+ * jamais avant la fin de l'essai.
+ */
+export const ANNUAL_OFFER_DAYS = 45;
+/** Mois où l'engagement est reproposé à un cabinet resté au mois. */
+export const ANNUAL_REMINDER_MONTH = 6;
 /** Le choix explicite doit être fait avant ce mois ; aucune bascule automatique. */
 export const COMMITMENT_DECISION_MONTH = 7;
-export const INCLUDED_ACTIVE_FOLLOWUPS = 10;
 export const LAUNCH_SURCHARGE_CENTS = 250;
 export const REACTIVATION_SURCHARGE_CENTS = 126;
 export const UNPAID_GRACE_DAYS = 30;
@@ -127,34 +171,52 @@ export function monthlyPriceCents(
   facts: Pick<SubscriptionFacts, "plan" | "cycle">,
   month: number,
 ): number {
-  if (month <= TRIAL_MONTHS) return TRIAL_MONTHLY_CENTS;
   const plan = PLAN_CATALOG[facts.plan];
-  return facts.cycle === "annual" ? plan.annualMonthlyCents : plan.monthlyCents;
+  return facts.cycle === "annual" && month > TRIAL_MONTHS
+    ? plan.annualMonthlyCents
+    : plan.monthlyCents;
 }
 
 export function isCanceled(facts: SubscriptionFacts, now: Date): boolean {
   return facts.endsAt !== null && facts.endsAt <= now;
 }
 
-/** L'engagement annuel ne se prend que sur demande explicite, à partir du mois 3. */
+/** Ouverture de l'offre d'engagement annuel, pendant l'essai. */
+export function annualOfferOpensAt(
+  facts: Pick<SubscriptionFacts, "startedAt">,
+): Date {
+  return new Date(facts.startedAt.getTime() + ANNUAL_OFFER_DAYS * DAY_MS);
+}
+
+/** Début de l'engagement pris à `now` : la prochaine échéance, jamais pendant l'essai. */
+export function annualStartsAt(facts: SubscriptionFacts, now: Date): Date {
+  const next = Math.max(subscriptionMonth(facts, now) + 1, TRIAL_MONTHS + 1);
+  return billingPeriod(facts, next).start;
+}
+
+/** L'engagement annuel ne se prend que sur demande explicite, une fois l'offre ouverte. */
 export function canCommitAnnual(facts: SubscriptionFacts, now: Date): boolean {
   return (
     facts.canceledAt === null &&
     facts.cycle === "monthly" &&
-    subscriptionMonth(facts, now) >= ANNUAL_FROM_MONTH
+    now >= annualOfferOpensAt(facts)
   );
 }
 
-/** Rappel du choix à faire avant le 7e mois ; sans réponse, la formule reste mensuelle. */
+/**
+ * Le choix est demandé à l'ouverture de l'offre, puis redemandé au 6e mois à un cabinet
+ * resté au mois ; sans réponse, la formule reste mensuelle.
+ */
 export function commitmentReminder(
   facts: SubscriptionFacts,
   now: Date,
 ): boolean {
-  return (
-    facts.canceledAt === null &&
-    facts.cycleChosenAt === null &&
-    phase(facts, now) === "flexible"
-  );
+  if (!canCommitAnnual(facts, now)) return false;
+  const month = subscriptionMonth(facts, now);
+  if (month >= COMMITMENT_DECISION_MONTH) return false;
+  if (facts.cycleChosenAt === null) return true;
+  const reminderStart = billingPeriod(facts, ANNUAL_REMINDER_MONTH).start;
+  return month === ANNUAL_REMINDER_MONTH && facts.cycleChosenAt < reminderStart;
 }
 
 /**
@@ -230,6 +292,14 @@ export function access(
   return { kind: "closed", reason };
 }
 
+/** Le plafond de la formule laisse-t-il lancer ou réactiver un suivi de plus ? */
+export function withinFollowupCap(
+  plan: Plan | null,
+  activeFollowupsBefore: number,
+): boolean {
+  return activeFollowupsBefore < planDefinition(plan).maxActiveFollowups;
+}
+
 /** Un nouveau suivi ou une réactivation n'est possible qu'en accès complet ou en délai de régularisation. */
 export function canStartFollowups(state: Access): boolean {
   return state.kind === "full" || state.kind === "grace";
@@ -241,8 +311,10 @@ export type UsageKind = "launch" | "reactivation";
 export function usageChargeCents(
   kind: UsageKind,
   activeFollowupsBefore: number,
+  plan: Plan | null,
 ): number {
-  if (activeFollowupsBefore < INCLUDED_ACTIVE_FOLLOWUPS) return 0;
+  if (activeFollowupsBefore < planDefinition(plan).includedActiveFollowups)
+    return 0;
   return kind === "launch"
     ? LAUNCH_SURCHARGE_CENTS
     : REACTIVATION_SURCHARGE_CENTS;
@@ -268,10 +340,7 @@ export function draftInvoice(
   const plan = PLAN_CATALOG[facts.plan];
   const lines: InvoiceLine[] = [
     {
-      label:
-        month <= TRIAL_MONTHS
-          ? `Essai pilote, mois ${month} sur ${TRIAL_MONTHS}`
-          : `Formule ${plan.label}, ${facts.cycle === "annual" ? "engagement annuel" : "sans engagement"}, mois ${month}`,
+      label: `Formule ${plan.label}, ${facts.cycle === "annual" && month > TRIAL_MONTHS ? "engagement annuel" : "sans engagement"}, mois ${month}`,
       amountCents: monthlyPriceCents(facts, month),
     },
   ];
@@ -281,7 +350,7 @@ export function draftInvoice(
     );
     if (!charged.length) continue;
     lines.push({
-      label: `${charged.length} ${kind === "launch" ? "lancement(s)" : "réactivation(s)"} au-delà de ${INCLUDED_ACTIVE_FOLLOWUPS} suivis actifs`,
+      label: `${kind === "launch" ? nombre(charged.length, "lancement", "lancements") : nombre(charged.length, "réactivation", "réactivations")} au-delà de ${plan.includedActiveFollowups} suivis actifs`,
       amountCents: charged.reduce((sum, event) => sum + event.amountCents, 0),
     });
   }
@@ -297,7 +366,12 @@ export function draftInvoice(
 
 /** Vétérinaires autorisés par la formule (3 sans abonnement enregistré). */
 export function maxVets(plan: Plan | null): number {
-  return plan ? PLAN_CATALOG[plan].maxVets : 3;
+  return planDefinition(plan).maxVets;
+}
+
+/** Assistants autorisés par la formule ; null : sans limite. */
+export function maxAssistants(plan: Plan | null): number | null {
+  return planDefinition(plan).maxAssistants;
 }
 
 /** `12 345` → `123,45 €` */
@@ -326,11 +400,16 @@ export const READ_ONLY_PERMISSIONS = [
 export function restrictPermissions<T extends string>(
   permissions: ReadonlySet<T>,
   state: Access,
+  plan: Plan | null = null,
 ): Set<T> {
+  let kept = [...permissions];
   if (state.kind === "read_only" || state.kind === "closed") {
-    const kept: readonly string[] =
+    const allowed: readonly string[] =
       state.kind === "read_only" ? READ_ONLY_PERMISSIONS : ["billing.manage"];
-    return new Set([...permissions].filter((key) => kept.includes(key)));
+    kept = kept.filter((key) => allowed.includes(key));
   }
-  return new Set(permissions);
+  // Stive n'est pas compris dans toutes les formules.
+  if (!planDefinition(plan).stive)
+    kept = kept.filter((key) => key !== "stive.use");
+  return new Set(kept);
 }

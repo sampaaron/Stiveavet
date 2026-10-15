@@ -1,16 +1,9 @@
+import { escapeHtml } from "@/adapters/email/html";
 import type { EmailMessage } from "@/adapters/email/types";
 
 import { AUTH_POLICY } from "./policy";
 
 const signature = "L'équipe Stivea Vet";
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
 function message(to: string, subject: string, lines: string[]): EmailMessage {
   return {

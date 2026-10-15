@@ -4,16 +4,21 @@ import { AlertBanner } from "@/ui/alert-banner";
 import { ButtonLink } from "@/ui/button";
 import { formatDate } from "@/ui/format";
 
+import { HiddenOn } from "./hidden-on";
+
 /**
- * Rappel de l'état de facturation sur tout l'espace cabinet : l'impayé pour qui gère la
- * facturation, la suspension des nouveaux suivis et la lecture seule pour toute l'équipe.
+ * Rappel de l'état de facturation sur tout l'espace cabinet : l'impayé et le choix
+ * d'engagement à faire (ADR 0023) pour qui gère la facturation, la suspension des nouveaux
+ * suivis et la lecture seule pour toute l'équipe.
  */
 export async function BillingNotice({
   access,
   canManage,
+  commitmentReminder,
 }: {
   access: Access;
   canManage: boolean;
+  commitmentReminder: boolean;
 }) {
   const { t, locale } = await appText();
   const text = t.dashboard.billing;
@@ -24,6 +29,8 @@ export async function BillingNotice({
   ) : undefined;
   let notice: { tone: "watch" | "urgent" | "info"; title: string } | null =
     null;
+  if (commitmentReminder && canManage)
+    notice = { tone: "info", title: text.annualChoice };
   if (access.kind === "grace" && canManage)
     notice = {
       tone: "watch",
@@ -41,9 +48,17 @@ export async function BillingNotice({
     };
   if (access.kind === "closed") notice = { tone: "info", title: text.closed };
   if (!notice) return null;
+  // Sur l'écran Facturation, le même choix est présenté en détail.
   return (
-    <div className="mb-6">
-      <AlertBanner tone={notice.tone} title={notice.title} action={action} />
-    </div>
+    <HiddenOn paths={["/app/facturation"]}>
+      <div className="mb-5">
+        <AlertBanner
+          compact
+          tone={notice.tone}
+          title={notice.title}
+          action={action}
+        />
+      </div>
+    </HiddenOn>
   );
 }

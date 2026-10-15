@@ -1,5 +1,3 @@
-import "server-only";
-
 import nodemailer from "nodemailer";
 
 import type { EmailMessage, EmailSender } from "./types";
@@ -7,6 +5,7 @@ import type { EmailMessage, EmailSender } from "./types";
 /**
  * Envoi SMTP vers Mailpit (local et CI) : les messages sont capturés, aucun n'est délivré.
  * Le prestataire réel sera une autre implémentation, ajoutée sur décision explicite (ADR 0004).
+ * Sans configuration propre, la classe sert aussi au worker (`worker.ts`), hors de Next.js.
  */
 export class SmtpEmailSender implements EmailSender {
   private readonly transport;

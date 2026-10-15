@@ -6,12 +6,7 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import { PAIR_CONSENT_WORDING_VERSION } from "@/domains/conversations/wording";
 import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
@@ -19,9 +14,9 @@ import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import { createWorker } from "@/domains/taches/worker";
 
 import { pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
  * Deux propriétaires (lot 18, cahier des charges §6) : accord de chacun avec l'explication
@@ -43,49 +38,21 @@ const launches = launchService({ db: appDb, drveto });
 const conversations = conversationsService(appDb);
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
 const protocols = protocolsService(appDb);
 
 /** WhatsApp simulé qui garde chaque envoi : direct (numéro) ou au groupe (`groupe`). */
-type Sent = { to: string; body: string };
-const sent: Sent[] = [];
-const groupCalls: string[] = [];
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  async sendMessage(input) {
-    sent.push({ to: input.to, body: input.body });
-    return fakeWhatsApp.sendMessage(input);
-  },
-  async createGroup(input) {
-    groupCalls.push(`create:${[...input.members].sort().join(",")}`);
-    return fakeWhatsApp.createGroup(input);
-  },
-  async sendGroupMessage(input) {
-    sent.push({ to: "groupe", body: input.body });
-    return fakeWhatsApp.sendGroupMessage(input);
-  },
-  async removeFromGroup(input) {
-    groupCalls.push(`remove:${input.member}`);
-    return fakeWhatsApp.removeFromGroup(input);
-  },
-  async closeGroup(input) {
-    groupCalls.push("close");
-    return fakeWhatsApp.closeGroup(input);
-  },
-};
-const handlers = conversationHandlers({ whatsapp, ai: fakeAiGateway });
-const worker = createWorker({
+const whatsapp = recordingWhatsApp();
+const { sent, groupCalls } = whatsapp;
+const { worker } = conversationWorker({
   db: appDb,
   workerId: "test-proprietaires",
-  handlers: {
-    "followup.message": async (context) => {
-      const handler = handlers["followup.message"];
-      if (handler && context.job.organizationId === org) await handler(context);
-    },
-  },
+  organizationId: () => org,
+  whatsapp,
+  ai: fakeAiGateway,
 });
 
 const org = randomUUID();
@@ -153,6 +120,7 @@ async function launchGaston(secondContactActive: boolean): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );
@@ -309,7 +277,10 @@ describe("accord de chacun, puis groupe", () => {
     const leo = await actor(ids.vet);
     await conversations.writeToOwner(leo, gaston, "Bonjour à tous deux.");
     await runDue(gaston);
-    expect(sent.at(-1)).toEqual({ to: "groupe", body: "Bonjour à tous deux." });
+    expect(sent.at(-1)).toMatchObject({
+      to: "groupe",
+      body: "Bonjour à tous deux.",
+    });
     await conversations.resumeNuma(leo, gaston);
   });
 });
@@ -335,7 +306,7 @@ describe("STOP dans le groupe", () => {
       "Tout va bien de votre côté ?",
     );
     await runDue(gaston);
-    expect(sent.at(-1)).toEqual({
+    expect(sent.at(-1)).toMatchObject({
       to: ANTOINE,
       body: "Tout va bien de votre côté ?",
     });

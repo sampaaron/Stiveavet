@@ -7,12 +7,7 @@ import { fakeAiGateway, simulatedNumaReply } from "@/adapters/ai-gateway/fake";
 import type { AiGateway } from "@/adapters/ai-gateway/types";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
-import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
-import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
-import {
-  conversationHandlers,
-  conversationsService,
-} from "@/domains/conversations/service";
+import { conversationsService } from "@/domains/conversations/service";
 import { safeFallback } from "@/domains/conversations/guard";
 import { CONSENT_WORDING_VERSION } from "@/domains/conversations/wording";
 import { DomainError } from "@/domains/equipe/actor";
@@ -21,10 +16,10 @@ import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import { createWorker } from "@/domains/taches/worker";
 import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
+import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 const { app, admin, appDb } = pools();
 afterAll(async () => {
@@ -38,30 +33,15 @@ const launches = launchService({ db: appDb, drveto });
 const conversations = conversationsService(appDb);
 const settings = settingsService({
   db: appDb,
-  whatsapp: fakeWhatsApp,
+  whatsapp: { live: false },
   drveto,
   payments: fakePaymentMandate,
 });
 const protocols = protocolsService(appDb);
 
 /** WhatsApp simulé qui garde chaque envoi, et peut tomber en panne à la demande. */
-type Sent = { to: string; body: string; idempotencyKey: string };
-const sent: Sent[] = [];
-let failNext = 0;
-const whatsapp: WhatsAppConnector = {
-  ...fakeWhatsApp,
-  simulated: true,
-  connectBusinessNumber: fakeWhatsApp.connectBusinessNumber,
-  sendStaffAlert: fakeWhatsApp.sendStaffAlert,
-  async sendMessage(input) {
-    if (failNext > 0) {
-      failNext -= 1;
-      throw new Error("prestataire indisponible");
-    }
-    sent.push(input);
-    return fakeWhatsApp.sendMessage(input);
-  },
-};
+const whatsapp = recordingWhatsApp();
+const { sent } = whatsapp;
 /** Passerelle IA qui compte ses appels (aucun avant l'accord du propriétaire). */
 let aiCalls = 0;
 let aiOverride: string | null = null;
@@ -79,17 +59,13 @@ const ai: AiGateway = {
   readAgendaCapture: fakeAiGateway.readAgendaCapture,
   summarizeFollowup: fakeAiGateway.summarizeFollowup,
 };
-const handlers = conversationHandlers({ whatsapp, ai });
 // Base partagée : les tâches laissées par les autres fichiers de test ne sont pas exécutées.
-const worker = createWorker({
+const { conversation: handlers, worker } = conversationWorker({
   db: appDb,
   workerId: "test-conversation",
-  handlers: {
-    "followup.message": async (context) => {
-      const handler = handlers["followup.message"];
-      if (handler && context.job.organizationId === org) await handler(context);
-    },
-  },
+  organizationId: () => org,
+  whatsapp,
+  ai,
 });
 
 const org = randomUUID();
@@ -160,6 +136,7 @@ async function launch(ref: string): Promise<string> {
       validateTreatmentIds: [],
       removeTreatmentIds: [],
       addTreatments: [],
+      whatsappOptIn: true,
     },
     { launch: true },
   );
@@ -359,16 +336,22 @@ describe("premier message et accord du propriétaire", () => {
     ]);
   });
 
-  it("un envoi en panne est retenté, sans doublon ni message à moitié enregistré", async () => {
+  it("un envoi en panne reste « en cours d'envoi », puis part une seule fois", async () => {
     const before = sent.length;
-    failNext = 1;
+    whatsapp.failNext();
     await owner(plume, "Merci pour les nouvelles");
     await runDue(plume);
     expect(sent).toHaveLength(before);
-    expect((await thread(plume)).at(-1)?.author).toBe("owner");
+    expect((await thread(plume)).at(-1)).toMatchObject({
+      author: "numa",
+      delivery: "queued",
+    });
     await runDue(plume);
     expect(sent).toHaveLength(before + 1);
-    expect((await thread(plume)).at(-1)?.author).toBe("numa");
+    expect((await thread(plume)).at(-1)).toMatchObject({
+      author: "numa",
+      delivery: "sent",
+    });
   });
 });
 

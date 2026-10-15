@@ -56,6 +56,8 @@ export const TENANT_TABLES = [
   "followup_syntheses",
   "appointment_durations",
   "appointment_requests",
+  "whatsapp_accounts",
+  "webhook_events",
 ] as const;
 
 export function pools() {

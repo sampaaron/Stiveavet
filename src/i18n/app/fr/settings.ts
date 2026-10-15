@@ -1,3 +1,5 @@
+import { nombre } from "@/i18n/pluriel";
+
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const settings = {
   title: "Numa, urgences et garde",
@@ -79,6 +81,9 @@ export const settings = {
     description:
       "Simulées pendant cette phase : aucun numéro WhatsApp, cabinet dr.veto ou compte bancaire réel n'est contacté.",
     simulated: "Simulé",
+    notIncluded:
+      "Compris dans la formule Premium. En attendant, enregistrez vos patients dans Animaux : le suivi fonctionne sans logiciel connecté.",
+    seePlans: "Voir les formules",
     connected: "Connecté",
     /** Suite de « Connecté », après le mot en gras. */
     connectedDetail: (label: string, date: string) =>
@@ -91,6 +96,21 @@ export const settings = {
       submit: "Connecter le numéro (simulé)",
       field: "Numéro WhatsApp Business",
       hint: "Seuls les deux derniers chiffres sont conservés.",
+      live: {
+        description:
+          "Connectez le numéro WhatsApp Business du cabinet avec votre compte Meta. Numa écrira depuis ce numéro ; Stivea Vet ne voit jamais votre mot de passe.",
+        pin: "Code PIN de vérification en deux étapes",
+        pinHint:
+          "6 chiffres. Si le numéro en a déjà un, saisissez-le ; sinon, choisissez-le et gardez-le précieusement. Il n'est pas conservé par Stivea Vet.",
+        submit: "Connecter avec Meta",
+        waiting:
+          "Fenêtre de Meta ouverte : suivez les étapes, puis revenez ici.",
+        finishing: "Connexion du numéro en cours…",
+        cancelled:
+          "Connexion interrompue dans la fenêtre de Meta. Vous pouvez recommencer.",
+        unavailable:
+          "La fenêtre de Meta n'a pas pu s'ouvrir. Autorisez les fenêtres de ce site, puis réessayez.",
+      },
     },
     drveto: {
       title: "dr.veto",
@@ -103,8 +123,11 @@ export const settings = {
     payment_mandate: {
       title: "Mandat de prélèvement",
       description:
-        "Pour l'essai pilote à 86 € HT par mois. Aucune donnée bancaire n'est demandée pendant cette phase.",
+        "Pour le prélèvement mensuel de votre formule. Aucune donnée bancaire n'est demandée pendant cette phase.",
       submit: "Signer le mandat (simulé)",
+      submitLive: "Signer le mandat SEPA",
+      descriptionLive:
+        "Prélèvement SEPA des factures. Vous saisissez votre IBAN sur la page sécurisée de Stripe : Stivea Vet ne le voit jamais.",
     },
   },
   notices: {
@@ -129,6 +152,7 @@ export const settings = {
     onCallEnded: "Cette garde est déjà terminée.",
     onCallTooLong: "Une garde dure au plus 14 jours.",
     drvetoCode: "Code du cabinet dr.veto : 3 à 32 lettres, chiffres ou tirets.",
+    whatsappPin: "Le code PIN compte exactement 6 chiffres.",
     chooseProtocol: "Choisissez un protocole validé.",
     /** Saisie refusée sans code connu (message par défaut de la validation). */
     invalidInput: "Vérifiez les valeurs saisies.",
@@ -154,7 +178,7 @@ export const settings = {
     description:
       "Huit étapes, de cinq à quinze minutes avec les réglages de départ. Chaque réglage reste modifiable ensuite.",
     progress: (done: number, total: number) =>
-      `${done} étape(s) terminée(s) sur ${total}`,
+      `${nombre(done, "étape terminée", "étapes terminées")} sur ${total}`,
     ready: {
       title: "Votre cabinet est prêt.",
       body: "Vous pouvez lancer vos premiers suivis.",
