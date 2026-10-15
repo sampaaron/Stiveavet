@@ -50,7 +50,7 @@ export default async function AuthLayout({
               />
             ))}
             <span className="ml-3 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-mint ring-1 ring-white/15 backdrop-blur">
-              {t.common.numaAi}
+              {t.shell.nav.assistants}
             </span>
           </div>
           <p className="font-display text-[2.6rem] leading-[1.05] font-semibold tracking-[-0.02em] text-balance">

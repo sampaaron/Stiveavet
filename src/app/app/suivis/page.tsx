@@ -176,7 +176,7 @@ export default async function FollowupsPage({
             />
           )
         ) : (
-          <ul className="grid gap-2.5">
+          <ul className="grid grid-cols-1 gap-2.5">
             {followups.map((followup) => {
               const badge = followupBadge(followup);
               return (

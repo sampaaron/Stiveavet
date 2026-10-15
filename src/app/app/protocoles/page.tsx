@@ -176,15 +176,6 @@ function ProtocolList({
                     aria-hidden="true"
                     className="absolute top-0 right-0 size-7 bg-[linear-gradient(225deg,var(--color-canvas)_50%,color-mix(in_oklab,var(--section-glow)_70%,white)_50%)] shadow-[-2px_2px_4px_rgb(11_18_32/0.06)]"
                   />
-                  <span className="flex items-start justify-between gap-3 pr-6">
-                    <span
-                      aria-hidden="true"
-                      className="font-display text-[2.5rem] leading-none font-semibold tracking-tight text-[var(--section-accent)]/80"
-                    >
-                      v{protocol.versionNumber}
-                    </span>
-                    <ValidationBadge validated={protocol.validated} />
-                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-display text-lg leading-snug font-semibold tracking-tight">
                       {protocol.name}
@@ -204,6 +195,16 @@ function ProtocolList({
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
+                  </span>
+                  {/* Le nom vient en premier dans le lien, pour qu'il ouvre son nom accessible. */}
+                  <span className="order-first flex items-start justify-between gap-3 pr-6">
+                    <span
+                      aria-hidden="true"
+                      className="font-display text-[2.5rem] leading-none font-semibold tracking-tight text-[var(--section-accent)]/80"
+                    >
+                      v{protocol.versionNumber}
+                    </span>
+                    <ValidationBadge validated={protocol.validated} />
                   </span>
                   <ChevronRight
                     aria-hidden="true"
