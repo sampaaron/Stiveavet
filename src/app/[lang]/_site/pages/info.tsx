@@ -1,4 +1,4 @@
-import { CircleDashed, LifeBuoy, ShieldAlert } from "lucide-react";
+import { CircleDashed, ShieldAlert } from "lucide-react";
 
 import {
   FEATURED_PLAN,
@@ -17,6 +17,7 @@ import { Card } from "@/ui/card";
 import {
   CheckList,
   CtaBand,
+  FaqList,
   LegalDraft,
   PageIntro,
   Section,
@@ -26,6 +27,7 @@ import {
 } from "../blocks";
 import { CtaLink, trialCta } from "../chrome";
 import type { SiteProps } from "../chrome";
+import { PricingVisual, SecurityVisual, SupportVisual } from "../illustrations";
 
 /** Prix issus du catalogue de facturation (une seule source, cahier des charges §13). */
 export function PricingPage({ locale, t }: SiteProps) {
@@ -33,7 +35,11 @@ export function PricingPage({ locale, t }: SiteProps) {
   const price = (cents: number) => formatPrice(cents, locale);
   return (
     <>
-      <PageIntro title={pricing.title} lead={pricing.lead} />
+      <PageIntro
+        title={pricing.title}
+        lead={pricing.lead}
+        aside={<PricingVisual locale={locale} t={t} />}
+      />
       <Section labelledBy="formules">
         <SectionTitle id="formules" title={pricing.plansTitle} />
         <ul className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -151,7 +157,11 @@ export function SecurityPage({ locale, t }: SiteProps) {
   const security = t.security;
   return (
     <>
-      <PageIntro title={security.title} lead={security.lead} />
+      <PageIntro
+        title={security.title}
+        lead={security.lead}
+        aside={<SecurityVisual t={t} />}
+      />
       <Section>
         <TextSections sections={security.sections} />
         <Card className="mt-4 flex gap-4 p-6">
@@ -174,34 +184,30 @@ export function SecurityPage({ locale, t }: SiteProps) {
   );
 }
 
+/** Questions fréquentes par thème ; l'assistance est présentée dans l'en-tête. */
 export function HelpPage({ t }: SiteProps) {
   const help = t.help;
   return (
     <>
-      <PageIntro title={help.title} lead={help.lead} />
+      <PageIntro
+        title={help.title}
+        lead={help.lead}
+        aside={<SupportVisual t={t} />}
+      />
       <Section>
-        <ul className="grid gap-3 md:grid-cols-2">
-          {help.topics.map((topic) => (
-            <li key={topic}>
-              <Card className="flex items-center justify-between gap-4 p-5">
-                <span className="font-semibold">{topic}</span>
-                <span className="shrink-0 rounded-full bg-canvas-subtle px-2.5 py-0.5 text-xs font-semibold text-ink-muted">
-                  {help.soon}
-                </span>
-              </Card>
-            </li>
+        <div className="grid grid-cols-1 gap-x-10 gap-y-12 lg:grid-cols-2">
+          {help.topics.map((topic, index) => (
+            <section key={topic.title} aria-labelledby={`aide-${index}`}>
+              <h2
+                id={`aide-${index}`}
+                className="font-display text-2xl font-semibold tracking-tight"
+              >
+                {topic.title}
+              </h2>
+              <FaqList items={topic.items} className="mt-4" />
+            </section>
           ))}
-        </ul>
-        <Card className="mt-4 flex gap-4 p-6">
-          <LifeBuoy
-            aria-hidden="true"
-            className="mt-0.5 size-6 shrink-0 text-brand"
-          />
-          <div>
-            <h2 className="font-bold">{help.supportTitle}</h2>
-            <p className="mt-2 text-ink-muted">{help.support}</p>
-          </div>
-        </Card>
+        </div>
       </Section>
     </>
   );

@@ -15,6 +15,7 @@ import {
   TextLink,
 } from "../blocks";
 import type { SiteProps } from "../chrome";
+import { HowVisual, IntegrationsVisual } from "../illustrations";
 
 const TRIAGE: Record<string, Status> = {
   normal: "normal",
@@ -26,7 +27,11 @@ export function HowPage({ locale, t }: SiteProps) {
   const how = t.how;
   return (
     <>
-      <PageIntro title={how.title} lead={how.lead} />
+      <PageIntro
+        title={how.title}
+        lead={how.lead}
+        aside={<HowVisual t={t} />}
+      />
       <Section labelledBy="parcours">
         <SectionTitle id="parcours" title={how.journeyTitle} />
         <ol className="mt-10 grid gap-4">
@@ -189,7 +194,11 @@ export function IntegrationsPage({ locale, t }: SiteProps) {
   const integrations = t.integrations;
   return (
     <>
-      <PageIntro title={integrations.title} lead={integrations.lead} />
+      <PageIntro
+        title={integrations.title}
+        lead={integrations.lead}
+        aside={<IntegrationsVisual t={t} />}
+      />
       <Section>
         <ul className="grid gap-4 md:grid-cols-2">
           {integrations.items.map((item) => {

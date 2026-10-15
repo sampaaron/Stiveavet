@@ -26,7 +26,7 @@ export const en: SiteDictionary = {
     integrations: {
       title: "Integrations",
       description:
-        "dr.veto at launch, Vétocom and Vetup coming soon, the practice's WhatsApp Business.",
+        "Built-in patient register, dr.veto with the Premium plan, Vétocom and Vetup coming soon, the practice's WhatsApp Business.",
     },
     pricing: {
       title: "Pricing",
@@ -215,7 +215,7 @@ export const en: SiteDictionary = {
       items: [
         {
           title: "Choose the animal",
-          body: "The animal, its owners and the procedure come from dr.veto, read-only.",
+          body: "The animal, its owners and the procedure come from the practice register, or from dr.veto, read-only, with the Premium plan.",
         },
         {
           title: "Approve the protocol",
@@ -223,7 +223,7 @@ export const en: SiteDictionary = {
         },
         {
           title: "Numa follows up",
-          body: "She talks with the owner, sorts every message as normal, to watch or urgent, and alerts you when needed.",
+          body: "She talks with the owner, sorts every message (nothing to report, to watch or urgent) and alerts you when needed.",
         },
         {
           title: "You decide",
@@ -277,7 +277,7 @@ export const en: SiteDictionary = {
         },
         {
           q: "Do I need to change my practice software?",
-          a: "No. Stivea Vet connects to dr.veto at launch, read-only, and never writes to it. Vétocom and Vetup will follow.",
+          a: "No. You register your patients in Stivea Vet in a few clicks. With the Premium plan, Stivea Vet also connects to dr.veto, read-only, and never writes to it. Vétocom and Vetup will follow.",
         },
         {
           q: "How much does Stivea Vet cost?",
@@ -302,7 +302,7 @@ export const en: SiteDictionary = {
     journey: [
       {
         title: "Open Stivea Vet and choose the animal",
-        body: "The search covers your dr.veto animals. Useful information is imported read-only: animal, owners, procedure, check-up appointment, allergies and active treatments.",
+        body: "You find the animal in the practice register, or register it with its owner in a few clicks. With the Premium plan, useful dr.veto information is imported read-only: procedure, check-up appointment, allergies and active treatments.",
       },
       {
         title: "Check the launch sheet",
@@ -321,11 +321,32 @@ export const en: SiteDictionary = {
         body: "When you open the file, you find the progress, positive and negative signals, alerts and open questions. Nothing is written automatically into dr.veto.",
       },
     ],
+    visual: {
+      label: "Example follow-up after a spay",
+      patient: "Caramel · spay",
+      vet: "Dr Fontaine",
+      steps: [
+        { day: "D0", text: "Follow-up launched by the vet", level: "done" },
+        { day: "D0", text: "Owner's consent on WhatsApp", level: "done" },
+        { day: "D1", text: "Wound photo: redness reported", level: "watch" },
+        {
+          day: "D3",
+          text: "Protocol answers: nothing to report",
+          level: "normal",
+        },
+        {
+          day: "D10",
+          text: "Summary ready before the check-up",
+          level: "done",
+        },
+      ],
+      fictitious: "Fictitious illustration",
+    },
     triageTitle: "Three levels, no needless alarm",
     triage: [
       {
         level: "normal",
-        name: "Normal",
+        name: "Nothing to report",
         where: "Visible in the file and the follow-up list",
         notify: "No interruption",
       },
@@ -366,7 +387,7 @@ export const en: SiteDictionary = {
       "Introduces herself as an AI from the very first message and asks for the owner's consent",
       "Asks your protocol's questions and sends reminders at the right time",
       "Receives text, photos and voice notes; voice notes are transcribed and filed in the record",
-      "Sorts every message as normal, to watch or urgent, and escalates when in doubt",
+      "Sorts every message (nothing to report, to watch or urgent) and escalates when in doubt",
       "Immediately passes on the practice's emergency instructions and contacts, including out of hours",
       "Suggests a slot within the times you approved, first with the animal's own vet",
       "Writes in French or English depending on the owner; you can correct the language",
@@ -414,7 +435,7 @@ export const en: SiteDictionary = {
       {
         name: "dr.veto",
         status: "launch",
-        body: "Direct connection at launch: animal, owners, procedure, treatments and agenda, read-only. Numa can suggest a slot; no summary is ever written into dr.veto.",
+        body: "With the Premium plan: animal, owners, procedure, treatments and agenda, read-only. Numa can suggest a slot; no summary is ever written into dr.veto.",
       },
       {
         name: "WhatsApp Business",
@@ -432,6 +453,15 @@ export const en: SiteDictionary = {
         body: "Integration in preparation.",
       },
     ],
+    visual: {
+      label: "What Stivea Vet connects",
+      nodes: [
+        { name: "WhatsApp Business", note: "The practice's number" },
+        { name: "Practice register", note: "Animals and owners" },
+        { name: "dr.veto", note: "Read-only, Premium plan" },
+        { name: "Agenda screenshot", note: "Free slots" },
+      ],
+    },
     screenshotTitle: "Until your software is supported: an agenda screenshot",
     screenshot:
       "Without an agenda integration, the practice can send a screenshot of its free slots. Stivea Vet extracts the slots, then deletes the screenshot; Numa suggests a slot and the practice confirms it. Remember to hide any unnecessary information.",
@@ -440,6 +470,15 @@ export const en: SiteDictionary = {
   pricing: {
     title: "Simple pricing, per practice",
     lead: "Three plans, without commitment. Prices exclude VAT, are per practice and collected monthly; invoices are sent by e-mail.",
+    visual: {
+      from: "From",
+      unit: "excl. VAT per month, per practice",
+      points: [
+        "Three plans, cancellable every month",
+        "Annual commitment never automatic",
+        "Invoices sent by e-mail",
+      ],
+    },
     plansTitle: "Plans",
     featured: "Most popular",
     annual:
@@ -530,6 +569,17 @@ export const en: SiteDictionary = {
         body: "At an owner's request, Stivea Vet deletes their follow-up data. The source medical record remains the practice's responsibility in its own software.",
       },
     ],
+    visual: {
+      label: "Each practice in its own space",
+      cabinets: ["Clinique des Tilleuls", "Cabinet du Parc"],
+      wall: "Isolated down to the database",
+      chips: [
+        "Encrypted in transit and at rest",
+        "Hosted in Europe",
+        "Tamper-proof activity log",
+        "Locks after 40 minutes",
+      ],
+    },
     incidentsTitle: "If an incident happens",
     incidents:
       "The administrator vet is notified by e-mail immediately in case of a security incident. Outages and maintenance are published on the Stivea Vet status page.",
@@ -537,18 +587,82 @@ export const en: SiteDictionary = {
 
   help: {
     title: "Help centre",
-    lead: "Guides and videos arrive when the service opens. They will also be available inside the software.",
+    lead: "Answers to the most frequent questions, by topic. Video guides will arrive when the service opens.",
     topics: [
-      "Setting up Stivea Vet step by step",
-      "Launching and running a first follow-up",
-      "Setting hours, on-call and emergency instructions",
-      "Managing the team and permissions",
-      "Billing and subscription",
+      {
+        title: "Getting started",
+        items: [
+          {
+            q: "How do I set up Stivea Vet?",
+            a: "Create the practice and your administrator vet account, then follow the guided setup: WhatsApp Business connection, hours and emergency instructions, team, protocols, direct debit mandate and a first test follow-up. Allow five to fifteen minutes with the starting settings, all editable later.",
+          },
+          {
+            q: "Do I need practice software?",
+            a: "No. The Stivea Vet patient register is enough: you record the animal and its owner there. With the Premium plan, you can also find your animals in dr.veto, read-only.",
+          },
+        ],
+      },
+      {
+        title: "Follow-ups",
+        items: [
+          {
+            q: "How do I launch a first follow-up?",
+            a: "From the animal's record or the “New follow-up” button, enter the procedure. Stivea Vet suggests the matching approved protocol; you review the launch sheet and click “Launch follow-up” yourself.",
+          },
+          {
+            q: "When does Numa write to the owner?",
+            a: "Numa introduces herself as an AI from the first message and asks for the owner's consent: the clinical follow-up only starts afterwards. Scheduled messages respect your sending hours; Numa answers incoming messages at any time.",
+          },
+          {
+            q: "How do I take over the conversation?",
+            a: "Write in the record's conversation: your message is sent from the practice's WhatsApp and Numa pauses until you click “Resume Numa”.",
+          },
+        ],
+      },
+      {
+        title: "Emergencies and on-call",
+        items: [
+          {
+            q: "What happens in an emergency?",
+            a: "Numa immediately sends your emergency instructions and contacts to the owner, and the responsible or on-call vet receives an alert. Without acknowledgement, the other vets are alerted after the delay you choose, between 3 and 5 hours.",
+          },
+          {
+            q: "Where do I set hours, on-call and instructions?",
+            a: "In “Numa, emergencies and on-call”: sending hours, appointments suggested by Numa, day, night, weekend and bank holiday emergency instructions, emergency contacts, alert rules and on-call schedule.",
+          },
+        ],
+      },
+      {
+        title: "Team and permissions",
+        items: [
+          {
+            q: "How do I invite a vet or an assistant?",
+            a: "In “Team and permissions”, enter their name, e-mail address and role. They receive a link valid for 7 days, usable once. The number of vets depends on your plan.",
+          },
+          {
+            q: "What can an assistant see?",
+            a: "An assistant has limited permissions: they only access clinical data if the administrator opens it to them. A vet can also mark a record as private.",
+          },
+        ],
+      },
+      {
+        title: "Billing",
+        items: [
+          {
+            q: "How am I billed?",
+            a: "By SEPA direct debit every month, according to your plan, plus any extra follow-ups. Invoices are sent by e-mail and stay available in “Billing”.",
+          },
+          {
+            q: "Can I change plan or cancel?",
+            a: "Yes, from “Billing”. A new plan applies from the next billing date. After cancelling, ongoing follow-ups continue until they end, then the practice keeps read-only access for 3 months.",
+          },
+        ],
+      },
     ],
-    soon: "In preparation",
     supportTitle: "Support",
     support:
       "Support answers through the built-in messaging and by e-mail, on working days, within 24 to 48 working hours.",
+    supportChannels: ["Built-in messaging", "E-mail"],
   },
 
   status: {
