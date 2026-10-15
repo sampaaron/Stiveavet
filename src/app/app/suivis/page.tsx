@@ -67,7 +67,7 @@ export default async function FollowupsPage({
         }
       />
       {all.length > 0 ? (
-        <Card className="mb-6 p-4 sm:p-5">
+        <Card className="mb-8 rounded-[28px] border-white/70 bg-surface/75 p-3 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_18px_40px_-24px_rgb(11_18_32/0.25)] sm:p-4">
           <form
             role="search"
             aria-label={text.filters.label}
@@ -162,7 +162,7 @@ export default async function FollowupsPage({
           </form>
         </Card>
       ) : null}
-      <Card>
+      <Card bare={followups.length > 0}>
         {followups.length === 0 ? (
           filtered ? (
             <EmptyState
@@ -176,14 +176,14 @@ export default async function FollowupsPage({
             />
           )
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="grid gap-2.5">
             {followups.map((followup) => {
               const badge = followupBadge(followup);
               return (
                 <li key={followup.id}>
                   <Link
                     href={`/app/suivis/${followup.id}`}
-                    className="flex items-center gap-4 px-5 py-4 hover:bg-canvas-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                    className={`group relative flex items-center gap-4 overflow-hidden rounded-[18px] border border-line/80 bg-surface/90 py-4 pr-5 pl-6 shadow-[0_1px_2px_rgb(11_18_32/0.04)] backdrop-blur transition-all duration-200 before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full hover:-translate-y-0.5 hover:border-[var(--section-accent)]/30 hover:shadow-[0_14px_30px_-18px_rgb(11_18_32/0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${badge === "urgent" ? "before:bg-urgent" : badge === "watch" ? "before:bg-watch" : "before:bg-[var(--section-accent)]/35"}`}
                   >
                     <AnimalAvatar
                       name={followup.animalName}

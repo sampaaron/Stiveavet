@@ -80,12 +80,15 @@ export default async function ActivityPage() {
           {actions.length === 0 ? (
             <EmptyState title={t.journal.noActions} />
           ) : (
-            <ol className="grid gap-3">
+            <ol className="relative -mx-1 divide-y divide-dashed divide-line before:absolute before:top-0 before:bottom-0 before:left-[8rem] before:w-px before:bg-line">
               {actions.map((event) => (
-                <li key={event.id} className="flex gap-3 text-sm">
+                <li
+                  key={event.id}
+                  className="relative flex gap-6 px-1 py-2.5 text-sm transition-colors hover:bg-canvas-subtle/60"
+                >
                   <time
                     dateTime={event.occurredAt.toISOString()}
-                    className="w-28 shrink-0 text-ink-muted tabular-nums"
+                    className="w-28 shrink-0 text-[13px] tracking-tight text-ink-muted tabular-nums after:absolute after:top-[1.05rem] after:left-[calc(8rem-3px)] after:size-[7px] after:rounded-full after:bg-[var(--section-accent)]/60 after:ring-2 after:ring-surface"
                   >
                     {formatDateTime(event.occurredAt, locale)}
                   </time>
@@ -101,12 +104,15 @@ export default async function ActivityPage() {
           {logins.length === 0 ? (
             <EmptyState title={t.journal.noLogins} />
           ) : (
-            <ol className="grid gap-3">
+            <ol className="relative -mx-1 divide-y divide-dashed divide-line before:absolute before:top-0 before:bottom-0 before:left-[8rem] before:w-px before:bg-line">
               {logins.map((event) => (
-                <li key={event.id} className="flex gap-3 text-sm">
+                <li
+                  key={event.id}
+                  className="relative flex gap-6 px-1 py-2.5 text-sm transition-colors hover:bg-canvas-subtle/60"
+                >
                   <time
                     dateTime={event.occurredAt.toISOString()}
-                    className="w-28 shrink-0 text-ink-muted tabular-nums"
+                    className="w-28 shrink-0 text-[13px] tracking-tight text-ink-muted tabular-nums after:absolute after:top-[1.05rem] after:left-[calc(8rem-3px)] after:size-[7px] after:rounded-full after:bg-[var(--section-accent)]/60 after:ring-2 after:ring-surface"
                   >
                     {formatDateTime(event.occurredAt, locale)}
                   </time>

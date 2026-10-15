@@ -149,3 +149,47 @@
       transparent 70%
     );
 }
+
+/*
+ * Fond décoratif de la rubrique (ADR 0033) : deux lueurs aux teintes de la rubrique,
+ * estompées vers le bas. Décor seulement.
+ */
+@utility section-backdrop {
+  background:
+    radial-gradient(
+      44rem 20rem at 88% -12%,
+      color-mix(in oklab, var(--section-glow) 50%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      32rem 18rem at 28% -24%,
+      color-mix(in oklab, var(--section-accent) 11%, transparent),
+      transparent 70%
+    );
+  mask-image: linear-gradient(to bottom, black 35%, transparent);
+}
+
+/* Motif de la rubrique : traits fins, fondus vers la gauche et vers le bas. */
+@utility section-motif {
+  opacity: 0.22;
+  mask-image:
+    linear-gradient(to left, black 25%, transparent 85%),
+    linear-gradient(to bottom, black 30%, transparent 95%);
+  mask-composite: intersect;
+}
+
+/* Apparition douce du contenu à chaque écran (désactivée si l'animation est réduite). */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise-in {
+  animation: rise-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}

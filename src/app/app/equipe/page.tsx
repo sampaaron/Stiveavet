@@ -56,6 +56,20 @@ export default async function TeamPage() {
         title={t.team.title}
         description={t.team.description(activeVets.length + pendingVets, limit)}
       />
+      <div aria-hidden="true" className="-mt-4 mb-8 flex items-center">
+        {members
+          .filter((member) => member.active)
+          .slice(0, 8)
+          .map((member, index) => (
+            <span
+              key={member.membershipId}
+              className="-ml-2.5 grid size-11 place-items-center rounded-full font-display text-sm font-semibold text-white shadow-[0_6px_14px_-8px_rgb(11_18_32/0.6)] ring-[3px] ring-canvas first:ml-0"
+              style={{ background: monogramGradient(index) }}
+            >
+              {initials(member.name)}
+            </span>
+          ))}
+      </div>
       <div className="grid gap-6">
         <SectionCard
           title={t.team.invite.title}
@@ -94,7 +108,10 @@ export default async function TeamPage() {
         ) : null}
 
         <section aria-labelledby="membres" className="grid gap-4">
-          <h2 id="membres" className="text-lg font-bold tracking-tight">
+          <h2
+            id="membres"
+            className="font-display text-xl font-semibold tracking-tight"
+          >
             {t.team.members.title}
           </h2>
           {members.map((member) => (
@@ -114,6 +131,29 @@ export default async function TeamPage() {
   );
 }
 
+/** Monogramme d'un membre : ses initiales, sans titre (« Dr »). */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter((part) => /^\p{L}/u.test(part))
+    .slice(-2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+/** Dégradés des monogrammes, en rotation (décor seulement). */
+const MONOGRAMS = [
+  "linear-gradient(135deg,#0f766e,#14b8a6)",
+  "linear-gradient(135deg,#087a54,#4ade80)",
+  "linear-gradient(135deg,#5b4fe0,#8b7cf6)",
+  "linear-gradient(135deg,#0b7480,#38bdf8)",
+  "linear-gradient(135deg,#8a5f12,#e0a43a)",
+];
+
+function monogramGradient(seed: number): string {
+  return MONOGRAMS[seed % MONOGRAMS.length] ?? "var(--color-brand)";
+}
+
 function MemberCard({
   member,
   t,
@@ -128,21 +168,30 @@ function MemberCard({
   const grants = ROLE_PERMISSIONS[member.role];
   const editable = !member.isSelf && member.active;
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-5 transition-shadow hover:shadow-[0_18px_36px_-24px_var(--section-accent)] sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-bold">
-            {member.name}
-            {member.isSelf ? (
-              <span className="font-normal text-ink-muted">
-                {" "}
-                · {t.team.members.you}
-              </span>
-            ) : null}
-          </h3>
-          <p className="text-sm text-ink-muted">
-            {member.email} · {t.labels.roles[member.role]}
-          </p>
+        <div className="flex min-w-0 items-center gap-4">
+          <span
+            aria-hidden="true"
+            className={`grid size-12 shrink-0 place-items-center rounded-2xl font-display text-base font-semibold text-white ${member.active ? "" : "opacity-40 grayscale"}`}
+            style={{ background: monogramGradient(member.name.length) }}
+          >
+            {initials(member.name)}
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-semibold tracking-tight">
+              {member.name}
+              {member.isSelf ? (
+                <span className="font-normal text-ink-muted">
+                  {" "}
+                  · {t.team.members.you}
+                </span>
+              ) : null}
+            </h3>
+            <p className="text-sm text-ink-muted">
+              {member.email} · {t.labels.roles[member.role]}
+            </p>
+          </div>
         </div>
         <p className="text-sm text-ink-muted">
           {member.active

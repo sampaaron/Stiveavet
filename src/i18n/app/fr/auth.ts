@@ -1,5 +1,9 @@
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const auth = {
+  /** Panneau de marque des écrans d'accès (grand écran). */
+  brandTitle: "Le suivi post-consultation, sans alourdir vos journées.",
+  brandBody:
+    "Numa, assistante IA, prend des nouvelles des animaux sur WhatsApp et vous signale ce qui compte. La décision médicale reste toujours la vôtre.",
   /** Mention sous la carte, uniquement en environnement local. */
   localNotice:
     "Environnement local : données fictives uniquement. Les e-mails sont capturés par Mailpit et ne quittent pas la machine.",

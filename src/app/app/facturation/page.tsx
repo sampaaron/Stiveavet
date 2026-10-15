@@ -101,20 +101,30 @@ export default async function BillingPage() {
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Card className="p-5">
-            <p className="text-sm font-medium text-ink-muted">{text.plan}</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight">
-              {planText.name}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {phaseLabel(overview, t, locale)}
-            </p>
-          </Card>
+          <div className="relative isolate flex min-h-44 flex-col justify-between overflow-hidden rounded-[22px] bg-[linear-gradient(135deg,#0b1512_0%,#123326_55%,#1d4a37_100%)] p-6 text-white shadow-[0_24px_48px_-24px_rgb(8_60_40/0.8)]">
+            <span
+              aria-hidden="true"
+              className="absolute -top-16 -right-12 -z-10 size-48 rounded-full bg-[conic-gradient(from_120deg,#f3d27a,#8ce8c3,#c9b8ff,#f3d27a)] opacity-40 blur-2xl"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 bg-[repeating-linear-gradient(115deg,rgb(255_255_255/0.035)_0_1px,transparent_1px_14px)]"
+            />
+            <p className="text-sm font-medium text-white/70">{text.plan}</p>
+            <div>
+              <p className="font-display text-[2rem] leading-tight font-semibold tracking-tight">
+                {planText.name}
+              </p>
+              <p className="mt-1 text-sm text-white/75">
+                {phaseLabel(overview, t, locale)}
+              </p>
+            </div>
+          </div>
           <Card className="p-5">
             <p className="text-sm font-medium text-ink-muted">
               {text.next.title}
             </p>
-            <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+            <p className="mt-2 font-display text-[1.75rem] leading-tight font-semibold tracking-tight tabular-nums">
               {overview.nextPriceCents !== null
                 ? text.exclVat(euros(overview.nextPriceCents))
                 : text.next.none}
@@ -136,7 +146,7 @@ export default async function BillingPage() {
             <p className="text-sm font-medium text-ink-muted">
               {text.activeFollowups.title}
             </p>
-            <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+            <p className="mt-2 font-display text-[1.75rem] leading-tight font-semibold tracking-tight tabular-nums">
               {text.activeFollowups.count(
                 overview.activeFollowups,
                 plan.includedActiveFollowups,

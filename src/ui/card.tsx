@@ -2,11 +2,19 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "./cn";
 
-export function Card({ className, ...props }: ComponentProps<"div">) {
+export function Card({
+  className,
+  bare = false,
+  ...props
+}: ComponentProps<"div"> & {
+  /** Sans cadre : pour une liste dont chaque ligne est déjà une carte. */
+  bare?: boolean;
+}) {
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-card)]",
+        !bare &&
+          "rounded-[var(--radius-card)] border border-line/80 bg-surface/92 shadow-[var(--shadow-card),inset_0_1px_0_rgb(255_255_255/0.9)] backdrop-blur-xl",
         className,
       )}
       {...props}

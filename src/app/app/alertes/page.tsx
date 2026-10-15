@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { appText } from "@/i18n/app/server";
@@ -7,6 +6,7 @@ import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { SectionCard } from "@/ui/card";
 import { PageHeader } from "@/ui/page-header";
+import { SegmentedTabs } from "@/ui/segmented-tabs";
 import { EmptyState } from "@/ui/states";
 
 import { AlertCard } from "../alert-card";
@@ -55,29 +55,18 @@ export default async function AlertsPage({
           {done}
         </p>
       ) : null}
-      <nav aria-label={text.views.label} className="mb-4 flex gap-2">
-        {[
+      <SegmentedTabs
+        label={text.views.label}
+        className="mb-6"
+        tabs={[
           { href: "/app/alertes", label: text.views.open, active: !history },
           {
             href: "/app/alertes?vue=historique",
             label: text.views.history,
             active: history,
           },
-        ].map((view) => (
-          <Link
-            key={view.href}
-            href={view.href}
-            aria-current={view.active ? "page" : undefined}
-            className={
-              view.active
-                ? "inline-flex min-h-11 items-center rounded-full bg-brand-soft px-4 text-sm font-semibold text-brand-ink"
-                : "inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-ink-muted hover:bg-canvas-subtle"
-            }
-          >
-            {view.label}
-          </Link>
-        ))}
-      </nav>
+        ]}
+      />
       {history ? (
         <SectionCard
           title={text.history.section}
@@ -116,8 +105,12 @@ export default async function AlertsPage({
               <section key={group.id} aria-labelledby={`alertes-${group.id}`}>
                 <h2
                   id={`alertes-${group.id}`}
-                  className="mb-3 text-lg font-semibold"
+                  className="mb-3 flex items-center gap-3 font-display text-xl font-semibold tracking-tight"
                 >
+                  <span
+                    aria-hidden="true"
+                    className={`size-2.5 rounded-full ${group.id === "urgences" ? "bg-urgent shadow-[0_0_0_4px_var(--color-urgent-soft)]" : "bg-watch shadow-[0_0_0_4px_var(--color-watch-soft)]"}`}
+                  />
                   {group.title} ({group.items.length})
                 </h2>
                 <ul className="grid gap-3">

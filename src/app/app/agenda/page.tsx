@@ -88,14 +88,18 @@ export default async function AgendaPage({
               description={t.agenda.slots.emptyDescription}
             />
           ) : (
-            <div className="grid gap-5">
+            <div className="relative grid gap-6 before:absolute before:top-3 before:bottom-3 before:left-[7px] before:w-px before:bg-gradient-to-b before:from-[var(--section-accent)]/50 before:to-transparent">
               {days.map(({ day, items }) => (
-                <section key={day} aria-label={day}>
-                  <h3 className="mb-2 text-sm font-semibold text-ink-muted">
+                <section key={day} aria-label={day} className="relative pl-7">
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-1 left-0 size-[15px] rounded-full border-[3px] border-surface bg-[var(--section-accent)] shadow-[0_0_0_1px_var(--section-accent)]"
+                  />
+                  <h3 className="mb-3 font-display text-base font-semibold tracking-tight first-letter:uppercase">
                     {day}
                   </h3>
                   <ul
-                    className="grid gap-2"
+                    className="grid gap-2 sm:grid-cols-2"
                     aria-label={t.agenda.slots.dayListLabel(day)}
                   >
                     {items.map((slot) => {
@@ -104,18 +108,20 @@ export default async function AgendaPage({
                       return (
                         <li
                           key={slot.id}
-                          className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line px-3 py-2"
+                          className="group flex items-center justify-between gap-3 rounded-[14px] border border-[var(--section-accent)]/15 bg-[linear-gradient(90deg,color-mix(in_oklab,var(--section-glow)_22%,white),white_70%)] py-2.5 pr-2 pl-3 transition-shadow hover:shadow-[0_10px_24px_-16px_var(--section-accent)]"
                         >
-                          <span className="flex min-w-0 items-center gap-2 text-sm">
+                          <span className="flex min-w-0 items-center gap-3 text-sm">
                             <CalendarClock
                               aria-hidden="true"
-                              className="size-4 shrink-0 text-brand"
+                              className="size-4 shrink-0 text-[var(--section-accent)]"
                             />
-                            <span className="font-semibold">
-                              {start} – {end}
-                            </span>
-                            <span className="truncate text-ink-muted">
-                              {slot.vetName}
+                            <span className="min-w-0">
+                              <span className="block font-display text-[15px] font-semibold tracking-tight tabular-nums">
+                                {start} – {end}
+                              </span>
+                              <span className="block truncate text-[13px] text-ink-muted">
+                                {slot.vetName}
+                              </span>
                             </span>
                           </span>
                           {canCapture ? (

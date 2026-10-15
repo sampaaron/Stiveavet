@@ -6,6 +6,7 @@ import { appDictionary } from "@/i18n/app";
 import type { Locale } from "@/i18n/locales";
 
 import { AppTopbar } from "./app-topbar";
+import { SectionFrame } from "./section-frame";
 import { SidebarNav } from "./sidebar-nav";
 
 type AppShellProps = {
@@ -98,18 +99,20 @@ export function AppShell({
         }
       />
       <div className="min-w-0 lg:py-2 lg:pr-2">
-        <div className="min-h-screen bg-canvas lg:min-h-[calc(100vh-1rem)] lg:rounded-[var(--radius-panel)] lg:border lg:border-line lg:shadow-[var(--shadow-card)]">
-          <AppTopbar
-            canSearch={canSearch}
-            canSeeAlerts={permissions.includes("clinical.read")}
-            pendingAlerts={pendingAlerts}
-          />
-          <main
-            id="contenu"
-            className="min-w-0 px-4 pt-6 pb-10 sm:px-8 lg:px-10 lg:pt-8"
-          >
-            <div className="mx-auto max-w-6xl">{children}</div>
-          </main>
+        <div className="min-h-screen bg-canvas lg:min-h-[calc(100vh-1rem)] lg:overflow-clip lg:rounded-[var(--radius-panel)] lg:border lg:border-line lg:shadow-[var(--shadow-card)]">
+          <SectionFrame>
+            <AppTopbar
+              canSearch={canSearch}
+              canSeeAlerts={permissions.includes("clinical.read")}
+              pendingAlerts={pendingAlerts}
+            />
+            <main
+              id="contenu"
+              className="min-w-0 px-4 pt-6 pb-10 sm:px-8 lg:px-10 lg:pt-8"
+            >
+              <div className="mx-auto max-w-6xl">{children}</div>
+            </main>
+          </SectionFrame>
         </div>
       </div>
     </div>

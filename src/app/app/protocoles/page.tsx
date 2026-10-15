@@ -151,30 +151,45 @@ function ProtocolList({
   return (
     <section aria-labelledby={headingId} className="grid gap-3">
       <div>
-        <h2 id={headingId} className="text-lg font-bold tracking-tight">
+        <h2
+          id={headingId}
+          className="font-display text-xl font-semibold tracking-tight"
+        >
           {title}
         </h2>
         {description ? (
           <p className="text-sm text-ink-muted">{description}</p>
         ) : null}
       </div>
-      <Card>
+      <Card bare={protocols.length > 0}>
         {protocols.length === 0 ? (
           <EmptyState title={empty} />
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {protocols.map((protocol) => (
               <li key={protocol.id}>
                 <Link
                   href={`/app/protocoles/${protocol.id}`}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-canvas-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                  className="group relative flex h-full flex-col gap-4 overflow-hidden rounded-[18px] rounded-tr-[4px] border border-line/80 bg-[linear-gradient(180deg,#fff,#fbfcf8)] p-5 shadow-[0_1px_2px_rgb(11_18_32/0.05),0_2px_0_-1px_#fff,0_4px_0_-1px_var(--color-line)] transition-all duration-300 hover:-translate-y-1 hover:rotate-[-0.4deg] hover:shadow-[0_22px_40px_-26px_var(--section-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">{protocol.name}</span>
-                      <ValidationBadge validated={protocol.validated} />
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0 right-0 size-7 bg-[linear-gradient(225deg,var(--color-canvas)_50%,color-mix(in_oklab,var(--section-glow)_70%,white)_50%)] shadow-[-2px_2px_4px_rgb(11_18_32/0.06)]"
+                  />
+                  <span className="flex items-start justify-between gap-3 pr-6">
+                    <span
+                      aria-hidden="true"
+                      className="font-display text-[2.5rem] leading-none font-semibold tracking-tight text-[var(--section-accent)]/80"
+                    >
+                      v{protocol.versionNumber}
                     </span>
-                    <span className="mt-0.5 block text-sm text-ink-muted">
+                    <ValidationBadge validated={protocol.validated} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display text-lg leading-snug font-semibold tracking-tight">
+                      {protocol.name}
+                    </span>
+                    <span className="mt-1.5 block text-sm text-ink-muted">
                       {[
                         t.labels.protocolCategories[protocol.category],
                         t.labels.species[protocol.species],
@@ -192,7 +207,7 @@ function ProtocolList({
                   </span>
                   <ChevronRight
                     aria-hidden="true"
-                    className="size-4 shrink-0 text-ink-muted"
+                    className="absolute right-4 bottom-4 size-4 text-ink-muted transition-transform group-hover:translate-x-0.5"
                   />
                 </Link>
               </li>

@@ -1,6 +1,9 @@
 import type { AppDictionary } from "../types";
 
 export const auth: AppDictionary["auth"] = {
+  brandTitle: "Post-visit follow-up, without weighing down your day.",
+  brandBody:
+    "Numa, an AI assistant, checks in on patients over WhatsApp and flags what matters. The medical decision always stays yours.",
   localNotice:
     "Local environment: fictitious data only. E-mails are captured by Mailpit and never leave the machine.",
   pending: "Please wait…",

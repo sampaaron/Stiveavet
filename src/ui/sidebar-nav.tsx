@@ -5,12 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { useAppText } from "@/i18n/app/client";
 
 import { cn } from "./cn";
 import { isNavItemActive, visibleNavigation } from "./navigation";
+import { sectionAccents, sectionOf } from "./sections";
 
 type SidebarNavProps = {
   brand: ReactNode;
@@ -97,6 +98,8 @@ export function SidebarNav({
                   ({ href, label, icon: Icon, assistant, badge }) => {
                     const active = isNavItemActive(href, pathname);
                     const count = badge === "alerts" ? pendingAlerts : 0;
+                    // Teinte claire de la rubrique, lisible sur la barre sombre (décor).
+                    const glow = sectionAccents[sectionOf(href)].glow;
                     return (
                       <li key={href}>
                         <Link
@@ -105,10 +108,10 @@ export function SidebarNav({
                           // Le menu mobile se referme après chaque navigation.
                           onClick={() => setOpen(false)}
                           className={cn(
-                            "flex min-h-9 items-center gap-3 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-mint",
+                            "group/nav relative flex min-h-9 items-center gap-3 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-mint",
                             active
-                              ? "bg-white/12 font-semibold text-white ring-1 ring-white/10"
-                              : "text-white/75 hover:bg-white/6 hover:text-white",
+                              ? "bg-gradient-to-r from-white/14 to-white/4 font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] ring-1 ring-white/10"
+                              : "text-white/75 hover:translate-x-0.5 hover:bg-white/6 hover:text-white",
                           )}
                         >
                           {assistant ? (
@@ -120,13 +123,18 @@ export function SidebarNav({
                               className="size-[22px] shrink-0 rounded-full object-cover ring-1 ring-white/30"
                             />
                           ) : (
-                            <Icon
+                            <span
                               aria-hidden="true"
                               className={cn(
-                                "size-[18px] shrink-0",
-                                active ? "text-mint" : undefined,
+                                "grid size-7 shrink-0 place-items-center rounded-full transition-colors",
+                                active
+                                  ? "text-[var(--nav-glow)] drop-shadow-[0_0_8px_var(--nav-glow)]"
+                                  : "group-hover/nav:text-[var(--nav-glow)]",
                               )}
-                            />
+                              style={{ "--nav-glow": glow } as CSSProperties}
+                            >
+                              <Icon className="size-[18px]" />
+                            </span>
                           )}
                           <span className="min-w-0 flex-1">{t.nav[label]}</span>
                           {count > 0 ? (

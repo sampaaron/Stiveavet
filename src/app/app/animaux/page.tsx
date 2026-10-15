@@ -85,7 +85,7 @@ export default async function AnimalsPage({
         }
       />
 
-      <Card className="mb-6 p-4 sm:p-5">
+      <Card className="mb-8 rounded-[28px] border-white/70 bg-surface/75 p-3 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_18px_40px_-24px_rgb(11_18_32/0.25)] sm:p-4">
         <form
           role="search"
           aria-label={text.filters.label}
@@ -154,7 +154,7 @@ export default async function AnimalsPage({
         </form>
       </Card>
 
-      <Card>
+      <Card bare={rows.length > 0}>
         {rows.length === 0 ? (
           filtered ? (
             <EmptyState
@@ -174,12 +174,12 @@ export default async function AnimalsPage({
           <>
             <p
               role="status"
-              className="border-b border-line px-5 py-3 text-sm font-medium text-ink-muted"
+              className="mb-4 px-1 text-sm font-medium text-ink-muted"
             >
               {text.count(rows.length)}
               {rows.length >= 200 ? ` · ${text.limitNote}` : ""}
             </p>
-            <ul className="divide-y divide-line">
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {rows.map((row) => {
                 const months = ageInMonths(row.birthDate, now);
                 const status = badge(row, text.badges);
@@ -188,15 +188,24 @@ export default async function AnimalsPage({
                     <Link
                       href={`/app/animaux/${row.id}`}
                       aria-label={text.openLabel(row.name)}
-                      className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 hover:bg-canvas-subtle focus-visible:bg-canvas-subtle"
+                      className="group relative grid h-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4 overflow-hidden rounded-[22px] border border-line/80 bg-surface/90 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-[var(--section-accent)]/30 hover:shadow-[0_22px_40px_-24px_var(--section-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                     >
-                      <AnimalAvatar name={row.name} species={row.species} />
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -top-10 -right-10 size-32 rounded-full bg-[var(--section-glow)] opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-40"
+                      />
+                      <AnimalAvatar
+                        name={row.name}
+                        species={row.species}
+                        size="lg"
+                      />
                       <div className="min-w-0">
                         <p className="truncate font-semibold">
-                          {row.name}
-                          <span className="font-normal text-ink-muted">
-                            {" "}
-                            · {t.labels.species[row.species]}
+                          <span className="font-display text-lg tracking-tight">
+                            {row.name}
+                          </span>
+                          <span className="block truncate text-sm font-normal text-ink-muted">
+                            {t.labels.species[row.species]}
                             {row.breed ? ` · ${row.breed}` : ""}
                             {months !== null ? ` · ${text.age(months)}` : ""}
                           </span>
@@ -216,7 +225,7 @@ export default async function AnimalsPage({
                       </div>
                       <ChevronRight
                         aria-hidden="true"
-                        className="size-4 text-ink-muted"
+                        className="mt-1 size-4 text-ink-muted transition-transform group-hover:translate-x-0.5"
                       />
                     </Link>
                   </li>

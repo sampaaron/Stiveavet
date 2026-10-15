@@ -277,8 +277,12 @@ export default async function TodayPage() {
       <div className="grid gap-6">
         <section
           aria-labelledby="point-de-numa"
-          className="rounded-[var(--radius-panel)] border border-line p-5 shadow-[var(--shadow-card)] assistant-glow sm:p-7"
+          className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(8_122_84/0.35)] assistant-glow sm:p-8"
         >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-25 blur-3xl"
+          />
           <div className="flex items-start gap-4">
             <AssistantAvatar
               assistant="numa"
@@ -293,7 +297,7 @@ export default async function TodayPage() {
                 {text.briefing.title}
                 <AiBadge assistant="numa" />
               </h2>
-              <p className="mt-1 max-w-3xl text-[15px] leading-relaxed">
+              <p className="mt-2 max-w-3xl font-display text-lg leading-snug tracking-[-0.01em] text-balance sm:text-[1.375rem]">
                 {clinical
                   ? text.briefing.clinical(
                       today.activeFollowups,
@@ -320,11 +324,11 @@ export default async function TodayPage() {
                 autoComplete="off"
                 maxLength={80}
                 placeholder={text.briefing.searchPlaceholder}
-                className="h-14 w-full rounded-full border border-line bg-surface pr-16 pl-13 text-[15px] text-ink shadow-[var(--shadow-pill)] placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+                className="h-14 w-full rounded-full border border-line/80 bg-surface/90 pr-16 pl-13 text-[15px] text-ink shadow-[0_1px_2px_rgb(11_18_32/0.05),0_10px_30px_-12px_rgb(11_18_32/0.18)] backdrop-blur placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
               />
               <button
                 type="submit"
-                className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-brand text-white hover:bg-brand-strong"
+                className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-strong text-white shadow-[0_6px_16px_-6px_rgb(8_122_84/0.8)] transition-transform hover:scale-105"
               >
                 <ArrowRight aria-hidden="true" className="size-5" />
                 <span className="sr-only">{text.briefing.searchSubmit}</span>
@@ -337,7 +341,7 @@ export default async function TodayPage() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-surface/80 px-4 text-sm font-medium text-ink transition-colors hover:border-brand/40 hover:bg-brand-soft"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line/80 bg-surface/70 px-4 text-sm font-medium text-ink backdrop-blur transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:bg-surface hover:shadow-[0_8px_20px_-10px_rgb(8_122_84/0.5)]"
                   >
                     <Icon aria-hidden="true" className="size-4 text-brand" />
                     {label}
