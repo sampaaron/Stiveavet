@@ -1,6 +1,6 @@
 "use client";
 
-import { CirclePlay, Languages, Send } from "lucide-react";
+import { CirclePlay, Languages, Send, Sparkles } from "lucide-react";
 import { useActionState, useId } from "react";
 
 import { useAppText } from "@/i18n/app/client";
@@ -20,6 +20,7 @@ export function OwnerComposer({
   recipients,
   animalName,
   pausesNuma,
+  draft = null,
 }: {
   followupId: string;
   /** Prénoms des destinataires, déjà mis en liste (« Antoine et Chloé »). */
@@ -27,13 +28,16 @@ export function OwnerComposer({
   animalName: string;
   /** Numa est active : écrire la met en pause. */
   pausesNuma: boolean;
+  /** Brouillon de Stive : seulement posé dans la zone, envoyé par le bouton. */
+  draft?: string | null;
 }) {
   const [state, action, pending] = useActionState(
     writeToOwnerAction,
     initialActionState,
   );
   const id = useId();
-  const text = useAppText().dossier.conversation.composer;
+  const t = useAppText();
+  const text = t.dossier.conversation.composer;
 
   return (
     <form
@@ -47,12 +51,19 @@ export function OwnerComposer({
       <p id={`${id}-aide`} className="text-xs text-ink-muted">
         {text.help} {pausesNuma ? text.pausesNuma : text.staysPaused}
       </p>
+      {draft ? (
+        <p className="flex items-center gap-1.5 text-sm font-medium text-accent">
+          <Sparkles aria-hidden="true" className="size-4 shrink-0" />
+          {t.stive.draftLoaded}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <textarea
           id={id}
           name="body"
-          rows={2}
           maxLength={MAX_BODY}
+          defaultValue={draft ?? undefined}
+          rows={draft ? 5 : 2}
           aria-describedby={`${id}-aide`}
           className="min-h-11 min-w-0 flex-1 resize-y rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] placeholder:text-ink-muted"
           placeholder={text.placeholder(animalName)}

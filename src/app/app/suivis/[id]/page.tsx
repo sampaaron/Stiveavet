@@ -1,4 +1,4 @@
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -68,7 +68,7 @@ export default async function FollowupPage({
   searchParams,
 }: PageProps<"/app/suivis/[id]">) {
   const { id } = await params;
-  const { fait } = await searchParams;
+  const { fait, brouillon } = await searchParams;
   const { t, locale } = await appText();
   const doneCode = doneKey(fait, t);
   const done = doneCode ? t.dossier.done[doneCode] : undefined;
@@ -152,6 +152,21 @@ export default async function FollowupPage({
         : Promise.resolve([]),
     ]);
   const openAlerts = alerts.filter((alert) => alert.status !== "resolved");
+  // Brouillon préparé par Stive : posé dans la zone de saisie, jamais envoyé sans clic.
+  const draft =
+    typeof brouillon === "string"
+      ? await services.stive().draftFor(context, brouillon, followup.id)
+      : null;
+  const askStive = context.permissions.has("stive.use") ? (
+    <ButtonLink
+      href={`/app/stive?suivi=${followup.id}`}
+      variant="secondary"
+      size="sm"
+      icon={<Sparkles aria-hidden="true" className="size-4" />}
+    >
+      {t.stive.askAbout}
+    </ButtonLink>
+  ) : null;
   const primary = record.contacts.find((contact) => contact.role === "primary");
 
   return (
@@ -198,6 +213,7 @@ export default async function FollowupPage({
             </p>
           ) : null}
         </div>
+        {askStive}
       </header>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -217,6 +233,7 @@ export default async function FollowupPage({
             locale={locale}
             view={view}
             links={links}
+            draft={draft}
             simulatorHref={
               serverEnv().APP_ENV === "local" && !followup.isTest
                 ? `/app/suivis/${followup.id}/simulateur`

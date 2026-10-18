@@ -157,8 +157,6 @@ export const dashboard = {
   quickActions: "Actions rapides",
   numa: (animals: number) =>
     `Suit ${animals} ${animals > 1 ? "animaux" : "animal"} pour la clinique. Elle ne pose jamais de diagnostic et escalade en cas de doute.`,
-  stive:
-    "Votre point du jour sera prêt ici. Toute action réelle attendra votre confirmation.",
   notFound: {
     title: "Cet écran n'est pas encore disponible",
     description:

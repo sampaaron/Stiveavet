@@ -84,6 +84,10 @@ export const journal: AppDictionary["journal"] = {
       `${actor} declined a slot chosen with Numa`,
     "appointment.callback_done": (actor: string) =>
       `${actor} called back an owner who asked for an appointment`,
+    "stive.action_confirmed": (actor: string) =>
+      `${actor} confirmed an action prepared by Stive`,
+    "stive.conversation_cleared": (actor: string) =>
+      `${actor} cleared their conversation with Stive`,
     "settings.appointment_windows_changed": (actor: string) =>
       `${actor} changed Numa's appointment windows`,
     "settings.appointment_durations_changed": (actor: string) =>
@@ -171,6 +175,8 @@ export const journal: AppDictionary["journal"] = {
       "Annual commitment offer e-mailed to whoever manages billing",
     "invoice.paid": "Invoice direct debit succeeded",
     "invoice.payment_failed": "Invoice direct debit failed",
+    "stive.messages_purged":
+      "Conversations with Stive older than 30 days were deleted",
   },
   ownerLanguageDetected: (owner: "primary" | "secondary", language: string) =>
     `Numa's language recognised in the ${owner === "secondary" ? "second owner's" : "owner's"} messages: ${language}`,

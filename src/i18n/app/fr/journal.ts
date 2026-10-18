@@ -90,6 +90,10 @@ export const journal = {
       `${actor} a refusé un créneau choisi avec Numa`,
     "appointment.callback_done": (actor: string) =>
       `${actor} a rappelé un propriétaire qui demandait un rendez-vous`,
+    "stive.action_confirmed": (actor: string) =>
+      `${actor} a confirmé une action préparée par Stive`,
+    "stive.conversation_cleared": (actor: string) =>
+      `${actor} a effacé ses échanges avec Stive`,
     "settings.appointment_windows_changed": (actor: string) =>
       `${actor} a modifié les plages de rendez-vous de Numa`,
     "settings.appointment_durations_changed": (actor: string) =>
@@ -181,6 +185,8 @@ export const journal = {
       "Offre d'engagement annuel envoyée par e-mail à qui gère la facturation",
     "invoice.paid": "Prélèvement d'une facture réussi",
     "invoice.payment_failed": "Prélèvement d'une facture refusé",
+    "stive.messages_purged":
+      "Des échanges avec Stive arrivés à 30 jours de conservation ont été effacés",
   },
   /** Langue de Numa pour un propriétaire ; `language` : nom de la langue (« Anglais »). */
   ownerLanguageDetected: (owner: "primary" | "secondary", language: string) =>

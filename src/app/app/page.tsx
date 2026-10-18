@@ -1,6 +1,9 @@
 import {
   ArrowRight,
+  BellRing,
   CalendarCheck,
+  CalendarClock,
+  ClipboardPen,
   CalendarDays,
   CircleAlert,
   Eye,
@@ -10,11 +13,13 @@ import {
   PawPrint,
   Plus,
   Search,
+  Sparkles,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { PermissionKey } from "@/domains/equipe/permissions";
+import type { StiveBriefing } from "@/domains/stive/service";
 import { daysSince } from "@/domains/suivis/calendrier";
 import type {
   DashboardAgendaItem,
@@ -159,6 +164,98 @@ function toAgendaEvent(
   };
 }
 
+/** Carte « Le point de Stive » : ce qui attend une décision, et le prochain rendez-vous. */
+function StiveBriefingCard({
+  t,
+  locale,
+  briefing,
+  now,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  briefing: StiveBriefing;
+  now: Date;
+}) {
+  const words = t.stive;
+  const next = briefing.agenda?.find(
+    (item) => new Date(item.startsAt).getTime() > now.getTime(),
+  );
+  const lines = [
+    briefing.unacknowledged
+      ? {
+          href: "/app/alertes",
+          icon: BellRing,
+          label: words.briefing.unacknowledged(briefing.unacknowledged),
+        }
+      : null,
+    briefing.pendingAppointments
+      ? {
+          href: "/app/agenda",
+          icon: CalendarClock,
+          label: words.briefing.pendingAppointments(
+            briefing.pendingAppointments,
+          ),
+        }
+      : null,
+    briefing.drafts.length
+      ? {
+          href: "/app/suivis",
+          icon: ClipboardPen,
+          label: words.dashboard.drafts(briefing.drafts.length),
+        }
+      : null,
+  ].filter((line) => line !== null);
+  return (
+    <AssistantCard
+      assistant="stive"
+      action={
+        <ButtonLink
+          href="/app/stive"
+          variant="secondary"
+          size="sm"
+          icon={<Sparkles aria-hidden="true" className="size-4" />}
+        >
+          {words.dashboard.open}
+        </ButtonLink>
+      }
+    >
+      <p className="mb-2 font-semibold">{words.dashboard.title}</p>
+      {lines.length ? (
+        <ul className="grid gap-1.5">
+          {lines.map(({ href, icon: Icon, label }) => (
+            <li key={href}>
+              <Link
+                href={href}
+                className="inline-flex items-center gap-2 font-medium text-brand-ink underline-offset-2 hover:underline"
+              >
+                <Icon aria-hidden="true" className="size-4 shrink-0" />
+                {label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-ink-muted">{words.dashboard.calm}</p>
+      )}
+      {next ? (
+        <p className="mt-2 text-ink-muted">
+          {words.dashboard.nextAppointment(
+            formatTime(new Date(next.startsAt), locale),
+            "appointment" in next.title
+              ? t.dashboard.agenda.appointment(
+                  next.title.appointment === "other"
+                    ? t.dashboard.agenda.otherAppointment
+                    : t.labels.appointmentKinds[next.title.appointment],
+                  next.title.animalName,
+                )
+              : next.title.text,
+          )}
+        </p>
+      ) : null}
+    </AssistantCard>
+  );
+}
+
 export default async function TodayPage() {
   const context = await memberContext();
   const can = (permission: PermissionKey) =>
@@ -172,6 +269,10 @@ export default async function TodayPage() {
     services.today().today(context, now),
     services.stats().activity(context, now),
   ]);
+  // Le point de Stive reprend la vue déjà lue : ni demande comptée, ni échange enregistré.
+  const briefing = can("stive.use")
+    ? await services.stive().briefing(context, now, today)
+    : null;
   const { views } = today;
   if (views.length === 0 && today.activeFollowups === 0)
     return (
@@ -548,8 +649,13 @@ export default async function TodayPage() {
               links={{ followups: views.length > 0, alerts: clinical }}
             />
 
-            {can("stive.use") ? (
-              <AssistantCard assistant="stive">{text.stive}</AssistantCard>
+            {briefing ? (
+              <StiveBriefingCard
+                t={t}
+                locale={locale}
+                briefing={briefing}
+                now={now}
+              />
             ) : null}
           </div>
         </div>
