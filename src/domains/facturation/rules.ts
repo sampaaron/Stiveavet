@@ -30,6 +30,11 @@ export type PlanDefinition = {
   maxActiveFollowups: number;
   /** Stive, l'assistant IA interne de l'équipe. */
   stive: boolean;
+  /**
+   * Demandes à Stive par personne et par mois de Paris (cahier des charges §10) : jamais
+   * illimité, jamais affiché sur le site ; 0 sans Stive.
+   */
+  stiveMonthlyRequests: number;
   /** Intégrations avancées : connexion au logiciel du cabinet (dr.veto). */
   advancedIntegrations: boolean;
 };
@@ -44,6 +49,7 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
     includedActiveFollowups: 15,
     maxActiveFollowups: 30,
     stive: false,
+    stiveMonthlyRequests: 0,
     advancedIntegrations: false,
   },
   pro: {
@@ -55,6 +61,7 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
     includedActiveFollowups: 40,
     maxActiveFollowups: 80,
     stive: true,
+    stiveMonthlyRequests: 200,
     advancedIntegrations: false,
   },
   premium: {
@@ -66,6 +73,7 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
     includedActiveFollowups: 100,
     maxActiveFollowups: 200,
     stive: true,
+    stiveMonthlyRequests: 600,
     advancedIntegrations: true,
   },
 };

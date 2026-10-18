@@ -26,6 +26,8 @@ import type { PatientsService } from "@/domains/patients/service";
 import { protocolsService } from "@/domains/protocoles/service";
 import type { ProtocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
+import { stiveService } from "@/domains/stive/service";
+import type { StiveService } from "@/domains/stive/service";
 import type { SettingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
@@ -68,6 +70,7 @@ let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
 let today: TodayService | undefined;
 let stats: StatsService | undefined;
+let stive: StiveService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 declare global {
@@ -190,6 +193,21 @@ export const services = {
   stats(): StatsService {
     stats ??= statsService(appDatabase());
     return stats;
+  },
+  /** Stive, l'assistant IA de l'équipe : lit par les services des écrans (ADR 0034). */
+  stive(): StiveService {
+    stive ??= stiveService({
+      db: appDatabase(),
+      followups: services.followups(),
+      today: services.today(),
+      synthesis: services.synthesis(),
+      appointments: services.appointments(),
+      agenda: services.agenda(),
+      conversations: services.conversations(),
+      launch: services.launch(),
+      alerts: services.alerts(),
+    });
+    return stive;
   },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement

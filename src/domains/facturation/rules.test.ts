@@ -71,6 +71,14 @@ describe("catalogue (cahier des charges §13)", () => {
       true,
       true,
     ]);
+    // Limite mensuelle par personne, toujours finie ; zéro exactement sans Stive.
+    expect(
+      PLANS.map((plan) => PLAN_CATALOG[plan].stiveMonthlyRequests),
+    ).toEqual([0, 200, 600]);
+    for (const plan of PLANS)
+      expect(PLAN_CATALOG[plan].stiveMonthlyRequests > 0).toBe(
+        PLAN_CATALOG[plan].stive,
+      );
     expect(
       PLANS.map((plan) => PLAN_CATALOG[plan].advancedIntegrations),
     ).toEqual([false, false, true]);

@@ -176,6 +176,7 @@ export function LiveConversation({
   locale,
   view,
   links,
+  draft,
   simulatorHref,
 }: {
   t: AppDictionary;
@@ -183,6 +184,8 @@ export function LiveConversation({
   view: ConversationView;
   /** Liens de lecture signés des photos et vocaux, pour la personne qui consulte. */
   links: Record<string, SignedLink>;
+  /** Brouillon préparé par Stive, posé dans la zone de saisie (ADR 0034). */
+  draft: string | null;
   /** Lien vers le simulateur du propriétaire, en local seulement. */
   simulatorHref: string | null;
 }) {
@@ -249,6 +252,7 @@ export function LiveConversation({
           }
           animalName={view.animalName}
           pausesNuma={view.status === "active"}
+          draft={draft}
         />
       ) : (
         <p className="border-t border-line p-4 text-sm text-ink-muted sm:p-5">
