@@ -7,7 +7,7 @@ test("la page d'accueil s'affiche en français", async ({ page }) => {
   await expect(page).toHaveTitle(/^Stivea Vet · /);
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Vos patients suivis après l'intervention",
+    "Le suivi post-opératoire de vos patients",
   );
 });
 
