@@ -91,6 +91,11 @@ export const en: SiteDictionary = {
   nav: {
     label: "Main navigation",
     menu: "Menu",
+    assistants: "AI assistants",
+    assistantsHint: {
+      numa: "Owner follow-up on WhatsApp",
+      stive: "Your team's assistant",
+    },
     links: {
       how: "How it works",
       numa: "Numa",
@@ -123,16 +128,45 @@ export const en: SiteDictionary = {
   },
 
   home: {
+    announce: "New: Stive, your team's AI assistant",
     hero: {
-      eyebrow: "Post-consultation follow-up · dogs and cats",
-      title: "Your patients followed up after the procedure,",
-      titleAccent: "without adding to your day.",
-      lead: "Numa, an AI assistant, talks with owners on the practice's professional WhatsApp. She follows your protocol, spots warning signs and prepares a summary for you. The medical decision always stays with you.",
+      title: "Post-operative follow-up for your patients,",
+      titleAccent: "right on WhatsApp.",
+      lead: "Numa, an AI assistant, checks in on operated pets over the practice's WhatsApp and alerts you at the right time. Stive prepares the team's work. The medical decision always stays with you.",
       points: [
         "On your real follow-ups from day one",
         "No commitment, cancel any month",
         "Guided setup",
       ],
+    },
+    prompt: {
+      label: "Example request to Stive, with fictional data",
+      question: "Give me today's briefing",
+      answerTitle: "Your daily briefing",
+      answer: [
+        "1 emergency is waiting for a vet: Caramel, day 1",
+        "2 cases to watch: Moka and Pixel",
+        "3 check-ups to confirm this week",
+      ],
+      note: "Fictional example · Stive never diagnoses",
+    },
+    band: {
+      title: "Ready-to-use protocols for",
+      items: [
+        "Cat spay",
+        "Dog spay",
+        "Dog neutering",
+        "Scaling and dental care",
+        "Home treatment follow-up",
+        "Your own protocols",
+      ],
+    },
+    video: {
+      label: "Stivea Vet presentation video",
+      soundOn: "Turn sound on",
+      soundOff: "Turn sound off",
+      captions: "English subtitles",
+      fallback: "Your browser can't play this video. You can download it.",
     },
     phone: {
       label: "Example WhatsApp conversation with Numa (fictional)",
@@ -168,6 +202,61 @@ export const en: SiteDictionary = {
       body: "Redness reported on the scar, photo received.",
       footer: "Dr Fontaine notified on the practice computer",
     },
+    assistants: {
+      eyebrow: "Numa answers at any time, 7 days a week",
+      title: "Two AI assistants entirely at your service",
+      lead: "Numa talks to owners, Stive helps the team. Neither of them diagnoses or makes a medical decision.",
+      chatLabel: "Fictional exchange with {name}",
+      numa: {
+        role: "Owner follow-up on WhatsApp",
+        chat: {
+          ask: "She's licking a lot tonight, is that normal?",
+          answer:
+            "Thank you for letting me know. I'm passing this on to the practice team right away, and they will get back to you.",
+        },
+        body: "Numa follows the protocol approved by the vet: questions at the right time, photos of the scar, treatment reminders and warning signs.",
+        points: [
+          "Introduces herself as an AI and asks for the owner's consent",
+          "Sorts every answer: nothing to report, to watch or urgent",
+          "Immediately passes on the practice's emergency instructions",
+        ],
+        link: "See more details",
+      },
+      stive: {
+        role: "The team's assistant, inside Stivea Vet",
+        chat: {
+          ask: "Summarise Caramel's file",
+          answer:
+            "Spayed yesterday. Redness reported this morning, photo received. Dr Fontaine has been notified.",
+        },
+        body: "Stive prepares the daily briefing, file summaries, free slots and draft messages. He only sees what each person is allowed to see.",
+        points: [
+          "Daily briefing and file summary in one request",
+          "Appointments and drafts suggested, never sent on their own",
+          "Every real action waits for your click",
+        ],
+        link: "See more details",
+      },
+    },
+    whatsapp: {
+      eyebrow: "Numa on WhatsApp",
+      title: "Your patients' follow-up, right on WhatsApp",
+      lead: "No app for owners to install: Numa writes from the practice's WhatsApp Business number, following the protocol you approved.",
+      features: [
+        {
+          title: "The practice's number",
+          body: "Your personal WhatsApp is never used.",
+        },
+        {
+          title: "Photos and voice notes filed",
+          body: "Every answer lands in the follow-up record.",
+        },
+        {
+          title: "Alerts first",
+          body: "Warning signs reach the team straight away.",
+        },
+      ],
+    },
     beforeAfter: {
       title: "What changes for the practice",
       lead: "Follow-up calls and scattered messages give way to a structured follow-up the whole team can see.",
@@ -186,29 +275,10 @@ export const en: SiteDictionary = {
         "A summary ready when you open the file",
       ],
     },
-    assistants: {
-      title: "Two AI assistants, one framework: yours",
-      lead: "Numa talks to owners, Stive helps the team. Neither of them diagnoses or makes a medical decision.",
-      numa: {
-        role: "Talks with owners on WhatsApp",
-        points: [
-          "Introduces herself as an AI from the very first message",
-          "Asks for the owner's consent before any follow-up",
-          "Follows the protocol approved by the vet",
-          "Immediately passes on the practice's emergency instructions",
-        ],
-        link: "Discover Numa",
-      },
-      stive: {
-        role: "Helps vets and the team inside Stivea Vet",
-        points: [
-          "Prepares the daily briefing and file summaries",
-          "Suggests draft messages and appointments",
-          "Only sees what each person is allowed to see",
-          "Every real action is confirmed by a vet",
-        ],
-        link: "Discover Stive",
-      },
+    integrations: {
+      title: "Stivea Vet works with your everyday tools",
+      lead: "WhatsApp Business and dr.veto at launch, other veterinary software next. Imported data is read, never changed.",
+      link: "See all integrations",
     },
     steps: {
       title: "A follow-up launched in a few clicks",
@@ -231,6 +301,19 @@ export const en: SiteDictionary = {
         },
       ],
       link: "See how it works in detail",
+    },
+    preview: {
+      eyebrow: "The software",
+      title: "Your whole practice at a glance",
+      lead: "Emergencies, cases to watch, active follow-ups and today's schedule: the dashboard reads in seconds.",
+      points: [
+        "Numa's briefing as soon as you open it",
+        "Emergencies first, at the right level",
+        "Schedule and next actions alongside",
+      ],
+      imageAlt:
+        "Stivea Vet dashboard with fictional data: Numa's briefing, a reported emergency, priorities and today's schedule",
+      caption: "Software screenshot, fictional data",
     },
     principles: {
       title: "Our commitments",
@@ -266,28 +349,60 @@ export const en: SiteDictionary = {
     },
     faq: {
       title: "Frequently asked questions",
-      items: [
+      tabsLabel: "Question topics",
+      tabs: [
         {
-          q: "Can Numa give medical advice?",
-          a: "No. Numa asks your protocol's questions, collects answers, photos and voice notes, and alerts you. She does not diagnose and never changes a treatment. In an emergency, she passes on your practice's emergency instructions and contacts.",
+          label: "General",
+          items: [
+            {
+              q: "How much does Stivea Vet cost?",
+              a: "From {price} excl. VAT per month with the Starter plan, without commitment and cancellable at any time. No annual commitment is ever created automatically.",
+            },
+            {
+              q: "Do owners know they are talking to an AI?",
+              a: "Yes, from the very first message. Numa also asks for their consent before starting the follow-up, and they can stop it at any time by writing STOP.",
+            },
+            {
+              q: "Do I need technical skills?",
+              a: "No. The guided setup takes you step by step: WhatsApp Business, opening hours, emergency instructions, team and protocols. Every setting can be changed later.",
+            },
+          ],
         },
         {
-          q: "Do owners know they are talking to an AI?",
-          a: "Yes, from the very first message. Numa also asks for their consent before starting the follow-up, and they can stop it at any time by writing STOP.",
+          label: "How it works",
+          items: [
+            {
+              q: "Can Numa give medical advice?",
+              a: "No. Numa asks your protocol's questions, collects answers, photos and voice notes, and alerts you. She does not diagnose and never changes a treatment. In an emergency, she passes on your practice's emergency instructions and contacts.",
+            },
+            {
+              q: "What happens at night and at weekends?",
+              a: "Numa answers owners at any time. Scheduled messages follow your opening hours. In an emergency, she immediately passes on your night, weekend or public holiday instructions.",
+            },
+            {
+              q: "Can Stive act on my behalf?",
+              a: "Stive prepares: daily briefing, file summary, slots, drafts. Every real action, such as confirming an appointment or sending a message, waits for a team member's click.",
+            },
+          ],
         },
         {
-          q: "Do I need to change my practice software?",
-          a: "No. You register your patients in Stivea Vet in a few clicks. With the Premium plan, Stivea Vet also connects to dr.veto, read-only, and never writes to it. Vétocom and Vetup will follow.",
-        },
-        {
-          q: "How much does Stivea Vet cost?",
-          a: "From {price} excl. VAT per month with the Starter plan, without commitment and cancellable at any time. No annual commitment is ever created automatically.",
-        },
-        {
-          q: "What happens at night and at weekends?",
-          a: "Numa answers owners at any time. Scheduled messages follow your opening hours. In an emergency, she immediately passes on your night, weekend or public holiday instructions.",
+          label: "Integrations",
+          items: [
+            {
+              q: "Do I need to change my practice software?",
+              a: "No. You register your patients in Stivea Vet in a few clicks. With the Premium plan, Stivea Vet also connects to dr.veto, read-only, and never writes to it. Vétocom and Vetup will follow.",
+            },
+            {
+              q: "Which WhatsApp number does Numa use?",
+              a: "The practice's professional WhatsApp Business number. Your personal WhatsApp is never used.",
+            },
+          ],
         },
       ],
+      helpTitle: "Still need help?",
+      helpBody:
+        "Explore the demo on a fictional practice, or browse the help centre.",
+      helpLink: "Help centre",
     },
     finalCta: {
       title: "Try Stivea Vet on your real follow-ups",

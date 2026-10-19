@@ -17,7 +17,6 @@ import { Card } from "@/ui/card";
 import {
   CheckList,
   CtaBand,
-  FaqList,
   LegalDraft,
   PageIntro,
   Section,
@@ -27,6 +26,7 @@ import {
 } from "../blocks";
 import { CtaLink, trialCta } from "../chrome";
 import type { SiteProps } from "../chrome";
+import { FaqList } from "../faq-list";
 import { PricingVisual, SecurityVisual, SupportVisual } from "../illustrations";
 
 /** Prix issus du catalogue de facturation (une seule source, cahier des charges §13). */

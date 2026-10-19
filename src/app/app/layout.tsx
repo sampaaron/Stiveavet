@@ -1,5 +1,3 @@
-import "@fontsource-variable/fraunces";
-
 import { LockKeyhole, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 

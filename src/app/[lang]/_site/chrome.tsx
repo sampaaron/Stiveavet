@@ -1,4 +1,4 @@
-import { Menu } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -10,7 +10,6 @@ import { pathFor } from "@/i18n/routes";
 import type { SitePage } from "@/i18n/routes";
 import { fill } from "@/i18n/site";
 import type { SiteDictionary } from "@/i18n/site";
-import { ButtonLink } from "@/ui/button";
 import { cn } from "@/ui/cn";
 
 export type SiteProps = { locale: Locale; t: SiteDictionary };
@@ -24,6 +23,10 @@ const NAV = [
   "security",
 ] as const satisfies readonly SitePage[];
 
+/** Numa et Stive sont regroupés dans le menu « Assistants IA » de l'en-tête. */
+const ASSISTANTS = ["numa", "stive"] as const satisfies readonly SitePage[];
+const NAV_AFTER = ["integrations", "pricing", "security"] as const;
+
 export function trialCta(locale: Locale, t: SiteDictionary): string {
   return fill(t.common.ctaTrial, {
     price: formatPrice(STARTING_PRICE_CENTS, locale),
@@ -31,7 +34,10 @@ export function trialCta(locale: Locale, t: SiteDictionary): string {
 }
 
 const CTA_TONES = {
-  primary: "bg-brand text-white hover:bg-brand-strong",
+  primary:
+    "bg-brand text-white shadow-[0_10px_30px_-12px_rgb(8_122_84/0.9)] hover:bg-brand-strong",
+  /** Appel principal sur fond sombre : menthe, le plus visible de la page. */
+  mint: "bg-mint text-night shadow-[0_10px_34px_-12px_rgb(140_232_195/0.75)] hover:bg-white",
   onDark: "border border-white/25 text-white hover:bg-white/10",
   outline: "border border-brand text-brand-ink hover:bg-brand-soft",
 } as const;
@@ -55,7 +61,7 @@ export function CtaLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] px-4 py-2.5 text-center text-sm font-semibold transition-colors",
+        "inline-flex min-h-11 items-center justify-center rounded-full px-5 py-2.5 text-center text-sm font-semibold transition-colors",
         CTA_TONES[tone],
         className,
       )}
@@ -71,8 +77,8 @@ function otherLocale(locale: Locale): Locale {
 
 function Wordmark() {
   return (
-    <span className="text-lg font-bold tracking-tight text-ink">
-      stivea <span className="text-brand">vet</span>
+    <span className="text-lg font-bold tracking-tight text-white">
+      stivea <span className="text-mint">vet</span>
     </span>
   );
 }
@@ -98,7 +104,59 @@ function LanguageLink({
 }
 
 const navLink =
-  "rounded-[10px] px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-canvas-subtle hover:text-ink aria-[current=page]:text-ink aria-[current=page]:font-semibold";
+  "rounded-full px-3 py-2 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white aria-[current=page]:text-white aria-[current=page]:font-semibold";
+
+/** Menu « Assistants IA » : `<details>` natif, utilisable au clavier et sans script. */
+function AssistantsMenu({ locale, t, page }: SiteProps & { page: SitePage }) {
+  const current = ASSISTANTS.some((item) => item === page);
+  return (
+    <details className="group relative">
+      <summary
+        className={cn(
+          navLink,
+          "flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden",
+          current && "font-semibold text-white",
+        )}
+      >
+        {t.nav.assistants}
+        <ChevronDown
+          aria-hidden="true"
+          className="size-3.5 transition-transform group-open:rotate-180"
+        />
+      </summary>
+      <ul className="absolute left-0 z-50 mt-2 grid w-72 gap-1 rounded-[var(--radius-card)] border border-white/10 bg-night-soft p-2 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.7)]">
+        {ASSISTANTS.map((item) => (
+          <li key={item}>
+            <Link
+              href={pathFor(item, locale)}
+              aria-current={item === page ? "page" : undefined}
+              className="flex items-center gap-3 rounded-[14px] p-2.5 transition-colors hover:bg-white/10"
+            >
+              <Image
+                src={`/assistants/${item}.webp`}
+                alt=""
+                width={40}
+                height={40}
+                className="rounded-full object-cover ring-2 ring-white/15"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-white">
+                  {t.nav.links[item]}
+                  <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-mint">
+                    {item === "numa" ? t.common.numaAi : t.common.stiveAi}
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-xs text-white/70">
+                  {t.nav.assistantsHint[item]}
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 export function SiteHeader({
   locale,
@@ -106,7 +164,7 @@ export function SiteHeader({
   page,
 }: SiteProps & { page: SitePage }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-night/90 text-white backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
         <Link
           href={pathFor("home", locale)}
@@ -125,7 +183,19 @@ export function SiteHeader({
 
         <nav aria-label={t.nav.label} className="ml-4 hidden lg:block">
           <ul className="flex items-center gap-0.5">
-            {NAV.map((item) => (
+            <li>
+              <Link
+                href={pathFor("how", locale)}
+                aria-current={page === "how" ? "page" : undefined}
+                className={navLink}
+              >
+                {t.nav.links.how}
+              </Link>
+            </li>
+            <li>
+              <AssistantsMenu locale={locale} t={t} page={page} />
+            </li>
+            {NAV_AFTER.map((item) => (
               <li key={item}>
                 <Link
                   href={pathFor(item, locale)}
@@ -149,22 +219,22 @@ export function SiteHeader({
             />
           </span>
           <span className="hidden md:block">
-            <ButtonLink href="/connexion" variant="quiet">
+            <Link href="/connexion" className={navLink}>
               {t.common.login}
-            </ButtonLink>
+            </Link>
           </span>
           <span className="hidden xl:block">
-            <ButtonLink href={pathFor("trial", locale)}>
+            <CtaLink href={pathFor("trial", locale)} tone="mint">
               {trialCta(locale, t)}
-            </ButtonLink>
+            </CtaLink>
           </span>
 
           <details className="group relative lg:hidden">
-            <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-full border border-white/20 px-4 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
               <Menu aria-hidden="true" className="size-4" />
               {t.nav.menu}
             </summary>
-            <div className="absolute right-0 z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--shadow-card)]">
+            <div className="absolute right-0 z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-white/10 bg-night-soft p-2 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.7)]">
               <nav aria-label={t.nav.menu}>
                 <ul className="grid">
                   {NAV.map((item) => (
@@ -193,7 +263,11 @@ export function SiteHeader({
                   </li>
                 </ul>
               </nav>
-              <CtaLink href={pathFor("trial", locale)} className="mt-2 w-full">
+              <CtaLink
+                href={pathFor("trial", locale)}
+                tone="mint"
+                className="mt-2 w-full"
+              >
                 {trialCta(locale, t)}
               </CtaLink>
             </div>

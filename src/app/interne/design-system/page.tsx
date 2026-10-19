@@ -1,5 +1,3 @@
-import "@fontsource-variable/fraunces";
-
 import { CalendarPlus, MessageSquareText, PawPrint } from "lucide-react";
 import type { Metadata } from "next";
 

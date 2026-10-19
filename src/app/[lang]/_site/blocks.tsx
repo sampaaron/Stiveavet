@@ -10,6 +10,7 @@ import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
 
 import { CtaLink, trialCta } from "./chrome";
+import { FaqList } from "./faq-list";
 
 export function Section({
   children,
@@ -34,23 +35,55 @@ export function SectionTitle({
   id,
   title,
   lead,
+  eyebrow,
+  onDark = false,
+  centered = false,
   className,
 }: {
   id: string;
   title: string;
   lead?: string;
+  /** Petite étiquette au-dessus du titre. */
+  eyebrow?: string;
+  onDark?: boolean;
+  centered?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("max-w-2xl", className)}>
+    <div
+      className={cn(
+        "max-w-2xl",
+        centered && "mx-auto max-w-3xl text-center",
+        className,
+      )}
+    >
+      {eyebrow ? (
+        <p
+          className={cn(
+            "mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold tracking-wide",
+            onDark
+              ? "border border-white/15 bg-white/5 text-mint"
+              : "bg-brand-soft text-brand-ink",
+          )}
+        >
+          {eyebrow}
+        </p>
+      ) : null}
       <h2
         id={id}
-        className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-4xl"
+        className="font-display text-[1.85rem] leading-[1.1] font-bold tracking-[-0.025em] text-balance sm:text-[2.6rem]"
       >
         {title}
       </h2>
       {lead ? (
-        <p className="mt-3 text-base text-ink-muted sm:text-lg">{lead}</p>
+        <p
+          className={cn(
+            "mt-4 text-base sm:text-lg",
+            onDark ? "text-white/75" : "text-ink-muted",
+          )}
+        >
+          {lead}
+        </p>
       ) : null}
     </div>
   );
@@ -82,7 +115,7 @@ export function PageIntro({
         )}
       >
         <div className="min-w-0">
-          <h1 className="max-w-3xl font-display text-[2rem] leading-tight font-semibold tracking-tight sm:text-5xl">
+          <h1 className="max-w-3xl font-display text-[2rem] leading-[1.08] font-bold tracking-[-0.03em] text-balance sm:text-5xl">
             {title}
           </h1>
           {lead ? (
@@ -187,12 +220,12 @@ export function CtaBand({
       <div className="relative overflow-hidden rounded-[24px] bg-night px-6 py-12 text-white sm:px-12">
         <div aria-hidden="true" className="absolute inset-0 site-halos" />
         <div className="relative max-w-2xl">
-          <h2 className="font-display text-[1.75rem] leading-tight font-semibold sm:text-4xl">
+          <h2 className="font-display text-[1.85rem] leading-[1.1] font-bold tracking-[-0.025em] text-balance sm:text-[2.6rem]">
             {title}
           </h2>
           {body ? <p className="mt-3 text-white/80">{body}</p> : null}
           <div className="mt-8 flex flex-wrap gap-3">
-            <CtaLink href={pathFor("trial", locale)}>
+            <CtaLink href={pathFor("trial", locale)} tone="mint">
               {trialCta(locale, t)}
             </CtaLink>
             <CtaLink href={pathFor("demo", locale)} tone="onDark">
@@ -218,39 +251,6 @@ export function Faq({
     <div>
       <SectionTitle id={id} title={title} />
       <FaqList items={items} className="mt-8" />
-    </div>
-  );
-}
-
-/** Questions dépliables, sans script : `<details>` natif, utilisable au clavier. */
-export function FaqList({
-  items,
-  className,
-}: {
-  items: readonly { q: string; a: string }[];
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface",
-        className,
-      )}
-    >
-      {items.map((item) => (
-        <details key={item.q} className="group px-5 py-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
-            {item.q}
-            <span
-              aria-hidden="true"
-              className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted transition-transform group-open:rotate-45"
-            >
-              +
-            </span>
-          </summary>
-          <p className="mt-3 text-ink-muted">{item.a}</p>
-        </details>
-      ))}
     </div>
   );
 }
