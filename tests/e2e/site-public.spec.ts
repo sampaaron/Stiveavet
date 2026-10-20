@@ -115,6 +115,10 @@ test.describe("pages du site", () => {
         page.getByText(price, { exact: true }).first(),
       ).toBeVisible();
     await expect(page.getByText("Offre phare")).toBeVisible();
+    for (const price of ["89 €", "179 €", "359 €"])
+      await expect(
+        page.getByRole("link", { name: `Démarrer à ${price} HT par mois` }),
+      ).toBeVisible();
     await expect(
       page.getByText(/^152\s€ HT \/ mois avec engagement/),
     ).toBeVisible();

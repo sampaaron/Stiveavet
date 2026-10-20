@@ -77,6 +77,7 @@ export const en: SiteDictionary = {
     brandVet: "vet",
     skipToContent: "Skip to content",
     ctaTrial: "Start from {price} excl. VAT per month",
+    ctaPlan: "Start at {price} excl. VAT per month",
     ctaDemo: "See the demo",
     login: "Log in",
     numaAi: "AI assistant",

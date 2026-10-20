@@ -27,7 +27,7 @@ import {
   TextLink,
   TextSections,
 } from "../blocks";
-import { CtaLink, trialCta } from "../chrome";
+import { CtaLink } from "../chrome";
 import type { SiteProps } from "../chrome";
 import { PricingVisual, SecurityVisual, SupportVisual } from "../illustrations";
 
@@ -134,7 +134,9 @@ export function PricingPage({ locale, t }: SiteProps) {
                       tone={featured ? "primary" : "outline"}
                       className="w-full"
                     >
-                      {trialCta(locale, t)}
+                      {fill(t.common.ctaPlan, {
+                        price: price(definition.monthlyCents),
+                      })}
                     </CtaLink>
                   </div>
                 </Card>

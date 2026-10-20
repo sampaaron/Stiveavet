@@ -82,6 +82,7 @@ export const fr = {
     brandVet: "vet",
     skipToContent: "Aller au contenu",
     ctaTrial: "Démarrer dès {price} HT par mois",
+    ctaPlan: "Démarrer à {price} HT par mois",
     ctaDemo: "Voir la démo",
     login: "Connexion",
     numaAi: "Assistante IA",
