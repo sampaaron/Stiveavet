@@ -197,7 +197,7 @@ describe("échéances et prélèvements simulés", () => {
     expect(first.invoices.map((invoice) => invoice.subtotalCents)).toEqual([
       23_100, 23_100, 23_100, 23_100,
     ]);
-    expect(first.invoices[3]?.totalCents).toBe(23_880);
+    expect(first.invoices[3]?.totalCents).toBe(27_720);
     expect(first.access).toEqual({ kind: "full" });
     expect(first.commitmentReminder).toBe(true);
     expect(first.nextPriceCents).toBe(23_100);
