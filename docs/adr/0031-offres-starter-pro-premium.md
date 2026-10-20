@@ -1,6 +1,7 @@
 # 0031 — Offres Starter, Pro et Premium
 
 - Statut : accepté (14 octobre 2026), remplace les formules de l'ADR 0011 et le prix d'essai de l'ADR 0023
+- Prix revus le 20 octobre 2026 (décision d'Aaron) : Starter reste à 79 €, puis 76 € d'écart entre chaque offre ; Pro passe de 129 € à 155 €, Premium de 199 € à 231 €. Les prix annuels gardent environ 15 % de remise.
 - Migration : `0022_offres_starter_pro_premium`
 
 ## Contexte
@@ -14,8 +15,8 @@ Le cahier des charges du MVP fixe trois offres : Starter à 79 €, Pro à 129 �
    | Offre   | Mois  | Annuel | Vétérinaires | Assistants  | Suivis inclus / plafond | Stive | dr.veto |
    | ------- | ----- | ------ | ------------ | ----------- | ----------------------- | ----- | ------- |
    | Starter | 79 €  | 67 €   | 1            | 1           | 15 / 30                 | non   | non     |
-   | Pro     | 129 € | 109 €  | 2            | 3           | 40 / 80                 | oui   | non     |
-   | Premium | 199 € | 169 €  | 3            | sans limite | 100 / 200               | oui   | oui     |
+   | Pro     | 155 € | 132 €  | 2            | 3           | 40 / 80                 | oui   | non     |
+   | Premium | 231 € | 196 €  | 3            | sans limite | 100 / 200               | oui   | oui     |
 
 2. **Fin de l'essai pilote.** Le prix de l'offre s'applique dès le premier mois. Les deux premiers mois restent sans engagement possible ; l'engagement annuel est proposé au 45e jour et commence au 3e mois, comme dans l'ADR 0023.
 3. **Limites appliquées côté serveur.**

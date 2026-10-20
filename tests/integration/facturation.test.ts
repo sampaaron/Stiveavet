@@ -195,12 +195,12 @@ describe("échéances et prélèvements simulés", () => {
     );
     // Prix de la formule Premium sans engagement dès le 1er mois ; TVA 20 %.
     expect(first.invoices.map((invoice) => invoice.subtotalCents)).toEqual([
-      19_900, 19_900, 19_900, 19_900,
+      23_100, 23_100, 23_100, 23_100,
     ]);
     expect(first.invoices[3]?.totalCents).toBe(23_880);
     expect(first.access).toEqual({ kind: "full" });
     expect(first.commitmentReminder).toBe(true);
-    expect(first.nextPriceCents).toBe(19_900);
+    expect(first.nextPriceCents).toBe(23_100);
   });
 
   it("sans mandat signé, les factures restent à prélever, sans impayé", async () => {
@@ -359,7 +359,7 @@ describe("formule et engagement", () => {
     const committed = await paying.overview(offered.owner);
     expect(committed.facts?.cycle).toBe("annual");
     // Prix sans engagement jusqu'à la fin des 2 premiers mois, puis le tarif annuel pendant 12 mois.
-    expect(committed.nextPriceCents).toBe(16_900);
+    expect(committed.nextPriceCents).toBe(19_600);
     const startedAt = committed.facts?.startedAt ?? new Date();
     expect(committed.facts?.annualEndsAt).toEqual(addMonths(startedAt, 14));
     expect(committed.commitmentReminder).toBe(false);
@@ -368,7 +368,7 @@ describe("formule et engagement", () => {
     await paying.chooseCycle(flexible.owner, "annual");
     const overview = await paying.overview(flexible.owner);
     expect(overview.facts?.cycle).toBe("annual");
-    expect(overview.nextPriceCents).toBe(16_900);
+    expect(overview.nextPriceCents).toBe(19_600);
     expect(overview.commitmentReminder).toBe(false);
     expect(await domainError(paying.changePlan(flexible.owner, "pro"))).toBe(
       "invalid_target",

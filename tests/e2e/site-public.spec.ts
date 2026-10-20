@@ -108,13 +108,13 @@ test.describe("pages du site", () => {
 
   test("tarifs : les prix HT du cahier des charges", async ({ page }) => {
     await page.goto("/fr/tarifs");
-    for (const price of ["79 €", "129 €", "199 €"])
+    for (const price of ["79 €", "155 €", "231 €"])
       await expect(
         page.getByText(price, { exact: true }).first(),
       ).toBeVisible();
     await expect(page.getByText("Offre phare")).toBeVisible();
     await expect(
-      page.getByText(/^109\s€ HT \/ mois avec engagement/),
+      page.getByText(/^132\s€ HT \/ mois avec engagement/),
     ).toBeVisible();
     await expect(page.getByText("Plus de 3 vétérinaires")).toBeVisible();
     await expect(page.getByText(/2,50\s€ HT/)).toBeVisible();

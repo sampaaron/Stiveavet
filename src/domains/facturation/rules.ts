@@ -54,8 +54,8 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   pro: {
     label: "Pro",
-    monthlyCents: 12_900,
-    annualMonthlyCents: 10_900,
+    monthlyCents: 15_500,
+    annualMonthlyCents: 13_200,
     maxVets: 2,
     maxAssistants: 3,
     includedActiveFollowups: 40,
@@ -66,8 +66,8 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   premium: {
     label: "Premium",
-    monthlyCents: 19_900,
-    annualMonthlyCents: 16_900,
+    monthlyCents: 23_100,
+    annualMonthlyCents: 19_600,
     maxVets: 3,
     maxAssistants: null,
     includedActiveFollowups: 100,

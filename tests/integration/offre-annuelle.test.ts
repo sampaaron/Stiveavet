@@ -151,7 +151,7 @@ describe("offre d'engagement annuel par e-mail", () => {
     expect(message?.subject).toBe(
       "Stivea Vet : engagement annuel ou mensuel ?",
     );
-    expect(message?.text).toMatch(/169,00\s€ HT par mois pendant 12 mois/);
+    expect(message?.text).toMatch(/196,00\s€ HT par mois pendant 12 mois/);
     expect(message?.text).toContain("rien ne bascule automatiquement");
     expect(message?.text).toContain("http://localhost:3000/app/facturation");
     const { rows } = await admin.query(
