@@ -496,6 +496,12 @@ export const fr = {
       "{price} HT / mois avec engagement annuel, possible à partir du 3e mois",
     perMonthExclVat: "HT / mois",
     monthly: "sans engagement",
+    intro: {
+      title: "Offre de lancement : −{percent} % pendant {months} mois",
+      body: "Pour les cabinets inscrits jusqu'au {date}, sur les trois formules. Ensuite, le prix normal s'applique, au mois ou avec engagement annuel.",
+      regular: "Prix normal",
+      then: "les {months} premiers mois, puis {price} HT / mois sans engagement",
+    },
     plans: {
       starter: {
         name: "Starter",

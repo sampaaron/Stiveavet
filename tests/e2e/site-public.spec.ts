@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
 
+import { introOfferOpen } from "../../src/domains/facturation/rules";
+
 import { expectAccessible } from "./support/flows";
 import { latestEmail } from "./support/mailpit";
 
@@ -116,6 +118,17 @@ test.describe("pages du site", () => {
     await expect(
       page.getByText(/^152\s€ HT \/ mois avec engagement/),
     ).toBeVisible();
+    // Offre de lancement, tant qu'elle est ouverte (ADR 0037).
+    if (introOfferOpen(new Date())) {
+      await expect(
+        page.getByText(/^Offre de lancement : −25 % pendant 6 mois$/),
+      ).toBeVisible();
+      for (const price of ["67 €", "134 €", "269 €"])
+        await expect(page.getByText(price, { exact: true })).toBeVisible();
+      await expect(
+        page.getByText(/^les 6 premiers mois, puis 179\s€ HT/),
+      ).toBeVisible();
+    }
     await expect(page.getByText("Plus de 3 vétérinaires")).toBeVisible();
     await expect(page.getByText(/2,50\s€ HT/)).toBeVisible();
     await expect(page.getByText(/1,26\s€ HT/)).toBeVisible();

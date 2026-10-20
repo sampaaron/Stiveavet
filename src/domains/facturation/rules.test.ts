@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   FEATURED_PLAN,
   LAUNCH_SURCHARGE_CENTS,
+  INTRO_OFFER,
   PLANS,
   PLAN_CATALOG,
   REACTIVATION_SURCHARGE_CENTS,
@@ -18,6 +19,8 @@ import {
   commitmentReminder,
   draftInvoice,
   formatEuros,
+  introOfferApplies,
+  introOfferOpen,
   isCanceled,
   maxAssistants,
   maxVets,
@@ -48,6 +51,9 @@ const facts = (
   endsAt: null,
   ...overrides,
 });
+/** Cabinet inscrit après la fin de l'offre de lancement : prix normaux dès le 1er mois. */
+const regular = (overrides: Partial<SubscriptionFacts> = {}) =>
+  facts({ startedAt: new Date("2027-09-01T10:00:00Z"), ...overrides });
 const idle = { activeFollowups: 0, lastFollowupEndedAt: null };
 const busy = { activeFollowups: 3, lastFollowupEndedAt: null };
 
@@ -61,6 +67,20 @@ describe("catalogue (cahier des charges §13)", () => {
     ]);
     expect(FEATURED_PLAN).toBe("pro");
     expect(STARTING_PRICE_CENTS).toBe(8_900);
+  });
+
+  it("offre de lancement : 25 % de moins, arrondi à l'euro (67 €, 134 €, 269 €)", () => {
+    expect(PLANS.map((plan) => PLAN_CATALOG[plan].introMonthlyCents)).toEqual([
+      6_700, 13_400, 26_900,
+    ]);
+    for (const plan of PLANS) {
+      const { monthlyCents, introMonthlyCents } = PLAN_CATALOG[plan];
+      expect(introMonthlyCents).toBe(
+        Math.round(
+          (monthlyCents * (100 - INTRO_OFFER.discountPercent)) / 10_000,
+        ) * 100,
+      );
+    }
   });
 
   it("quotas : places, suivis actifs, Stive et intégrations", () => {
@@ -122,14 +142,26 @@ describe("calendrier de l'abonnement", () => {
 
 describe("prix", () => {
   it("prix de la formule dès le 1er mois ; tarif annuel à partir du 3e", () => {
-    expect(monthlyPriceCents(facts(), 1)).toBe(35_900);
-    expect(monthlyPriceCents(facts({ cycle: "annual" }), 2)).toBe(35_900);
-    expect(monthlyPriceCents(facts(), 3)).toBe(35_900);
-    expect(monthlyPriceCents(facts({ cycle: "annual" }), 3)).toBe(30_500);
+    expect(monthlyPriceCents(regular(), 1)).toBe(35_900);
+    expect(monthlyPriceCents(regular({ cycle: "annual" }), 2)).toBe(35_900);
+    expect(monthlyPriceCents(regular(), 3)).toBe(35_900);
+    expect(monthlyPriceCents(regular({ cycle: "annual" }), 3)).toBe(30_500);
+  });
+
+  it("offre de lancement les 6 premiers mois, quel que soit le cycle, pour les inscrits avant le 1er juillet 2027", () => {
+    expect(introOfferOpen(new Date("2027-06-30T21:59:59Z"))).toBe(true);
+    expect(introOfferOpen(new Date("2027-06-30T22:00:00Z"))).toBe(false);
+    for (const m of [1, 3, 6]) {
+      expect(monthlyPriceCents(facts(), m)).toBe(26_900);
+      expect(monthlyPriceCents(facts({ cycle: "annual" }), m)).toBe(26_900);
+    }
+    expect(monthlyPriceCents(facts(), 7)).toBe(35_900);
+    expect(monthlyPriceCents(facts({ cycle: "annual" }), 7)).toBe(30_500);
+    expect(introOfferApplies(regular(), 1)).toBe(false);
   });
 
   it("aucune bascule annuelle automatique avant (ni après) le 7e mois", () => {
-    const untouched = facts();
+    const untouched = regular();
     for (const m of [3, 6, 7, 12])
       expect(monthlyPriceCents(untouched, m)).toBe(
         PLAN_CATALOG.premium.monthlyCents,
@@ -363,7 +395,7 @@ describe("plafond des suivis actifs (dépassement maîtrisé)", () => {
 
 describe("factures", () => {
   it("abonnement du mois et suppléments du mois précédent, TVA 20 %", () => {
-    const invoice = draftInvoice(facts(), 4, [
+    const invoice = draftInvoice(regular(), 4, [
       { kind: "launch", amountCents: 250 },
       { kind: "launch", amountCents: 0 },
       { kind: "launch", amountCents: 250 },
@@ -390,7 +422,7 @@ describe("factures", () => {
 
   it("premiers mois et engagement annuel", () => {
     expect(
-      draftInvoice(facts({ cycle: "annual", plan: "starter" }), 1, []).lines,
+      draftInvoice(regular({ cycle: "annual", plan: "starter" }), 1, []).lines,
     ).toEqual([
       {
         label: "Formule Starter, sans engagement, mois 1",
@@ -398,11 +430,19 @@ describe("factures", () => {
       },
     ]);
     expect(
-      draftInvoice(facts({ cycle: "annual", plan: "starter" }), 8, []).lines,
+      draftInvoice(regular({ cycle: "annual", plan: "starter" }), 8, []).lines,
     ).toEqual([
       {
         label: "Formule Starter, engagement annuel, mois 8",
         amountCents: 7_600,
+      },
+    ]);
+    expect(
+      draftInvoice(facts({ cycle: "annual", plan: "starter" }), 4, []).lines,
+    ).toEqual([
+      {
+        label: "Formule Starter, engagement annuel, offre de lancement, mois 4",
+        amountCents: 6_700,
       },
     ]);
   });

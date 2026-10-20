@@ -485,6 +485,12 @@ export const en: SiteDictionary = {
       "{price} excl. VAT / month with an annual commitment, available from month 3",
     perMonthExclVat: "excl. VAT / month",
     monthly: "no commitment",
+    intro: {
+      title: "Launch offer: {percent}% off for {months} months",
+      body: "For practices that sign up by {date}, on all three plans. After that, the regular price applies, monthly or with an annual commitment.",
+      regular: "Regular price",
+      then: "for the first {months} months, then {price} excl. VAT / month with no commitment",
+    },
     plans: {
       starter: {
         name: "Starter",

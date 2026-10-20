@@ -2,6 +2,7 @@
 
 - Statut : accepté (14 octobre 2026), remplace les formules de l'ADR 0011 et le prix d'essai de l'ADR 0023
 - Prix revus le 20 octobre 2026 : Aaron a confié la grille à l'équipe technique, « alignée sur la concurrence mais un peu moins chère », avec une bonne marge. Voir « Prix et concurrence » ci-dessous.
+- Offre de lancement (−25 % les 6 premiers mois) : ADR 0037
 - Migration : `0022_offres_starter_pro_premium`
 
 ## Contexte

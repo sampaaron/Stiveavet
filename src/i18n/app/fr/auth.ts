@@ -88,6 +88,13 @@ export const auth = {
       legend: "Votre offre",
       help: "Au mois et sans engagement : vous changez d'offre ou résiliez à tout moment. L'engagement annuel, moins cher, vous est proposé après un mois et demi ; il n'est jamais automatique.",
       option: (name: string, price: string) => `${name} · ${price} HT par mois`,
+      introOption: (
+        name: string,
+        intro: string,
+        months: number,
+        price: string,
+      ) =>
+        `${name} · offre de lancement : ${intro} HT par mois les ${months} premiers mois, puis ${price}`,
       details: (summary: string, annualPrice: string) =>
         `${summary}. Avec engagement annuel : ${annualPrice} HT par mois.`,
     },
