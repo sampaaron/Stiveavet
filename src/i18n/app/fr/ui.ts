@@ -51,4 +51,9 @@ export const ui = {
     },
     pending: "À confirmer",
   },
+  fileDrop: {
+    prompt: "Glissez l'image ici",
+    browse: "ou cliquez pour choisir un fichier",
+    replace: "Cliquez pour choisir une autre image",
+  },
 };

@@ -12,6 +12,7 @@ import { useActionState, useId } from "react";
 import { useAppText } from "@/i18n/app/client";
 
 import { Button } from "@/ui/button";
+import { FileDrop } from "@/ui/file-drop";
 
 import { ActionMessage, selectClasses } from "../action-message";
 import { initialActionState } from "../action-state";
@@ -60,14 +61,11 @@ export function CaptureForm({
         <label htmlFor={`${id}-file`} className="text-sm font-semibold">
           {t.agenda.capture.fileLabel}
         </label>
-        <input
+        <FileDrop
           id={`${id}-file`}
           name="capture"
-          type="file"
-          required
           accept="image/jpeg,image/png,image/webp"
-          aria-describedby={`${id}-hint`}
-          className="min-h-11 w-full min-w-0 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] file:mr-3 file:rounded-full file:border-0 file:bg-brand-soft file:px-3 file:py-1 file:text-sm file:font-semibold file:text-brand-ink"
+          describedBy={`${id}-hint`}
         />
         <p id={`${id}-hint`} className="text-xs text-ink-muted">
           {t.agenda.capture.fileHint}
