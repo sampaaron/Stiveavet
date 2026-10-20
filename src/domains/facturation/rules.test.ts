@@ -52,15 +52,15 @@ const idle = { activeFollowups: 0, lastFollowupEndedAt: null };
 const busy = { activeFollowups: 3, lastFollowupEndedAt: null };
 
 describe("catalogue (cahier des charges §13)", () => {
-  it("Starter 79 €, Pro 155 € (offre phare), Premium 231 € HT par mois", () => {
+  it("Starter 89 €, Pro 179 € (offre phare), Premium 359 € HT par mois", () => {
     expect(PLANS.map((plan) => PLAN_CATALOG[plan].monthlyCents)).toEqual([
-      7_900, 15_500, 23_100,
+      8_900, 17_900, 35_900,
     ]);
     expect(PLANS.map((plan) => PLAN_CATALOG[plan].annualMonthlyCents)).toEqual([
-      6_700, 13_200, 19_600,
+      7_600, 15_200, 30_500,
     ]);
     expect(FEATURED_PLAN).toBe("pro");
-    expect(STARTING_PRICE_CENTS).toBe(7_900);
+    expect(STARTING_PRICE_CENTS).toBe(8_900);
   });
 
   it("quotas : places, suivis actifs, Stive et intégrations", () => {
@@ -88,7 +88,7 @@ describe("catalogue (cahier des charges §13)", () => {
   });
 
   it("affiche les montants en euros", () => {
-    expect(formatEuros(7_900).replace(/\s/g, " ")).toBe("79,00 €");
+    expect(formatEuros(8_900).replace(/\s/g, " ")).toBe("89,00 €");
   });
 });
 
@@ -122,10 +122,10 @@ describe("calendrier de l'abonnement", () => {
 
 describe("prix", () => {
   it("prix de la formule dès le 1er mois ; tarif annuel à partir du 3e", () => {
-    expect(monthlyPriceCents(facts(), 1)).toBe(23_100);
-    expect(monthlyPriceCents(facts({ cycle: "annual" }), 2)).toBe(23_100);
-    expect(monthlyPriceCents(facts(), 3)).toBe(23_100);
-    expect(monthlyPriceCents(facts({ cycle: "annual" }), 3)).toBe(19_600);
+    expect(monthlyPriceCents(facts(), 1)).toBe(35_900);
+    expect(monthlyPriceCents(facts({ cycle: "annual" }), 2)).toBe(35_900);
+    expect(monthlyPriceCents(facts(), 3)).toBe(35_900);
+    expect(monthlyPriceCents(facts({ cycle: "annual" }), 3)).toBe(30_500);
   });
 
   it("aucune bascule annuelle automatique avant (ni après) le 7e mois", () => {
@@ -372,7 +372,7 @@ describe("factures", () => {
     expect(invoice.lines).toEqual([
       {
         label: "Formule Premium, sans engagement, mois 4",
-        amountCents: 23_100,
+        amountCents: 35_900,
       },
       {
         label: "2 lancements au-delà de 100 suivis actifs",
@@ -383,9 +383,9 @@ describe("factures", () => {
         amountCents: 126,
       },
     ]);
-    expect(invoice.subtotalCents).toBe(23_726);
-    expect(invoice.vatCents).toBe(4_745);
-    expect(invoice.totalCents).toBe(28_471);
+    expect(invoice.subtotalCents).toBe(36_526);
+    expect(invoice.vatCents).toBe(7_305);
+    expect(invoice.totalCents).toBe(43_831);
   });
 
   it("premiers mois et engagement annuel", () => {
@@ -394,7 +394,7 @@ describe("factures", () => {
     ).toEqual([
       {
         label: "Formule Starter, sans engagement, mois 1",
-        amountCents: 7_900,
+        amountCents: 8_900,
       },
     ]);
     expect(
@@ -402,7 +402,7 @@ describe("factures", () => {
     ).toEqual([
       {
         label: "Formule Starter, engagement annuel, mois 8",
-        amountCents: 6_700,
+        amountCents: 7_600,
       },
     ]);
   });

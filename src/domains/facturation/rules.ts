@@ -42,8 +42,8 @@ export type PlanDefinition = {
 export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   starter: {
     label: "Starter",
-    monthlyCents: 7_900,
-    annualMonthlyCents: 6_700,
+    monthlyCents: 8_900,
+    annualMonthlyCents: 7_600,
     maxVets: 1,
     maxAssistants: 1,
     includedActiveFollowups: 15,
@@ -54,8 +54,8 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   pro: {
     label: "Pro",
-    monthlyCents: 15_500,
-    annualMonthlyCents: 13_200,
+    monthlyCents: 17_900,
+    annualMonthlyCents: 15_200,
     maxVets: 2,
     maxAssistants: 3,
     includedActiveFollowups: 40,
@@ -66,8 +66,8 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   premium: {
     label: "Premium",
-    monthlyCents: 23_100,
-    annualMonthlyCents: 19_600,
+    monthlyCents: 35_900,
+    annualMonthlyCents: 30_500,
     maxVets: 3,
     maxAssistants: null,
     includedActiveFollowups: 100,
