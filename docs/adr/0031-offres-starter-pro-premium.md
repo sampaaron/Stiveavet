@@ -15,9 +15,9 @@ Le cahier des charges du MVP fixe trois offres : Starter à 79 €, Pro à 129 �
 
    | Offre   | Mois  | Annuel | Vétérinaires | Assistants  | Suivis inclus / plafond | Stive | dr.veto |
    | ------- | ----- | ------ | ------------ | ----------- | ----------------------- | ----- | ------- |
-   | Starter | 89 €  | 76 €   | 1            | 1           | 15 / 30                 | non   | non     |
-   | Pro     | 179 € | 152 €  | 2            | 3           | 40 / 80                 | oui   | non     |
-   | Premium | 359 € | 305 €  | 3            | sans limite | 100 / 200               | oui   | oui     |
+   | Starter | 89 €  | 76 €   | 1            | 1           | 10 / 30                 | non   | non     |
+   | Pro     | 179 € | 152 €  | 2            | 2           | 30 / 50                 | oui   | non     |
+   | Premium | 359 € | 305 €  | 3            | sans limite | 80 / 120                | oui   | oui     |
 
 2. **Fin de l'essai pilote.** Le prix de l'offre s'applique dès le premier mois. Les deux premiers mois restent sans engagement possible ; l'engagement annuel est proposé au 45e jour et commence au 3e mois, comme dans l'ADR 0023.
 3. **Limites appliquées côté serveur.**
