@@ -220,7 +220,7 @@ describe("séquence de cinq e-mails", () => {
       "Comment Numa accompagne un propriétaire après une intervention",
       "Urgences : Numa alerte, vous décidez",
       "Votre équipe, vos droits, vos données",
-      "Démarrer Stivea Vet à partir de 79 € HT par mois",
+      "Démarrer Stivea Vet à partir de 89 € HT par mois",
     ]);
     expect(Math.max(...DEMO_SEQUENCE_DAYS)).toBeLessThan(14);
     await ageLead("sequence@exemple.test", 10);

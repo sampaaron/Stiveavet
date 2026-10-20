@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
 
+import { introOfferOpen } from "../../src/domains/facturation/rules";
+
 import { expectAccessible } from "./support/flows";
 import { latestEmail } from "./support/mailpit";
 
@@ -95,7 +97,7 @@ test.describe("pages du site", () => {
   }) => {
     await page.goto("/fr");
     await expect(
-      page.getByRole("link", { name: "Démarrer dès 79 € HT par mois" }).first(),
+      page.getByRole("link", { name: "Démarrer dès 89 € HT par mois" }).first(),
     ).toBeVisible();
     await expect(
       page.getByRole("img", { name: "Numa, Assistante IA" }),
@@ -108,14 +110,32 @@ test.describe("pages du site", () => {
 
   test("tarifs : les prix HT du cahier des charges", async ({ page }) => {
     await page.goto("/fr/tarifs");
-    for (const price of ["79 €", "129 €", "199 €"])
+    for (const price of ["89 €", "179 €", "359 €"])
       await expect(
         page.getByText(price, { exact: true }).first(),
       ).toBeVisible();
     await expect(page.getByText("Offre phare")).toBeVisible();
+    // Chaque formule a son bouton, au prix affiché en grand (lancement tant que l'offre dure).
+    for (const price of introOfferOpen(new Date())
+      ? ["67 €", "134 €", "269 €"]
+      : ["89 €", "179 €", "359 €"])
+      await expect(
+        page.getByRole("link", { name: `Démarrer à ${price} HT par mois` }),
+      ).toBeVisible();
     await expect(
-      page.getByText(/^109\s€ HT \/ mois avec engagement/),
+      page.getByText(/^152\s€ HT \/ mois avec engagement/),
     ).toBeVisible();
+    // Offre de lancement, tant qu'elle est ouverte (ADR 0037).
+    if (introOfferOpen(new Date())) {
+      await expect(
+        page.getByText(/^Offre de lancement : −25 % pendant 6 mois$/),
+      ).toBeVisible();
+      for (const price of ["67 €", "134 €", "269 €"])
+        await expect(page.getByText(price, { exact: true })).toBeVisible();
+      await expect(
+        page.getByText(/^les 6 premiers mois, puis 179\s€ HT/),
+      ).toBeVisible();
+    }
     await expect(page.getByText("Plus de 3 vétérinaires")).toBeVisible();
     await expect(page.getByText(/2,50\s€ HT/)).toBeVisible();
     await expect(page.getByText(/1,26\s€ HT/)).toBeVisible();

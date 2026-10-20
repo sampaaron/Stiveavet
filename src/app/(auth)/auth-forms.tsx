@@ -7,6 +7,8 @@ import {
   PLANS,
   PLAN_CATALOG,
   FEATURED_PLAN,
+  INTRO_OFFER,
+  introOfferOpen,
 } from "@/domains/facturation/rules";
 import { useAppText, useLocale } from "@/i18n/app/client";
 import { pathFor } from "@/i18n/routes";
@@ -401,6 +403,7 @@ function PlanChoice({
   const text = useAppText();
   const t = text.auth.signup.plan;
   const locale = useLocale();
+  const intro = introOfferOpen(new Date());
   return (
     <fieldset
       className="grid gap-2"
@@ -426,10 +429,17 @@ function PlanChoice({
             />
             <span>
               <span className="block font-semibold">
-                {t.option(
-                  text.labels.plans[plan].name,
-                  formatEuros(definition.monthlyCents, locale),
-                )}
+                {intro
+                  ? t.introOption(
+                      text.labels.plans[plan].name,
+                      formatEuros(definition.introMonthlyCents, locale),
+                      INTRO_OFFER.months,
+                      formatEuros(definition.monthlyCents, locale),
+                    )
+                  : t.option(
+                      text.labels.plans[plan].name,
+                      formatEuros(definition.monthlyCents, locale),
+                    )}
                 {plan === FEATURED_PLAN ? (
                   <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-white">
                     {text.labels.planFeatured}

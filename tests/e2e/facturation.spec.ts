@@ -23,7 +23,7 @@ test.describe("Clinique des Tilleuls (Claire)", () => {
       page.getByRole("heading", { level: 1, name: "Facturation" }),
     ).toBeVisible();
     await expect(page.getByText("Premium", { exact: true })).toBeVisible();
-    await expect(page.getByText(/^\d+ \/ 100 inclus$/)).toBeVisible();
+    await expect(page.getByText(/^\d+ \/ 80 inclus$/)).toBeVisible();
     await expect(page.getByText("Payée").first()).toBeVisible();
     await expectAccessible(page);
 

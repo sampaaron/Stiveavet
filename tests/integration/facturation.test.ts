@@ -12,7 +12,11 @@ import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { settingsService } from "@/domains/reglages/service";
 import { vetLimit } from "@/domains/facturation/limits";
-import { addMonths } from "@/domains/facturation/rules";
+import {
+  PLAN_CATALOG,
+  addMonths,
+  introOfferOpen,
+} from "@/domains/facturation/rules";
 import type { Plan } from "@/domains/facturation/rules";
 import {
   billingService,
@@ -172,6 +176,13 @@ function usage(
 
 const day = 86_400_000;
 
+/**
+ * Prix des 6 premiers mois : celui de l'offre de lancement pour un cabinet inscrit avant sa
+ * fin (règle couverte par rules.test.ts), sinon le prix attendu.
+ */
+const firstMonthsPrice = (plan: Plan, start: Date, regularCents: number) =>
+  introOfferOpen(start) ? PLAN_CATALOG[plan].introMonthlyCents : regularCents;
+
 describe("échéances et prélèvements simulés", () => {
   it("émet une facture par mois écoulé, une seule fois, et prélève sur le mandat", async () => {
     const start = addMonths(new Date(), -3);
@@ -194,13 +205,17 @@ describe("échéances et prélèvements simulés", () => {
       4,
     );
     // Prix de la formule Premium sans engagement dès le 1er mois ; TVA 20 %.
+    const premium = firstMonthsPrice("premium", start, 35_900);
     expect(first.invoices.map((invoice) => invoice.subtotalCents)).toEqual([
-      19_900, 19_900, 19_900, 19_900,
+      premium,
+      premium,
+      premium,
+      premium,
     ]);
-    expect(first.invoices[3]?.totalCents).toBe(23_880);
+    expect(first.invoices[3]?.totalCents).toBe((premium * 6) / 5);
     expect(first.access).toEqual({ kind: "full" });
     expect(first.commitmentReminder).toBe(true);
-    expect(first.nextPriceCents).toBe(19_900);
+    expect(first.nextPriceCents).toBe(premium);
   });
 
   it("sans mandat signé, les factures restent à prélever, sans impayé", async () => {
@@ -256,9 +271,10 @@ describe("échéances et prélèvements simulés", () => {
 });
 
 describe("suppléments d'usage", () => {
-  it("Starter : 15 suivis actifs inclus ; le 16e lancement coûte 2,50 €, une réactivation 1,26 €", async () => {
-    const { owner } = await cabinet(addMonths(new Date(), -3), "starter");
-    await addFollowups(owner, 15);
+  it("Starter : 10 suivis actifs inclus ; le 11e lancement coûte 2,50 €, une réactivation 1,26 €", async () => {
+    const start = addMonths(new Date(), -3);
+    const { owner } = await cabinet(start, "starter");
+    await addFollowups(owner, 10);
     await addFollowups(owner, 2, "active", true); // suivis test : jamais comptés
     const [eleventh] = await addFollowups(owner, 1, "draft");
     const [old] = await addFollowups(owner, 1, "ended");
@@ -276,7 +292,7 @@ describe("suppléments d'usage", () => {
     });
 
     const overview = await paying.overview(owner);
-    expect(overview.activeFollowups).toBe(15);
+    expect(overview.activeFollowups).toBe(10);
     expect(overview.pending).toEqual({
       launches: 1,
       reactivations: 1,
@@ -288,7 +304,9 @@ describe("suppléments d'usage", () => {
     const billed = await paying.overview(owner, new Date(next.getTime() + 1));
     const latest = billed.invoices[0];
     expect(latest?.lines.map((line) => line.amountCents)).toEqual([
-      7_900, 250, 126,
+      firstMonthsPrice("starter", start, 8_900),
+      250,
+      126,
     ]);
     expect(billed.pending.amountCents).toBe(0);
     const { rows } = await admin.query(
@@ -314,9 +332,10 @@ describe("suppléments d'usage", () => {
     expect(await domainError(usage(owner, extra, "launch"))).toBe(
       "plan_quota_reached",
     );
-    // Passer à Pro relève aussitôt le plafond (80) et les suivis inclus (40).
+    // Passer à Pro relève aussitôt le plafond (50) ; au-delà des 30 suivis inclus, le
+    // lancement est facturé.
     await paying.changePlan(owner, "pro");
-    expect(await usage(owner, extra, "launch")).toEqual({ amountCents: 0 });
+    expect(await usage(owner, extra, "launch")).toEqual({ amountCents: 250 });
   });
 });
 
@@ -359,16 +378,21 @@ describe("formule et engagement", () => {
     const committed = await paying.overview(offered.owner);
     expect(committed.facts?.cycle).toBe("annual");
     // Prix sans engagement jusqu'à la fin des 2 premiers mois, puis le tarif annuel pendant 12 mois.
-    expect(committed.nextPriceCents).toBe(16_900);
     const startedAt = committed.facts?.startedAt ?? new Date();
+    expect(committed.nextPriceCents).toBe(
+      firstMonthsPrice("premium", startedAt, 30_500),
+    );
     expect(committed.facts?.annualEndsAt).toEqual(addMonths(startedAt, 14));
     expect(committed.commitmentReminder).toBe(false);
 
-    const flexible = await cabinet(addMonths(new Date(), -2));
+    const flexibleStart = addMonths(new Date(), -2);
+    const flexible = await cabinet(flexibleStart);
     await paying.chooseCycle(flexible.owner, "annual");
     const overview = await paying.overview(flexible.owner);
     expect(overview.facts?.cycle).toBe("annual");
-    expect(overview.nextPriceCents).toBe(16_900);
+    expect(overview.nextPriceCents).toBe(
+      firstMonthsPrice("premium", flexibleStart, 30_500),
+    );
     expect(overview.commitmentReminder).toBe(false);
     expect(await domainError(paying.changePlan(flexible.owner, "pro"))).toBe(
       "invalid_target",

@@ -54,10 +54,10 @@ test.describe("tableau de bord « Aujourd'hui »", () => {
     const meter = page.getByRole("meter", { name: "Suivis actifs" });
     const active = Number(await meter.getAttribute("aria-valuenow"));
     expect(active).toBeGreaterThanOrEqual(7);
-    // Les Tilleuls sont en Premium : 100 suivis actifs inclus.
-    await expect(meter).toHaveAttribute("aria-valuemax", "100");
+    // Les Tilleuls sont en Premium : 80 suivis actifs inclus.
+    await expect(meter).toHaveAttribute("aria-valuemax", "80");
     await expect(
-      page.getByText(`${100 - active} places incluses restantes`),
+      page.getByText(`${80 - active} places incluses restantes`),
     ).toBeVisible();
   });
 
