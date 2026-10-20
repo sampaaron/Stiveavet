@@ -592,6 +592,8 @@ export function settingsService(deps: {
 
     /** Connexion simulée (ADR 0004) : seul un libellé masqué est conservé. */
     async connect(actor: Actor, provider: Integration, input: string) {
+      // Avant tout appel à un prestataire : seul un administrateur relie un service.
+      assertPermission(actor, "organization.settings");
       let displayLabel: string;
       if (provider === "whatsapp") {
         // WhatsApp réel : le numéro se connecte par l'inscription intégrée de Meta.

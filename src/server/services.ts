@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { after } from "next/server";
 
 import { configuredAiGateway } from "@/adapters/ai-gateway";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
@@ -238,6 +239,7 @@ export const services = {
       db: appDatabase(),
       email: { send: (message) => marketingEmailSender().send(message) },
       appUrl: serverEnv().APP_URL,
+      defer: async (task) => after(task),
     });
     return demo;
   },

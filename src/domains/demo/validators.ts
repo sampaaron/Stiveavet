@@ -14,7 +14,9 @@ export const demoRequestInput = z.object({
     .string()
     .trim()
     .min(2, "cabinet_short")
-    .max(160, "cabinet_long"),
+    .max(160, "cabinet_long")
+    // Un nom, pas un message : ni lien, ni adresse, ni caractère invisible ou de contrôle.
+    .regex(/^(?!.*(?:https?:|www\.|:\/\/))[^\p{C}<>@]*$/iu, "cabinet_chars"),
   // 4 signifie « plus de trois vétérinaires ».
   vetCount: z.enum(["1", "2", "3", "4"], "vets").transform(Number),
   locale: z.enum(LOCALES),

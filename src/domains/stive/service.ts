@@ -663,6 +663,11 @@ export function stiveService(deps: {
             ),
           );
 
+        const rights = {
+          clinical: can(actor, "clinical.read"),
+          agenda: can(actor, "agenda.read"),
+          launch: can(actor, "followups.launch"),
+        };
         return {
           entries: rows.map((row): StiveEntry => {
             if (row.author === "member")
@@ -677,7 +682,7 @@ export function stiveService(deps: {
               id: row.id,
               author: "stive",
               at: row.createdAt,
-              answer: parsed ? visibleAnswer(parsed, access) : null,
+              answer: parsed ? visibleAnswer(parsed, access, rights) : null,
             };
           }),
           proposals: Object.fromEntries(
