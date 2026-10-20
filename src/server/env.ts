@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { parseConfig } from "./config";
+
 /**
  * Variables d'environnement serveur, validées une seule fois.
  * Aucune valeur secrète n'a de défaut dans le code : elles viennent de `.env` en local
@@ -60,15 +62,7 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
 export function parseServerEnv(
   source: Record<string, string | undefined>,
 ): ServerEnv {
-  const result = serverEnvSchema.safeParse(source);
-  if (!result.success) {
-    // On ne journalise que les noms de variables fautives, jamais leurs valeurs.
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  return result.data;
+  return parseConfig(serverEnvSchema, source);
 }
 
 let cached: ServerEnv | undefined;

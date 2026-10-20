@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * refusé, pour qu'un événement intercepté ne puisse pas être rejoué plus tard.
  */
 
-export const SIGNATURE_TOLERANCE_SECONDS = 300;
+const SIGNATURE_TOLERANCE_SECONDS = 300;
 
 function digest(secret: string, timestamp: string, body: Uint8Array): Buffer {
   return createHmac("sha256", secret)

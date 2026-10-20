@@ -49,6 +49,7 @@ import {
   usageChargeCents,
   withinFollowupCap,
 } from "./rules";
+import { loadFacts } from "./faits";
 import { scheduleAnnualOffers } from "./offre-annuelle";
 import { recordPayment, refreshUnpaid, settleInvoice } from "./paiements";
 import type {
@@ -102,25 +103,6 @@ export type BillingOverview = {
   /** Prélèvements simulés (poste local) ou réels, par Stripe (ADR 0027). */
   simulated: boolean;
 };
-
-async function loadFacts(
-  tx: TenantTransaction,
-  lock = false,
-): Promise<SubscriptionFacts | null> {
-  const query = tx.select().from(subscriptions);
-  const [row] = lock ? await query.for("update") : await query;
-  if (!row) return null;
-  return {
-    plan: row.plan,
-    cycle: row.cycle,
-    startedAt: row.startedAt,
-    cycleChosenAt: row.cycleChosenAt,
-    annualEndsAt: row.annualEndsAt,
-    unpaidSince: row.unpaidSince,
-    canceledAt: row.canceledAt,
-    endsAt: row.endsAt,
-  };
-}
 
 /** Suivis actifs (hors suivis test) et fin du dernier suivi terminé. */
 export async function followupActivity(

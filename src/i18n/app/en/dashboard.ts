@@ -73,7 +73,6 @@ export const dashboard: AppDictionary["dashboard"] = {
     launchedHint: (ongoing: number) =>
       `${ongoing} ${ongoing === 1 ? "follow-up" : "follow-ups"} running`,
     ended: "Follow-ups ended",
-    endedHint: "Check-up reached or stopped",
     messages: "Messages received",
     messagesHint: (outbound: number) => `${outbound} sent by Numa and the team`,
     response: "Response rate",
@@ -136,7 +135,6 @@ export const dashboard: AppDictionary["dashboard"] = {
     appointment: (kind, animal) => `${kind} · ${animal}`,
     otherAppointment: "Appointment",
   },
-  quickActions: "Quick actions",
   numa: (animals: number) =>
     `Follows ${animals} ${animals === 1 ? "animal" : "animals"} for the practice. She never makes a diagnosis and escalates whenever in doubt.`,
   notFound: {

@@ -17,7 +17,6 @@ export const shell = {
   alertsPending: (count: number) =>
     `Alertes : ${count} sans accusé de réception`,
   onThisPage: "Sur cette page",
-  workspace: "Espace du cabinet",
   nav: {
     today: "Aujourd'hui",
     followups: "Suivis",

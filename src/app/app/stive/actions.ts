@@ -12,6 +12,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { domainFailure, invalidRequest } from "../domain-messages";
+import { text } from "../form-data";
 
 /**
  * Stive (ADR 0034). Chaque action refait toute la garde : session, membre actif, permissions
@@ -19,11 +20,6 @@ import { domainFailure, invalidRequest } from "../domain-messages";
  * confirmation d'une carte, les droits de l'action elle-même. La question n'apparaît dans
  * aucun journal.
  */
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 const contextId = z.union([z.literal(""), z.uuid()]);
 

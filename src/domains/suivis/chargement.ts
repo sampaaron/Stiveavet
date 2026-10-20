@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoAnimalHit } from "@/adapters/drveto/types";
@@ -17,13 +17,11 @@ import {
   followupTreatments,
   followups,
   integrationConnections,
-  memberships,
   ownerContacts,
   owners,
   protocolSteps,
   protocolVersions,
   protocols,
-  users,
 } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
 
@@ -283,20 +281,6 @@ export async function protocolChoices(tx: TenantTransaction, actor: Actor) {
   return rows.filter(
     (row) => row.validatedAt !== null && canReadProtocol(actor, row),
   );
-}
-
-export async function activeVets(tx: TenantTransaction) {
-  return tx
-    .select({ membershipId: memberships.id, name: users.displayName })
-    .from(memberships)
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .where(
-      and(
-        isNull(memberships.deactivatedAt),
-        inArray(memberships.role, ["admin_vet", "vet"]),
-      ),
-    )
-    .orderBy(asc(users.displayName));
 }
 
 /** Copie les étapes et signes d'alerte d'une version de protocole dans une nouvelle révision. */

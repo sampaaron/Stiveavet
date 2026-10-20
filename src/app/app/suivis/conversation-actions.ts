@@ -20,6 +20,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { domainFailure, invalidRequest } from "../domain-messages";
+import { text } from "../form-data";
 
 /**
  * Conversation d'un suivi (ADR 0016). Chaque action refait toute la garde : session, membre
@@ -50,11 +51,6 @@ const messageError = (error: z.ZodError) =>
     empty: v.emptyMessage,
     tooLong: v.messageTooLong,
   }));
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 async function guarded<T>(
   run: () => Promise<T>,

@@ -6,7 +6,7 @@ import type { EmailMessage, EmailSender } from "./types";
  * sujet ou le contenu du message, qui peut contenir un code de sécurité.
  */
 
-export const SCALEWAY_API_URL = "https://api.scaleway.com";
+const SCALEWAY_API_URL = "https://api.scaleway.com";
 
 export class EmailSendError extends Error {
   constructor(readonly status: number) {

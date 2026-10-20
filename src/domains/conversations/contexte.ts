@@ -328,10 +328,7 @@ export function otherOf(
   return ctx.contacts.find((other) => other.id !== contact.id) ?? null;
 }
 
-export function names(
-  contacts: readonly Contact[],
-  language: "fr" | "en",
-): string {
+function names(contacts: readonly Contact[], language: "fr" | "en"): string {
   const first = contacts.map((contact) => firstName(contact.ownerFullName));
   if (first.length <= 1) return first[0] ?? "";
   return `${first.slice(0, -1).join(", ")} ${language === "en" ? "and" : "et"} ${first.at(-1)}`;

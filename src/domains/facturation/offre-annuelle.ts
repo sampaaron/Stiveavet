@@ -10,13 +10,13 @@ import {
   membershipPermissions,
   memberships,
   organizations,
-  subscriptions,
   users,
 } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
 import { formatDate } from "@/ui/format";
 
 import { annualOfferEmail } from "./emails";
+import { loadFacts } from "./faits";
 import {
   ANNUAL_REMINDER_MONTH,
   COMMITMENT_DECISION_MONTH,
@@ -59,23 +59,6 @@ export async function scheduleAnnualOffers(
     runAt: billingPeriod(facts, ANNUAL_REMINDER_MONTH).start,
     payload: { reason: "reminder" },
   });
-}
-
-async function loadFacts(
-  tx: TenantTransaction,
-): Promise<SubscriptionFacts | null> {
-  const [row] = await tx.select().from(subscriptions);
-  if (!row) return null;
-  return {
-    plan: row.plan,
-    cycle: row.cycle,
-    startedAt: row.startedAt,
-    cycleChosenAt: row.cycleChosenAt,
-    annualEndsAt: row.annualEndsAt,
-    unpaidSince: row.unpaidSince,
-    canceledAt: row.canceledAt,
-    endsAt: row.endsAt,
-  };
 }
 
 /** Membres actifs qui gèrent la facturation : les seuls destinataires. */

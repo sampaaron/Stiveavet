@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, count, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
@@ -62,6 +62,7 @@ import {
   messageWindowsInput,
 } from "./content";
 import type { EmergencyPeriod, WindowInput } from "./content";
+import { activeVets } from "@/domains/equipe/veterinaires";
 
 export const ONBOARDING_STEPS = [
   "organization",
@@ -244,17 +245,7 @@ export function settingsService(deps: {
           .innerJoin(users, eq(users.id, memberships.userId))
           .where(gt(onCallSchedules.endsAt, new Date()))
           .orderBy(asc(onCallSchedules.startsAt));
-        const candidates = await tx
-          .select({ membershipId: memberships.id, name: users.displayName })
-          .from(memberships)
-          .innerJoin(users, eq(users.id, memberships.userId))
-          .where(
-            and(
-              isNull(memberships.deactivatedAt),
-              inArray(memberships.role, ["admin_vet", "vet"]),
-            ),
-          )
-          .orderBy(asc(users.displayName));
+        const candidates = await activeVets(tx);
         const integrations = await tx.select().from(integrationConnections);
         return {
           escalationDelayMinutes: settings?.escalationDelayMinutes ?? 240,

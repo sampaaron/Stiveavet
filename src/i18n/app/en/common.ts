@@ -9,7 +9,6 @@ export const common: AppDictionary["common"] = {
   edit: "Edit",
   remove: "Remove",
   back: "Back",
-  loading: "Loading…",
   saved: "Saved.",
   yes: "Yes",
   no: "No",

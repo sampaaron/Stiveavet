@@ -103,6 +103,15 @@ n'affiche que des compteurs.
   `SECURITY DEFINER` étroites, qui retrouvent le cabinet à partir d'un identifiant du
   fournisseur, puis tout le reste se fait sous `withTenant`.
 
+## Briques à réutiliser
+
+Avant d'écrire une aide, vérifiez qu'elle n'existe pas déjà :
+
+- `text` et `parseJson` (`src/app/app/form-data.ts`) lisent les champs d'un formulaire dans une Server Action.
+- `parseConfig` (`src/server/config.ts`) valide une configuration. En cas d'erreur, il ne cite que les noms des variables, jamais leurs valeurs.
+- `activeVets` (`src/domains/equipe/veterinaires.ts`) liste les vétérinaires actifs du cabinet courant.
+- `loadFacts` (`src/domains/facturation/faits.ts`) lit l'abonnement du cabinet courant.
+
 ## Heure de Paris
 
 Les règles métier (rappels, jour courant, horaires de garde) suivent l'heure murale de Paris.

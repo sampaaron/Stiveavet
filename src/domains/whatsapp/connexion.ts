@@ -6,6 +6,7 @@ import { embeddedSignup } from "@/adapters/whatsapp/inscription";
 import type { EmbeddedSignup } from "@/adapters/whatsapp/inscription";
 import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
+import { parseConfig } from "@/server/config";
 import { parseSecretKeys, secretBox } from "@/server/crypto/secret-box";
 import type { SecretBox } from "@/server/crypto/secret-box";
 import { whatsappAccounts } from "@/server/db/schema";
@@ -123,14 +124,7 @@ export type WhatsAppConfig =
 export function whatsappConfig(
   source: Record<string, string | undefined>,
 ): WhatsAppConfig {
-  const result = configSchema.safeParse(source);
-  if (!result.success) {
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  const env = result.data;
+  const env = parseConfig(configSchema, source);
   if (env.WHATSAPP_PROVIDER === "simulated") return { mode: "simulated" };
   return {
     mode: "cloud_api",
