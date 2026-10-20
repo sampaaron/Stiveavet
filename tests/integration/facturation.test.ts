@@ -271,10 +271,10 @@ describe("échéances et prélèvements simulés", () => {
 });
 
 describe("suppléments d'usage", () => {
-  it("Starter : 15 suivis actifs inclus ; le 16e lancement coûte 2,50 €, une réactivation 1,26 €", async () => {
+  it("Starter : 10 suivis actifs inclus ; le 11e lancement coûte 2,50 €, une réactivation 1,26 €", async () => {
     const start = addMonths(new Date(), -3);
     const { owner } = await cabinet(start, "starter");
-    await addFollowups(owner, 15);
+    await addFollowups(owner, 10);
     await addFollowups(owner, 2, "active", true); // suivis test : jamais comptés
     const [eleventh] = await addFollowups(owner, 1, "draft");
     const [old] = await addFollowups(owner, 1, "ended");
@@ -292,7 +292,7 @@ describe("suppléments d'usage", () => {
     });
 
     const overview = await paying.overview(owner);
-    expect(overview.activeFollowups).toBe(15);
+    expect(overview.activeFollowups).toBe(10);
     expect(overview.pending).toEqual({
       launches: 1,
       reactivations: 1,
@@ -332,9 +332,10 @@ describe("suppléments d'usage", () => {
     expect(await domainError(usage(owner, extra, "launch"))).toBe(
       "plan_quota_reached",
     );
-    // Passer à Pro relève aussitôt le plafond (80) et les suivis inclus (40).
+    // Passer à Pro relève aussitôt le plafond (50) ; au-delà des 30 suivis inclus, le
+    // lancement est facturé.
     await paying.changePlan(owner, "pro");
-    expect(await usage(owner, extra, "launch")).toEqual({ amountCents: 0 });
+    expect(await usage(owner, extra, "launch")).toEqual({ amountCents: 250 });
   });
 });
 

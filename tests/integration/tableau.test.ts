@@ -138,7 +138,7 @@ describe("tableau de bord « Aujourd'hui »", () => {
   it("compteur de capacité : total du cabinet ; agenda : dr.veto simulé et rendez-vous Stivea", async () => {
     const view = await today.today(claire);
     expect(view.activeFollowups).toBeGreaterThanOrEqual(7);
-    expect(view.includedFollowups).toBe(100); // formule Premium
+    expect(view.includedFollowups).toBe(80); // formule Premium
     const agenda = view.agenda ?? [];
     const control = agenda.find(
       (item) =>

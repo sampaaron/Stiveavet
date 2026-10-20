@@ -115,7 +115,10 @@ test.describe("pages du site", () => {
         page.getByText(price, { exact: true }).first(),
       ).toBeVisible();
     await expect(page.getByText("Offre phare")).toBeVisible();
-    for (const price of ["89 €", "179 €", "359 €"])
+    // Chaque formule a son bouton, au prix affiché en grand (lancement tant que l'offre dure).
+    for (const price of introOfferOpen(new Date())
+      ? ["67 €", "134 €", "269 €"]
+      : ["89 €", "179 €", "359 €"])
       await expect(
         page.getByRole("link", { name: `Démarrer à ${price} HT par mois` }),
       ).toBeVisible();

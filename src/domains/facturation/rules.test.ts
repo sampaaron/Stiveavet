@@ -85,7 +85,17 @@ describe("catalogue (cahier des charges §13)", () => {
 
   it("quotas : places, suivis actifs, Stive et intégrations", () => {
     expect(PLANS.map((plan) => maxVets(plan))).toEqual([1, 2, 3]);
-    expect(PLANS.map((plan) => maxAssistants(plan))).toEqual([1, 3, null]);
+    expect(PLANS.map((plan) => maxAssistants(plan))).toEqual([1, 2, null]);
+    expect(
+      PLANS.map((plan) => [
+        PLAN_CATALOG[plan].includedActiveFollowups,
+        PLAN_CATALOG[plan].maxActiveFollowups,
+      ]),
+    ).toEqual([
+      [10, 30],
+      [30, 50],
+      [80, 120],
+    ]);
     expect(PLANS.map((plan) => PLAN_CATALOG[plan].stive)).toEqual([
       false,
       true,
@@ -366,16 +376,16 @@ describe("accès du cabinet", () => {
 
 describe("suppléments d'usage", () => {
   it("suivis inclus selon la formule ; au-delà 2,50 € par lancement, 1,26 € par réactivation", () => {
-    expect(usageChargeCents("launch", 14, "starter")).toBe(0);
-    expect(usageChargeCents("launch", 15, "starter")).toBe(
+    expect(usageChargeCents("launch", 9, "starter")).toBe(0);
+    expect(usageChargeCents("launch", 10, "starter")).toBe(
       LAUNCH_SURCHARGE_CENTS,
     );
-    expect(usageChargeCents("launch", 15, "pro")).toBe(0);
-    expect(usageChargeCents("reactivation", 39, "pro")).toBe(0);
-    expect(usageChargeCents("reactivation", 40, "pro")).toBe(
+    expect(usageChargeCents("launch", 10, "pro")).toBe(0);
+    expect(usageChargeCents("reactivation", 29, "pro")).toBe(0);
+    expect(usageChargeCents("reactivation", 30, "pro")).toBe(
       REACTIVATION_SURCHARGE_CENTS,
     );
-    expect(usageChargeCents("launch", 99, null)).toBe(0);
+    expect(usageChargeCents("launch", 79, null)).toBe(0);
     expect([LAUNCH_SURCHARGE_CENTS, REACTIVATION_SURCHARGE_CENTS]).toEqual([
       250, 126,
     ]);
@@ -386,10 +396,10 @@ describe("plafond des suivis actifs (dépassement maîtrisé)", () => {
   it("aucun lancement au-delà du plafond de la formule", () => {
     expect(withinFollowupCap("starter", 29)).toBe(true);
     expect(withinFollowupCap("starter", 30)).toBe(false);
-    expect(withinFollowupCap("pro", 79)).toBe(true);
-    expect(withinFollowupCap("pro", 80)).toBe(false);
-    expect(withinFollowupCap(null, 199)).toBe(true);
-    expect(withinFollowupCap("premium", 200)).toBe(false);
+    expect(withinFollowupCap("pro", 49)).toBe(true);
+    expect(withinFollowupCap("pro", 50)).toBe(false);
+    expect(withinFollowupCap(null, 119)).toBe(true);
+    expect(withinFollowupCap("premium", 120)).toBe(false);
   });
 });
 
@@ -407,11 +417,11 @@ describe("factures", () => {
         amountCents: 35_900,
       },
       {
-        label: "2 lancements au-delà de 100 suivis actifs",
+        label: "2 lancements au-delà de 80 suivis actifs",
         amountCents: 500,
       },
       {
-        label: "1 réactivation au-delà de 100 suivis actifs",
+        label: "1 réactivation au-delà de 80 suivis actifs",
         amountCents: 126,
       },
     ]);

@@ -135,7 +135,11 @@ export function PricingPage({ locale, t }: SiteProps) {
                       className="w-full"
                     >
                       {fill(t.common.ctaPlan, {
-                        price: price(definition.monthlyCents),
+                        price: price(
+                          intro
+                            ? definition.introMonthlyCents
+                            : definition.monthlyCents,
+                        ),
                       })}
                     </CtaLink>
                   </div>
