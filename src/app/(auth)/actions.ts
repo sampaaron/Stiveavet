@@ -202,6 +202,7 @@ export async function resetPasswordAction(
   if (result.status === "invalid_password")
     return { fieldErrors: passwordErrors(t, result.problems) };
   if (result.status === "expired") return { error: t.errors.resetExpired };
+  if (result.status === "rate_limited") return { error: t.errors.rateLimited };
   await clearAuthCookie("session");
   redirect("/connexion?raison=mot-de-passe");
 }

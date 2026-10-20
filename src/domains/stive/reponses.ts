@@ -216,14 +216,23 @@ type Access = "none" | "summary" | "clinical";
 const allowed = (have: Access | undefined, need: "summary" | "clinical") =>
   have === "clinical" || (need === "summary" && have === "summary");
 
+/** Droits du moment qui décident de ce qu'une ancienne réponse peut encore montrer. */
+export type AnswerRights = {
+  clinical: boolean;
+  agenda: boolean;
+  launch: boolean;
+};
+
 /**
- * Réponse telle qu'on peut encore la montrer à la personne, selon ses accès actuels : les
- * lignes d'un dossier devenu inaccessible sont retirées ; une réponse qui ne parle que d'un tel
- * dossier est masquée entièrement (null).
+ * Réponse telle qu'on peut encore la montrer à la personne, selon ses accès et ses droits
+ * actuels (un droit retiré s'applique aussitôt, ADR 0008) : les lignes d'un dossier devenu
+ * inaccessible sont retirées ; une réponse qui ne parle que de ce qui n'est plus visible est
+ * masquée entièrement (null).
  */
 export function visibleAnswer(
   answer: StiveAnswer,
   access: ReadonlyMap<string, Access>,
+  rights: AnswerRights,
 ): StiveAnswer | null {
   const can = (id: string, need: "summary" | "clinical") =>
     allowed(access.get(id), need);
@@ -233,17 +242,28 @@ export function visibleAnswer(
         ...answer,
         urgent: answer.urgent.filter((line) => can(line.id, "clinical")),
         watch: answer.watch.filter((line) => can(line.id, "clinical")),
-        drafts: answer.drafts.filter((line) => can(line.id, "summary")),
+        unacknowledged: rights.clinical ? answer.unacknowledged : null,
+        agenda: rights.agenda ? answer.agenda : null,
+        pendingAppointments: rights.agenda ? answer.pendingAppointments : null,
+        drafts: rights.launch
+          ? answer.drafts.filter((line) => can(line.id, "summary"))
+          : [],
       };
+    case "slots":
+      return rights.agenda ? answer : null;
     case "summary":
     case "draft":
     case "status":
       return can(answer.followup.id, "clinical") ? answer : null;
     case "appointments":
-      return {
-        ...answer,
-        items: answer.items.filter((item) => can(item.followupId, "summary")),
-      };
+      return rights.agenda
+        ? {
+            ...answer,
+            items: answer.items.filter((item) =>
+              can(item.followupId, "summary"),
+            ),
+          }
+        : null;
     case "choose":
       return {
         ...answer,

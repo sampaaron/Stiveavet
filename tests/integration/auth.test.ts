@@ -23,6 +23,11 @@ const service = authService({
   appUrl: "http://localhost:3000",
 });
 const origin: RequestOrigin = { ip: null, userAgent: "vitest" };
+/** Adresse de documentation (RFC 3849), différente à chaque appel. */
+const randomIp = () => {
+  const id = randomUUID();
+  return `2001:db8::${id.slice(0, 4)}:${id.slice(4, 8)}`;
+};
 const STRONG = "une phrase de passe solide 42";
 
 function codeSentTo(address: string): string {
@@ -180,6 +185,40 @@ describe("connexion", () => {
       (await service.login({ email, password: STRONG, deviceToken }, origin))
         .status,
     ).toBe("signed_in");
+  });
+
+  it("des échecs depuis une autre adresse IP ne bloquent pas la personne", async () => {
+    const { email } = await newAdmin();
+    const attacker = { ip: randomIp(), userAgent: "vitest" };
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      await service.login({ email, password: "mauvais essai" }, attacker);
+    expect(
+      (await service.login({ email, password: STRONG }, attacker)).status,
+    ).toBe("rate_limited");
+    const office = { ip: randomIp(), userAgent: "vitest" };
+    expect(
+      (await service.login({ email, password: STRONG }, office)).status,
+    ).toBe("code_required");
+  });
+
+  it("des échecs répartis sur plusieurs adresses IP bloquent le compte à 25", async () => {
+    const { email } = await newAdmin();
+    for (let place = 0; place < 5; place += 1) {
+      const elsewhere = { ip: randomIp(), userAgent: "vitest" };
+      for (let attempt = 0; attempt < 5; attempt += 1)
+        expect(
+          (await service.login({ email, password: "mauvais essai" }, elsewhere))
+            .status,
+        ).toBe("invalid");
+    }
+    expect(
+      (
+        await service.login(
+          { email, password: STRONG },
+          { ip: randomIp(), userAgent: "vitest" },
+        )
+      ).status,
+    ).toBe("rate_limited");
   });
 
   it("une connexion réussie ne compte pas comme un échec", async () => {
@@ -436,6 +475,24 @@ describe("réinitialisation du mot de passe", () => {
         )
       ).status,
     ).toBe("expired");
+  });
+
+  it("limite les nouveaux mots de passe envoyés depuis une même adresse IP", async () => {
+    const from = { ip: randomIp(), userAgent: "vitest" };
+    const statuses: string[] = [];
+    for (let attempt = 0; attempt < 21; attempt += 1)
+      statuses.push(
+        (
+          await service.resetPassword(
+            { token: "C".repeat(43), password: "encore une phrase valable 9" },
+            from,
+          )
+        ).status,
+      );
+    expect(statuses.slice(0, 20).every((status) => status === "expired")).toBe(
+      true,
+    );
+    expect(statuses[20]).toBe("rate_limited");
   });
 
   it("adresse inconnue : même réponse, aucun e-mail", async () => {

@@ -716,6 +716,7 @@ export const en: SiteDictionary = {
       too_long: "Address too long.",
       cabinet_short: "Enter the practice name.",
       cabinet_long: "Practice name too long.",
+      cabinet_chars: "Enter only the practice name, without a link or address.",
       vets: "Choose the number of vets.",
       rate_limited:
         "Too many requests from this connection. Try again in an hour.",

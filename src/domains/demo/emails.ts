@@ -27,7 +27,6 @@ type Template = { subject: string; blocks: Block[] };
 
 export type DemoEmailContext = {
   locale: Locale;
-  cabinetName: string;
   appUrl: string;
   /** Lien d'accès direct à la démo (premier e-mail, s'il est envoyé à la demande). */
   accessUrl?: string;
@@ -39,7 +38,6 @@ export type DemoEmailContext = {
 
 function templates(
   locale: Locale,
-  cabinetName: string,
   accessUrl?: string,
 ): Record<DemoStep, Template> {
   const from = formatPrice(PLAN_CATALOG.starter.monthlyCents, locale);
@@ -49,12 +47,12 @@ function templates(
         subject: "Your Stivea Vet demo is ready",
         blocks: [
           "Hello,",
-          `Thank you for your interest. The Stivea Vet demo for ${cabinetName} is open for 14 days.`,
+          "Thank you for your interest. Your Stivea Vet demo is open for 14 days.",
           accessUrl
             ? { label: "Open the demo", url: accessUrl }
             : { label: "Request access to the demo again", page: "demo" },
           "Everything in it is fictional: the practice, the animals, the owners and the conversations. No real WhatsApp, no dr.veto connection.",
-          "Over the next two weeks we will send you four short e-mails about how Stivea Vet works. You can unsubscribe at any time.",
+          "Once you have opened the demo from this e-mail, we will send you four short e-mails over two weeks about how Stivea Vet works. You can unsubscribe at any time.",
         ],
       },
       2: {
@@ -105,12 +103,12 @@ function templates(
       subject: "Votre démo Stivea Vet est prête",
       blocks: [
         "Bonjour,",
-        `Merci pour votre intérêt. La démo de Stivea Vet pour ${cabinetName} est ouverte pendant 14 jours.`,
+        "Merci pour votre intérêt. Votre démo de Stivea Vet est ouverte pendant 14 jours.",
         accessUrl
           ? { label: "Ouvrir la démo", url: accessUrl }
           : { label: "Redemander l'accès à la démo", page: "demo" },
         "Tout y est fictif : le cabinet, les animaux, les propriétaires et les conversations. Aucun WhatsApp réel, aucune connexion dr.veto.",
-        "Dans les deux prochaines semaines, nous vous enverrons quatre e-mails courts sur le fonctionnement de Stivea Vet. Vous pouvez vous désinscrire à tout moment.",
+        "Une fois la démo ouverte depuis cet e-mail, nous vous enverrons quatre e-mails courts sur deux semaines pour présenter le fonctionnement de Stivea Vet. Vous pouvez vous désinscrire à tout moment.",
       ],
     },
     2: {
@@ -164,11 +162,7 @@ export function demoEmail(
 ): EmailMessage {
   const { locale, appUrl, unsubscribeUrl } = context;
   if (!isDemoStep(step)) throw new Error("Étape de séquence inconnue");
-  const { subject, blocks } = templates(
-    locale,
-    context.cabinetName,
-    context.accessUrl,
-  )[step];
+  const { subject, blocks } = templates(locale, context.accessUrl)[step];
   const signature =
     locale === "en" ? "The Stivea Vet team" : "L'équipe Stivea Vet";
   const footer =

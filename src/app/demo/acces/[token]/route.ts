@@ -14,7 +14,7 @@ export async function GET(
   context: RouteContext<"/demo/acces/[token]">,
 ) {
   const { token } = await context.params;
-  const access = await services.demo().access(token);
+  const access = await services.demo().openLink(token);
   if (!access)
     return NextResponse.redirect(
       new URL(`${pathFor("demo", "fr")}?acces=expire`, serverEnv().APP_URL),

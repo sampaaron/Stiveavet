@@ -728,6 +728,8 @@ export const fr = {
       too_long: "Adresse trop longue.",
       cabinet_short: "Indiquez le nom du cabinet.",
       cabinet_long: "Nom du cabinet trop long.",
+      cabinet_chars:
+        "Indiquez seulement le nom du cabinet, sans lien ni adresse.",
       vets: "Choisissez le nombre de vétérinaires.",
       rate_limited:
         "Trop de demandes depuis cette connexion. Réessayez dans une heure.",

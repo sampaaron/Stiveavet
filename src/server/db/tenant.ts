@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
+import { safeDbError } from "./errors";
 import type * as schema from "./schema";
 
 export type Database = NodePgDatabase<typeof schema>;
@@ -46,9 +47,11 @@ export async function withTenant<T>(
 ): Promise<T> {
   const { organizationId, userId } = contextSchema.parse(context);
   const state = { wake: false };
-  const result = await pendingWake.run(state, () =>
-    transaction(db, organizationId, userId, run),
-  );
+  const result = await pendingWake
+    .run(state, () => transaction(db, organizationId, userId, run))
+    .catch((error: unknown) => {
+      throw safeDbError(error);
+    });
   if (state.wake) wakeHook?.();
   return result;
 }
