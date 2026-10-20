@@ -9,10 +9,8 @@ export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const MAX_VOICE_BYTES = 16 * 1024 * 1024;
 export const MAX_CAPTURE_BYTES = 5 * 1024 * 1024;
 
-export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-export const AUDIO_TYPES = ["audio/ogg", "audio/wav", "audio/mpeg"] as const;
-export type ImageType = (typeof IMAGE_TYPES)[number];
-export type AudioType = (typeof AUDIO_TYPES)[number];
+export type ImageType = "image/jpeg" | "image/png" | "image/webp";
+export type AudioType = "audio/ogg" | "audio/wav" | "audio/mpeg";
 
 function startsWith(bytes: Uint8Array, signature: readonly number[], at = 0) {
   return signature.every((value, index) => bytes[at + index] === value);

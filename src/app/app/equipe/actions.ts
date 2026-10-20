@@ -10,6 +10,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { attempt, invalidRequest } from "../domain-messages";
+import { text } from "../form-data";
 
 const role = z.enum(["admin_vet", "vet", "assistant"]);
 
@@ -49,11 +50,6 @@ function validationMessage(t: AppDictionary, code: string | undefined) {
   return code && code !== "fallback" && Object.hasOwn(messages, code)
     ? messages[code as ValidationCode]
     : messages.fallback;
-}
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
 }
 
 /**

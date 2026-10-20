@@ -103,17 +103,17 @@ export const TRIAL_MONTHS = 2;
  * ADR 0023) : vers un mois et demi, pour le prélèvement suivant. L'engagement ne commence
  * jamais avant la fin de l'essai.
  */
-export const ANNUAL_OFFER_DAYS = 45;
+const ANNUAL_OFFER_DAYS = 45;
 /** Mois où l'engagement est reproposé à un cabinet resté au mois. */
 export const ANNUAL_REMINDER_MONTH = 6;
 /** Le choix explicite doit être fait avant ce mois ; aucune bascule automatique. */
 export const COMMITMENT_DECISION_MONTH = 7;
 export const LAUNCH_SURCHARGE_CENTS = 250;
 export const REACTIVATION_SURCHARGE_CENTS = 126;
-export const UNPAID_GRACE_DAYS = 30;
-export const READ_ONLY_MONTHS = 3;
+const UNPAID_GRACE_DAYS = 30;
+const READ_ONLY_MONTHS = 3;
 /** TVA française au taux normal (à confirmer avec l'expert-comptable avant facturation réelle). */
-export const VAT_RATE_PERCENT = 20;
+const VAT_RATE_PERCENT = 20;
 
 const DAY_MS = 86_400_000;
 
@@ -391,7 +391,7 @@ export function formatEuros(cents: number): string {
 }
 
 /** Droits conservés en lecture seule : consulter, jamais modifier ni lancer. */
-export const READ_ONLY_PERMISSIONS = [
+const READ_ONLY_PERMISSIONS = [
   "followups.read_all",
   "followups.read_own",
   "followups.read_summary",

@@ -12,17 +12,13 @@ import { formatDate } from "@/ui/format";
 
 import type { ActionState } from "../action-state";
 import { attempt, domainFailure } from "../domain-messages";
+import { text } from "../form-data";
 
 const planInput = z.object({ plan: z.enum(PLANS) });
 const cycleInput = z.object({
   cycle: z.enum(["annual", "monthly"]),
   confirmed: z.boolean(),
 });
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 /**
  * Chaque action repasse par la garde serveur ; le service refuse sans `billing.manage`,

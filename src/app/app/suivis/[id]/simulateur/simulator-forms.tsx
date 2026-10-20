@@ -5,6 +5,7 @@ import { useActionState, useId } from "react";
 
 import { useAppText } from "@/i18n/app/client";
 import { Button } from "@/ui/button";
+import { FileDrop } from "@/ui/file-drop";
 
 import { ActionMessage } from "../../../action-message";
 import { initialActionState } from "../../../action-state";
@@ -138,13 +139,10 @@ export function OwnerPhotoForm({
       <label htmlFor={`${id}-file`} className="text-sm font-semibold">
         {text.photoOf(ownerFirstName)}
       </label>
-      <input
+      <FileDrop
         id={`${id}-file`}
         name="photo"
-        type="file"
-        required
         accept="image/jpeg,image/png,image/webp"
-        className={`${FIELD} w-full file:mr-3 file:rounded-full file:border-0 file:bg-brand-soft file:px-3 file:py-1 file:text-sm file:font-semibold file:text-brand-ink`}
       />
       <label htmlFor={`${id}-caption`} className="text-sm font-semibold">
         {text.caption}

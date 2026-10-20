@@ -22,6 +22,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { attempt, domainFailure, invalidRequest } from "../domain-messages";
+import { text } from "../form-data";
 
 const idInput = z.object({ id: z.uuid() });
 const periodInput = z.object({
@@ -40,11 +41,6 @@ const onCallInput = z.object({
   endsAt: z.string().max(16),
 });
 const providerInput = z.enum(["whatsapp", "drveto", "payment_mandate"]);
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 type ValidationCode = keyof AppDictionary["settings"]["validation"];
 
@@ -97,18 +93,22 @@ export async function applyDefaultsAction(): Promise<ActionState> {
   );
 }
 
-export async function saveMessageWindowsAction(
-  _previous: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  const windows = WEEKDAYS.filter((day) => form.get(`day-${day}`) === "on").map(
+/** Plages horaires cochées jour par jour (envois de Numa ou rendez-vous proposés). */
+function weekWindows(form: FormData) {
+  return WEEKDAYS.filter((day) => form.get(`day-${day}`) === "on").map(
     (weekday) => ({
       weekday,
       startsAt: text(form, `start-${weekday}`),
       endsAt: text(form, `end-${weekday}`),
     }),
   );
-  const parsed = messageWindowsInput.safeParse(windows);
+}
+
+export async function saveMessageWindowsAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const parsed = messageWindowsInput.safeParse(weekWindows(form));
   if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(
@@ -123,14 +123,7 @@ export async function saveAppointmentWindowsAction(
   _previous: ActionState,
   form: FormData,
 ): Promise<ActionState> {
-  const windows = WEEKDAYS.filter((day) => form.get(`day-${day}`) === "on").map(
-    (weekday) => ({
-      weekday,
-      startsAt: text(form, `start-${weekday}`),
-      endsAt: text(form, `end-${weekday}`),
-    }),
-  );
-  const parsed = messageWindowsInput.safeParse(windows);
+  const parsed = messageWindowsInput.safeParse(weekWindows(form));
   if (!parsed.success) return await firstIssue(parsed.error);
   const context = await memberContext();
   return finish(

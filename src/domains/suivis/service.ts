@@ -20,6 +20,7 @@ import { auditFollowup as audit } from "@/domains/audit/journal";
 import { canManageFollowupAccess, followupAccess } from "./policies";
 import type { FollowupAccess, Viewer } from "./policies";
 import { loadFollowupRecord } from "./record";
+import { activeVets } from "@/domains/equipe/veterinaires";
 
 type Status = "draft" | "active" | "paused" | "human_takeover" | "ended";
 type Triage = "normal" | "watch" | "urgent";
@@ -348,17 +349,7 @@ export function followupsService(db: Database) {
         const shared = new Set(
           loaded.shares.map((share) => share.membershipId),
         );
-        const rows = await tx
-          .select({ membershipId: memberships.id, name: users.displayName })
-          .from(memberships)
-          .innerJoin(users, eq(users.id, memberships.userId))
-          .where(
-            and(
-              isNull(memberships.deactivatedAt),
-              inArray(memberships.role, ["admin_vet", "vet"]),
-            ),
-          )
-          .orderBy(asc(users.displayName));
+        const rows = await activeVets(tx);
         return rows.filter(
           (row) =>
             row.membershipId !== loaded.row.responsibleMembershipId &&

@@ -8,7 +8,7 @@ import { toE164 } from "@/domains/whatsapp/numero";
  */
 
 export const MAX_OWNERS = 2;
-export const NOTES_MAX = 2000;
+const NOTES_MAX = 2000;
 const WEIGHT_MAX_KG = 150;
 
 const optionalText = (max: number) =>
@@ -59,7 +59,7 @@ export const ownerInput = z.object({
 
 export type OwnerInput = z.output<typeof ownerInput>;
 
-export function animalInput(now: Date = new Date()) {
+function animalInput(now: Date = new Date()) {
   return z.object({
     name: z.string().trim().min(1).max(80),
     species: z.enum(["dog", "cat"]),

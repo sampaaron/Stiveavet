@@ -30,7 +30,7 @@ export const fr = {
     integrations: {
       title: "Intégrations",
       description:
-        "dr.veto au lancement, Vétocom et Vetup bientôt disponibles, WhatsApp Business du cabinet.",
+        "Registre des animaux intégré, dr.veto avec la formule Premium, Vétocom et Vetup bientôt disponibles, WhatsApp Business du cabinet.",
     },
     pricing: {
       title: "Tarifs",
@@ -221,7 +221,7 @@ export const fr = {
       items: [
         {
           title: "Choisir l'animal",
-          body: "L'animal, ses propriétaires et l'intervention sont repris de dr.veto, en lecture seule.",
+          body: "L'animal, ses propriétaires et l'intervention viennent du registre du cabinet, ou de dr.veto en lecture seule avec la formule Premium.",
         },
         {
           title: "Valider le protocole",
@@ -229,7 +229,7 @@ export const fr = {
         },
         {
           title: "Numa accompagne",
-          body: "Elle échange avec le propriétaire, trie chaque message en normal, à surveiller ou urgent, et vous alerte si besoin.",
+          body: "Elle échange avec le propriétaire, classe chaque message (rien à signaler, à surveiller ou urgent) et vous alerte si besoin.",
         },
         {
           title: "Vous décidez",
@@ -283,7 +283,7 @@ export const fr = {
         },
         {
           q: "Faut-il changer de logiciel vétérinaire ?",
-          a: "Non. Stivea Vet se connecte à dr.veto au lancement, en lecture seule, et n'y écrit jamais. Vétocom et Vetup arrivent ensuite.",
+          a: "Non. Vous enregistrez vos patients dans Stivea Vet en quelques clics. Avec la formule Premium, Stivea Vet se connecte aussi à dr.veto, en lecture seule, et n'y écrit jamais. Vétocom et Vetup arrivent ensuite.",
         },
         {
           q: "Combien coûte Stivea Vet ?",
@@ -308,7 +308,7 @@ export const fr = {
     journey: [
       {
         title: "Ouvrir Stivea Vet et choisir l'animal",
-        body: "La recherche porte sur les animaux de dr.veto. Les informations utiles sont importées en lecture seule : animal, propriétaires, intervention, rendez-vous de contrôle, allergies et traitements actifs.",
+        body: "Vous cherchez l'animal dans le registre du cabinet, ou vous l'enregistrez en quelques clics avec son propriétaire. Avec la formule Premium, les informations utiles de dr.veto sont importées en lecture seule : intervention, rendez-vous de contrôle, allergies et traitements actifs.",
       },
       {
         title: "Vérifier la fiche de lancement",
@@ -327,11 +327,36 @@ export const fr = {
         body: "En ouvrant le dossier, vous retrouvez l'évolution, les signaux positifs et négatifs, les alertes et les questions ouvertes. Rien n'est écrit automatiquement dans dr.veto.",
       },
     ],
+    visual: {
+      label: "Exemple de suivi après une ovariectomie",
+      patient: "Caramel · ovariectomie",
+      vet: "Dr Fontaine",
+      steps: [
+        { day: "J0", text: "Suivi lancé par le vétérinaire", level: "done" },
+        {
+          day: "J0",
+          text: "Accord du propriétaire sur WhatsApp",
+          level: "done",
+        },
+        {
+          day: "J1",
+          text: "Photo de la cicatrice : rougeur signalée",
+          level: "watch",
+        },
+        {
+          day: "J3",
+          text: "Réponses au protocole : rien à signaler",
+          level: "normal",
+        },
+        { day: "J10", text: "Synthèse prête avant le contrôle", level: "done" },
+      ],
+      fictitious: "Illustration fictive",
+    },
     triageTitle: "Trois niveaux, jamais d'alarme inutile",
     triage: [
       {
         level: "normal",
-        name: "Normal",
+        name: "Rien à signaler",
         where: "Visible dans le dossier et la liste des suivis",
         notify: "Aucune interruption",
       },
@@ -373,7 +398,7 @@ export const fr = {
       "Se présente comme une IA dès le premier message et recueille l'accord du propriétaire",
       "Pose les questions de votre protocole et envoie les rappels au bon moment",
       "Reçoit textes, photos et vocaux ; les vocaux sont transcrits et rangés dans le dossier",
-      "Classe chaque message en normal, à surveiller ou urgent, et escalade en cas de doute",
+      "Classe chaque message (rien à signaler, à surveiller ou urgent) et escalade en cas de doute",
       "Transmet immédiatement les consignes et coordonnées d'urgence du cabinet, y compris hors horaires",
       "Propose un créneau dans les plages que vous avez approuvées, d'abord avec le vétérinaire de l'animal",
       "Écrit en français ou en anglais selon le propriétaire ; vous pouvez corriger la langue",
@@ -421,7 +446,7 @@ export const fr = {
       {
         name: "dr.veto",
         status: "launch",
-        body: "Connexion directe au lancement : animal, propriétaires, intervention, traitements et agenda, en lecture seule. Numa peut proposer un créneau ; aucun résumé n'est écrit dans dr.veto.",
+        body: "Avec la formule Premium : animal, propriétaires, intervention, traitements et agenda, en lecture seule. Numa peut proposer un créneau ; aucun résumé n'est écrit dans dr.veto.",
       },
       {
         name: "WhatsApp Business",
@@ -439,6 +464,15 @@ export const fr = {
         body: "Intégration en préparation.",
       },
     ],
+    visual: {
+      label: "Ce que Stivea Vet relie",
+      nodes: [
+        { name: "WhatsApp Business", note: "Le numéro du cabinet" },
+        { name: "Registre du cabinet", note: "Animaux et propriétaires" },
+        { name: "dr.veto", note: "Lecture seule, formule Premium" },
+        { name: "Capture d'agenda", note: "Créneaux libres" },
+      ],
+    },
     screenshotTitle: "En attendant votre logiciel : une capture d'agenda",
     screenshot:
       "Sans intégration agenda, le cabinet peut envoyer une capture d'écran de ses créneaux libres. Stivea Vet en extrait les créneaux puis supprime la capture ; Numa propose un créneau et le cabinet le confirme. Pensez à masquer toute information inutile.",
@@ -447,6 +481,15 @@ export const fr = {
   pricing: {
     title: "Des tarifs simples, par cabinet",
     lead: "Trois formules, sans engagement. Les prix sont hors taxes, par cabinet, prélevés chaque mois ; les factures sont envoyées par e-mail.",
+    visual: {
+      from: "À partir de",
+      unit: "HT par mois, par cabinet",
+      points: [
+        "Trois formules, résiliables chaque mois",
+        "Engagement annuel jamais automatique",
+        "Factures envoyées par e-mail",
+      ],
+    },
     plansTitle: "Les formules",
     featured: "Offre phare",
     annual:
@@ -538,6 +581,17 @@ export const fr = {
         body: "À la demande d'un propriétaire, Stivea Vet supprime ses données de suivi. Le dossier médical source reste sous la responsabilité du cabinet dans son logiciel.",
       },
     ],
+    visual: {
+      label: "Chaque cabinet dans son propre espace",
+      cabinets: ["Clinique des Tilleuls", "Cabinet du Parc"],
+      wall: "Isolés jusque dans la base de données",
+      chips: [
+        "Chiffré en transit et au repos",
+        "Hébergé en Europe",
+        "Journal non modifiable",
+        "Verrouillage après 40 minutes",
+      ],
+    },
     incidentsTitle: "En cas d'incident",
     incidents:
       "Le vétérinaire administrateur est prévenu par e-mail immédiatement en cas d'incident de sécurité. Les pannes et maintenances sont publiées sur la page État de Stivea Vet.",
@@ -545,18 +599,82 @@ export const fr = {
 
   help: {
     title: "Centre d'aide",
-    lead: "Les guides et vidéos arrivent avec l'ouverture du service. Ils seront aussi disponibles dans le logiciel.",
+    lead: "Les réponses aux questions les plus fréquentes, par thème. Les guides vidéo arriveront avec l'ouverture du service.",
     topics: [
-      "Installer Stivea Vet pas à pas",
-      "Lancer et suivre un premier suivi",
-      "Régler les horaires, la garde et les consignes d'urgence",
-      "Gérer l'équipe et les droits",
-      "Facturation et abonnement",
+      {
+        title: "Démarrer",
+        items: [
+          {
+            q: "Comment installer Stivea Vet ?",
+            a: "Créez le cabinet et votre compte de vétérinaire administrateur, puis suivez le démarrage guidé : connexion WhatsApp Business, horaires et consignes d'urgence, équipe, protocoles, mandat de prélèvement et premier suivi test. Comptez de cinq à quinze minutes avec les réglages de départ, tous modifiables ensuite.",
+          },
+          {
+            q: "Faut-il un logiciel vétérinaire ?",
+            a: "Non. Le registre des animaux de Stivea Vet suffit : vous y enregistrez l'animal et son propriétaire. Avec la formule Premium, vous pouvez aussi retrouver vos animaux dans dr.veto, en lecture seule.",
+          },
+        ],
+      },
+      {
+        title: "Suivis",
+        items: [
+          {
+            q: "Comment lancer un premier suivi ?",
+            a: "Depuis la fiche de l'animal ou le bouton « Nouveau suivi », indiquez l'intervention. Stivea Vet propose le protocole validé correspondant ; vous relisez la fiche de lancement et cliquez vous-même sur « Lancer le suivi ».",
+          },
+          {
+            q: "Quand Numa écrit-elle au propriétaire ?",
+            a: "Numa se présente comme une IA dès le premier message et demande l'accord du propriétaire : le suivi clinique ne commence qu'après. Les messages programmés respectent vos horaires d'envoi ; Numa répond aux messages entrants à toute heure.",
+          },
+          {
+            q: "Comment reprendre la conversation ?",
+            a: "Écrivez dans la conversation du dossier : votre message part depuis le WhatsApp du cabinet et Numa se met en pause jusqu'à ce que vous cliquiez sur « Reprendre Numa ».",
+          },
+        ],
+      },
+      {
+        title: "Urgences et garde",
+        items: [
+          {
+            q: "Que se passe-t-il en cas d'urgence ?",
+            a: "Numa transmet immédiatement vos consignes et coordonnées d'urgence au propriétaire, et le vétérinaire responsable ou de garde reçoit une alerte. Sans accusé de réception, les autres vétérinaires sont prévenus après le délai que vous choisissez, entre 3 et 5 heures.",
+          },
+          {
+            q: "Où régler les horaires, la garde et les consignes ?",
+            a: "Dans « Numa, urgences et garde » : horaires d'envoi, rendez-vous proposés par Numa, consignes d'urgence de jour, de nuit, de week-end et de jour férié, contacts d'urgence, règles d'alerte et planning de garde.",
+          },
+        ],
+      },
+      {
+        title: "Équipe et droits",
+        items: [
+          {
+            q: "Comment inviter un vétérinaire ou un assistant ?",
+            a: "Dans « Équipe et droits », saisissez son nom, son adresse e-mail et son rôle. La personne reçoit un lien valable 7 jours, utilisable une seule fois. Le nombre de vétérinaires dépend de votre formule.",
+          },
+          {
+            q: "Que voit un assistant ?",
+            a: "Un assistant a des droits limités : il n'accède aux données cliniques que si l'administrateur les lui ouvre. Un vétérinaire peut aussi marquer un dossier comme privé.",
+          },
+        ],
+      },
+      {
+        title: "Facturation",
+        items: [
+          {
+            q: "Comment suis-je facturé ?",
+            a: "Par prélèvement SEPA chaque mois, selon votre formule, avec les éventuels suivis supplémentaires. Les factures sont envoyées par e-mail et restent disponibles dans « Facturation ».",
+          },
+          {
+            q: "Puis-je changer de formule ou résilier ?",
+            a: "Oui, depuis « Facturation ». Une nouvelle formule s'applique à la prochaine échéance. Après une résiliation, les suivis en cours continuent jusqu'à leur fin, puis le cabinet garde un accès en lecture seule pendant 3 mois.",
+          },
+        ],
+      },
     ],
-    soon: "En préparation",
     supportTitle: "Assistance",
     support:
       "L'assistance répond par la messagerie intégrée et par e-mail, les jours ouvrés, sous 24 à 48 heures ouvrées.",
+    supportChannels: ["Messagerie intégrée", "E-mail"],
   },
 
   status: {

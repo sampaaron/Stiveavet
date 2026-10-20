@@ -12,16 +12,12 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { domainFailure, invalidRequest } from "../domain-messages";
+import { text } from "../form-data";
 
 /**
  * Capture d'agenda et créneaux libres (ADR 0019). Le service vérifie `agenda.capture`, le
  * vétérinaire choisi et le type réel du fichier ; la capture est supprimée dès la lecture.
  */
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 export async function importCaptureAction(
   _previous: ActionState,

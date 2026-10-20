@@ -15,7 +15,7 @@ const name = z.string().min(1).max(160);
 const instant = z.iso.datetime();
 const count = z.int().min(0).max(100_000);
 
-export const STATUS_CHANGES = ["pause", "resume", "stop"] as const;
+const STATUS_CHANGES = ["pause", "resume", "stop"] as const;
 const change = z.enum(STATUS_CHANGES);
 const followupStatus = z.enum([
   "draft",

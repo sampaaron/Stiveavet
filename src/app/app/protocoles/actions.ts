@@ -14,6 +14,7 @@ import type { ActionState } from "../action-state";
 import { attempt, domainFailure } from "../domain-messages";
 
 import { protocolIssueMessage } from "./validation";
+import { parseJson, text } from "../form-data";
 
 const MAX_PAYLOAD = 100_000;
 
@@ -32,19 +33,6 @@ const saveInput = z.discriminatedUnion("mode", [
   }),
 ]);
 const idInput = z.object({ protocolId: z.uuid() });
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
-
-function parseJson(payload: string): unknown {
-  try {
-    return JSON.parse(payload) as unknown;
-  } catch {
-    return null;
-  }
-}
 
 /** Création ou nouvelle version : le contenu est revalidé ici puis par le service. */
 export async function saveProtocolAction(

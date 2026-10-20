@@ -14,6 +14,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { domainFailure, invalidRequest } from "../domain-messages";
+import { text } from "../form-data";
 
 /**
  * Registre des animaux (ADR 0030). Chaque action refait la garde (session, membre actif,
@@ -50,11 +51,6 @@ export type PatientFormState = ActionState & {
 };
 
 const idInput = z.uuid();
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 /** Saisie brute du formulaire, dans la forme attendue par `patientInput`. */
 function readPatient(form: FormData) {

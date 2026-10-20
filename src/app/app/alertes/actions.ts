@@ -12,6 +12,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { domainFailure } from "../domain-messages";
+import { text } from "../form-data";
 
 /**
  * Accusé de réception et clôture d'une alerte (ADR 0017). Le service vérifie l'accès
@@ -26,11 +27,6 @@ const input = z.object({
   // Retour vers la liste des alertes ou le dossier, jamais vers une adresse libre.
   from: z.enum(["alertes", "dossier"]),
 });
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 /** Numéro d'alerte WhatsApp du vétérinaire connecté (vide : retiré). */
 export async function alertPhoneAction(
