@@ -5,6 +5,7 @@ import {
   formatDayTitle,
   formatDuration,
   formatEuros,
+  initials,
   formatMinutes,
   formatRelativeDayTime,
   formatRelativeMoment,
@@ -87,5 +88,13 @@ describe("en anglais (usage britannique, heure de Paris)", () => {
     expect(formatDate(now, "en")).toBe("7 October 2026");
     expect(formatEuros(8600, "en")).toBe("€86.00");
     expect(formatEuros(8_900, "fr").replace(/\s/g, " ")).toBe("89,00 €");
+  });
+});
+
+describe("initiales", () => {
+  it("garde les deux derniers mots qui commencent par une lettre", () => {
+    expect(initials("Dr Claire Fontaine")).toBe("CF");
+    expect(initials("léa  (ASV)")).toBe("L");
+    expect(initials("Inès")).toBe("I");
   });
 });

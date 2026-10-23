@@ -9,6 +9,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../../action-state";
 import { attempt } from "../../domain-messages";
+import { fields } from "../../form-data";
 
 const SHARE_DURATIONS = { illimite: null, "7": 7, "30": 30 } as const;
 
@@ -31,10 +32,6 @@ const languageInput = z.object({
   language: z.enum(["fr", "en"]),
 });
 
-function read(form: FormData, names: readonly string[]) {
-  return Object.fromEntries(names.map((name) => [name, form.get(name)]));
-}
-
 /**
  * Chaque action refait toute la garde : session, membre actif, permissions relues en base,
  * puis le service vérifie que l'acteur est bien le vétérinaire responsable du dossier.
@@ -45,7 +42,7 @@ export async function shareFollowupAction(
 ): Promise<ActionState> {
   const { t } = await appText();
   const parsed = shareInput.safeParse(
-    read(form, ["followupId", "membershipId", "duration"]),
+    fields(form, ["followupId", "membershipId", "duration"]),
   );
   if (!parsed.success)
     return parsed.error.issues.some((issue) => issue.path[0] === "membershipId")
@@ -72,7 +69,7 @@ export async function revokeShareAction(
 ): Promise<ActionState> {
   const { t } = await appText();
   const parsed = revokeInput.safeParse(
-    read(form, ["followupId", "membershipId"]),
+    fields(form, ["followupId", "membershipId"]),
   );
   if (!parsed.success) return { error: t.common.invalidRequest };
   const context = await memberContext();
@@ -93,7 +90,7 @@ export async function setPrivateAction(
 ): Promise<ActionState> {
   const { t } = await appText();
   const parsed = privacyInput.safeParse(
-    read(form, ["followupId", "isPrivate"]),
+    fields(form, ["followupId", "isPrivate"]),
   );
   if (!parsed.success) return { error: t.common.invalidRequest };
   const isPrivate = parsed.data.isPrivate === "true";
@@ -120,7 +117,7 @@ export async function setOwnerLanguageAction(
 ): Promise<ActionState> {
   const { t } = await appText();
   const parsed = languageInput.safeParse(
-    read(form, ["followupId", "role", "language"]),
+    fields(form, ["followupId", "role", "language"]),
   );
   if (!parsed.success) return { error: t.common.invalidRequest };
   const { followupId, role, language } = parsed.data;

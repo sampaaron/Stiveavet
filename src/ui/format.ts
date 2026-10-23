@@ -153,6 +153,16 @@ export function formatEuros(cents: number, locale: Locale): string {
   }).format(cents / 100);
 }
 
+/** Initiales d'un nom pour un avatar : « Dr Claire Fontaine » donne « CF ». */
+export function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter((part) => /^\p{L}/u.test(part))
+    .slice(-2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
 /** « Dr Claire Fontaine » devient « Dr Fontaine » ; un autre nom reste entier. */
 export function shortPersonName(displayName: string): string {
   const parts = displayName.trim().split(/\s+/);

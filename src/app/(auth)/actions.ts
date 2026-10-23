@@ -29,16 +29,9 @@ import { requestOrigin } from "@/server/auth/origin";
 import { appDatabase } from "@/server/db/client";
 import { syncUiLocaleCookie } from "@/server/ui-locale";
 
-import type { FormState } from "./form-state";
+import { fields, text } from "@/app/app/form-data";
 
-function fields(form: FormData, names: readonly string[]) {
-  return Object.fromEntries(
-    names.map((name) => {
-      const value = form.get(name);
-      return [name, typeof value === "string" ? value : ""];
-    }),
-  );
-}
+import type { FormState } from "./form-state";
 
 type AuthText = AppDictionary["auth"];
 
@@ -86,7 +79,7 @@ export async function loginAction(
 ): Promise<FormState> {
   const t = (await appText()).t.auth;
   const parsed = loginInput.safeParse(fields(form, ["email", "password"]));
-  const values = { email: String(form.get("email") ?? "").slice(0, 254) };
+  const values = { email: text(form, "email").slice(0, 254) };
   if (!parsed.success)
     return { fieldErrors: fieldErrors(t, parsed.error), values };
 
@@ -172,7 +165,7 @@ export async function requestResetAction(
 ): Promise<FormState> {
   const t = (await appText()).t.auth;
   const parsed = resetRequestInput.safeParse(fields(form, ["email"]));
-  const values = { email: String(form.get("email") ?? "").slice(0, 254) };
+  const values = { email: text(form, "email").slice(0, 254) };
   if (!parsed.success)
     return { fieldErrors: fieldErrors(t, parsed.error), values };
 

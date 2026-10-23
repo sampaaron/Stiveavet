@@ -9,14 +9,12 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { attempt, invalidRequest } from "../domain-messages";
+import { fields } from "../form-data";
 
 const idInput = z.object({ id: z.uuid() });
 
 function jobId(form: FormData): string | null {
-  const value = form.get("id");
-  const parsed = idInput.safeParse({
-    id: typeof value === "string" ? value : "",
-  });
+  const parsed = idInput.safeParse(fields(form, ["id"]));
   return parsed.success ? parsed.data.id : null;
 }
 
