@@ -269,5 +269,3 @@ export function createWorker(options: WorkerOptions) {
     },
   };
 }
-
-export type Worker = ReturnType<typeof createWorker>;

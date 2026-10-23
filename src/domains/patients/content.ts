@@ -19,7 +19,7 @@ const optionalText = (max: number) =>
     .max(max)
     .transform((value) => value || null);
 
-export const ownerInput = z.object({
+const ownerInput = z.object({
   fullName: z.string().trim().min(2).max(160),
   phone: z
     .string()
@@ -93,8 +93,6 @@ function animalInput(now: Date = new Date()) {
     notes: optionalText(NOTES_MAX),
   });
 }
-
-export type AnimalInput = z.output<ReturnType<typeof animalInput>>;
 
 export const patientInput = (now?: Date) =>
   z.object({

@@ -8,8 +8,14 @@ import {
 import { checkNumaReply, safeFallback } from "./guard";
 import { ownerKeyword } from "./keywords";
 import { NUMA_TRAPS } from "./pieges";
-import { fixedMessage } from "./wording";
-import type { FixedStep } from "./wording";
+import { fixedContent } from "./wording";
+import type { FixedStep, WordingContext } from "./wording";
+
+/** Texte envoyé pour une étape fixe (corps du modèle WhatsApp le cas échéant). */
+function fixedMessage(step: FixedStep, context: WordingContext): string {
+  const content = fixedContent(step, context);
+  return typeof content === "string" ? content : content.body;
+}
 
 const context = {
   language: "fr" as const,
