@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { scheduleReminders } from "@/domains/suivis/rappels";
 import { triageOwnerMessage } from "@/domains/urgences/service";
 import type { TriageLevel } from "@/domains/urgences/triage";

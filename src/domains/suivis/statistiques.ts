@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
 import { parisDate } from "@/domains/heure-paris";

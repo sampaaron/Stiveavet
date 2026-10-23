@@ -2,7 +2,8 @@
 
 Un dossier par domaine : `agenda`, `audit`, `auth`, `cabinet`, `conversations`, `demo`, `equipe`,
 `facturation`, `fichiers`, `notifications`, `protocoles`, `reglages`, `suivis`, `taches`,
-`urgences`, `whatsapp`. `commun.ts` regroupe quelques utilitaires sans dépendance (texte, heures).
+`urgences`, `whatsapp`. `commun/` regroupe ce que tous partagent : `actor.ts` (acteur, permissions,
+`DomainError`) et `utilitaires.ts` (petites aides sans dépendance : texte, heures, octets).
 
 Dans un domaine :
 
@@ -18,6 +19,5 @@ Dans un domaine :
 - `*.test.ts` à côté du code testé.
 
 Un domaine passe par le service d'un autre plutôt que par ses détails internes. Exceptions
-assumées : `equipe/actor.ts` (acteur, permissions, `DomainError`), `audit/journal.ts` et les
-`schema.ts`, partagés par tous. Le trajet complet d'une action est décrit dans
-`docs/DEVELOPPEMENT.md`.
+assumées : `commun/`, `audit/journal.ts` et les `schema.ts`, partagés par tous. Le trajet complet
+d'une action est décrit dans `docs/DEVELOPPEMENT.md`.

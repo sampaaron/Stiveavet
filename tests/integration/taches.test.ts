@@ -14,8 +14,8 @@ import {
 } from "vitest";
 
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { ROLE_PERMISSIONS } from "@/domains/equipe/permissions";
 import { JobError } from "@/domains/taches/kinds";
 import { emit, enqueue } from "@/domains/taches/queue";

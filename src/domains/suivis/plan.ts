@@ -7,7 +7,7 @@ import {
   stepInput,
 } from "@/domains/protocoles/content";
 
-import { foldText } from "@/domains/commun";
+import { foldText } from "@/domains/commun/utilitaires";
 import { nombre } from "@/i18n/pluriel";
 
 /**

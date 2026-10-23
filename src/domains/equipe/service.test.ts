@@ -1,7 +1,7 @@
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { describe, expect, it } from "vitest";
 
-import { DomainError } from "./actor";
+import { DomainError } from "@/domains/commun/actor";
 import { translateDbError } from "./service";
 
 function dbError(fields: {

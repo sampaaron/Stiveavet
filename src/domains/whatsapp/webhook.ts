@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { classifyGraphError } from "@/adapters/whatsapp/cloud-api";
 import { receiveInTx, recordInbound } from "@/domains/conversations/service";
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { refuseOwnerMedia } from "@/domains/fichiers/service";
 import {
   followupContacts,

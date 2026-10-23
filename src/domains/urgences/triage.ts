@@ -1,4 +1,4 @@
-import { foldText, minutesOfDay } from "@/domains/commun";
+import { foldText, minutesOfDay } from "@/domains/commun/utilitaires";
 import { parisWallMinutes } from "@/domains/heure-paris";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { DEFAULT_MESSAGE_WINDOWS } from "@/domains/reglages/content";

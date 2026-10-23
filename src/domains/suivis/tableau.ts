@@ -6,7 +6,7 @@ import { followupActivity } from "@/domains/facturation/service";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
 import type { Plan } from "@/domains/facturation/rules";
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { parisDayIndex, parisLocalToDate } from "@/domains/heure-paris";
 import {
   triageReason,

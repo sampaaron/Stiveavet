@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { stiveQuestion } from "@/domains/stive/service";
 import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";

@@ -16,8 +16,8 @@ import {
 import { z } from "zod";
 
 import { WhatsAppSendError } from "@/adapters/whatsapp/types";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import { VET_ROLES, isPermissionKey } from "@/domains/equipe/permissions";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";

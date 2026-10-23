@@ -14,8 +14,8 @@ import {
   DEFAULT_APPOINTMENT_MINUTES,
 } from "@/domains/agenda/rendez-vous";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";

@@ -1,4 +1,4 @@
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { currentSession } from "@/server/auth";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";

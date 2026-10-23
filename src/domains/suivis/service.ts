@@ -1,8 +1,8 @@
 import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import {
   animalOwners,
   animals,

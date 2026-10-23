@@ -5,8 +5,8 @@ import { z } from "zod";
 
 import type { AiGateway, FreeSlot } from "@/adapters/ai-gateway/types";
 import type { ObjectStorage } from "@/adapters/object-storage";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import {
   MAX_CAPTURE_BYTES,
   sha256Hex,

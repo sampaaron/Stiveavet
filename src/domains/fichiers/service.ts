@@ -17,8 +17,8 @@ import type {
   ContactRole,
   InboundOutcome,
 } from "@/domains/conversations/service";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
 import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { JobError } from "@/domains/taches/kinds";

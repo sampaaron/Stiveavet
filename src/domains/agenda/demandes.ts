@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
 import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { followupAccessMap } from "@/domains/suivis/service";

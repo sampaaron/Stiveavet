@@ -7,8 +7,8 @@ import {
   createOrganization,
   insertFollowup,
 } from "../../db/seed/cabinets-fictifs";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import type { ProtocolContent } from "@/domains/protocoles/content";
 import { PROTOCOL_LIBRARY } from "@/domains/protocoles/library";
