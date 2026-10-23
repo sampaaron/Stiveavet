@@ -21,7 +21,7 @@ import { JobError } from "@/domains/taches/kinds";
 import { emit, enqueue } from "@/domains/taches/queue";
 import { jobsService } from "@/domains/taches/service";
 import { createWorker } from "@/domains/taches/worker";
-import type { JobHandler } from "@/domains/taches/worker";
+import type { JobHandler, StagedJobHandler } from "@/domains/taches/worker";
 import * as schema from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
@@ -404,6 +404,63 @@ describe("worker", () => {
 
     expect(await job(id)).toMatchObject({ status: "succeeded", attempts: 2 });
     expect([...delivered.values()]).toEqual([1]);
+  });
+
+  it("exécute un lot en parallèle ; un exécutant en deux temps appelle hors transaction, avec un bail prolongé", async () => {
+    const ids = await Promise.all(
+      Array.from({ length: 3 }, () => addJob("essai.deux_temps")),
+    );
+    // Chaque appel attend que les trois aient commencé : en série, le lot resterait bloqué.
+    let arrived = 0;
+    let all = () => {};
+    const together = new Promise<void>((resolve) => (all = resolve));
+    const leases: number[] = [];
+    const staged: StagedJobHandler<string> = {
+      async prepare({ job: claimed, read }) {
+        leases.push(
+          await read(async (tx) => {
+            const result = await tx.execute<{ s: number }>(
+              sql`SELECT round(extract(epoch FROM locked_until - now()))::int AS s FROM scheduled_jobs WHERE id = ${claimed.id}`,
+            );
+            return result.rows[0]?.s ?? 0;
+          }),
+        );
+        arrived += 1;
+        if (arrived === 3) all();
+        await Promise.race([
+          together,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("exécution en série")), 5_000),
+          ),
+        ]);
+        return claimed.id;
+      },
+      async commit({ tx, job: claimed, prepared }) {
+        expect(prepared).toBe(claimed.id);
+        await enqueue(tx, {
+          organizationId: org,
+          kind: "essai.trace",
+          idempotencyKey: `trace:${claimed.id}`,
+          runAt: new Date(Date.now() + 3_600_000),
+        });
+      },
+    };
+
+    const result = await createWorker({
+      db: appDb,
+      workerId: "essai-a",
+      handlers: { "essai.deux_temps": staged },
+      leaseSeconds: 120,
+    }).runOnce();
+
+    expect(result.succeeded).toBe(3);
+    expect(leases.every((seconds) => seconds >= 119)).toBe(true);
+    for (const { id } of ids) expect((await job(id)).status).toBe("succeeded");
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM scheduled_jobs WHERE organization_id = $1 AND kind = 'essai.trace'",
+      [org],
+    );
+    expect(rows[0]).toEqual({ n: 3 });
   });
 
   it("refuse un identifiant de worker mal formé", async () => {
