@@ -10,6 +10,7 @@ import {
   lt,
   max,
   ne,
+  sql,
 } from "drizzle-orm";
 import { z } from "zod";
 
@@ -390,8 +391,12 @@ export function billingService(deps: {
           ),
         );
       const draft = draftInvoice(facts, month, usage);
-      const [issued] = await tx.select({ n: count() }).from(invoices);
-      const number = `SV-${period.start.getUTCFullYear()}-${String((issued?.n ?? 0) + 1).padStart(3, "0")}`;
+      // Suite unique et continue par année, tous cabinets confondus (migration 0026).
+      const numbered = await tx.execute<{ number: string }>(
+        sql`SELECT app.next_invoice_number(${period.start.getUTCFullYear()}) AS number`,
+      );
+      const number = numbered.rows[0]?.number;
+      if (!number) throw new Error("Numéro de facture indisponible");
       const [invoice] = await tx
         .insert(invoices)
         .values({
