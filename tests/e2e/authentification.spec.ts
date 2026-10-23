@@ -4,6 +4,7 @@ import { LEA, PHRASE } from "./support/accounts";
 import {
   expectAccessible,
   login,
+  loginWithCode,
   openAccountMenu,
   signUp,
 } from "./support/flows";
@@ -132,4 +133,55 @@ test("mot de passe oublié : lien à usage unique, sessions fermées", async ({
   await page.goto("/app");
   await expect(page).toHaveURL(/\/connexion$/);
   await other.close();
+});
+
+test("sécurité du compte : nouveau mot de passe, autres sessions fermées", async ({
+  page,
+  browser,
+}) => {
+  const account = await signUp(page);
+  // Une autre session, ouverte depuis un second navigateur.
+  const other = await browser.newContext({ storageState: undefined });
+  const otherPage = await other.newPage();
+  await loginWithCode(otherPage, account.email, account.password);
+
+  await openAccountMenu(page);
+  await page.getByRole("link", { name: "Sécurité du compte" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Sécurité du compte" }),
+  ).toBeVisible();
+  await expect(page.getByText(/· Cet appareil/).first()).toBeVisible();
+  await expectAccessible(page);
+
+  const fresh = "une toute nouvelle phrase de passe";
+  await page.getByLabel("Mot de passe actuel").fill("pas le bon");
+  await page.getByLabel("Nouveau mot de passe").fill(fresh);
+  await page.getByLabel("Confirmer le mot de passe").fill(fresh);
+  await page.getByRole("button", { name: "Changer le mot de passe" }).click();
+  await expect(page.getByText("Mot de passe incorrect.")).toBeVisible();
+
+  const since = new Date(Date.now() - 1000);
+  await page.getByLabel("Mot de passe actuel").fill(account.password);
+  await page.getByLabel("Nouveau mot de passe").fill(fresh);
+  await page.getByLabel("Confirmer le mot de passe").fill(fresh);
+  await page.getByRole("button", { name: "Changer le mot de passe" }).click();
+  await expect(page.getByRole("status")).toContainText("Mot de passe modifié");
+  const { Text } = await latestEmail(account.email, since, /mot de passe/);
+  expect(Text).not.toMatch(/https?:/);
+
+  // La session courante reste ouverte, l'autre est fermée.
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/app$/);
+  await otherPage.goto("/app");
+  await expect(otherPage).toHaveURL(/\/connexion/);
+  await other.close();
+
+  // Deux appareils de confiance (un par navigateur) : l'un se retire de la liste.
+  await page.goto("/app/compte");
+  const remove = page.getByRole("button", {
+    name: /^Retirer l'appareil de confiance/,
+  });
+  await expect(remove).toHaveCount(2);
+  await remove.first().click();
+  await expect(remove).toHaveCount(1);
 });

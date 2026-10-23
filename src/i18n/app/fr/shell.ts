@@ -5,6 +5,7 @@ export const shell = {
   closeMenu: "Fermer le menu",
   mainNavigation: "Navigation principale",
   lock: "Verrouiller",
+  account: "Sécurité du compte",
   logout: "Déconnexion",
   newFollowup: "Nouveau suivi",
   search: {
