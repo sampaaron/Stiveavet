@@ -25,7 +25,8 @@ import { pools } from "./support/db";
 /**
  * Lot 20 (ADR 0023) : l'offre d'engagement annuel part par e-mail à 45 jours d'essai, puis
  * en rappel au 6e mois, seulement à qui gère la facturation et seulement si le choix reste
- * à faire.
+ * à faire. Un envoi par destinataire : une reprise ne renvoie rien aux autres (ADR 0041).
+ * Horloge fixe : le résultat ne dépend pas du jour où les tests tournent.
  */
 
 const { app, admin, appDb } = pools();
@@ -35,6 +36,7 @@ afterAll(async () => {
 });
 
 const DAY = 86_400_000;
+const NOW = new Date("2027-03-10T10:00:00Z");
 const paying = billingService({ db: appDb, provider: fakeBillingProvider() });
 
 async function actorOf(org: string, membershipId: string): Promise<Actor> {
@@ -56,7 +58,7 @@ async function actorOf(org: string, membershipId: string): Promise<Actor> {
   };
 }
 
-async function cabinet(startedAt: Date) {
+async function cabinet(startedAt: Date, options = { secondAdmin: false }) {
   const org = randomUUID();
   const tag = org.slice(0, 8);
   const [adminId] = await createOrganization(
@@ -79,6 +81,15 @@ async function cabinet(startedAt: Date) {
         displayName: "Olga Asv",
         role: "assistant",
       },
+      ...(options.secondAdmin
+        ? [
+            {
+              email: `ob-${tag}@essai.test`,
+              displayName: "Dr Bruno Admin",
+              role: "admin_vet" as const,
+            },
+          ]
+        : []),
     ],
   );
   if (!adminId) throw new Error("cabinet");
@@ -88,16 +99,17 @@ async function cabinet(startedAt: Date) {
   return { org, tag, owner: await actorOf(org, adminId) };
 }
 
-async function run(
+/** Exécute une tâche de l'offre, comme le worker, dans la transaction du cabinet. */
+async function runJob(
   org: string,
-  now: Date,
   payload: JobPayload,
-  email = new MemoryEmailSender(),
+  email: MemoryEmailSender,
+  idempotencyKey = "billing:annual-offer",
 ) {
   const handler = billingHandlers({
     email,
     appUrl: "http://localhost:3000",
-    clock: () => now,
+    clock: () => NOW,
   })[ANNUAL_OFFER_JOB];
   if (!handler) throw new Error("exécutant");
   await withTenant(appDb, { organizationId: org }, (tx) =>
@@ -110,10 +122,32 @@ async function run(
         attempt: 1,
         followupId: null,
         payload,
-        idempotencyKey: "billing:annual-offer",
+        idempotencyKey,
       },
     }),
   );
+}
+
+/** Envois par destinataire inscrits par la tâche de départ. */
+async function deliveries(org: string) {
+  const { rows } = await admin.query(
+    `SELECT idempotency_key, payload FROM scheduled_jobs
+     WHERE organization_id = $1 AND kind = $2 AND payload ? 'membershipId'
+     ORDER BY idempotency_key`,
+    [org, ANNUAL_OFFER_JOB],
+  );
+  return rows as { idempotency_key: string; payload: JobPayload }[];
+}
+
+/** Tâche de départ, puis chaque envoi : le parcours complet du worker. */
+async function run(
+  org: string,
+  payload: JobPayload,
+  email = new MemoryEmailSender(),
+) {
+  await runJob(org, payload, email);
+  for (const job of await deliveries(org))
+    await runJob(org, job.payload, email, job.idempotency_key);
   return email;
 }
 
@@ -141,11 +175,18 @@ describe("offre d'engagement annuel par e-mail", () => {
   });
 
   it("à 45 jours : un e-mail à qui gère la facturation, sans donnée clinique, journalisé", async () => {
-    const startedAt = new Date(Date.now() - 46 * DAY);
-    const { org, tag } = await cabinet(startedAt);
-    const email = await run(org, new Date(), { reason: "offer" });
+    const { org, tag, owner } = await cabinet(
+      new Date(NOW.getTime() - 46 * DAY),
+    );
+    const email = await run(org, { reason: "offer" });
     expect(email.sent.map((message) => message.to)).toEqual([
       `oa-${tag}@essai.test`,
+    ]);
+    expect(await deliveries(org)).toEqual([
+      {
+        idempotency_key: `annual_offer:offer:${owner.membershipId}`,
+        payload: { reason: "offer", membershipId: owner.membershipId },
+      },
     ]);
     const [message] = email.sent;
     expect(message?.subject).toBe(
@@ -155,55 +196,96 @@ describe("offre d'engagement annuel par e-mail", () => {
     expect(message?.text).toContain("rien ne bascule automatiquement");
     expect(message?.text).toContain("http://localhost:3000/app/facturation");
     const { rows } = await admin.query(
-      `SELECT metadata FROM audit_events
+      `SELECT actor_membership_id, target_type, metadata FROM audit_events
        WHERE organization_id = $1 AND action = 'billing.annual_offer_sent'`,
       [org],
     );
-    expect(rows).toEqual([{ metadata: { reason: "offer", recipients: 1 } }]);
+    expect(rows).toEqual([
+      {
+        actor_membership_id: null,
+        target_type: "organization",
+        metadata: { reason: "offer", membershipId: owner.membershipId },
+      },
+    ]);
+  });
+
+  it("une panne chez un destinataire ne renvoie jamais l'e-mail aux autres", async () => {
+    const { org, tag } = await cabinet(new Date(NOW.getTime() - 46 * DAY), {
+      secondAdmin: true,
+    });
+    await runJob(org, { reason: "offer" }, new MemoryEmailSender());
+    // Rejouer la tâche de départ n'inscrit pas d'envoi en double.
+    await runJob(org, { reason: "offer" }, new MemoryEmailSender());
+    const jobs = await deliveries(org);
+    expect(jobs).toHaveLength(2);
+
+    const email = new MemoryEmailSender();
+    const send = email.send.bind(email);
+    const down = `ob-${tag}@essai.test`;
+    email.send = (message) =>
+      message.to === down ? Promise.reject(new Error("smtp")) : send(message);
+    const attempts = await Promise.allSettled(
+      jobs.map((job) => runJob(org, job.payload, email, job.idempotency_key)),
+    );
+    expect(attempts.map((attempt) => attempt.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    // Reprise de l'envoi en échec seulement : chacun ne reçoit qu'un e-mail.
+    email.send = send;
+    const failed = jobs.filter(
+      (_, index) => attempts[index]?.status === "rejected",
+    );
+    for (const job of failed)
+      await runJob(org, job.payload, email, job.idempotency_key);
+    expect(email.sent.map((message) => message.to).sort()).toEqual([
+      `oa-${tag}@essai.test`,
+      down,
+    ]);
   });
 
   it("rien n'est envoyé si le choix est déjà fait ou l'abonnement résilié", async () => {
-    const committed = await cabinet(new Date(Date.now() - 46 * DAY));
-    await paying.chooseCycle(committed.owner, "annual");
-    expect(
-      (await run(committed.org, new Date(), { reason: "offer" })).sent,
-    ).toEqual([]);
+    const committed = await cabinet(new Date(NOW.getTime() - 46 * DAY));
+    await paying.chooseCycle(committed.owner, "annual", NOW);
+    expect((await run(committed.org, { reason: "offer" })).sent).toEqual([]);
 
-    const canceled = await cabinet(new Date(Date.now() - 46 * DAY));
-    await paying.cancel(canceled.owner);
-    expect(
-      (await run(canceled.org, new Date(), { reason: "offer" })).sent,
-    ).toEqual([]);
+    const canceled = await cabinet(new Date(NOW.getTime() - 46 * DAY));
+    await paying.cancel(canceled.owner, NOW);
+    expect((await run(canceled.org, { reason: "offer" })).sent).toEqual([]);
   });
 
   it("au 6e mois, rappel à un cabinet resté au mois ; plus rien après le choix", async () => {
-    const startedAt = addMonths(new Date(), -5);
+    const startedAt = addMonths(NOW, -5);
     const { org, owner } = await cabinet(new Date(startedAt.getTime() - DAY));
     // Resté au mois plus tôt (choix daté du 2e mois).
     await admin.query(
       "UPDATE subscriptions SET cycle_chosen_at = started_at + interval '50 days' WHERE organization_id = $1",
       [org],
     );
-    const reminder = await run(org, new Date(), { reason: "reminder" });
+    const reminder = await run(org, { reason: "reminder" });
     expect(reminder.sent).toHaveLength(1);
     expect(reminder.sent[0]?.subject).toBe(
       "Stivea Vet : dernier rappel pour l'engagement annuel",
     );
-    await paying.chooseCycle(owner, "annual");
-    expect((await run(org, new Date(), { reason: "reminder" })).sent).toEqual(
-      [],
-    );
+    await paying.chooseCycle(owner, "annual", NOW);
+    expect(
+      (await run(org, { reason: "reminder" }, new MemoryEmailSender())).sent,
+    ).toEqual([]);
   });
 
   it("une charge utile inconnue échoue proprement ; une panne d'envoi est réessayée", async () => {
-    const { org } = await cabinet(new Date(Date.now() - 46 * DAY));
-    await expect(run(org, new Date(), { reason: "autre" })).rejects.toEqual(
-      new JobError("invalid_payload"),
-    );
+    const { org, owner } = await cabinet(new Date(NOW.getTime() - 46 * DAY));
+    await expect(
+      runJob(org, { reason: "autre" }, new MemoryEmailSender()),
+    ).rejects.toEqual(new JobError("invalid_payload"));
     const failing = new MemoryEmailSender();
     failing.send = () => Promise.reject(new Error("smtp"));
     await expect(
-      run(org, new Date(), { reason: "offer" }, failing),
+      runJob(
+        org,
+        { reason: "offer", membershipId: owner.membershipId },
+        failing,
+      ),
     ).rejects.toEqual(new JobError("provider_unavailable"));
   });
 });

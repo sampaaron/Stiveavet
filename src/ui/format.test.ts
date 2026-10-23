@@ -86,5 +86,6 @@ describe("en anglais (usage britannique, heure de Paris)", () => {
     );
     expect(formatDate(now, "en")).toBe("7 October 2026");
     expect(formatEuros(8600, "en")).toBe("€86.00");
+    expect(formatEuros(8_900, "fr").replace(/\s/g, " ")).toBe("89,00 €");
   });
 });

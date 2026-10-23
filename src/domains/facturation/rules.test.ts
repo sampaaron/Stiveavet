@@ -18,7 +18,6 @@ import {
   cancellationEffectiveAt,
   commitmentReminder,
   draftInvoice,
-  formatEuros,
   introOfferApplies,
   introOfferOpen,
   isCanceled,
@@ -115,10 +114,6 @@ describe("catalogue (cahier des charges §13)", () => {
     // Cabinet antérieur aux abonnements : limites de la formule la plus complète.
     expect(maxVets(null)).toBe(3);
     expect(maxAssistants(null)).toBeNull();
-  });
-
-  it("affiche les montants en euros", () => {
-    expect(formatEuros(8_900).replace(/\s/g, " ")).toBe("89,00 €");
   });
 });
 

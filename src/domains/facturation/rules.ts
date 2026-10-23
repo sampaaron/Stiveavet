@@ -413,14 +413,6 @@ export function maxAssistants(plan: Plan | null): number | null {
   return planDefinition(plan).maxAssistants;
 }
 
-/** `12 345` → `123,45 €` */
-export function formatEuros(cents: number): string {
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-  }).format(cents / 100);
-}
-
 /** Droits conservés en lecture seule : consulter, jamais modifier ni lancer. */
 const READ_ONLY_PERMISSIONS = [
   "followups.read_all",
