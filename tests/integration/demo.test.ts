@@ -134,6 +134,37 @@ describe("demande de démo", () => {
     expect(await service().access(linkIn(outbox.sent[0]?.text))).not.toBeNull();
   });
 
+  it("une demande pour une adresse confirmée ne change ni le nom, ni la langue, ni l'accès", async () => {
+    const first = await service().capture(
+      request("confirme@exemple.test"),
+      null,
+    );
+    await confirm("confirme@exemple.test");
+    await admin.query(
+      "UPDATE marketing.demo_leads SET access_expires_at = now() + interval '1 day' WHERE email = $1",
+      ["confirme@exemple.test"],
+    );
+    const intruder = await service().capture(
+      request("confirme@exemple.test", { cabinetName: "Intrus", locale: "en" }),
+      null,
+    );
+    if (first.status !== "captured" || intruder.status !== "captured")
+      throw new Error("attendu : captured");
+
+    // Même réponse qu'une adresse inconnue, mais rien ne change pour le prospect.
+    expect(await service().access(intruder.accessToken)).toBeNull();
+    expect(await service().access(first.accessToken)).toEqual({
+      locale: "fr",
+      cabinetName: "Cabinet des Essais",
+    });
+    const { rows } = await admin.query(
+      "SELECT access_expires_at > now() + interval '13 days' AS renewed FROM marketing.demo_leads WHERE email = $1",
+      ["confirme@exemple.test"],
+    );
+    expect(rows[0]).toEqual({ renewed: true });
+    expect(outbox.sent).toHaveLength(1);
+  });
+
   it("refuse un jeton inconnu, mal formé ou expiré", async () => {
     const result = await service().capture(
       request("expire@exemple.test"),

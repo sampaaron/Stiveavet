@@ -343,6 +343,43 @@ describe("session et verrouillage", () => {
     expect((await service.resolveSession(sessionToken))?.locked).toBe(false);
   });
 
+  it("n'écrit l'activité qu'une fois par minute et ne journalise le verrouillage qu'une fois", async () => {
+    const { sessionToken } = await newAdmin();
+    const hash = tokenHash(sessionToken);
+    const age = async (interval: string) => {
+      await admin.query(
+        `UPDATE auth.sessions SET last_activity_at = now() - $2::interval WHERE token_hash = $1`,
+        [hash, interval],
+      );
+    };
+    const recent = async () => {
+      const { rows } = await admin.query(
+        "SELECT last_activity_at > now() - interval '10 seconds' AS recent FROM auth.sessions WHERE token_hash = $1",
+        [hash],
+      );
+      return (rows[0] as { recent: boolean }).recent;
+    };
+
+    await age("30 seconds");
+    await service.resolveSession(sessionToken);
+    expect(await recent()).toBe(false);
+    await age("2 minutes");
+    await service.resolveSession(sessionToken);
+    expect(await recent()).toBe(true);
+
+    await age("41 minutes");
+    const results = await Promise.all(
+      [1, 2, 3].map(() => service.resolveSession(sessionToken)),
+    );
+    expect(results.every((session) => session?.locked)).toBe(true);
+    const { rows } = await admin.query(
+      `SELECT count(*)::int AS n FROM login_events e JOIN auth.sessions s ON s.user_id = e.user_id
+       WHERE s.token_hash = $1 AND e.kind = 'session_locked'`,
+      [hash],
+    );
+    expect(rows[0]).toEqual({ n: 1 });
+  });
+
   it("trop d'échecs de déverrouillage ferment la session", async () => {
     const { sessionToken } = await newAdmin();
     await service.lock(sessionToken);

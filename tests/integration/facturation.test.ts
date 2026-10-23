@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { createOrganization } from "../../db/seed/cabinets-fictifs";
+import { SEED, createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
 import { fakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
@@ -306,6 +306,45 @@ describe("échéances hors des pages (ADR 0040)", () => {
     const issued = await invoicesOf();
     expect(issued).toHaveLength(3);
     expect(issued.every((invoice) => invoice.status === "paid")).toBe(true);
+  });
+});
+
+describe("numéros de facture (émettrice unique)", () => {
+  it("sont uniques et continus par année, tous cabinets confondus", async () => {
+    const start = addMonths(new Date(), -2);
+    const first = await paying.overview((await cabinet(start)).owner);
+    const second = await paying.overview((await cabinet(start)).owner);
+    const numbers = [...first.invoices, ...second.invoices].map(
+      (invoice) => invoice.number,
+    );
+    expect(new Set(numbers).size).toBe(numbers.length);
+
+    // Chaque année : 1, 2, 3… sans trou ni doublon, et le compteur suit.
+    const { rows } = await admin.query(`
+      SELECT substr(i.number, 4, 4)::int AS year, count(*)::int AS n,
+             max(substr(i.number, 9)::int) AS last, c.last_number
+      FROM invoices i JOIN app.invoice_counters c ON c.year = substr(i.number, 4, 4)::int
+      GROUP BY 1, c.last_number`);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows as {
+      n: number;
+      last: number;
+      last_number: number;
+    }[])
+      expect(row).toMatchObject({ last: row.n, last_number: row.n });
+  });
+
+  it("ne se tirent que dans un cabinet, et jamais par lecture du compteur", async () => {
+    expect(
+      await asApp(app, null, (client) =>
+        errorCode(client.query("SELECT app.next_invoice_number(2026)")),
+      ),
+    ).toBe("42501");
+    expect(
+      await asApp(app, SEED.tilleuls, (client) =>
+        errorCode(client.query("SELECT * FROM app.invoice_counters")),
+      ),
+    ).toBe("42501");
   });
 });
 

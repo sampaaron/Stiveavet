@@ -51,6 +51,22 @@ export async function loadMigrations(directory: string): Promise<Migration[]> {
   });
 }
 
+/** Clé du verrou consultatif : deux déploiements simultanés appliquent l'un après l'autre. */
+export const MIGRATION_LOCK_KEY = 0x5374_6976;
+
+/** Exécute `run` sous le verrou des migrations, rendu même en cas d'échec. */
+async function withMigrationLock<T>(
+  client: Client,
+  run: () => Promise<T>,
+): Promise<T> {
+  await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+  try {
+    return await run();
+  } finally {
+    await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
+  }
+}
+
 async function ensureLedger(client: Client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS public.schema_migrations (
@@ -79,7 +95,14 @@ async function inTransaction(client: Client, run: () => Promise<void>) {
 }
 
 /** Applique toutes les migrations en attente, dans l'ordre. Retourne les versions appliquées. */
-export async function migrateUp(
+export function migrateUp(
+  client: Client,
+  migrations: Migration[],
+): Promise<string[]> {
+  return withMigrationLock(client, () => applyPending(client, migrations));
+}
+
+async function applyPending(
   client: Client,
   migrations: Migration[],
 ): Promise<string[]> {
@@ -110,7 +133,14 @@ export async function migrateUp(
 }
 
 /** Annule la dernière migration appliquée. Retourne sa version, ou null s'il n'y en a aucune. */
-export async function migrateDown(
+export function migrateDown(
+  client: Client,
+  migrations: Migration[],
+): Promise<string | null> {
+  return withMigrationLock(client, () => undoLast(client, migrations));
+}
+
+async function undoLast(
   client: Client,
   migrations: Migration[],
 ): Promise<string | null> {
