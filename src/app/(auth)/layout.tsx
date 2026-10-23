@@ -39,7 +39,7 @@ export default async function AuthLayout({
         </div>
         <div className="max-w-md">
           <div className="mb-8 flex items-center">
-            {(["numa", "stive"] as const).map((assistant) => (
+            {(["stive", "numa"] as const).map((assistant) => (
               <Image
                 key={assistant}
                 src={`/assistants/${assistant}.webp`}
