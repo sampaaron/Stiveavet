@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  // L'indicateur de développement injecte ses styles sans nonce : la CSP les bloque et il
+  // s'affichait sans mise en forme sous la page. Les erreurs restent signalées.
+  devIndicators: false,
   experimental: {
     // Photos et captures d'agenda : 5 Mo au plus, vérifiés ensuite par le serveur (ADR 0019).
     serverActions: { bodySizeLimit: "6mb" },

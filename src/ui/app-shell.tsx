@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -13,7 +14,8 @@ import { SidebarNav } from "./sidebar-nav";
 type AppShellProps = {
   organizationName: string;
   user: { name: string; roleLabel: string };
-  /** Actions du compte (verrouiller, se déconnecter), sous l'identité, à droite. */
+  /** Actions du compte (verrouiller, se déconnecter), sous l'identité, à droite. L'identité
+   * elle-même mène à « Mon compte ». */
   accountActions?: ReactNode;
   /** Sous l'identité, à gauche (choix de la langue). */
   accountFooter?: ReactNode;
@@ -44,13 +46,14 @@ export function AppShell({
     "followups.read_own",
     "followups.read_summary",
   ].some((key) => permissions.includes(key));
+  const text = appDictionary(locale).shell;
   return (
     <div className="min-h-screen bg-chrome lg:grid lg:grid-cols-[272px_minmax(0,1fr)]">
       <a
         href="#contenu"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2"
       >
-        {appDictionary(locale).shell.skipToContent}
+        {text.skipToContent}
       </a>
       <SidebarNav
         permissions={permissions}
@@ -76,7 +79,10 @@ export function AppShell({
         }
         footer={
           <div className="flex flex-col gap-1 rounded-[var(--radius-card)] bg-white/6 p-2 ring-1 ring-white/10">
-            <div className="flex items-center gap-2.5 p-1">
+            <Link
+              href="/app/compte"
+              className="group flex items-center gap-2.5 rounded-[calc(var(--radius-card)-4px)] p-1 transition-colors hover:bg-white/8 focus-visible:outline-mint"
+            >
               <span
                 aria-hidden="true"
                 className="grid size-9 shrink-0 place-items-center rounded-full bg-mint text-sm font-bold text-night"
@@ -84,6 +90,7 @@ export function AppShell({
                 {initials(user.name)}
               </span>
               <span className="min-w-0 flex-1 leading-tight">
+                <span className="sr-only">{text.account} : </span>
                 <span className="block truncate text-sm font-semibold">
                   {user.name}
                 </span>
@@ -91,7 +98,11 @@ export function AppShell({
                   {user.roleLabel}
                 </span>
               </span>
-            </div>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-white/80"
+              />
+            </Link>
             <div className="flex items-center gap-1 border-t border-white/10 pt-1">
               <div className="min-w-0 flex-1">{accountFooter}</div>
               {accountActions}

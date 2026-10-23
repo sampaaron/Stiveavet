@@ -1,9 +1,51 @@
 import type { AppDictionary } from "../types";
 
 export const account: AppDictionary["account"] = {
-  title: "Account security",
+  title: "My account",
   description:
-    "Your password, open sessions and trusted devices. These settings only concern you.",
+    "Your details, your activity and the security of your account. Only you can see this page.",
+  profile: {
+    title: "Your details",
+    email: "Sign-in e-mail",
+    organization: "Practice",
+    role: "Role",
+    alertPhone: "Urgent alerts number",
+    noAlertPhone: "No number provided",
+    language: "Workspace language",
+    languages: { fr: "French", en: "English" },
+    memberSince: "Member since",
+    plan: "Practice plan",
+    changeHint:
+      "To change your name, e-mail or role, please ask the practice administrator.",
+  },
+  activity: {
+    title: "Your activity",
+    description:
+      "The follow-ups you are responsible for, test follow-ups excluded.",
+    statuses: {
+      active: "Ongoing",
+      paused: "Paused",
+      human_takeover: "Taken over by the team",
+      draft: "Drafts",
+      ended: "Ended",
+    },
+    stive: "Requests to Stive this month",
+    stiveUsage: (used: number, limit: number) => `${used} of ${limit}`,
+    stiveOff: "Stive is not included in your access.",
+  },
+  rights: {
+    title: "Your rights",
+    description:
+      "What your account allows in the practice, based on your role and the plan.",
+  },
+  privacy: {
+    title: "What stays private",
+    points: [
+      "Your exchanges with Stive are visible only to you and are deleted after 30 days.",
+      "The activity log keeps your actions on records, never the medical content.",
+      "Your password is never stored in plain text, and nobody at the practice can read it.",
+    ],
+  },
   password: {
     title: "Password",
     description:

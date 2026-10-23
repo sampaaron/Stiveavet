@@ -27,3 +27,11 @@ L'audit de sécurité du 23 octobre 2026 n'a trouvé aucun point critique ni él
 - `FINGERPRINT_SECRET` doit être ajoutée au gestionnaire de secrets du staging avant le prochain déploiement, sinon l'application refuse de démarrer. Changer la clé remet les compteurs à zéro, sans autre effet.
 - Les brouillons de Stive, signés par le vétérinaire (« c'est Dr … »), ne passent pas les garde-fous de Numa ; ils ne leur ont jamais été soumis en production.
 - Retirer un appareil de confiance n'ouvre ni ne ferme de session : il impose seulement le code à la prochaine connexion sur cet appareil.
+
+## Mon compte (23 octobre 2026)
+
+À la demande d'Aaron, la carte d'identité en bas de la barre latérale mène à « Mon compte » (`/app/compte`), qui remplace « Sécurité du compte » et reprend ses trois réglages (mot de passe, sessions, appareils de confiance).
+
+- La page montre à la seule personne connectée : son e-mail de connexion, son cabinet, son rôle, la formule, son numéro d'alertes urgentes, sa langue, sa date d'arrivée, ses suivis par statut (hors suivis test), ses demandes à Stive du mois et la liste de ses droits.
+- Tout est lu sous RLS par l'adhésion de la session (`accountOverview`) : aucune donnée d'un autre membre, aucun contenu clinique. Une adhésion d'un autre cabinet glissée dans le contexte ne renvoie rien (test d'intégration `compte.test.ts`).
+- Rien n'y est modifiable hormis la sécurité : le nom, l'e-mail et le rôle restent gérés par l'administrateur (« Équipe et droits »).

@@ -56,6 +56,15 @@ describe("buildContentSecurityPolicy", () => {
       "'unsafe-eval'",
     );
   });
+
+  it("n'accepte les styles en ligne sans nonce qu'en développement", () => {
+    const dev = parseDirectives(buildContentSecurityPolicy("abc123", true));
+    const prod = parseDirectives(buildContentSecurityPolicy("abc123", false));
+
+    expect(dev.get("style-src")).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(prod.get("style-src")).toEqual(["'self'", "'nonce-abc123'"]);
+    expect(dev.get("script-src")).not.toContain("'unsafe-inline'");
+  });
 });
 
 describe("createNonce", () => {
