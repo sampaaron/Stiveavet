@@ -194,7 +194,14 @@ export function conversationsService(db: Database) {
             conversationThreads,
             eq(conversationThreads.id, messages.threadId),
           )
-          .leftJoin(triageEvents, eq(triageEvents.messageId, messages.id))
+          // Le suivi dans la jointure : seuls les triages de ce suivi sont lus.
+          .leftJoin(
+            triageEvents,
+            and(
+              eq(triageEvents.followupId, messages.followupId),
+              eq(triageEvents.messageId, messages.id),
+            ),
+          )
           .leftJoin(
             memberships,
             eq(memberships.id, messages.authorMembershipId),

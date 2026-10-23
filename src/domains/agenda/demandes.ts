@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import { followupAccessMap } from "@/domains/suivis/service";
 import { enqueue } from "@/domains/taches/queue";
 import {
   agendaFreeSlots,
@@ -18,7 +19,7 @@ import {
   protocolVersions,
   users,
 } from "@/server/db/schema";
-import { tenantRunner } from "@/server/db/tenant";
+import { tenantRunner, uuidArray } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 import { auditFollowup as audit } from "@/domains/audit/journal";
 
@@ -38,6 +39,8 @@ import type { AppointmentKind, Interval } from "./rendez-vous";
  */
 
 const DAY_MS = 86_400_000;
+/** Rendez-vous à confirmer et rappels montrés au bureau : les plus proches, puis les plus récents. */
+const MAX_DESK_ROWS = 100;
 
 /** Verrou par vétérinaire : deux propriétaires ne prennent jamais le même créneau. */
 export async function lockVetAgenda(
@@ -316,7 +319,8 @@ export function appointmentsService(db: Database) {
               gt(appointments.endsAt, now),
             ),
           )
-          .orderBy(asc(appointments.startsAt));
+          .orderBy(asc(appointments.startsAt))
+          .limit(MAX_DESK_ROWS);
         const callbackRows = await tx
           .select({
             id: appointmentRequests.id,
@@ -338,8 +342,9 @@ export function appointmentsService(db: Database) {
           )
           .innerJoin(vet, eq(vet.id, memberships.userId))
           .where(eq(appointmentRequests.status, "callback"))
-          .orderBy(desc(appointmentRequests.createdAt));
-        // Seulement les suivis que la personne peut voir.
+          .orderBy(desc(appointmentRequests.createdAt))
+          .limit(MAX_DESK_ROWS);
+        // Seulement les suivis que la personne peut voir, lus en une fois.
         const ids = [
           ...new Set(
             [...pendingRows, ...callbackRows]
@@ -347,11 +352,20 @@ export function appointmentsService(db: Database) {
               .filter((id): id is string => Boolean(id)),
           ),
         ];
-        const visible = new Set<string>();
-        for (const id of ids) {
-          const followup = await loadFollowup(tx, actor, id).catch(() => null);
-          if (followup && followup.access !== "none") visible.add(id);
-        }
+        const facts = ids.length
+          ? await tx
+              .select({
+                id: followups.id,
+                responsibleMembershipId: followups.responsibleMembershipId,
+                isPrivate: followups.isPrivate,
+              })
+              .from(followups)
+              .where(sql`${followups.id} = ANY(${uuidArray(ids)})`)
+          : [];
+        const access = await followupAccessMap(tx, actor, facts);
+        const visible = new Set(
+          ids.filter((id) => (access.get(id) ?? "none") !== "none"),
+        );
         return {
           pending: pendingRows
             .filter((row) => row.followupId && visible.has(row.followupId))
