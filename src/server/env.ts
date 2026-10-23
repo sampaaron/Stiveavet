@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { parseConfig } from "./config";
+import { fingerprintSecret } from "./crypto/fingerprint";
 
 /**
  * Variables d'environnement serveur, validées une seule fois.
@@ -21,6 +22,8 @@ const serverEnvSchema = z
     // En local, sans valeur, une clé aléatoire est tirée au démarrage (liens perdus au
     // redémarrage, sans conséquence : ils ne vivent que deux minutes).
     FILE_LINK_SECRET: z.string().min(32).optional(),
+    // Clé des empreintes d'IP et d'e-mails (ADR 0039) ; en local, dérivée si absente.
+    FINGERPRINT_SECRET: fingerprintSecret,
     // Stockage objet local de la phase 2 : chemin absolu (défaut : .data/objets).
     OBJECT_STORAGE_DIR: z
       .string()
@@ -46,6 +49,12 @@ const serverEnvSchema = z
       context.addIssue({
         code: "custom",
         path: ["FILE_LINK_SECRET"],
+        message: "requis",
+      });
+    if (env.APP_ENV !== "local" && !env.FINGERPRINT_SECRET)
+      context.addIssue({
+        code: "custom",
+        path: ["FINGERPRINT_SECRET"],
         message: "requis",
       });
     // Hors local, les cookies d'authentification doivent être Secure.

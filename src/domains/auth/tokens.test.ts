@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -39,6 +41,10 @@ describe("jetons et codes", () => {
       rateLimitBucket("loginFailuresPerAccount", "claire@tilleuls.test"),
     );
     expect(ipFingerprint("203.0.113.7")).toMatch(/^[0-9a-f]{16}$/);
+    // Empreinte à clé : différente d'un simple SHA-256, qu'il suffirait de recalculer.
+    expect(bucket.split(":")[1]).not.toBe(
+      createHash("sha256").update("claire@tilleuls.test").digest("hex"),
+    );
     expect(ipFingerprint(null)).toBeNull();
   });
 });

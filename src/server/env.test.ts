@@ -18,7 +18,7 @@ describe("parseServerEnv", () => {
     expect(() =>
       parseServerEnv({ APP_ENV: "production", APP_URL: "http://stivea.test" }),
     ).toThrow(
-      "Configuration invalide : TRUST_PROXY, FILE_LINK_SECRET, APP_URL",
+      "Configuration invalide : TRUST_PROXY, FILE_LINK_SECRET, FINGERPRINT_SECRET, APP_URL",
     );
     expect(
       parseServerEnv({
@@ -26,6 +26,7 @@ describe("parseServerEnv", () => {
         APP_URL: "https://stivea.test",
         TRUST_PROXY: "true",
         FILE_LINK_SECRET: "x".repeat(48),
+        FINGERPRINT_SECRET: "y".repeat(48),
       }).TRUST_PROXY,
     ).toBe(true);
   });

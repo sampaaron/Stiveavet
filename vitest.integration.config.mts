@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
@@ -23,6 +25,8 @@ export default defineConfig({
   },
   test: {
     include: ["tests/integration/**/*.test.ts"],
+    // Clé des empreintes (ADR 0039), tirée au hasard pour chaque exécution.
+    env: { FINGERPRINT_SECRET: randomBytes(32).toString("base64url") },
     environment: "node",
     globalSetup: ["tests/integration/support/global-setup.ts"],
     // Une seule base partagée : les fichiers s'exécutent l'un après l'autre.
