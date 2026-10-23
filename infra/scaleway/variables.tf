@@ -41,4 +41,10 @@ variable "secrets" {
   description = "Secrets de l'application : clés WhatsApp, IA, Stripe, chiffrement, liens signés."
   type        = map(string)
   sensitive   = true
+  # Ces secrets sont injectés dans l'application et le worker : jamais le rôle migrateur,
+  # propriétaire des tables, qui pourrait lever la RLS (ADR 0041).
+  validation {
+    condition     = !contains(keys(var.secrets), "MIGRATOR_DATABASE_URL")
+    error_message = "MIGRATOR_DATABASE_URL ne va jamais dans les conteneurs : voir la procédure de migration du README."
+  }
 }

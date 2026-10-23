@@ -40,11 +40,27 @@ resource "scaleway_rdb_database" "main" {
 }
 
 # Photos, vocaux et captures : bucket privé, versionné, à Paris (ADR 0019).
+# Une suppression doit être réelle (purge à un an, captures effacées tout de suite ; ADR 0020,
+# 0041) : l'application efface chaque version, et cette règle rattrape le reste (version
+# remplacée ou suppression interrompue) au bout d'un jour, marqueurs orphelins compris.
 resource "scaleway_object_bucket" "objects" {
   name = "${local.name}-objets"
   tags = { project = "stivea", environment = var.environment }
   versioning {
     enabled = true
+  }
+
+  lifecycle_rule {
+    id      = "versions-effacees"
+    enabled = true
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
   }
 }
 
