@@ -19,6 +19,8 @@ import { auditFollowup as audit } from "@/domains/audit/journal";
 
 import { canManageFollowupAccess, followupAccess } from "./policies";
 import type { FollowupAccess, Viewer } from "./policies";
+import { loadFollowup } from "./chargement";
+import type { LoadedFollowup } from "./chargement";
 import { loadFollowupRecord } from "./record";
 import { activeVets } from "@/domains/equipe/veterinaires";
 
@@ -294,6 +296,39 @@ export function followupsService(db: Database) {
     );
   }
 
+  /**
+   * Dossier pour l'acteur, ou null (inexistant, autre cabinet ou non autorisé : même réponse).
+   * Chaque consultation autorisée est journalisée, dans la même transaction.
+   */
+  async function openIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followupId: string,
+  ) {
+    const loaded = await load(tx, followupId);
+    if (!loaded) return null;
+    const facts = {
+      responsibleMembershipId: loaded.row.responsibleMembershipId,
+      isPrivate: loaded.row.isPrivate,
+      sharedWith: loaded.shares.map((share) => share.membershipId),
+    };
+    const access = followupAccess(actor, facts);
+    if (access === "none") return null;
+
+    await audit(tx, actor, "followup.viewed", followupId, { access });
+    const { animalId } = loaded.row;
+    const ownerName = (await firstOwners(tx, [animalId])).get(animalId) ?? null;
+    const canManage = canManageFollowupAccess(actor, facts);
+    return {
+      followup: toView(loaded.row, ownerName, access),
+      // Contacts pour tous ; conversation, triage et alertes avec `clinical.read` seulement.
+      record: await loadFollowupRecord(tx, followupId, access),
+      canManageAccess: canManage,
+      // La liste des partages n'est montrée qu'au responsable.
+      shares: canManage ? loaded.shares : [],
+    };
+  }
+
   return {
     /**
      * Suivis visibles par l'acteur, chacun au niveau de détail autorisé. `statuses` filtre
@@ -330,29 +365,32 @@ export function followupsService(db: Database) {
      */
     async open(actor: Actor, followupId: string) {
       if (!idSchema.safeParse(followupId).success) return null;
-      return run(actor, async (tx) => {
-        const loaded = await load(tx, followupId);
-        if (!loaded) return null;
-        const facts = {
-          responsibleMembershipId: loaded.row.responsibleMembershipId,
-          isPrivate: loaded.row.isPrivate,
-          sharedWith: loaded.shares.map((share) => share.membershipId),
-        };
-        const access = followupAccess(actor, facts);
-        if (access === "none") return null;
+      return run(actor, (tx) => openIn(tx, actor, followupId));
+    },
 
-        await audit(tx, actor, "followup.viewed", followupId, { access });
-        const { animalId } = loaded.row;
-        const ownerName =
-          (await firstOwners(tx, [animalId])).get(animalId) ?? null;
-        const canManage = canManageFollowupAccess(actor, facts);
+    /**
+     * Page dossier en une seule transaction (ADR 0040) : ouverture journalisée, puis, pour un
+     * suivi lancé lu en clinique, les lectures de `clinical` sur le même suivi chargé une fois.
+     * Ailleurs, `clinical` vaut null.
+     */
+    async dossier<T>(
+      actor: Actor,
+      followupId: string,
+      clinical: (tx: TenantTransaction, followup: LoadedFollowup) => Promise<T>,
+    ) {
+      if (!idSchema.safeParse(followupId).success) return null;
+      return run(actor, async (tx) => {
+        const opened = await openIn(tx, actor, followupId);
+        if (!opened) return null;
+        const readable =
+          opened.followup.access === "clinical" &&
+          opened.record.access === "clinical" &&
+          opened.followup.status !== "draft";
         return {
-          followup: toView(loaded.row, ownerName, access),
-          // Contacts pour tous ; conversation, triage et alertes avec `clinical.read` seulement.
-          record: await loadFollowupRecord(tx, followupId, access),
-          canManageAccess: canManage,
-          // La liste des partages n'est montrée qu'au responsable.
-          shares: canManage ? loaded.shares : [],
+          ...opened,
+          clinical: readable
+            ? await clinical(tx, await loadFollowup(tx, actor, followupId))
+            : null,
         };
       });
     },

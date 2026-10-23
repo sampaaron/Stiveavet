@@ -60,6 +60,7 @@ import {
 import type {
   DrVetoSearchHit,
   LaunchSheet,
+  LoadedFollowup,
   SheetStep,
   StatusChange,
 } from "./chargement";
@@ -265,6 +266,18 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     const [first] = await activeVets(tx);
     if (!first) throw new DomainError("invalid_target");
     return first.membershipId;
+  }
+
+  /** Programme d'un suivi déjà chargé, dans la transaction de l'appelant (ADR 0040). */
+  async function programmeIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+  ): Promise<ProgrammeView> {
+    assertPermission(actor, "clinical.read");
+    if (followup.access !== "clinical" || followup.status === "draft")
+      throw new DomainError("not_found");
+    return programmeOf(tx, followup.id);
   }
 
   return {
@@ -1008,13 +1021,12 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     /** Programme du suivi lancé (étapes et fin automatique), réservé à l'accès clinique. */
     async programme(actor: Actor, followupId: string): Promise<ProgrammeView> {
       assertPermission(actor, "clinical.read");
-      return run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access !== "clinical" || followup.status === "draft")
-          throw new DomainError("not_found");
-        return programmeOf(tx, followupId);
-      });
+      return run(actor, async (tx) =>
+        programmeIn(tx, actor, await loadFollowup(tx, actor, followupId)),
+      );
     },
+
+    programmeIn,
 
     /** Pause, reprise, arrêt ou réactivation : décision d'un vétérinaire, journalisée. */
     async changeStatus(

@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup, setStatusReason } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { canResumeNuma, canWriteToOwner } from "@/domains/suivis/policies";
 import {
   AUTOMATIC_END_REASON,
@@ -164,105 +165,110 @@ export function conversationsService(db: Database) {
       .map((contact) => firstName(contact.ownerFullName));
   }
 
+  /** Fil d'un suivi déjà chargé, dans la transaction de la page dossier (ADR 0040). */
+  async function viewIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+  ): Promise<ConversationView> {
+    assertPermission(actor, "clinical.read");
+    if (followup.access !== "clinical") throw new DomainError("not_found");
+    const followupId = followup.id;
+    const ctx = await loadContext(tx, followupId);
+    const reach = await reachOf(tx, ctx);
+    const primary = primaryOf(ctx);
+    const rows = await tx
+      .select({
+        id: messages.id,
+        author: messages.author,
+        authorName: users.displayName,
+        body: messages.body,
+        occurredAt: messages.occurredAt,
+        delivery: messages.deliveryStatus,
+        triage: triageEvents.level,
+        threadKind: conversationThreads.kind,
+        contactName: owners.fullName,
+        contactRole: followupContacts.role,
+        noteCode: messages.noteCode,
+        noteNames: messages.noteNames,
+      })
+      .from(messages)
+      .innerJoin(
+        conversationThreads,
+        eq(conversationThreads.id, messages.threadId),
+      )
+      // Le suivi dans la jointure : seuls les triages de ce suivi sont lus.
+      .leftJoin(
+        triageEvents,
+        and(
+          eq(triageEvents.followupId, messages.followupId),
+          eq(triageEvents.messageId, messages.id),
+        ),
+      )
+      .leftJoin(memberships, eq(memberships.id, messages.authorMembershipId))
+      .leftJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(
+        followupContacts,
+        eq(followupContacts.id, messages.followupContactId),
+      )
+      .leftJoin(owners, eq(owners.id, followupContacts.ownerId))
+      .where(eq(messages.followupId, followupId))
+      .orderBy(desc(messages.occurredAt), desc(messages.id))
+      .limit(MAX_VIEW_MESSAGES);
+    const media = await attachmentsOf(
+      tx,
+      rows.map((row) => row.id),
+    );
+    return {
+      followupId,
+      status: followup.status,
+      isTest: followup.isTest,
+      animalName: followup.animalName,
+      ownerFirstName: primary ? firstName(primary.ownerFullName) : null,
+      consent: primary ? (reach.consents.get(primary.id)?.state ?? null) : null,
+      contacts: ctx.contacts.map((contact) => ({
+        firstName: firstName(contact.ownerFullName),
+        role: contact.role,
+        consent: reach.consents.get(contact.id)?.state ?? null,
+        inGroup: Boolean(ctx.group) && !contact.leftGroupAt,
+        leftGroup: Boolean(contact.leftGroupAt),
+        leftGroupAt: contact.leftGroupAt,
+        stopRequested: Boolean(contact.stopRequestedAt),
+        language: contact.language,
+        languageSource: contact.languageSource,
+      })),
+      group: Boolean(ctx.group),
+      recipients: recipientNames(broadcastTargets(ctx, reach)),
+      stoppedByOwner: reach.stopped,
+      endedAutomatically:
+        followup.status === "ended" &&
+        (await lastStatusReason(tx, followupId)) === AUTOMATIC_END_REASON,
+      messages: rows
+        .reverse()
+        .map(({ threadKind, contactName, noteCode, noteNames, ...row }) => ({
+          ...row,
+          note: noteCode ? { code: noteCode, names: noteNames } : null,
+          channel: threadKind,
+          contactName: contactName ? firstName(contactName) : null,
+          attachment: media.get(row.id) ?? null,
+        })),
+      rights: {
+        canWrite: canWriteToOwner(actor, followup.access),
+        canResume: canResumeNuma(actor, followup.access),
+      },
+    };
+  }
+
   return {
     /** Fil de la conversation, réservé à l'accès clinique. */
     async view(actor: Actor, followupId: string): Promise<ConversationView> {
       assertPermission(actor, "clinical.read");
-      return run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access !== "clinical") throw new DomainError("not_found");
-        const ctx = await loadContext(tx, followupId);
-        const reach = await reachOf(tx, ctx);
-        const primary = primaryOf(ctx);
-        const rows = await tx
-          .select({
-            id: messages.id,
-            author: messages.author,
-            authorName: users.displayName,
-            body: messages.body,
-            occurredAt: messages.occurredAt,
-            delivery: messages.deliveryStatus,
-            triage: triageEvents.level,
-            threadKind: conversationThreads.kind,
-            contactName: owners.fullName,
-            contactRole: followupContacts.role,
-            noteCode: messages.noteCode,
-            noteNames: messages.noteNames,
-          })
-          .from(messages)
-          .innerJoin(
-            conversationThreads,
-            eq(conversationThreads.id, messages.threadId),
-          )
-          // Le suivi dans la jointure : seuls les triages de ce suivi sont lus.
-          .leftJoin(
-            triageEvents,
-            and(
-              eq(triageEvents.followupId, messages.followupId),
-              eq(triageEvents.messageId, messages.id),
-            ),
-          )
-          .leftJoin(
-            memberships,
-            eq(memberships.id, messages.authorMembershipId),
-          )
-          .leftJoin(users, eq(users.id, memberships.userId))
-          .leftJoin(
-            followupContacts,
-            eq(followupContacts.id, messages.followupContactId),
-          )
-          .leftJoin(owners, eq(owners.id, followupContacts.ownerId))
-          .where(eq(messages.followupId, followupId))
-          .orderBy(desc(messages.occurredAt), desc(messages.id))
-          .limit(MAX_VIEW_MESSAGES);
-        const media = await attachmentsOf(
-          tx,
-          rows.map((row) => row.id),
-        );
-        return {
-          followupId,
-          status: followup.status,
-          isTest: followup.isTest,
-          animalName: followup.animalName,
-          ownerFirstName: primary ? firstName(primary.ownerFullName) : null,
-          consent: primary
-            ? (reach.consents.get(primary.id)?.state ?? null)
-            : null,
-          contacts: ctx.contacts.map((contact) => ({
-            firstName: firstName(contact.ownerFullName),
-            role: contact.role,
-            consent: reach.consents.get(contact.id)?.state ?? null,
-            inGroup: Boolean(ctx.group) && !contact.leftGroupAt,
-            leftGroup: Boolean(contact.leftGroupAt),
-            leftGroupAt: contact.leftGroupAt,
-            stopRequested: Boolean(contact.stopRequestedAt),
-            language: contact.language,
-            languageSource: contact.languageSource,
-          })),
-          group: Boolean(ctx.group),
-          recipients: recipientNames(broadcastTargets(ctx, reach)),
-          stoppedByOwner: reach.stopped,
-          endedAutomatically:
-            followup.status === "ended" &&
-            (await lastStatusReason(tx, followupId)) === AUTOMATIC_END_REASON,
-          messages: rows
-            .reverse()
-            .map(
-              ({ threadKind, contactName, noteCode, noteNames, ...row }) => ({
-                ...row,
-                note: noteCode ? { code: noteCode, names: noteNames } : null,
-                channel: threadKind,
-                contactName: contactName ? firstName(contactName) : null,
-                attachment: media.get(row.id) ?? null,
-              }),
-            ),
-          rights: {
-            canWrite: canWriteToOwner(actor, followup.access),
-            canResume: canResumeNuma(actor, followup.access),
-          },
-        };
-      });
+      return run(actor, async (tx) =>
+        viewIn(tx, actor, await loadFollowup(tx, actor, followupId)),
+      );
     },
+
+    viewIn,
 
     /**
      * Message écrit par un membre du cabinet : part du WhatsApp du cabinet (au groupe s'il

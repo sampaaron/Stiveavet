@@ -23,6 +23,7 @@ import { VET_ROLES, isPermissionKey } from "@/domains/equipe/permissions";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { followupAccess } from "@/domains/suivis/policies";
 import { followupAccessMap } from "@/domains/suivis/service";
 import { messageWindows } from "@/domains/suivis/rappels";
@@ -713,6 +714,17 @@ export function alertsService(db: Database) {
       .map(({ id, name }) => ({ id, name }));
   }
 
+  /** Alertes d'un suivi déjà chargé, dans la transaction de l'appelant (ADR 0040). */
+  async function ofFollowupIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+  ): Promise<AlertView[]> {
+    assertPermission(actor, "clinical.read");
+    if (followup.access !== "clinical") throw new DomainError("not_found");
+    return listAlerts(tx, actor, { followupId: followup.id, view: "all" });
+  }
+
   async function listAlerts(
     tx: TenantTransaction,
     actor: Actor,
@@ -938,12 +950,12 @@ export function alertsService(db: Database) {
     /** Alertes d'un dossier, closes comprises. */
     async ofFollowup(actor: Actor, followupId: string): Promise<AlertView[]> {
       assertPermission(actor, "clinical.read");
-      return run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access !== "clinical") throw new DomainError("not_found");
-        return listAlerts(tx, actor, { followupId, view: "all" });
-      });
+      return run(actor, async (tx) =>
+        ofFollowupIn(tx, actor, await loadFollowup(tx, actor, followupId)),
+      );
     },
+
+    ofFollowupIn,
 
     /** « Accuser réception » : arrête l'escalade d'une urgence. Décision de vétérinaire. */
     async acknowledge(actor: Actor, alertId: string) {

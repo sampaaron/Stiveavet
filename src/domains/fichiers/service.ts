@@ -20,6 +20,7 @@ import type {
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { JobError } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
@@ -322,6 +323,9 @@ export async function refuseOwnerMedia(
   );
 }
 
+/** Photo ou vocal d'un dossier, avant signature de son lien. */
+export type ReadableAttachment = { id: string; key: string };
+
 export type MediaService = ReturnType<typeof mediaService>;
 
 export function mediaService(deps: {
@@ -363,6 +367,57 @@ export function mediaService(deps: {
       await storage.deleteObject(key);
       throw error;
     }
+  }
+
+  /** Photos et vocaux lisibles d'un suivi déjà chargé, dans la transaction de l'appelant. */
+  async function readableIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+  ): Promise<ReadableAttachment[]> {
+    assertPermission(actor, "clinical.read");
+    if (followup.access !== "clinical") throw new DomainError("not_found");
+    return tx
+      .select({ id: attachments.id, key: attachments.storageKey })
+      .from(attachments)
+      .where(
+        and(
+          eq(attachments.followupId, followup.id),
+          inArray(attachments.kind, ["photo", "voice"]),
+          isNull(attachments.deletedAt),
+        ),
+      );
+  }
+
+  /**
+   * Liens signés, hors transaction. En stockage simulé seulement, un fichier absent (données
+   * fictives d'exemple) n'a pas de lien ; en production, aucune requête au stockage par fichier.
+   */
+  async function signLinks(
+    actor: Actor,
+    rows: readonly ReadableAttachment[],
+  ): Promise<Record<string, SignedLink>> {
+    const present = storage.simulated
+      ? await Promise.all(
+          rows.map(async (row) =>
+            (await storage.hasObject(row.key)) ? row : null,
+          ),
+        )
+      : rows;
+    const now = new Date();
+    return Object.fromEntries(
+      present
+        .filter((row) => row !== null)
+        .map((row) => [
+          row.id,
+          signReadLink({
+            secret: linkSecret,
+            attachmentId: row.id,
+            membershipId: actor.membershipId,
+            now,
+          }),
+        ]),
+    );
   }
 
   return {
@@ -416,41 +471,14 @@ export function mediaService(deps: {
       followupId: string,
     ): Promise<Record<string, SignedLink>> {
       assertPermission(actor, "clinical.read");
-      const rows = await run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access !== "clinical") throw new DomainError("not_found");
-        return tx
-          .select({ id: attachments.id, key: attachments.storageKey })
-          .from(attachments)
-          .where(
-            and(
-              eq(attachments.followupId, followupId),
-              inArray(attachments.kind, ["photo", "voice"]),
-              isNull(attachments.deletedAt),
-            ),
-          );
-      });
-      // Un fichier absent du stockage (données fictives d'exemple) n'a pas de lien.
-      const present = await Promise.all(
-        rows.map(async (row) =>
-          (await storage.hasObject(row.key)) ? row : null,
-        ),
+      const rows = await run(actor, async (tx) =>
+        readableIn(tx, actor, await loadFollowup(tx, actor, followupId)),
       );
-      const now = new Date();
-      return Object.fromEntries(
-        present
-          .filter((row) => row !== null)
-          .map((row) => [
-            row.id,
-            signReadLink({
-              secret: linkSecret,
-              attachmentId: row.id,
-              membershipId: actor.membershipId,
-              now,
-            }),
-          ]),
-      );
+      return signLinks(actor, rows);
     },
+
+    readableIn,
+    signLinks,
 
     /**
      * Ouverture d'un lien : signature et expiration pour ce membre, puis droits revérifiés

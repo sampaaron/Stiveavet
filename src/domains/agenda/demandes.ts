@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { followupAccessMap } from "@/domains/suivis/service";
 import { enqueue } from "@/domains/taches/queue";
 import {
@@ -291,6 +292,35 @@ export function appointmentsService(db: Database) {
       );
   }
 
+  /** Rendez-vous d'un suivi déjà chargé, dans la transaction de l'appelant (ADR 0040). */
+  async function ofFollowupIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+    now = new Date(),
+  ) {
+    assertPermission(actor, "agenda.read");
+    if (followup.access === "none") throw new DomainError("not_found");
+    return tx
+      .select({
+        id: appointments.id,
+        kind: appointments.kind,
+        status: appointments.status,
+        source: appointments.source,
+        startsAt: appointments.startsAt,
+        endsAt: appointments.endsAt,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.followupId, followup.id),
+          inArray(appointments.status, ["proposed", "confirmed"]),
+          gt(appointments.endsAt, now),
+        ),
+      )
+      .orderBy(asc(appointments.startsAt));
+  }
+
   return {
     /** Rendez-vous à confirmer et demandes à rappeler, pour les suivis visibles. */
     async desk(actor: Actor, now = new Date()): Promise<AppointmentDesk> {
@@ -469,29 +499,12 @@ export function appointmentsService(db: Database) {
     /** Rendez-vous proposés et confirmés d'un suivi (carte du dossier). */
     async ofFollowup(actor: Actor, followupId: string, now = new Date()) {
       assertPermission(actor, "agenda.read");
-      return run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access === "none") throw new DomainError("not_found");
-        return tx
-          .select({
-            id: appointments.id,
-            kind: appointments.kind,
-            status: appointments.status,
-            source: appointments.source,
-            startsAt: appointments.startsAt,
-            endsAt: appointments.endsAt,
-          })
-          .from(appointments)
-          .where(
-            and(
-              eq(appointments.followupId, followupId),
-              inArray(appointments.status, ["proposed", "confirmed"]),
-              gt(appointments.endsAt, now),
-            ),
-          )
-          .orderBy(asc(appointments.startsAt));
-      });
+      return run(actor, async (tx) =>
+        ofFollowupIn(tx, actor, await loadFollowup(tx, actor, followupId), now),
+      );
     },
+
+    ofFollowupIn,
   };
 }
 
