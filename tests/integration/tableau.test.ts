@@ -277,12 +277,25 @@ describe("synthèse pré-consultation", () => {
       "not_found",
     );
     // Seul un droit clinique ouvert explicitement par l'administrateur lui donne la synthèse.
+    // Le droit est donné en base : la base impose aussi l'accès clinique (ADR 0038).
     const opened: Actor = {
       ...lea,
       permissions: new Set([...lea.permissions, "clinical.read"]),
     };
-    const granted = await syntheses.forFollowup(opened, caramel);
-    expect(granted?.exchanges.ownerMessages).toBe(5);
+    const grant = [lea.organizationId, lea.membershipId];
+    await admin.query(
+      "INSERT INTO membership_permissions (organization_id, membership_id, permission) VALUES ($1, $2, 'clinical.read')",
+      grant,
+    );
+    try {
+      const granted = await syntheses.forFollowup(opened, caramel);
+      expect(granted?.exchanges.ownerMessages).toBe(5);
+    } finally {
+      await admin.query(
+        "DELETE FROM membership_permissions WHERE organization_id = $1 AND membership_id = $2 AND permission = 'clinical.read'",
+        grant,
+      );
+    }
   });
 
   it("une rédaction hors cadre est écartée par les garde-fous, sans rien garder de son contenu", async () => {
