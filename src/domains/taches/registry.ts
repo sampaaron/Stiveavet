@@ -16,8 +16,8 @@ import { failureEmailHandlers } from "@/domains/whatsapp/echecs";
 import { mediaDownloadHandlers } from "@/domains/whatsapp/medias";
 
 import type {
+  AnyJobHandler,
   DeadJobHandler,
-  JobHandler,
   JobPlanner,
   OutboxRoute,
 } from "./worker";
@@ -35,7 +35,7 @@ export function jobRegistry(deps: {
   whatsapp: WhatsAppProvider;
   ai: AiGateway;
 }): {
-  handlers: Readonly<Record<string, JobHandler>>;
+  handlers: Readonly<Record<string, AnyJobHandler>>;
   dead: Readonly<Record<string, DeadJobHandler>>;
 } {
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";

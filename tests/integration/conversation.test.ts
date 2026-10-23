@@ -16,10 +16,13 @@ import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
-import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
+import {
+  conversationWorker,
+  recordingWhatsApp,
+  replayJob,
+} from "./support/whatsapp";
 
 const { app, admin, appDb } = pools();
 afterAll(async () => {
@@ -253,21 +256,14 @@ describe("premier message et accord du propriétaire", () => {
   });
 
   it("un premier message rejoué ne part jamais deux fois", async () => {
-    await withTenant(appDb, { organizationId: org }, async (tx) => {
-      const handler = handlers["followup.message"];
-      if (!handler) throw new Error("exécutant manquant");
-      await handler({
-        tx,
-        job: {
-          id: randomUUID(),
-          organizationId: org,
-          kind: "followup.message",
-          attempt: 1,
-          followupId: plume,
-          payload: { step: "intro" },
-          idempotencyKey: `followup:${plume}:intro`,
-        },
-      });
+    await replayJob(appDb, handlers["followup.message"], {
+      id: randomUUID(),
+      organizationId: org,
+      kind: "followup.message",
+      attempt: 1,
+      followupId: plume,
+      payload: { step: "intro" },
+      idempotencyKey: `followup:${plume}:intro`,
     });
     expect(sent).toHaveLength(1);
     expect(await thread(plume)).toHaveLength(1);

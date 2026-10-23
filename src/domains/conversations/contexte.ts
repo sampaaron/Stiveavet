@@ -183,7 +183,7 @@ const sourceSteps = [
   "left_group",
   "stopped_all",
 ] as const;
-type SourceStep = (typeof sourceSteps)[number];
+export type SourceStep = (typeof sourceSteps)[number];
 
 export const jobPayload = z.discriminatedUnion("step", [
   z.object({ step: z.literal("intro") }),
@@ -196,6 +196,8 @@ export const jobPayload = z.discriminatedUnion("step", [
     appointmentId: z.uuid(),
   }),
 ]);
+
+export type JobPayload = z.infer<typeof jobPayload>;
 
 export const reminderPayload = z.object({ stepId: z.uuid() });
 

@@ -4,13 +4,19 @@ import { WhatsAppSendError } from "@/adapters/whatsapp/types";
 import type { WhatsAppConnector } from "@/adapters/whatsapp/types";
 import { conversationHandlers } from "@/domains/conversations/service";
 import { createWorker } from "@/domains/taches/worker";
-import type { DeadJobHandler, JobHandler } from "@/domains/taches/worker";
+import type {
+  AnyJobHandler,
+  ClaimedJob,
+  DeadJobHandler,
+  StagedJobHandler,
+} from "@/domains/taches/worker";
 import { alertHandlers } from "@/domains/urgences/service";
 import { simulatedProvider } from "@/domains/whatsapp/connexion";
 import type { WhatsAppProvider } from "@/domains/whatsapp/connexion";
 import { sendHandlers } from "@/domains/whatsapp/envoi";
 import { fillTemplate } from "@/domains/whatsapp/modeles";
 import type { TemplateKey } from "@/domains/whatsapp/modeles";
+import { withTenant } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
 
 /** Un envoi vu par le propriétaire : destinataire (numéro, ou « groupe ») et texte lu. */
@@ -78,19 +84,69 @@ export function recordingWhatsApp(options: { groups?: boolean } = {}) {
 }
 
 /** Exécutants limités à un cabinet : la base est partagée entre fichiers de test. */
-function onlyFor<T extends JobHandler | DeadJobHandler>(
+function onlyFor(
   organizationId: () => string,
-  handlers: Record<string, T>,
-): Record<string, T> {
+  handlers: Record<string, AnyJobHandler>,
+): Record<string, AnyJobHandler> {
+  const mine = (job: ClaimedJob) => job.organizationId === organizationId();
+  return Object.fromEntries(
+    Object.entries(handlers).map(([kind, handler]): [string, AnyJobHandler] => {
+      if (typeof handler === "function")
+        return [
+          kind,
+          async (context) => {
+            if (mine(context.job)) await handler(context);
+          },
+        ];
+      const staged: StagedJobHandler<{ prepared: unknown } | null> = {
+        async prepare(context) {
+          return mine(context.job)
+            ? { prepared: await handler.prepare(context) }
+            : null;
+        },
+        async commit({ tx, job, prepared }) {
+          if (prepared)
+            await handler.commit({ tx, job, prepared: prepared.prepared });
+        },
+      };
+      return [kind, staged];
+    }),
+  );
+}
+
+function deadOnlyFor(
+  organizationId: () => string,
+  handlers: Record<string, DeadJobHandler>,
+): Record<string, DeadJobHandler> {
   return Object.fromEntries(
     Object.entries(handlers).map(([kind, handler]) => [
       kind,
-      (async (context: Parameters<T>[0]) => {
+      async (context: Parameters<DeadJobHandler>[0]) => {
         if (context.job.organizationId === organizationId())
-          await handler(context as never);
-      }) as T,
+          await handler(context);
+      },
     ]),
   );
+}
+
+/**
+ * Rejoue une tâche hors worker, comme il l'exécuterait : en une transaction, ou en deux
+ * temps (préparation hors transaction, puis écriture).
+ */
+export async function replayJob(
+  db: Database,
+  handler: AnyJobHandler | undefined,
+  job: ClaimedJob,
+) {
+  if (!handler) throw new Error("exécutant manquant");
+  const tenant = { organizationId: job.organizationId };
+  if (typeof handler === "function")
+    return withTenant(db, tenant, (tx) => handler({ tx, job }));
+  const prepared = await handler.prepare({
+    job,
+    read: (run) => withTenant(db, tenant, run),
+  });
+  await withTenant(db, tenant, (tx) => handler.commit({ tx, job, prepared }));
 }
 
 /**
@@ -104,7 +160,7 @@ export function conversationWorker(deps: {
   /** WhatsApp simulé (`recordingWhatsApp`) ou réel contre l'imitation de Meta. */
   whatsapp: { provider: WhatsAppProvider };
   ai: AiGateway;
-  extra?: Record<string, JobHandler>;
+  extra?: Record<string, AnyJobHandler>;
   extraDead?: Record<string, DeadJobHandler>;
 }) {
   const sends = sendHandlers({ whatsapp: deps.whatsapp.provider });
@@ -126,7 +182,7 @@ export function conversationWorker(deps: {
       db: deps.db,
       workerId: deps.workerId,
       handlers: onlyFor(deps.organizationId, handlers),
-      deadHandlers: onlyFor(deps.organizationId, {
+      deadHandlers: deadOnlyFor(deps.organizationId, {
         ...sends.dead,
         ...alerts.dead,
         ...deps.extraDead,
