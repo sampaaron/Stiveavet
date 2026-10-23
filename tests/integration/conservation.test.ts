@@ -18,6 +18,7 @@ import { SWEEP_KIND, retentionHandlers } from "@/domains/suivis/conservation";
 import { launchService } from "@/domains/suivis/lancement";
 import { followupEndHandlers } from "@/domains/suivis/rappels";
 import { enqueue } from "@/domains/taches/queue";
+import { createWorker } from "@/domains/taches/worker";
 import { withTenant } from "@/server/db/tenant";
 
 import { asApp, pools } from "./support/db";
@@ -229,6 +230,39 @@ beforeAll(async () => {
     [plume],
   );
   plumeOwners = owners.map((row) => (row as { owner_id: string }).owner_id);
+  // Plume a eu une demande de rendez-vous traitée par Numa : elle ne bloque plus l'effacement.
+  const { rows: asked } = await admin.query(
+    `SELECT m.id AS message_id, m.thread_id, m.followup_contact_id
+     FROM messages m WHERE m.followup_id = $1 AND m.author = 'owner' LIMIT 1`,
+    [plume],
+  );
+  const request = asked[0] as {
+    message_id: string;
+    thread_id: string;
+    followup_contact_id: string;
+  };
+  const { rows: booked } = await admin.query(
+    `INSERT INTO appointments (organization_id, followup_id, animal_id, membership_id, kind, source,
+       starts_at, ends_at)
+     VALUES ($1, $2, $3, $4, 'post_op_control', 'drveto', now() + interval '2 days',
+       now() + interval '2 days 20 minutes')
+     RETURNING id`,
+    [org, plume, plumeAnimal, vetId],
+  );
+  await admin.query(
+    `INSERT INTO appointment_requests (organization_id, followup_id, followup_contact_id, thread_id,
+       request_message_id, membership_id, kind, minutes, status, appointment_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'post_op_control', 20, 'chosen', $7)`,
+    [
+      org,
+      plume,
+      request.followup_contact_id,
+      request.thread_id,
+      request.message_id,
+      vetId,
+      (booked[0] as { id: string }).id,
+    ],
+  );
 
   tango = await launchWithConsent("DV-20560");
   biscotte = await launchWithConsent("DV-20574");
@@ -345,6 +379,7 @@ describe("balayage quotidien", () => {
       "scheduled_jobs",
       "followup_syntheses",
       "appointments",
+      "appointment_requests",
     ])
       expect(await exists(table, "followup_id", plume), table).toBe(0);
     expect(await exists("animals", "id", plumeAnimal)).toBe(0);
@@ -414,5 +449,223 @@ describe("balayage quotidien", () => {
     );
     expect((rows[0] as { n: number }).n).toBe(2);
     expect(await exists("followups", "id", tango)).toBe(1);
+  });
+});
+
+describe("conservation renforcée (ADR 0038)", () => {
+  const handlers = retentionHandlers({ storage });
+  const sweepHandler = handlers[SWEEP_KIND];
+  if (!sweepHandler) throw new Error("balayage attendu");
+  /** Worker qui ne fait que balayer : l'effacement qu'il programme attend. */
+  const sweepOnly = createWorker({
+    db: appDb,
+    workerId: "test-balayage-seul",
+    handlers: {
+      [SWEEP_KIND]: async (context) => {
+        if (context.job.organizationId === org) await sweepHandler(context);
+      },
+    },
+  });
+
+  async function sweep(key: string, run: () => Promise<unknown> = drain) {
+    await withTenant(appDb, { organizationId: org }, (tx) =>
+      enqueue(tx, {
+        organizationId: org,
+        kind: SWEEP_KIND,
+        idempotencyKey: `retention:${key}-${tag}`,
+        runAt: new Date(),
+        followupId: null,
+      }),
+    );
+    await run();
+  }
+
+  async function oldAnimal(name: string): Promise<string> {
+    const { rows } = await admin.query(
+      `INSERT INTO animals (organization_id, name, species, created_at)
+       VALUES ($1, $2, 'dog', now() - interval '16 months') RETURNING id`,
+      [org, name],
+    );
+    return (rows[0] as { id: string }).id;
+  }
+
+  const purgeJobs = async (followupId: string) => {
+    const { rows } = await admin.query(
+      `SELECT status FROM scheduled_jobs
+       WHERE kind = 'followup.purge' AND payload ->> 'followupId' = $1 ORDER BY created_at`,
+      [followupId],
+    );
+    return rows.map((row) => (row as { status: string }).status);
+  };
+
+  it("un effacement en échec est retenté par le balayage suivant, sans doublon entre-temps", async () => {
+    const animal = await oldAnimal("Brouillon oublié");
+    const { rows } = await admin.query(
+      `INSERT INTO followups (organization_id, animal_id, responsible_membership_id, procedure,
+         procedure_at, created_at)
+       VALUES ($1, $2, $3, 'Intervention fictive', now() - interval '16 months',
+         now() - interval '16 months')
+       RETURNING id`,
+      [org, animal, vetId],
+    );
+    const forgotten = (rows[0] as { id: string }).id;
+
+    await sweep("echec-a", () => sweepOnly.runOnce());
+    await sweep("echec-b", () => sweepOnly.runOnce());
+    expect(await purgeJobs(forgotten)).toEqual(["pending"]);
+
+    // Cinq échecs plus tard, la tâche est en échec.
+    await admin.query(
+      `UPDATE scheduled_jobs SET status = 'dead', finished_at = now(),
+         last_error_code = 'provider_unavailable'
+       WHERE kind = 'followup.purge' AND payload ->> 'followupId' = $1`,
+      [forgotten],
+    );
+    await sweep("echec-c");
+    expect(await purgeJobs(forgotten)).toEqual(["dead", "succeeded"]);
+    expect(await exists("followups", "id", forgotten)).toBe(0);
+    expect(await exists("animals", "id", animal)).toBe(0);
+  });
+
+  it("efface les rendez-vous hors suivi finis depuis un an, puis l'animal et ses propriétaires", async () => {
+    const gone = await oldAnimal("Ancien patient");
+    const kept = await oldAnimal("Patient récent");
+    const { rows: owner } = await admin.query(
+      "INSERT INTO owners (organization_id, full_name) VALUES ($1, 'Propriétaire ancien') RETURNING id",
+      [org],
+    );
+    const ownerId = (owner[0] as { id: string }).id;
+    await admin.query(
+      "INSERT INTO animal_owners (organization_id, animal_id, owner_id) VALUES ($1, $2, $3)",
+      [org, gone, ownerId],
+    );
+    for (const [animal, ago] of [
+      [gone, "13 months"],
+      [kept, "6 months"],
+    ] as const)
+      await admin.query(
+        `INSERT INTO appointments (organization_id, animal_id, membership_id, kind, source,
+           starts_at, ends_at)
+         VALUES ($1, $2, $3, 'other', 'drveto', now() - $4::interval,
+           now() - $4::interval + interval '30 minutes')`,
+        [org, animal, vetId, ago],
+      );
+
+    await sweep("rendez-vous");
+
+    expect(await exists("appointments", "animal_id", gone)).toBe(0);
+    expect(await exists("animals", "id", gone)).toBe(0);
+    expect(await exists("owners", "id", ownerId)).toBe(0);
+    expect(await exists("appointments", "animal_id", kept)).toBe(1);
+    expect(await exists("animals", "id", kept)).toBe(1);
+  });
+
+  it("efface les traces techniques de plus de 90 jours, garde les récentes", async () => {
+    const ids: Record<string, string> = {};
+    for (const [label, ago] of [
+      ["old", "100 days"],
+      ["new", "10 days"],
+    ] as const) {
+      const { rows: job } = await admin.query(
+        `INSERT INTO scheduled_jobs (organization_id, kind, idempotency_key, status, run_at,
+           attempts, finished_at)
+         VALUES ($1, 'test.noop', $2, 'succeeded', now() - $3::interval, 1, now() - $3::interval)
+         RETURNING id`,
+        [org, `essai:${label}:${tag}`, ago],
+      );
+      ids[`job-${label}`] = (job[0] as { id: string }).id;
+      await admin.query(
+        `INSERT INTO job_attempts (organization_id, job_id, attempt_number, finished_at, outcome)
+         VALUES ($1, $2, 1, now() - $3::interval, 'succeeded')`,
+        [org, ids[`job-${label}`], ago],
+      );
+      const { rows: event } = await admin.query(
+        `INSERT INTO outbox_events (organization_id, topic, aggregate_type, aggregate_id,
+           created_at, published_at)
+         VALUES ($1, 'test.noop', 'essai', gen_random_uuid(), now() - $2::interval,
+           now() - $2::interval)
+         RETURNING id`,
+        [org, ago],
+      );
+      ids[`event-${label}`] = (event[0] as { id: string }).id;
+      const { rows: hook } = await admin.query(
+        `INSERT INTO webhook_events (organization_id, provider, event_key, kind, received_at)
+         VALUES ($1, 'whatsapp', $2, 'message', now() - $3::interval) RETURNING id`,
+        [org, `essai-${label}-${tag}`, ago],
+      );
+      ids[`hook-${label}`] = (hook[0] as { id: string }).id;
+      const { rows: delivery } = await admin.query(
+        `INSERT INTO notification_deliveries (organization_id, channel, recipient_membership_id,
+           idempotency_key, status, created_at)
+         VALUES ($1, 'email', $2, $3, 'sent', now() - $4::interval) RETURNING id`,
+        [org, vetId, `livraison:${label}:${tag}`, ago],
+      );
+      ids[`delivery-${label}`] = (delivery[0] as { id: string }).id;
+    }
+
+    await sweep("technique");
+
+    const counts = async (label: string) => [
+      await exists("scheduled_jobs", "id", ids[`job-${label}`] ?? ""),
+      await exists("job_attempts", "job_id", ids[`job-${label}`] ?? ""),
+      await exists("outbox_events", "id", ids[`event-${label}`] ?? ""),
+      await exists("webhook_events", "id", ids[`hook-${label}`] ?? ""),
+      await exists(
+        "notification_deliveries",
+        "id",
+        ids[`delivery-${label}`] ?? "",
+      ),
+    ];
+    expect(await counts("old")).toEqual([0, 0, 0, 0, 0]);
+    expect(await counts("new")).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it("le premier passage du jour purge les traces d'authentification échues", async () => {
+    const { rows: member } = await admin.query(
+      "SELECT user_id FROM memberships WHERE id = $1",
+      [vetId],
+    );
+    const userId = (member[0] as { user_id: string }).user_id;
+    const client = await admin.connect();
+    try {
+      await client.query("BEGIN");
+      for (const [label, expires] of [
+        ["old", "now() - interval '40 days'"],
+        ["new", "now() + interval '1 day'"],
+      ] as const)
+        await client.query(
+          `INSERT INTO auth.sessions (token_hash, user_id, organization_id, membership_id, expires_at)
+           VALUES (sha256($1::bytea), $2, $3, $4, ${expires})`,
+          [`session-${label}-${tag}`, userId, org, vetId],
+        );
+      await client.query(
+        `INSERT INTO login_events (organization_id, user_id, kind, occurred_at) VALUES
+           ($1, $2, 'logout', now() - interval '13 months'),
+           ($1, $2, 'logout', now() - interval '11 months')`,
+        [org, userId],
+      );
+      await client.query(
+        `INSERT INTO auth.rate_limits (bucket, window_started_at, hits)
+         VALUES ('login_per_ip:' || encode(sha256($1::bytea), 'hex'), now() - interval '2 days', 3)`,
+        [`ip-${tag}`],
+      );
+      await client.query("DELETE FROM jobs.daily_runs");
+      await client.query("SET LOCAL ROLE stivea_app");
+      await client.query("SELECT jobs.plan_retention_sweeps()");
+      await client.query("RESET ROLE");
+
+      const { rows } = await client.query(
+        `SELECT
+           (SELECT count(*)::int FROM auth.sessions WHERE user_id = $1 AND organization_id = $2) AS sessions,
+           (SELECT count(*)::int FROM login_events WHERE user_id = $1 AND kind = 'logout') AS events,
+           (SELECT count(*)::int FROM auth.rate_limits
+            WHERE bucket = 'login_per_ip:' || encode(sha256($3::bytea), 'hex')) AS limits`,
+        [userId, org, `ip-${tag}`],
+      );
+      expect(rows[0]).toEqual({ sessions: 1, events: 1, limits: 0 });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
   });
 });

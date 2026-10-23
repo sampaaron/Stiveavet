@@ -89,6 +89,45 @@ n'affiche que des compteurs.
 - **Le schéma Drizzle** (`src/domains/*/schema.ts`, regroupé par `src/server/db/schema.ts`)
   décrit les tables pour TypeScript. Il ne crée rien : le SQL des migrations fait foi, et
   `migrations.test.ts` vérifie que les deux correspondent colonne par colonne.
+- **Les migrations prennent un verrou consultatif** (`MIGRATION_LOCK_KEY`) : deux déploiements
+  simultanés s'attendent au lieu d'appliquer deux fois la même migration.
+
+### Règles de la base (ADR 0038)
+
+- **Une colonne nouvellement modifiée par l'application** demande un `GRANT UPDATE (colonne)`
+  dans la migration. Sur `organizations`, `users`, `memberships`, `followups`, `invitations` et
+  `followup_shares`, `stivea_app` n'a pas de droit de mise à jour sur la table entière.
+  `tests/integration/durcissement.test.ts` vérifie les colonnes interdites.
+- **Toute fonction `SECURITY DEFINER`** fixe son `search_path` et le termine par `pg_temp`, par
+  exemple `SET search_path = pg_catalog, public, pg_temp`. Un test échoue sinon.
+- **Les tables cliniques** (`messages`, transcriptions, photos, synthèses, triage, imports,
+  traitements) ont une politique restrictive `clinical_access`. Elle relit les permissions dans
+  `membership_permissions`. Un droit donné seulement en mémoire, dans un test par exemple, ne
+  suffit pas. Une nouvelle table clinique reçoit la même politique.
+- **Les journaux** `audit_events` et `login_events` ne s'effacent pas, même pour le
+  propriétaire. Seule `auth.purge_expired()` efface les connexions de plus de 12 mois.
+- **Numéros de facture** : toujours `app.next_invoice_number(année)`, jamais un comptage.
+
+### Créer la base en production
+
+`db/bootstrap/roles.sql` crée la base seulement si elle n'existe pas. Quand l'hébergeur ou
+Terraform l'a déjà créée, elle appartient à un autre rôle. L'administrateur exécute alors une
+fois, avant la première migration :
+
+```sql
+ALTER DATABASE stivea OWNER TO stivea_migrator;
+-- Seulement si \dn montre un autre propriétaire que pg_database_owner :
+ALTER SCHEMA public OWNER TO stivea_migrator;
+REVOKE ALL ON DATABASE stivea FROM PUBLIC;
+GRANT CONNECT ON DATABASE stivea TO stivea_app;
+```
+
+Pour vérifier :
+
+- `stivea_app` n'a ni `CREATE` ni `TEMPORARY` sur la base :
+  `SELECT has_database_privilege('stivea_app', 'stivea', 'CREATE')`, puis la même requête avec
+  `'TEMP'`, doivent renvoyer `false`.
+- Aucun rôle applicatif n'a `BYPASSRLS` : `SELECT rolname FROM pg_roles WHERE rolbypassrls`.
 
 ### Pièges connus
 
