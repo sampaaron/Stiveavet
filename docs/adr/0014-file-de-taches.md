@@ -17,6 +17,15 @@ Phase 2, lot 11. Architecture §9 : chaque envoi, rappel, alerte, transcription,
 7. **Aucune donnée sensible dans la file** : charges utiles limitées aux identifiants et codes (Zod et contrôle de taille en base) ; seul un code d'erreur est enregistré, jamais le message d'une exception ; les journaux du worker ne contiennent que des compteurs.
 8. **Tâches en échec** : écran « Tâches en échec » pour qui a `organization.settings`, sans contenu clinique (type, motif, tentatives, dates, lien vers le dossier soumis à ses propres droits). Relancer remet la tâche en file avec une nouvelle série de tentatives ; abandonner la clôt. Les deux actions sont journalisées.
 
+9. **Exécution parallèle et exécutants en deux temps** (révision du 23 octobre 2026, ADR 0040).
+   - Le worker prend 3 tâches à la fois et les exécute en parallèle. Les tâches d'un même suivi gardent leur ordre.
+   - Un exécutant qui appelle un prestataire lent lit d'abord, appelle hors transaction, puis écrit sous verrou après avoir revérifié l'état. Chaque lecture prolonge le bail de la tâche.
+   - Un envoi parti chez le prestataire est enregistré même si le bail a été perdu pendant l'appel, pour ne jamais être refait.
+10. **Outbox** : `emit` et `enqueue` demandent le réveil du worker après l'insertion. Les événements `followup.launched`, `followup.ended` et `message.received` n'ont pas encore de destinataire (`OUTBOX_ROUTES` vide).
+    - Ils sont réservés aux intégrations à venir (dr.veto, statistiques) et sont publiés sans effet.
+    - Ils restent écrits pour que ces intégrations reprennent l'historique sans modifier les domaines.
+    - Ils sont purgés après 90 jours avec les autres tables techniques (ADR 0038).
+
 ## Conséquences
 
 - Les tests d'intégration prouvent : inscription unique, exécution sous le bon cabinet, calendrier des tentatives, mise en échec, annulation des écritures d'une exécution ratée, absence de prise double entre deux workers concurrents, reprise après arrêt d'un worker, absence de doublon chez le prestataire après une panne, publication unique de l'outbox, droits et isolation de l'écran.

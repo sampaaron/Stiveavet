@@ -151,6 +151,7 @@ export const auth = {
     passwords_mismatch: "Les deux mots de passe ne correspondent pas.",
     organization_name_short: "Nom du cabinet trop court.",
     organization_name_long: "Nom du cabinet trop long.",
+    organization_name_chars: "Indiquez un nom, sans lien ni adresse e-mail.",
     display_name_required: "Indiquez votre nom.",
     display_name_long: "Nom trop long.",
     plan_required: "Choisissez votre offre.",
@@ -167,5 +168,6 @@ export const auth = {
     repetitive: "Trop de caractères répétés.",
     common: "Ce mot de passe figure parmi les plus utilisés.",
     personal: "Il ne doit pas contenir votre nom ou votre e-mail.",
+    unchanged: "Choisissez un mot de passe différent de l'actuel.",
   },
 };

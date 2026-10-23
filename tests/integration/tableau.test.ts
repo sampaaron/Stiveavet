@@ -4,8 +4,8 @@ import { SEED } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
 import type { AiGateway } from "@/adapters/ai-gateway/types";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { ROLE_PERMISSIONS } from "@/domains/equipe/permissions";
 import { followupsService } from "@/domains/suivis/service";
 import { statsService } from "@/domains/suivis/statistiques";
@@ -13,7 +13,7 @@ import { synthesisService } from "@/domains/suivis/synthese";
 import { todayService } from "@/domains/suivis/tableau";
 import { followups as fixtureFollowups } from "@/fixtures/cabinet-tilleuls";
 
-import { pools } from "./support/db";
+import { asApp, errorCode, pools } from "./support/db";
 
 /**
  * Lot 17 (ADR 0020) : le tableau de bord « Aujourd'hui » et la synthèse pré-consultation
@@ -232,6 +232,31 @@ describe("synthèse pré-consultation", () => {
     expect(synthesis?.simulated).toBe(true);
   });
 
+  it("une synthèse par langue : un lecteur anglais ne fait pas réécrire celle du lecteur français", async () => {
+    const generated = async () =>
+      Number(
+        (
+          await admin.query(
+            `SELECT count(*)::int AS n FROM audit_events
+             WHERE action = 'synthesis.generated' AND target_id = $1`,
+            [caramel],
+          )
+        ).rows[0]?.n,
+      );
+    const fr = await syntheses.forFollowup(claire, caramel, { language: "fr" });
+    const en = await syntheses.forFollowup(claire, caramel, { language: "en" });
+    const before = await generated();
+    const frAgain = await syntheses.forFollowup(claire, caramel, {
+      language: "fr",
+    });
+    const enAgain = await syntheses.forFollowup(claire, caramel, {
+      language: "en",
+    });
+    expect(frAgain?.generatedAt.getTime()).toBe(fr?.generatedAt.getTime());
+    expect(enAgain?.generatedAt.getTime()).toBe(en?.generatedAt.getTime());
+    expect(await generated()).toBe(before);
+  });
+
   it("gardée en base, refaite seulement si les échanges changent ; journalisée sans contenu", async () => {
     const first = await syntheses.forFollowup(claire, moka);
     const again = await syntheses.forFollowup(claire, moka);
@@ -277,12 +302,25 @@ describe("synthèse pré-consultation", () => {
       "not_found",
     );
     // Seul un droit clinique ouvert explicitement par l'administrateur lui donne la synthèse.
+    // Le droit est donné en base : la base impose aussi l'accès clinique (ADR 0038).
     const opened: Actor = {
       ...lea,
       permissions: new Set([...lea.permissions, "clinical.read"]),
     };
-    const granted = await syntheses.forFollowup(opened, caramel);
-    expect(granted?.exchanges.ownerMessages).toBe(5);
+    const grant = [lea.organizationId, lea.membershipId];
+    await admin.query(
+      "INSERT INTO membership_permissions (organization_id, membership_id, permission) VALUES ($1, $2, 'clinical.read')",
+      grant,
+    );
+    try {
+      const granted = await syntheses.forFollowup(opened, caramel);
+      expect(granted?.exchanges.ownerMessages).toBe(5);
+    } finally {
+      await admin.query(
+        "DELETE FROM membership_permissions WHERE organization_id = $1 AND membership_id = $2 AND permission = 'clinical.read'",
+        grant,
+      );
+    }
   });
 
   it("une rédaction hors cadre est écartée par les garde-fous, sans rien garder de son contenu", async () => {
@@ -340,9 +378,31 @@ describe("activité du cabinet (totaux du tableau de bord)", () => {
       tilleuls.daily.reduce((sum, day) => sum + day.inbound, 0),
     ).toBeLessThanOrEqual(tilleuls.ownerMessages);
 
-    // Un autre cabinet ne voit pas ces totaux ; l'assistante voit les mêmes que l'administratrice.
+    // Un autre cabinet ne voit pas ces totaux ; l'assistante, sans accès au contenu clinique
+    // (politique `clinical_access`, 0026), voit exactement les mêmes que l'administratrice.
     const martin = await stats.activity(paul);
     expect(martin.ongoing).toBeLessThan(tilleuls.ongoing);
-    expect((await stats.activity(lea)).ongoing).toBe(tilleuls.ongoing);
+    expect(lea.permissions.has("clinical.read")).toBe(false);
+    expect(await stats.activity(lea)).toEqual(tilleuls);
+  });
+
+  it("les compteurs de messages ne se lisent que dans un cabinet, sans aucun identifiant", async () => {
+    for (const query of [
+      "SELECT * FROM app.activity_messages(now() - interval '30 days')",
+      "SELECT app.activity_answered(now() - interval '30 days')",
+    ])
+      expect(
+        await asApp(app, null, (client) => errorCode(client.query(query))),
+      ).toBe("42501");
+    const { fields } = await asApp(app, SEED.tilleuls, (client) =>
+      client.query(
+        "SELECT * FROM app.activity_messages(now() - interval '30 days')",
+      ),
+    );
+    expect(fields.map((field) => field.name)).toEqual([
+      "day",
+      "inbound",
+      "outbound",
+    ]);
   });
 });

@@ -7,7 +7,7 @@ import { fakeAiGateway, simulatedNumaStep } from "@/adapters/ai-gateway/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { conversationsService } from "@/domains/conversations/service";
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
@@ -22,7 +22,11 @@ import {
 import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
-import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
+import {
+  conversationWorker,
+  recordingWhatsApp,
+  replayJob,
+} from "./support/whatsapp";
 
 /**
  * Lot 15 : rappels planifiés et fin du suivi automatisé (ADR 0018). Les heures d'envoi sont
@@ -301,21 +305,14 @@ describe("rappels planifiés", () => {
     });
 
     // Rejouée, l'étape ne repart pas.
-    await withTenant(appDb, { organizationId: org }, async (tx) => {
-      const handler = allHandlers["followup.reminder"];
-      if (!handler) throw new Error("exécutant manquant");
-      await handler({
-        tx,
-        job: {
-          id: randomUUID(),
-          organizationId: org,
-          kind: "followup.reminder",
-          attempt: 1,
-          followupId: plume,
-          payload: { stepId: step.id },
-          idempotencyKey: `followup:${plume}:step:${step.id}`,
-        },
-      });
+    await replayJob(appDb, allHandlers["followup.reminder"], {
+      id: randomUUID(),
+      organizationId: org,
+      kind: "followup.reminder",
+      attempt: 1,
+      followupId: plume,
+      payload: { stepId: step.id },
+      idempotencyKey: `followup:${plume}:step:${step.id}`,
     });
     expect(sent).toHaveLength(before + 1);
   });
@@ -327,21 +324,32 @@ describe("rappels planifiés", () => {
       (job) => job.status === "pending",
     );
     if (!next) throw new Error("aucun rappel à venir");
+    // « Avancer » rend dus tous les rappels prévus au même créneau que le prochain : le soir,
+    // plusieurs étapes attendent souvent l'ouverture de la même plage d'envoi.
+    const until = Math.max(next.run_at.getTime(), Date.now()) + 1;
+    const released = (await jobsOf(plume, "followup.reminder")).filter(
+      (job) => job.status === "pending" && job.run_at.getTime() <= until,
+    );
     const before = sent.length;
     await advance(plume);
     expect(sent).toHaveLength(before);
     await launches.changeStatus(leo, plume, "resume");
     const jobs = await jobsOf(plume, "followup.reminder");
-    expect(
-      jobs.filter((job) => job.payload.stepId === next.payload.stepId),
-    ).toEqual([expect.objectContaining({ status: "succeeded" })]);
-    expect(
-      (await messagesOf(plume)).some(
-        (message) => message.idempotency_key === `step:${next.payload.stepId}`,
-      ),
-    ).toBe(false);
+    const messages = await messagesOf(plume);
+    for (const skipped of released) {
+      expect(
+        jobs.filter((job) => job.payload.stepId === skipped.payload.stepId),
+      ).toEqual([expect.objectContaining({ status: "succeeded" })]);
+      expect(
+        messages.some(
+          (message) =>
+            message.idempotency_key === `step:${skipped.payload.stepId}`,
+        ),
+      ).toBe(false);
+    }
+    // Le rappel déjà parti au test précédent, plus ceux passés pendant la pause.
     expect(jobs.filter((job) => job.status === "pending").length).toBe(
-      jobs.length - 2,
+      jobs.length - 1 - released.length,
     );
   });
 
@@ -405,21 +413,14 @@ describe("rappels planifiés", () => {
     const stale = ends.find((job) => job.status === "cancelled");
     if (!stale) throw new Error("ancienne fin");
     // Une tâche de fin périmée ne termine rien.
-    await withTenant(appDb, { organizationId: org }, async (tx) => {
-      const handler = allHandlers["followup.end"];
-      if (!handler) throw new Error("exécutant manquant");
-      await handler({
-        tx,
-        job: {
-          id: randomUUID(),
-          organizationId: org,
-          kind: "followup.end",
-          attempt: 1,
-          followupId: plume,
-          payload: stale.payload,
-          idempotencyKey: `followup:${plume}:end:stale`,
-        },
-      });
+    await replayJob(appDb, allHandlers["followup.end"], {
+      id: randomUUID(),
+      organizationId: org,
+      kind: "followup.end",
+      attempt: 1,
+      followupId: plume,
+      payload: stale.payload,
+      idempotencyKey: `followup:${plume}:end:stale`,
     });
     expect((await followupRow(plume)).status).toBe("active");
   });

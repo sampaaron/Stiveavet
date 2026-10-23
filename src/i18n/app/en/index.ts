@@ -20,6 +20,7 @@ import { tasks } from "./tasks";
 import { agenda } from "./agenda";
 import { patients } from "./patients";
 import { stive } from "./stive";
+import { account } from "./account";
 
 export const en: AppDictionary = {
   common,
@@ -41,4 +42,5 @@ export const en: AppDictionary = {
   agenda,
   patients,
   stive,
+  account,
 };

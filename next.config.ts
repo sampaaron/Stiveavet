@@ -14,7 +14,8 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "6mb" },
   },
   // Pas de pré-rendu statique partiel : chaque page doit recevoir le nonce CSP de sa requête
-  // (voir docs/adr/0003-csp-nonce-rendu-dynamique.md).
+  // (voir docs/adr/0003-csp-nonce-rendu-dynamique.md). Valeur par défaut, écrite pour rester visible.
+  cacheComponents: false,
   turbopack: {
     rules: {
       "*.css": {

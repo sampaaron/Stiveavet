@@ -234,14 +234,14 @@ describe("médias reçus des propriétaires", () => {
   it("ne suit que les adresses de Meta, jamais une autre", async () => {
     const calls: string[] = [];
     const connector = cloudApiConnector({
-      fetch: (async (input: string | URL | Request) => {
+      fetch: async (input: string | URL | Request) => {
         const url = String(input instanceof Request ? input.url : input);
         calls.push(new URL(url).hostname);
         return Response.json({
           url: "https://169.254.169.254/latest",
           file_size: 1,
         });
-      }) as typeof fetch,
+      },
       phoneNumberId: "1234567890",
       accessToken: TOKEN,
     });

@@ -9,15 +9,20 @@ import {
   organizations,
   users,
 } from "@/server/db/schema";
+import { recordAudit } from "@/domains/audit/journal";
 import { startSubscription } from "@/domains/facturation/service";
 import type { Plan } from "@/domains/facturation/rules";
+import { isUniqueViolation } from "@/server/db/errors";
 import { withTenant } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
+import { deviceLabel } from "./appareil";
 import {
   existingAccountEmail,
   passwordChangedEmail,
+  passwordChangedInAccountEmail,
   passwordResetEmail,
   securityCodeEmail,
 } from "./emails";
@@ -26,7 +31,12 @@ import type { PasswordProblem } from "./password";
 import { AUTH_POLICY, RATE_LIMITS, TERMS_VERSION } from "./policy";
 import type { RateLimitName } from "./policy";
 import { authRepository } from "./repository";
-import type { MemberRole, ResolvedSession } from "./repository";
+import type {
+  AccountSession,
+  MemberRole,
+  ResolvedSession,
+  TrustedDevice,
+} from "./repository";
 import {
   createSecurityCode,
   createToken,
@@ -67,6 +77,17 @@ export type LoginResult =
 
 export type CodeResult =
   SignedIn | { status: "invalid" } | { status: "expired" };
+
+export type PasswordChangeResult =
+  | { status: "changed" }
+  | { status: "invalid_current" }
+  | { status: "invalid_password"; problems: PasswordProblem[] }
+  | { status: "signed_out" };
+
+export type AccountSecurity = {
+  sessions: AccountSession[];
+  devices: TrustedDevice[];
+};
 
 export type RegisterResult =
   | { status: "code_required"; challengeToken: string }
@@ -113,6 +134,7 @@ export function authService({
   async function openSession(
     userId: string,
     membershipId: string,
+    origin: RequestOrigin,
   ): Promise<SignedIn> {
     const sessionToken = createToken();
     const lifetimeMinutes = AUTH_POLICY.sessionHours * 60;
@@ -121,6 +143,7 @@ export function authService({
       userId,
       membershipId,
       lifetimeMinutes,
+      deviceLabel(origin.userAgent),
     );
     return {
       status: "signed_in",
@@ -226,6 +249,7 @@ export function authService({
       const signedIn = await openSession(
         credentials.userId,
         membership.membershipId,
+        origin,
       );
       await repo.recordLoginEvent({
         kind: "login_succeeded",
@@ -263,12 +287,17 @@ export function authService({
 
       const [membership] = await repo.activeMemberships(userId);
       if (!membership) return { status: "expired" };
-      const signedIn = await openSession(userId, membership.membershipId);
+      const signedIn = await openSession(
+        userId,
+        membership.membershipId,
+        origin,
+      );
       const deviceToken = createToken();
       await repo.trustDevice(
         tokenHash(deviceToken),
         userId,
         AUTH_POLICY.trustedDeviceDays,
+        deviceLabel(origin.userAgent),
       );
       await repo.recordLoginEvent({
         kind: "login_succeeded",
@@ -419,8 +448,10 @@ export function authService({
       if (!isWellFormedToken(input.token)) return { status: "expired" };
       const hash = tokenHash(input.token);
       // Le hachage du mot de passe est coûteux : il n'a lieu que pour un lien encore valable.
-      if (!(await repo.passwordResetValid(hash))) return { status: "expired" };
-      const problems = passwordProblems(input.password);
+      // Le mot de passe ne doit contenir ni l'adresse ni le nom du titulaire du lien.
+      const owner = await repo.passwordResetOwner(hash);
+      if (!owner) return { status: "expired" };
+      const problems = passwordProblems(input.password, owner);
       if (problems.length) return { status: "invalid_password", problems };
 
       const result = await repo.resetPassword(
@@ -435,6 +466,150 @@ export function authService({
         ...eventOrigin(origin),
       });
       return { status: "done" };
+    },
+
+    // Sécurité du compte (ADR 0039) : toujours à partir de la session courante, déverrouillée.
+
+    /** Sessions ouvertes et appareils de confiance de la personne connectée. */
+    async accountSecurity(
+      sessionToken: string | undefined,
+      deviceToken: string | undefined,
+    ): Promise<AccountSecurity> {
+      if (!isWellFormedToken(sessionToken))
+        return { sessions: [], devices: [] };
+      const hash = tokenHash(sessionToken);
+      return {
+        sessions: await repo.accountSessions(hash),
+        devices: await repo.accountTrustedDevices(
+          hash,
+          isWellFormedToken(deviceToken) ? tokenHash(deviceToken) : null,
+        ),
+      };
+    },
+
+    /**
+     * Nouveau mot de passe, l'ancien à l'appui. Les autres sessions sont fermées, la personne
+     * prévenue par e-mail et le changement journalisé. Trop d'erreurs sur l'ancien mot de
+     * passe ferment la session : une session volée ne sert pas à le deviner.
+     */
+    async changePassword(
+      input: {
+        sessionToken: string | undefined;
+        currentPassword: string;
+        password: string;
+      },
+      origin: RequestOrigin,
+    ): Promise<PasswordChangeResult> {
+      const session = await this.resolveSession(input.sessionToken);
+      if (!session || session.locked || !input.sessionToken)
+        return { status: "signed_out" };
+      const hash = tokenHash(input.sessionToken);
+      const tenant = {
+        organizationId: session.organizationId,
+        userId: session.userId,
+      };
+
+      const failures = await reserveFailure(
+        "passwordChangeFailuresPerAccount",
+        session.userId,
+      );
+      if (!failures.ok) {
+        await repo.revokeSession(hash);
+        await repo.recordLoginEvent({
+          kind: "login_rate_limited",
+          userId: session.userId,
+          organizationId: session.organizationId,
+          ...eventOrigin(origin),
+        });
+        return { status: "signed_out" };
+      }
+      const ok = await verifyPassword(
+        await repo.passwordHashFor(session.userId),
+        input.currentPassword,
+      );
+      if (!ok) return { status: "invalid_current" };
+      await failures.release();
+
+      const owner = await withTenant(db, tenant, async (tx) => {
+        const [row] = await tx
+          .select({ email: users.email, displayName: users.displayName })
+          .from(users)
+          .where(eq(users.id, session.userId));
+        return row;
+      });
+      const problems = passwordProblems(input.password, owner);
+      if (input.password === input.currentPassword)
+        problems.push({ code: "unchanged" });
+      if (problems.length) return { status: "invalid_password", problems };
+
+      const passwordHash = await hashPassword(input.password);
+      const changed = await withTenant(db, tenant, async (tx) => {
+        const row = await authRepository(tx).changePassword(hash, passwordHash);
+        if (row)
+          await recordAudit(tx, session, "account.password_changed", {
+            type: "membership",
+            id: session.membershipId,
+          });
+        return row;
+      });
+      if (!changed) return { status: "signed_out" };
+      // Le mot de passe est changé : un échec d'envoi ne doit pas le faire croire inchangé.
+      await email
+        .send(passwordChangedInAccountEmail(changed.email))
+        .catch(() =>
+          console.error("Avis de changement de mot de passe non envoyé."),
+        );
+      return { status: "changed" };
+    },
+
+    /** Ferme toutes les autres sessions de la personne ; renvoie leur nombre. */
+    async revokeOtherSessions(sessionToken: string | undefined) {
+      const session = await this.resolveSession(sessionToken);
+      if (!session || session.locked || !sessionToken) return 0;
+      return withTenant(
+        db,
+        { organizationId: session.organizationId, userId: session.userId },
+        async (tx) => {
+          const count = await authRepository(tx).revokeOtherSessions(
+            tokenHash(sessionToken),
+          );
+          if (count > 0)
+            await recordAudit(
+              tx,
+              session,
+              "account.sessions_revoked",
+              { type: "membership", id: session.membershipId },
+              { count },
+            );
+          return count;
+        },
+      );
+    },
+
+    /** Retire un appareil de confiance de la personne : le code e-mail y sera redemandé. */
+    async revokeTrustedDevice(
+      sessionToken: string | undefined,
+      deviceId: string,
+    ): Promise<boolean> {
+      if (!z.uuid().safeParse(deviceId).success) return false;
+      const session = await this.resolveSession(sessionToken);
+      if (!session || session.locked || !sessionToken) return false;
+      return withTenant(
+        db,
+        { organizationId: session.organizationId, userId: session.userId },
+        async (tx) => {
+          const revoked = await authRepository(tx).revokeTrustedDevice(
+            tokenHash(sessionToken),
+            deviceId,
+          );
+          if (revoked)
+            await recordAudit(tx, session, "account.device_revoked", {
+              type: "membership",
+              id: session.membershipId,
+            });
+          return revoked;
+        },
+      );
     },
 
     /**
@@ -551,8 +726,3 @@ export function authService({
 }
 
 export type AuthService = ReturnType<typeof authService>;
-
-function isUniqueViolation(error: unknown): boolean {
-  const candidate = error as { code?: string; cause?: { code?: string } };
-  return candidate.code === "23505" || candidate.cause?.code === "23505";
-}

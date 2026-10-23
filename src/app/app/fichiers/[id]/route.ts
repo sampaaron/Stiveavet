@@ -1,4 +1,4 @@
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { currentSession } from "@/server/auth";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
@@ -31,7 +31,13 @@ export async function GET(
       expires: url.searchParams.get("e") ?? "",
       signature: url.searchParams.get("s") ?? "",
     });
-    return new Response(Buffer.from(object.bytes), {
+    // Vue sur les mêmes octets, sans copie du fichier (copie seulement en mémoire partagée).
+    const { buffer, byteOffset, byteLength } = object.bytes;
+    const body =
+      buffer instanceof ArrayBuffer
+        ? new Uint8Array(buffer, byteOffset, byteLength)
+        : Uint8Array.from(object.bytes);
+    return new Response(body, {
       headers: {
         "Content-Type": object.contentType,
         "Content-Length": String(object.bytes.length),

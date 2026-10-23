@@ -1,7 +1,14 @@
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { describe, expect, it } from "vitest";
 
-import { DatabaseFailure, safeDbError, withSafeDbErrors } from "./errors";
+import {
+  DatabaseFailure,
+  isUniqueViolation,
+  pgConstraint,
+  pgErrorCode,
+  safeDbError,
+  withSafeDbErrors,
+} from "./errors";
 
 function pgError(fields: Record<string, string>) {
   return Object.assign(new Error(fields.message), {
@@ -60,6 +67,31 @@ describe("erreurs de base de données", () => {
     expect(safeDbError(other)).toBe(other);
   });
 
+  it("sans code ni champ texte, l'erreur reste générique", () => {
+    const failure = safeDbError(
+      new DrizzleQueryError("select 1", [], undefined),
+    ) as DatabaseFailure;
+    expect(failure.message).toBe("Requête refusée par la base");
+    expect(failure.cause).toEqual({
+      code: undefined,
+      message: "",
+      constraint: undefined,
+    });
+    const odd = safeDbError(
+      Object.assign(new Error(), {
+        severity: "ERROR",
+        code: 42,
+        message: { texte: "inattendu" },
+        constraint: null,
+      }),
+    ) as DatabaseFailure;
+    expect([odd.code, odd.cause.message, odd.cause.constraint]).toEqual([
+      undefined,
+      "",
+      undefined,
+    ]);
+  });
+
   it("protège chaque méthode d'un dépôt", async () => {
     const repo = withSafeDbErrors({
       fail: () =>
@@ -67,8 +99,29 @@ describe("erreurs de base de données", () => {
           query(pgError({ code: "40001", message: "serialization" })),
         ),
       ok: (value: number) => Promise.resolve(value * 2),
+      label: "dépôt",
     });
     await expect(repo.ok(2)).resolves.toBe(4);
+    expect(repo.label).toBe("dépôt");
     await expect(repo.fail()).rejects.toBeInstanceOf(DatabaseFailure);
+  });
+
+  it("lit le code et la contrainte de toute erreur, sans jamais lever", () => {
+    const duplicate = query(
+      pgError({
+        code: "23505",
+        message: "duplicate key",
+        constraint: "users_email_key",
+      }),
+    );
+    expect(pgErrorCode(duplicate)).toBe("23505");
+    expect(isUniqueViolation(duplicate)).toBe(true);
+    expect(isUniqueViolation(safeDbError(duplicate))).toBe(true);
+    expect(pgConstraint(duplicate)).toBe("users_email_key");
+    for (const other of [null, undefined, "texte", 42, new Error("autre")]) {
+      expect(pgErrorCode(other)).toBeUndefined();
+      expect(pgConstraint(other)).toBeUndefined();
+      expect(isUniqueViolation(other)).toBe(false);
+    }
   });
 });

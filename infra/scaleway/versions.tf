@@ -4,8 +4,9 @@ terraform {
   required_version = ">= 1.6"
   required_providers {
     scaleway = {
+      # 2.77 : expiration des versions non courantes et des marqueurs de suppression.
       source  = "scaleway/scaleway"
-      version = "~> 2.50"
+      version = "~> 2.77"
     }
     random = {
       source  = "hashicorp/random"

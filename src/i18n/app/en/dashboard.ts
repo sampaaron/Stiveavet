@@ -3,8 +3,6 @@ import type { AppDictionary } from "../types";
 export const dashboard: AppDictionary["dashboard"] = {
   title: "Today",
   greeting: (firstName: string) => `Hello ${firstName}`,
-  headline: (day: string, urgent: number, watch: number) =>
-    `${day} · ${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
   headlineShort: (urgent: number, watch: number) =>
     `${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
   briefing: {

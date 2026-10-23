@@ -81,8 +81,6 @@ function graphError(status: number, code: number): Response {
   );
 }
 
-export type MetaImitation = ReturnType<typeof metaImitation>;
-
 /** Média reçu d'un propriétaire, tel que Meta le garde (30 jours). */
 type ImitatedMedia = {
   bytes: Uint8Array;

@@ -2,6 +2,7 @@
 .github
 .next
 node_modules
+dist
 coverage
 playwright-report
 test-results
@@ -12,3 +13,10 @@ tests
 !.env.example
 *.md
 .data
+# Infrastructure et secrets locaux : jamais dans une image (état Terraform, clés).
+infra
+**/*.tfstate*
+**/*.tfvars
+**/.terraform
+*.pem
+tsconfig.tsbuildinfo

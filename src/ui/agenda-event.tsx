@@ -1,10 +1,10 @@
 import Link from "next/link";
 
-import type { AgendaEvent as AgendaEventData } from "@/fixtures/types";
 import { appDictionary } from "@/i18n/app";
 import type { Locale } from "@/i18n/locales";
 
 import { cn } from "./cn";
+import type { AgendaEvent as AgendaEventData } from "./types";
 
 const kindBorder: Record<AgendaEventData["kind"], string> = {
   consultation: "border-l-line",

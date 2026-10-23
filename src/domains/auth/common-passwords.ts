@@ -1,136 +1,67 @@
+import { COMMON_PASSWORDS } from "./mots-de-passe-courants";
+
 /**
- * Mots de passe et racines parmi les plus répandus dans les fuites publiques (FR et EN),
- * embarqués localement : aucune requête vers un service externe.
- * La comparaison se fait sur la forme normalisée (minuscules, sans chiffres ni symboles
- * en fin de chaîne), si bien que « Azerty2024! » est refusé comme « azerty ».
+ * Mots de passe courants (FR et EN), embarqués localement : aucune requête vers un service
+ * externe. La liste (`mots-de-passe-courants.ts`, plus de 15 000 racines) est chargée une
+ * seule fois, au premier contrôle. La comparaison se fait sur une forme normalisée, si bien
+ * que « Azerty2024! », « P@ssw0rd » ou « mot de passe » sont refusés comme leur racine.
  */
-export const COMMON_PASSWORD_ROOTS: ReadonlySet<string> = new Set([
-  "123456789",
-  "1234567890",
-  "12345678910",
-  "0123456789",
-  "987654321",
-  "azerty",
-  "azertyuiop",
-  "qwerty",
-  "qwertyuiop",
-  "qwerty123",
-  "azerty123",
-  "password",
-  "passw0rd",
-  "motdepasse",
-  "mot2passe",
-  "motdepass",
-  "secret",
-  "soleil",
-  "bonjour",
-  "doudou",
-  "chouchou",
-  "loulou",
-  "marseille",
-  "paris",
-  "toulouse",
-  "lyon",
-  "bordeaux",
-  "nantes",
-  "lille",
-  "france",
-  "jetaime",
-  "jesus",
-  "nicolas",
-  "camille",
-  "thomas",
-  "julien",
-  "alexandre",
-  "antoine",
-  "maxime",
-  "pierre",
-  "louise",
-  "emma",
-  "chocolat",
-  "princesse",
-  "football",
-  "olympique",
-  "marseille13",
-  "dragon",
-  "monkey",
-  "letmein",
-  "welcome",
-  "iloveyou",
-  "admin",
-  "administrateur",
-  "administrator",
-  "root",
-  "user",
-  "utilisateur",
-  "login",
-  "changeme",
-  "default",
-  "master",
-  "superman",
-  "batman",
-  "sunshine",
-  "shadow",
-  "michael",
-  "jennifer",
-  "charlie",
-  "baseball",
-  "trustno1",
-  "starwars",
-  "whatever",
-  "freedom",
-  "computer",
-  "internet",
-  "abc123",
-  "abcdef",
-  "abcdefgh",
-  "aaaaaa",
-  "azertyqsdf",
-  "qsdfghjklm",
-  "wxcvbn",
-  "1q2w3e4r",
-  "1qaz2wsx",
-  "zaq12wsx",
-  "qazwsx",
-  "asdfgh",
-  "asdfghjkl",
-  "zxcvbnm",
-  "vétérinaire",
-  "veterinaire",
-  "veto",
-  "clinique",
-  "cabinet",
-  "chien",
-  "chat",
-  "chiot",
-  "chaton",
-  "animal",
-  "stivea",
-  "stiveavet",
-  "strivea",
-  "striveavet",
-  "bienvenue",
-  "printemps",
-  "automne",
-  "hiver",
-  "ete",
-  "janvier",
-  "fevrier",
-  "mars",
-  "avril",
-  "mai",
-  "juin",
-  "juillet",
-  "aout",
-  "septembre",
-  "octobre",
-  "novembre",
-  "decembre",
-  "lundi",
-  "mardi",
-  "mercredi",
-  "jeudi",
-  "vendredi",
-  "samedi",
-  "dimanche",
-]);
+
+const LEET: Readonly<Record<string, string>> = {
+  "0": "o",
+  "1": "i",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "@": "a",
+  $: "s",
+  "!": "i",
+};
+
+/**
+ * Racine d'un mot de passe : minuscules sans accents, sans chiffres ni symboles en début et
+ * en fin, sans espaces ni séparateurs, chiffres et symboles « leet » remplacés par la lettre
+ * qu'ils imitent. Sans lettre, la racine est vide.
+ */
+export function passwordRoot(password: string): string {
+  return password
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "")
+    .replace(/[\s._-]+/gu, "")
+    .replace(/[013457@$!]/g, (char) => LEET[char] ?? char);
+}
+
+// Suites de touches ou de caractères : un mot de passe qui en est un extrait est refusé.
+const SEQUENCES = [
+  "01234567890123456789",
+  "98765432109876543210",
+  "abcdefghijklmnopqrstuvwxyz",
+  "azertyuiopqsdfghjklmwxcvbn",
+  "qwertyuiopasdfghjklzxcvbnm",
+  "qwertzuiopasdfghjklyxcvbnm",
+];
+
+let roots: ReadonlySet<string> | undefined;
+
+function commonRoots(): ReadonlySet<string> {
+  roots ??= new Set(COMMON_PASSWORDS.split("\n").filter(Boolean));
+  return roots;
+}
+
+export function isCommonPassword(password: string): boolean {
+  const compact = password.toLowerCase().replace(/[\s._-]+/gu, "");
+  if (
+    compact.length >= 4 &&
+    SEQUENCES.some((sequence) => sequence.includes(compact))
+  )
+    return true;
+  const root = passwordRoot(password);
+  if (!root) return false;
+  if (commonRoots().has(root)) return true;
+  // Racine répétée (« soleilsoleil », « abcabcabcabc ») : aussi faible que sa base.
+  const unit = /^(.+?)\1+$/u.exec(root)?.[1];
+  return !!unit && (unit.length <= 3 || commonRoots().has(unit));
+}

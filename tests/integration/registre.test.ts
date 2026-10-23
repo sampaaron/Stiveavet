@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { patientsService } from "@/domains/patients/service";
 import { protocolsService } from "@/domains/protocoles/service";

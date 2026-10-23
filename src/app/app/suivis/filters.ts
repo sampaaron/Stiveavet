@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { foldText } from "@/domains/commun";
+import { foldText } from "@/domains/commun/utilitaires";
 import type { FollowupView } from "@/domains/suivis/service";
 
 /** Filtres de la liste des suivis, lus dans l'adresse (valeur inconnue : pas de filtre). */

@@ -66,6 +66,7 @@ export const team = {
     email_invalid: "Adresse e-mail invalide.",
     name_missing: "Indiquez le nom de la personne.",
     name_too_long: "Nom trop long.",
+    name_chars: "Indiquez un nom, sans lien ni adresse e-mail.",
     fallback: "Vérifiez le nom, l'adresse e-mail et le rôle.",
   },
 };

@@ -1,14 +1,12 @@
 /**
- * Types des données fictives de la démo du site public et du jeu de données local (lot 2).
- * Les messages, pièces jointes et rendez-vous servent aussi de forme d'affichage aux écrans
- * de l'espace cabinet, qui lisent la base depuis le lot 17.
+ * Formes d'affichage d'un suivi, de son fil et des rendez-vous. Les écrans de l'espace cabinet
+ * les remplissent depuis la base ; la démo du site public et le jeu de données local, depuis
+ * les données fictives (`src/fixtures`).
  */
 export type Triage = "normal" | "watch" | "urgent";
 export type ConsentState = "pending" | "given" | "stopped";
 export type FollowupState = "active" | "paused" | "human" | "ended";
 export type Species = "chien" | "chat";
-
-export type Vet = { id: string; name: string; shortName: string };
 
 export type OwnerContact = {
   name: string;

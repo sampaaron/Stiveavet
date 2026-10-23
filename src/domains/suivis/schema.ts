@@ -278,15 +278,21 @@ export const followupAlertRules = pgTable("followup_alert_rules", {
   createdAt,
 });
 
-// Migration 0013 : synthèse pré-consultation, refaite quand les échanges changent.
+// Migration 0013 : synthèse pré-consultation, refaite quand les échanges changent ; une par
+// langue de lecture depuis la migration 0028.
 
-export const followupSyntheses = pgTable("followup_syntheses", {
-  followupId: uuid("followup_id").primaryKey(),
-  organizationId: uuid("organization_id").notNull(),
-  content: jsonb("content").notNull(),
-  sourceDigest: text("source_digest").notNull(),
-  engine: text("engine").notNull().default("simulated"),
-  generatedAt: timestamp("generated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const followupSyntheses = pgTable(
+  "followup_syntheses",
+  {
+    followupId: uuid("followup_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    language: text("language", { enum: ["fr", "en"] }).notNull(),
+    content: jsonb("content").notNull(),
+    sourceDigest: text("source_digest").notNull(),
+    engine: text("engine").notNull().default("simulated"),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.followupId, table.language] })],
+);

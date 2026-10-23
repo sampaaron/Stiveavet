@@ -1,6 +1,6 @@
 import type { MemberRole } from "@/domains/auth/repository";
 
-import type { PermissionKey } from "./permissions";
+import type { PermissionKey } from "@/domains/equipe/permissions";
 
 /** Personne qui agit, telle qu'établie par la garde serveur (session + permissions en base). */
 export type Actor = {
@@ -20,6 +20,8 @@ export class DomainError extends Error {
       | "vet_limit"
       | "already_member"
       | "already_invited"
+      | "email_registered"
+      | "invitation_limit"
       | "invalid_target"
       | "self_action"
       | "last_admin"

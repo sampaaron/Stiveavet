@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import type { LaunchSheet } from "@/domains/suivis/lancement";
 import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";
@@ -11,7 +11,7 @@ import type { Locale } from "@/i18n/locales";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
-import { SectionCard } from "@/ui/card";
+import { Fact, SectionCard } from "@/ui/card";
 import { formatDate, formatDateTime, toDateTimeInput } from "@/ui/format";
 
 import { TestMark } from "../../test-mark";
@@ -247,14 +247,5 @@ function ImportedSummary({
         />
       </dl>
     </SectionCard>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className="font-semibold">{value}</dd>
-    </div>
   );
 }

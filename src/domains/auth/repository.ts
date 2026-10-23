@@ -23,14 +23,36 @@ export type ResolvedSession = {
   locked: boolean;
 };
 
+/** Session ouverte de la personne, telle que la montre « Sécurité du compte ». */
+export type AccountSession = {
+  id: string;
+  deviceLabel: string | null;
+  createdAt: Date;
+  lastActivityAt: Date;
+  current: boolean;
+};
+
+/** Appareil de confiance de la personne (pas de code e-mail à la connexion). */
+export type TrustedDevice = {
+  id: string;
+  deviceLabel: string | null;
+  createdAt: Date;
+  lastUsedAt: Date;
+  expiresAt: Date;
+  current: boolean;
+};
+
+/** Base ou transaction d'un cabinet : les fonctions `auth` s'appellent dans l'une ou l'autre. */
+type Executor = Pick<Database, "execute">;
+
 const minutes = (value: number) => `${value} minutes`;
 
-async function rows<T>(db: Database, query: ReturnType<typeof sql>) {
+async function rows<T>(db: Executor, query: ReturnType<typeof sql>) {
   const result = await db.execute(query);
   return result.rows as T[];
 }
 
-export function authRepository(db: Database) {
+export function authRepository(db: Executor) {
   return withSafeDbErrors({
     async credentialsByEmail(email: string) {
       const [row] = await rows<{ user_id: string; password_hash: string }>(
@@ -76,9 +98,10 @@ export function authRepository(db: Database) {
       userId: string,
       membershipId: string,
       lifetimeMinutes: number,
+      deviceLabel: string | null,
     ) {
       await db.execute(
-        sql`SELECT auth.create_session(${hash}, ${userId}, ${membershipId}, ${minutes(lifetimeMinutes)}::interval)`,
+        sql`SELECT auth.create_session(${hash}, ${userId}, ${membershipId}, ${minutes(lifetimeMinutes)}::interval, ${deviceLabel})`,
       );
     },
 
@@ -150,9 +173,14 @@ export function authRepository(db: Database) {
       };
     },
 
-    async trustDevice(hash: Buffer, userId: string, lifetimeDays: number) {
+    async trustDevice(
+      hash: Buffer,
+      userId: string,
+      lifetimeDays: number,
+      deviceLabel: string | null,
+    ) {
       await db.execute(
-        sql`SELECT auth.trust_device(${hash}, ${userId}, ${`${lifetimeDays} days`}::interval)`,
+        sql`SELECT auth.trust_device(${hash}, ${userId}, ${`${lifetimeDays} days`}::interval, ${deviceLabel})`,
       );
     },
 
@@ -182,10 +210,88 @@ export function authRepository(db: Database) {
       return row?.valid === true;
     },
 
+    /** Adresse et nom du titulaire d'un lien encore valable, pour juger le mot de passe choisi. */
+    async passwordResetOwner(hash: Buffer) {
+      const [row] = await rows<{ email: string; display_name: string }>(
+        db,
+        sql`SELECT * FROM auth.password_reset_owner(${hash})`,
+      );
+      return row ? { email: row.email, displayName: row.display_name } : null;
+    },
+
     async resetPassword(hash: Buffer, passwordHash: string) {
       const [row] = await rows<{ user_id: string; email: string }>(
         db,
         sql`SELECT * FROM auth.reset_password(${hash}, ${passwordHash})`,
+      );
+      return row ? { userId: row.user_id, email: row.email } : null;
+    },
+
+    // Sécurité du compte : toujours à partir du jeton de la session courante (migration 0027).
+
+    async accountSessions(sessionHash: Buffer): Promise<AccountSession[]> {
+      const result = await rows<{
+        session_id: string;
+        device_label: string | null;
+        created_at: string;
+        last_activity_at: string;
+        current: boolean;
+      }>(db, sql`SELECT * FROM auth.account_sessions(${sessionHash})`);
+      // Requête brute : Drizzle laisse les horodatages en texte, convertis ici.
+      return result.map((row) => ({
+        id: row.session_id,
+        deviceLabel: row.device_label,
+        createdAt: new Date(row.created_at),
+        lastActivityAt: new Date(row.last_activity_at),
+        current: row.current,
+      }));
+    },
+
+    async accountTrustedDevices(
+      sessionHash: Buffer,
+      deviceHash: Buffer | null,
+    ): Promise<TrustedDevice[]> {
+      const result = await rows<{
+        device_id: string;
+        device_label: string | null;
+        created_at: string;
+        last_used_at: string;
+        expires_at: string;
+        current: boolean;
+      }>(
+        db,
+        sql`SELECT * FROM auth.account_trusted_devices(${sessionHash}, ${deviceHash})`,
+      );
+      return result.map((row) => ({
+        id: row.device_id,
+        deviceLabel: row.device_label,
+        createdAt: new Date(row.created_at),
+        lastUsedAt: new Date(row.last_used_at),
+        expiresAt: new Date(row.expires_at),
+        current: row.current,
+      }));
+    },
+
+    async revokeOtherSessions(sessionHash: Buffer) {
+      const [row] = await rows<{ revoked: number }>(
+        db,
+        sql`SELECT auth.revoke_other_sessions(${sessionHash}) AS revoked`,
+      );
+      return row?.revoked ?? 0;
+    },
+
+    async revokeTrustedDevice(sessionHash: Buffer, deviceId: string) {
+      const [row] = await rows<{ revoked: boolean | null }>(
+        db,
+        sql`SELECT auth.revoke_trusted_device(${sessionHash}, ${deviceId}) AS revoked`,
+      );
+      return row?.revoked === true;
+    },
+
+    async changePassword(sessionHash: Buffer, passwordHash: string) {
+      const [row] = await rows<{ user_id: string; email: string }>(
+        db,
+        sql`SELECT * FROM auth.change_password(${sessionHash}, ${passwordHash})`,
       );
       return row ? { userId: row.user_id, email: row.email } : null;
     },
@@ -215,5 +321,3 @@ export function authRepository(db: Database) {
     },
   });
 }
-
-export type AuthRepository = ReturnType<typeof authRepository>;

@@ -1,4 +1,4 @@
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import type { TenantTransaction } from "@/server/db/tenant";
 
 import { auditEvents } from "./schema";

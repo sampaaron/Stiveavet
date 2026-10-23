@@ -27,6 +27,8 @@ export const RATE_LIMITS = {
   loginFailuresPerAccount: [25, 15],
   loginPerIp: [30, 15],
   unlockFailuresPerAccount: [5, 15],
+  /** Ancien mot de passe refusé dans « Sécurité du compte » : la session est alors fermée. */
+  passwordChangeFailuresPerAccount: [5, 15],
   /** Codes e-mail envoyés : 5 essais chacun, soit 30 essais par heure au plus. */
   securityCodesPerAccount: [6, 60],
   resetPerAccount: [3, 60],
@@ -34,6 +36,8 @@ export const RATE_LIMITS = {
   /** Nouveaux mots de passe envoyés depuis un lien, valable ou non. */
   resetAttemptsPerIp: [20, 60],
   signupPerIp: [5, 60],
+  /** Invitations envoyées par un cabinet en 24 heures, annulées comprises (ADR 0039). */
+  invitationsPerOrganization: [20, 24 * 60],
 } as const satisfies Record<string, readonly [number, number]>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

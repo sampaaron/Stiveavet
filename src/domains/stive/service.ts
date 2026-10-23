@@ -7,13 +7,17 @@ import type { AgendaService } from "@/domains/agenda/captures";
 import type { AppointmentsService } from "@/domains/agenda/demandes";
 import { auditFollowup, auditOrganization } from "@/domains/audit/journal";
 import type { ConversationsService } from "@/domains/conversations/service";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
-import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
-import { daysSince, parisDayIndex } from "@/domains/suivis/calendrier";
+import {
+  parisDayIndex,
+  parisLocalToDate,
+  parisWallMinutes,
+} from "@/domains/heure-paris";
+import { daysSince } from "@/domains/suivis/calendrier";
 import { TRANSITIONS } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { canSteerFollowup } from "@/domains/suivis/policies";
@@ -239,9 +243,7 @@ export function stiveService(deps: {
     });
     const clinical = can(actor, "clinical.read");
     const unacknowledged = clinical
-      ? (await deps.alerts.open(actor)).filter(
-          (alert) => alert.status === "open" || alert.status === "escalated",
-        ).length
+      ? (await deps.alerts.pendingCounts(actor)).pending
       : null;
     const pending = can(actor, "agenda.read")
       ? (await deps.appointments.desk(actor, now)).pending.length

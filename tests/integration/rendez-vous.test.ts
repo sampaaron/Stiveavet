@@ -10,11 +10,12 @@ import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { appointmentsService } from "@/domains/agenda/demandes";
 import { slotLabel } from "@/domains/agenda/rendez-vous";
 import { conversationsService } from "@/domains/conversations/service";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
-import { WEEKDAYS, parisLocalToDate } from "@/domains/reglages/content";
+import { parisLocalToDate } from "@/domains/heure-paris";
+import { WEEKDAYS } from "@/domains/reglages/content";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 

@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
-import { LocaleProvider } from "@/i18n/app/client";
+import { LocaleProvider } from "@/i18n/app/locale-context";
 import { uiLocale } from "@/i18n/app/server";
 
 export const metadata: Metadata = {

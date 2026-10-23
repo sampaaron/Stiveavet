@@ -6,7 +6,7 @@ import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { stripeApi } from "@/adapters/stripe/api";
 import { stripeImitation } from "@/adapters/stripe/imitation";
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { addMonths } from "@/domains/facturation/rules";
 import {
   billingService,

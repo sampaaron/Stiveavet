@@ -1,10 +1,7 @@
-import {
-  DEFAULT_MESSAGE_WINDOWS,
-  parisLocalToDate,
-  parisWallMinutes,
-} from "@/domains/reglages/content";
+import { parisLocalToDate, parisWallMinutes } from "@/domains/heure-paris";
+import { DEFAULT_MESSAGE_WINDOWS } from "@/domains/reglages/content";
 
-import { minutesOfDay } from "@/domains/commun";
+import { minutesOfDay } from "@/domains/commun/utilitaires";
 
 /**
  * Plage d'envoi des messages programmés (cahier des charges §3.5) : un message programmé ne

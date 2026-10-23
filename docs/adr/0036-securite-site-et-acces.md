@@ -1,7 +1,7 @@
 # 0036 — Sécurité du site et des accès (revue du 20 octobre 2026)
 
 - Statut : accepté (20 octobre 2026)
-- Complète l'ADR 0007 (§8) et l'ADR 0029 (§2)
+- Complète l'ADR 0007 (§8) et l'ADR 0029 (§2) ; complétée par l'ADR 0039 (audit du 23 octobre 2026)
 
 ## Contexte
 
@@ -26,6 +26,6 @@ Aaron a demandé de sécuriser le site et les accès. Une revue a relu la connex
 
 ## Conséquences
 
-- Un attaquant qui veut deviner un mot de passe a 25 essais par compte et par quart d'heure au plus, contre 5 jusqu'ici ; le mot de passe reste long (12 caractères), hors liste des mots de passe courants et haché avec Argon2id.
+- Un attaquant qui veut deviner un mot de passe a 25 essais par compte et par quart d'heure au plus, contre 5 jusqu'ici ; le mot de passe reste long (12 caractères), hors liste des mots de passe courants (étendue à plus de 15 000 racines par l'ADR 0039) et haché avec Argon2id.
 - Un prospect qui n'ouvre jamais le lien du premier e-mail ne reçoit pas la suite.
 - Le test d'intrusion externe reste prévu avant le premier vrai cabinet (cahier des charges §19).

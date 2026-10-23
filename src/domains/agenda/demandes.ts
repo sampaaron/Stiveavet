@@ -1,9 +1,11 @@
 import { and, asc, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
+import { followupAccessMap } from "@/domains/suivis/service";
 import { enqueue } from "@/domains/taches/queue";
 import {
   agendaFreeSlots,
@@ -18,9 +20,9 @@ import {
   protocolVersions,
   users,
 } from "@/server/db/schema";
-import { tenantRunner } from "@/server/db/tenant";
+import { tenantRunner, uuidArray } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit } from "@/domains/audit/journal";
+import { auditFollowup } from "@/domains/audit/journal";
 
 import {
   DEFAULT_APPOINTMENT_MINUTES,
@@ -38,6 +40,8 @@ import type { AppointmentKind, Interval } from "./rendez-vous";
  */
 
 const DAY_MS = 86_400_000;
+/** Rendez-vous à confirmer et rappels montrés au bureau : les plus proches, puis les plus récents. */
+const MAX_DESK_ROWS = 100;
 
 /** Verrou par vétérinaire : deux propriétaires ne prennent jamais le même créneau. */
 export async function lockVetAgenda(
@@ -288,6 +292,35 @@ export function appointmentsService(db: Database) {
       );
   }
 
+  /** Rendez-vous d'un suivi déjà chargé, dans la transaction de l'appelant (ADR 0040). */
+  async function ofFollowupIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+    now = new Date(),
+  ) {
+    assertPermission(actor, "agenda.read");
+    if (followup.access === "none") throw new DomainError("not_found");
+    return tx
+      .select({
+        id: appointments.id,
+        kind: appointments.kind,
+        status: appointments.status,
+        source: appointments.source,
+        startsAt: appointments.startsAt,
+        endsAt: appointments.endsAt,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.followupId, followup.id),
+          inArray(appointments.status, ["proposed", "confirmed"]),
+          gt(appointments.endsAt, now),
+        ),
+      )
+      .orderBy(asc(appointments.startsAt));
+  }
+
   return {
     /** Rendez-vous à confirmer et demandes à rappeler, pour les suivis visibles. */
     async desk(actor: Actor, now = new Date()): Promise<AppointmentDesk> {
@@ -316,7 +349,8 @@ export function appointmentsService(db: Database) {
               gt(appointments.endsAt, now),
             ),
           )
-          .orderBy(asc(appointments.startsAt));
+          .orderBy(asc(appointments.startsAt))
+          .limit(MAX_DESK_ROWS);
         const callbackRows = await tx
           .select({
             id: appointmentRequests.id,
@@ -338,8 +372,9 @@ export function appointmentsService(db: Database) {
           )
           .innerJoin(vet, eq(vet.id, memberships.userId))
           .where(eq(appointmentRequests.status, "callback"))
-          .orderBy(desc(appointmentRequests.createdAt));
-        // Seulement les suivis que la personne peut voir.
+          .orderBy(desc(appointmentRequests.createdAt))
+          .limit(MAX_DESK_ROWS);
+        // Seulement les suivis que la personne peut voir, lus en une fois.
         const ids = [
           ...new Set(
             [...pendingRows, ...callbackRows]
@@ -347,11 +382,20 @@ export function appointmentsService(db: Database) {
               .filter((id): id is string => Boolean(id)),
           ),
         ];
-        const visible = new Set<string>();
-        for (const id of ids) {
-          const followup = await loadFollowup(tx, actor, id).catch(() => null);
-          if (followup && followup.access !== "none") visible.add(id);
-        }
+        const facts = ids.length
+          ? await tx
+              .select({
+                id: followups.id,
+                responsibleMembershipId: followups.responsibleMembershipId,
+                isPrivate: followups.isPrivate,
+              })
+              .from(followups)
+              .where(sql`${followups.id} = ANY(${uuidArray(ids)})`)
+          : [];
+        const access = await followupAccessMap(tx, actor, facts);
+        const visible = new Set(
+          ids.filter((id) => (access.get(id) ?? "none") !== "none"),
+        );
         return {
           pending: pendingRows
             .filter((row) => row.followupId && visible.has(row.followupId))
@@ -383,9 +427,15 @@ export function appointmentsService(db: Database) {
           "appointment_confirmed",
           row.id,
         );
-        await audit(tx, actor, "appointment.confirmed", row.followupId, {
-          appointmentId: row.id,
-        });
+        await auditFollowup(
+          tx,
+          actor,
+          "appointment.confirmed",
+          row.followupId,
+          {
+            appointmentId: row.id,
+          },
+        );
       });
     },
 
@@ -406,7 +456,7 @@ export function appointmentsService(db: Database) {
           "appointment_declined",
           row.id,
         );
-        await audit(tx, actor, "appointment.declined", row.followupId, {
+        await auditFollowup(tx, actor, "appointment.declined", row.followupId, {
           appointmentId: row.id,
         });
       });
@@ -440,7 +490,7 @@ export function appointmentsService(db: Database) {
             closedByMembershipId: actor.membershipId,
           })
           .where(eq(appointmentRequests.id, request.id));
-        await audit(
+        await auditFollowup(
           tx,
           actor,
           "appointment.callback_done",
@@ -455,29 +505,12 @@ export function appointmentsService(db: Database) {
     /** Rendez-vous proposés et confirmés d'un suivi (carte du dossier). */
     async ofFollowup(actor: Actor, followupId: string, now = new Date()) {
       assertPermission(actor, "agenda.read");
-      return run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access === "none") throw new DomainError("not_found");
-        return tx
-          .select({
-            id: appointments.id,
-            kind: appointments.kind,
-            status: appointments.status,
-            source: appointments.source,
-            startsAt: appointments.startsAt,
-            endsAt: appointments.endsAt,
-          })
-          .from(appointments)
-          .where(
-            and(
-              eq(appointments.followupId, followupId),
-              inArray(appointments.status, ["proposed", "confirmed"]),
-              gt(appointments.endsAt, now),
-            ),
-          )
-          .orderBy(asc(appointments.startsAt));
-      });
+      return run(actor, async (tx) =>
+        ofFollowupIn(tx, actor, await loadFollowup(tx, actor, followupId), now),
+      );
     },
+
+    ofFollowupIn,
   };
 }
 

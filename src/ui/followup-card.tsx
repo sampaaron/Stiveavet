@@ -1,11 +1,10 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-import type { Followup } from "@/fixtures/types";
-
 import { AnimalAvatar } from "./animal-avatar";
 import { StatusBadge } from "./status-badge";
 import type { Status } from "./status-badge";
+import type { Followup } from "./types";
 
 /** Statut principal d'un suivi : la gravité prime, puis l'état du suivi. */
 function followupStatus(followup: Followup): Status {

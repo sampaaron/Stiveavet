@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
-import { parisLocalToDate } from "@/domains/reglages/content";
+import { DomainError } from "@/domains/commun/actor";
+import { parisLocalToDate } from "@/domains/heure-paris";
 import { MAX_FIRST_CONTACT_HOURS, sheetInput } from "@/domains/suivis/plan";
 import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";

@@ -15,8 +15,6 @@ export const common: AppDictionary["common"] = {
   none: "None",
   optional: "optional",
   simulated: "simulated",
-  numaAi: "AI assistant",
-  stiveAi: "AI assistant",
   and: "and",
   list: (items) =>
     items.length <= 1

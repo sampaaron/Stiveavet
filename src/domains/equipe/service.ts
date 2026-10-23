@@ -17,10 +17,13 @@ import {
 import { z } from "zod";
 
 import type { EmailSender } from "@/adapters/email/types";
+import { RATE_LIMITS } from "@/domains/auth/policy";
+import { authRepository } from "@/domains/auth/repository";
 import type { MemberRole } from "@/domains/auth/repository";
 import {
   createToken,
   isWellFormedToken,
+  rateLimitBucket,
   tokenHash,
 } from "@/domains/auth/tokens";
 import {
@@ -35,12 +38,17 @@ import {
   users,
 } from "@/server/db/schema";
 import { assistantLimit, vetLimit } from "@/domains/facturation/limits";
+import {
+  isUniqueViolation,
+  pgConstraint,
+  pgErrorCode,
+} from "@/server/db/errors";
 import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { recordAudit as audit } from "@/domains/audit/journal";
+import { recordAudit } from "@/domains/audit/journal";
 
-import { DomainError, assertPermission } from "./actor";
-import type { Actor } from "./actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { invitationEmail } from "./emails";
 import {
   PERMISSION_KEYS,
@@ -113,14 +121,25 @@ export function assistantSeats(tx: TenantTransaction, includePending = true) {
 }
 
 /**
+ * Verrou des places du cabinet, jusqu'à la fin de la transaction : deux invitations,
+ * acceptations ou changements de rôle simultanés comptent l'un après l'autre.
+ */
+export async function lockSeats(tx: TenantTransaction) {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext('seats:' || app.current_organization_id()::text))`,
+  );
+}
+
+/**
  * Refuse une place de plus pour ce rôle si l'offre est au complet : vétérinaires
- * (`vet_limit`) ou assistants (`plan_assistant_limit`).
+ * (`vet_limit`) ou assistants (`plan_assistant_limit`). Compte sous verrou.
  */
 async function assertSeat(
   tx: TenantTransaction,
   role: MemberRole,
   includePending = true,
 ) {
+  await lockSeats(tx);
   if (VET_ROLES.has(role)) {
     if ((await vetSeats(tx, includePending)) >= (await vetLimit(tx)))
       throw new DomainError("vet_limit");
@@ -146,18 +165,38 @@ async function memberOf(tx: TenantTransaction, membershipId: string) {
   return member;
 }
 
-function translateDbError(error: unknown): never {
-  const code =
-    (error as { code?: string }).code ??
-    (error as { cause?: { code?: string } }).cause?.code;
-  const message =
-    (error as { cause?: { message?: string } }).cause?.message ??
-    (error as { message?: string }).message ??
-    "";
-  if (code === "23514" && message.includes("administrateur"))
-    throw new DomainError("last_admin");
-  if (code === "23514") throw new DomainError("permission_not_allowed");
+/** Règles de la base traduites en refus métier, par nom de contrainte (refus 23514). */
+const KNOWN_CONSTRAINTS: Readonly<Record<string, DomainError["code"]>> = {
+  memberships_keep_one_admin: "last_admin",
+};
+
+/** Refus connu de la base en refus métier ; toute autre erreur est relancée telle quelle. */
+export function translateDbError(error: unknown): never {
+  const known = KNOWN_CONSTRAINTS[pgConstraint(error) ?? ""];
+  if (pgErrorCode(error) === "23514" && known) throw new DomainError(known);
   throw error;
+}
+
+/**
+ * Rôle ou accès d'un membre. Seul le déclencheur `memberships_keep_one_admin` refuse cette
+ * mise à jour ; tant qu'il ne nomme pas sa contrainte (avant la migration 0026), un refus
+ * 23514 sans contrainte sur cette requête précise est donc le sien.
+ */
+async function updateMembership(
+  tx: TenantTransaction,
+  membershipId: string,
+  values: { role: MemberRole } | { deactivatedAt: Date | null },
+) {
+  try {
+    await tx
+      .update(memberships)
+      .set(values)
+      .where(eq(memberships.id, membershipId));
+  } catch (error) {
+    if (pgErrorCode(error) === "23514" && !pgConstraint(error))
+      throw new DomainError("last_admin");
+    throw error;
+  }
 }
 
 export function teamService(deps: {
@@ -267,7 +306,24 @@ export function teamService(deps: {
             and(eq(users.email, address), isNull(memberships.deactivatedAt)),
           );
         if (existing) throw new DomainError("already_member");
+        // Un compte n'appartient qu'à un cabinet : inviter une adresse inscrite n'aboutirait
+        // pas, et l'e-mail ne partirait que pour rien (ADR 0039).
+        const repo = authRepository(tx);
+        if (await repo.emailRegistered(address))
+          throw new DomainError("email_registered");
         await assertSeat(tx, input.role);
+        // Plafond quotidien d'invitations envoyées, annulées comprises : le formulaire ne peut
+        // pas servir à envoyer des e-mails en nombre. Compté avec l'invitation, dans la même
+        // transaction.
+        const [max, windowMinutes] = RATE_LIMITS.invitationsPerOrganization;
+        if (
+          !(await repo.hitRateLimit(
+            rateLimitBucket("invitationsPerOrganization", actor.organizationId),
+            windowMinutes,
+            max,
+          ))
+        )
+          throw new DomainError("invitation_limit");
 
         const id = randomUUID();
         try {
@@ -282,13 +338,11 @@ export function teamService(deps: {
             expiresAt: new Date(Date.now() + INVITATION_DAYS * 24 * 3600_000),
           });
         } catch (error) {
-          const code =
-            (error as { code?: string }).code ??
-            (error as { cause?: { code?: string } }).cause?.code;
-          if (code === "23505") throw new DomainError("already_invited");
+          if (isUniqueViolation(error))
+            throw new DomainError("already_invited");
           throw error;
         }
-        await audit(
+        await recordAudit(
           tx,
           actor,
           "invitation.created",
@@ -332,7 +386,7 @@ export function teamService(deps: {
           )
           .returning({ id: invitations.id });
         if (!revoked.length) throw new DomainError("not_found");
-        await audit(tx, actor, "invitation.revoked", {
+        await recordAudit(tx, actor, "invitation.revoked", {
           type: "invitation",
           id: invitationId,
         });
@@ -394,7 +448,7 @@ export function teamService(deps: {
               grantedByMembershipId: actor.membershipId,
             })),
           );
-        await audit(
+        await recordAudit(
           tx,
           actor,
           "membership.permissions_changed",
@@ -429,11 +483,8 @@ export function teamService(deps: {
           if ((open?.n ?? 0) > 0)
             throw new DomainError("reassignment_required");
         }
-        await tx
-          .update(memberships)
-          .set({ role })
-          .where(eq(memberships.id, membershipId));
-        await audit(
+        await updateMembership(tx, membershipId, { role });
+        await recordAudit(
           tx,
           actor,
           "membership.role_changed",
@@ -444,8 +495,9 @@ export function teamService(deps: {
     },
 
     /**
-     * Départ d'un membre : ses suivis en cours passent au vétérinaire choisi, ses partages
-     * sont retirés, et sa session tombe immédiatement (contrôle à chaque requête).
+     * Départ d'un membre : ses suivis en cours passent au vétérinaire choisi, ses partages et
+     * les invitations qu'il a envoyées sont retirés, et ses sessions sont fermées : elles ne
+     * reviennent pas s'il retrouve l'accès.
      */
     async deactivate(
       actor: Actor,
@@ -501,7 +553,7 @@ export function teamService(deps: {
               ),
             );
           for (const followup of open)
-            await audit(
+            await recordAudit(
               tx,
               actor,
               "followup.reassigned",
@@ -523,11 +575,31 @@ export function teamService(deps: {
               isNull(followupShares.revokedAt),
             ),
           );
-        await tx
-          .update(memberships)
-          .set({ deactivatedAt: new Date() })
-          .where(eq(memberships.id, membershipId));
-        await audit(
+        await updateMembership(tx, membershipId, { deactivatedAt: new Date() });
+        await tx.execute(
+          sql`SELECT auth.revoke_membership_sessions(${membershipId})`,
+        );
+        // Une invitation garde la caution de qui l'a envoyée : elle tombe avec son accès.
+        const revoked = await tx
+          .update(invitations)
+          .set({ revokedAt: new Date() })
+          .where(
+            and(
+              eq(invitations.invitedByMembershipId, membershipId),
+              isNull(invitations.acceptedAt),
+              isNull(invitations.revokedAt),
+            ),
+          )
+          .returning({ id: invitations.id });
+        for (const invitation of revoked)
+          await recordAudit(
+            tx,
+            actor,
+            "invitation.revoked",
+            { type: "invitation", id: invitation.id },
+            { reason: "member_deactivated" },
+          );
+        await recordAudit(
           tx,
           actor,
           "membership.deactivated",
@@ -543,11 +615,8 @@ export function teamService(deps: {
         const member = await memberOf(tx, membershipId);
         if (!member.deactivatedAt) return;
         await assertSeat(tx, member.role);
-        await tx
-          .update(memberships)
-          .set({ deactivatedAt: null })
-          .where(eq(memberships.id, membershipId));
-        await audit(tx, actor, "membership.reactivated", {
+        await updateMembership(tx, membershipId, { deactivatedAt: null });
+        await recordAudit(tx, actor, "membership.reactivated", {
           type: "membership",
           id: membershipId,
         });
@@ -676,7 +745,8 @@ export async function previewInvitation(
 
 /**
  * Crée le compte de la personne invitée et son appartenance au cabinet. L'invitation est
- * consommée dans la même transaction ; la limite de vétérinaires est revérifiée.
+ * consommée dans la même transaction, si son auteur est encore membre actif ; la limite de
+ * vétérinaires est revérifiée.
  */
 export async function acceptInvitation(
   db: Database,
@@ -711,6 +781,14 @@ export async function acceptInvitation(
               isNull(invitations.acceptedAt),
               isNull(invitations.revokedAt),
               gt(invitations.expiresAt, new Date()),
+              // Son auteur doit être encore membre actif du cabinet.
+              inArray(
+                invitations.invitedByMembershipId,
+                tx
+                  .select({ id: memberships.id })
+                  .from(memberships)
+                  .where(isNull(memberships.deactivatedAt)),
+              ),
             ),
           )
           .returning({ invitedBy: invitations.invitedByMembershipId });
@@ -733,7 +811,7 @@ export async function acceptInvitation(
         await tx.execute(
           sql`SELECT auth.set_initial_password(${userId}, ${input.passwordHash})`,
         );
-        await audit(
+        await recordAudit(
           tx,
           {
             organizationId: invitation.organization_id,
@@ -752,10 +830,7 @@ export async function acceptInvitation(
       (error.code === "vet_limit" || error.code === "plan_assistant_limit")
     )
       return "vet_limit";
-    const code =
-      (error as { code?: string }).code ??
-      (error as { cause?: { code?: string } }).cause?.code;
-    if (code === "23505") return "email_registered";
+    if (isUniqueViolation(error)) return "email_registered";
     throw error;
   }
 }

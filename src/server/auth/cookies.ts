@@ -17,7 +17,7 @@ function name(base: string) {
   return secure() ? `__Host-${base}` : base;
 }
 
-export const COOKIE = {
+const COOKIE = {
   session: () => name("sv_session"),
   device: () => name("sv_device"),
   challenge: () => name("sv_challenge"),

@@ -1,4 +1,5 @@
 import type { fr } from "./fr";
+import type { shared } from "./fr/shared";
 
 /**
  * Même structure que le français, chaque texte pouvant différer. Un texte à compléter est
@@ -13,3 +14,6 @@ type Widen<T> = T extends string
       : { [Key in keyof T]: Widen<T[Key]> };
 
 export type AppDictionary = Widen<typeof fr>;
+
+/** Textes des composants partagés avec la vitrine (`fr/shared.ts`). */
+export type SharedDictionary = Widen<typeof shared>;

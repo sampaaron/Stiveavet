@@ -177,11 +177,6 @@ export function fixedContent(
   return (context.language === "en" ? EN : FR)[step](context);
 }
 
-export function fixedMessage(step: FixedStep, context: WordingContext): string {
-  const content = fixedContent(step, context);
-  return typeof content === "string" ? content : content.body;
-}
-
 export function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }

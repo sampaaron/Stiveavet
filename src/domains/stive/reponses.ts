@@ -170,7 +170,6 @@ export const stiveAnswer = z.discriminatedUnion("kind", [
 ]);
 
 export type StiveAnswer = z.infer<typeof stiveAnswer>;
-export type StiveAnswerKind = StiveAnswer["kind"];
 
 /**
  * Suivis cités par une réponse et accès requis pour les montrer : le détail clinique d'un

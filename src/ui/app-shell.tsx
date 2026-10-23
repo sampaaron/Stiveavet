@@ -6,6 +6,7 @@ import { appDictionary } from "@/i18n/app";
 import type { Locale } from "@/i18n/locales";
 
 import { AppTopbar } from "./app-topbar";
+import { initials } from "./format";
 import { SectionFrame } from "./section-frame";
 import { SidebarNav } from "./sidebar-nav";
 
@@ -117,13 +118,4 @@ export function AppShell({
       </div>
     </div>
   );
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter((part) => /^\p{L}/u.test(part))
-    .slice(-2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }

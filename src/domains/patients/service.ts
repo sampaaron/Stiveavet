@@ -17,8 +17,8 @@ import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { recordAudit } from "@/domains/audit/journal";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import type { FollowupAccess } from "@/domains/suivis/policies";
 import { followupAccessMap } from "@/domains/suivis/service";
 import {

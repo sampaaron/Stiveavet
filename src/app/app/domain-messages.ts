@@ -1,6 +1,6 @@
 import "server-only";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { appText } from "@/i18n/app/server";
 
 import type { ActionState } from "./action-state";

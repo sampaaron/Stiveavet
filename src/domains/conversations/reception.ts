@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { scheduleReminders } from "@/domains/suivis/rappels";
 import { triageOwnerMessage } from "@/domains/urgences/service";
 import type { TriageLevel } from "@/domains/urgences/triage";
@@ -8,9 +8,10 @@ import { releaseHeld } from "@/domains/whatsapp/envoi";
 import { emit } from "@/domains/taches/queue";
 import { followupContacts, messages } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit, systemAuthor } from "@/domains/audit/journal";
+import { auditFollowup, systemAuthor } from "@/domains/audit/journal";
 
 import { ownerKeyword } from "./keywords";
+import type { OwnerKeyword } from "./keywords";
 import { detectLanguage } from "./language";
 import { firstName } from "./wording";
 import type {
@@ -19,6 +20,7 @@ import type {
   ContactRole,
   ConversationContext,
   InboundOutcome,
+  Reach,
 } from "./contexte";
 import {
   enqueueMessageJob,
@@ -114,7 +116,7 @@ async function learnLanguage(
     .where(eq(followupContacts.id, writer.id));
   writer.language = detected;
   writer.languageSource = "detected";
-  await audit(
+  await auditFollowup(
     tx,
     systemAuthor(ctx.organizationId),
     "followup.owner_language_detected",
@@ -177,141 +179,178 @@ export async function processInbound(
     });
   await learnLanguage(tx, ctx, writer, text);
   const reach = await reachOf(tx, ctx);
-  const consent = reach.consents.get(writer.id) ?? null;
-  const keyword = ownerKeyword(text);
-  const now = new Date();
+  const inbound: Inbound = {
+    tx,
+    ctx,
+    writer,
+    reach,
+    consent: reach.consents.get(writer.id) ?? null,
+    keyword: ownerKeyword(text),
+    messageId,
+    text,
+    media: options.media,
+    now: new Date(),
+  };
+  const clarified = await answerStopClarification(inbound);
+  if (clarified) return { outcome: clarified, triage: "normal" };
+  const decided = await applyConsentKeyword(inbound);
+  if (decided) return { outcome: decided, triage: "normal" };
+  return assessContent(inbound);
+}
 
-  const setContact = (values: {
-    leftGroupAt?: Date;
-    stopRequestedAt: Date | null;
-  }) =>
-    tx
-      .update(followupContacts)
-      .set(values)
-      .where(eq(followupContacts.id, writer.id));
+/** Message du propriétaire en cours de traitement, verrou du suivi tenu. */
+type Inbound = {
+  tx: TenantTransaction;
+  ctx: ConversationContext;
+  writer: Contact;
+  reach: Reach;
+  consent: NonNullable<ReturnType<Reach["consents"]["get"]>> | null;
+  keyword: OwnerKeyword;
+  messageId: string;
+  text: string;
+  media: "photo" | "refused" | undefined;
+  now: Date;
+};
 
-  // Clarification après un STOP dans le groupe (§6) : GROUPE, TOUT, ou REPRENDRE.
-  if (writer.stopRequestedAt) {
-    if (keyword === "leave_group") {
-      await setContact({ leftGroupAt: now, stopRequestedAt: null });
-      await enqueueMessageJob(tx, ctx, "left_group", messageId);
-      await audit(
-        tx,
-        systemAuthor(ctx.organizationId),
-        "conversation.left_group",
-        followupId,
-      );
-      return { outcome: "left_group", triage: "normal" };
-    }
-    if (keyword === "stop_all" || keyword === "stop") {
-      await setContact({ stopRequestedAt: null });
-      await recordConsent(
-        tx,
-        ctx,
-        writer.id,
-        "withdrawn",
-        messageId,
-        "followup",
-      );
-      await enqueueMessageJob(tx, ctx, "stopped_all", messageId);
-      await audit(
-        tx,
-        systemAuthor(ctx.organizationId),
-        "conversation.owner_stopped_all",
-        followupId,
-      );
-      return { outcome: "stopped_all", triage: "normal" };
-    }
-    if (keyword === "resume") {
-      await setContact({ stopRequestedAt: null });
-      await enqueueMessageJob(tx, ctx, "resumed", messageId);
-      return { outcome: "resumed", triage: "normal" };
-    }
+function setContact(
+  { tx, writer }: Inbound,
+  values: { leftGroupAt?: Date; stopRequestedAt: Date | null },
+) {
+  return tx
+    .update(followupContacts)
+    .set(values)
+    .where(eq(followupContacts.id, writer.id));
+}
+
+/**
+ * Clarification après un STOP dans le groupe (§6) : GROUPE, TOUT, ou REPRENDRE. Renvoie
+ * l'issue, ou null si le message ne répond pas à la question.
+ */
+async function answerStopClarification(
+  inbound: Inbound,
+): Promise<InboundOutcome | null> {
+  const { tx, ctx, writer, keyword, messageId, now } = inbound;
+  if (!writer.stopRequestedAt) return null;
+  if (keyword === "leave_group") {
+    await setContact(inbound, { leftGroupAt: now, stopRequestedAt: null });
+    await enqueueMessageJob(tx, ctx, "left_group", messageId);
+    await auditFollowup(
+      tx,
+      systemAuthor(ctx.organizationId),
+      "conversation.left_group",
+      ctx.followupId,
+    );
+    return "left_group";
   }
+  if (keyword === "stop_all" || keyword === "stop") {
+    await setContact(inbound, { stopRequestedAt: null });
+    await recordConsent(tx, ctx, writer.id, "withdrawn", messageId, "followup");
+    await enqueueMessageJob(tx, ctx, "stopped_all", messageId);
+    await auditFollowup(
+      tx,
+      systemAuthor(ctx.organizationId),
+      "conversation.owner_stopped_all",
+      ctx.followupId,
+    );
+    return "stopped_all";
+  }
+  if (keyword === "resume") {
+    await setContact(inbound, { stopRequestedAt: null });
+    await enqueueMessageJob(tx, ctx, "resumed", messageId);
+    return "resumed";
+  }
+  return null;
+}
 
-  let outcome: InboundOutcome = "stored";
-  let triage: TriageLevel = "normal";
-  const member = Boolean(ctx.group) && !writer.leftGroupAt;
-
+/** STOP, OUI ou REPRENDRE qui change l'accord ; null si le message n'en est pas un. */
+async function applyConsentKeyword(
+  inbound: Inbound,
+): Promise<InboundOutcome | null> {
+  const { tx, ctx, writer, consent, keyword, messageId, now } = inbound;
   if (
     keyword === "stop" &&
     consent?.state !== "withdrawn" &&
     !writer.stopRequestedAt
   ) {
+    const member = Boolean(ctx.group) && !writer.leftGroupAt;
     if (member && consent?.state === "given") {
       // Dans le groupe : quitter le groupe seulement, ou arrêter le suivi entier ?
-      await setContact({ stopRequestedAt: now });
+      await setContact(inbound, { stopRequestedAt: now });
       await enqueueMessageJob(tx, ctx, "stop_clarify", messageId);
-      outcome = "stop_clarify";
-    } else {
-      await recordConsent(tx, ctx, writer.id, "withdrawn", messageId);
-      await enqueueMessageJob(tx, ctx, "stopped", messageId);
-      outcome = "stopped";
+      return "stop_clarify";
     }
-  } else if (
+    await recordConsent(tx, ctx, writer.id, "withdrawn", messageId);
+    await enqueueMessageJob(tx, ctx, "stopped", messageId);
+    return "stopped";
+  }
+  if (
     (keyword === "yes" || keyword === "resume") &&
     consent?.state === "requested"
   ) {
     await recordConsent(tx, ctx, writer.id, "given", messageId);
     await enqueueMessageJob(tx, ctx, "consent_given", messageId);
-    await scheduleReminders(tx, followupId, now);
-    outcome = "consent_given";
-  } else if (keyword === "resume" && consent?.state === "withdrawn") {
+    await scheduleReminders(tx, ctx.followupId, now);
+    return "consent_given";
+  }
+  if (keyword === "resume" && consent?.state === "withdrawn") {
     await recordConsent(tx, ctx, writer.id, "given", messageId);
     await enqueueMessageJob(tx, ctx, "resumed", messageId);
-    await scheduleReminders(tx, followupId, now);
-    outcome = "resumed";
-  } else {
-    // Un message de contenu est toujours évalué, même repris en main ou en pause : l'équipe
-    // est alertée dans tous les cas.
-    const mayReply = mayReach(reach, writer) && (await numaMayReply(tx, ctx));
-    ({ level: triage } = await triageOwnerMessage(tx, {
-      organizationId: ctx.organizationId,
-      followupId,
-      responsibleMembershipId: ctx.responsibleMembershipId,
-      messageId,
-      body: text,
-      // Le propriétaire réécrit après la fin du suivi automatisé : le vétérinaire est informé.
-      afterAutomaticEnd: mayReply && ctx.status === "ended",
-    }));
-    if (triage === "urgent" && consent?.state !== "withdrawn") {
-      // Consignes d'urgence tout de suite, même avant l'accord : ce sont les numéros du
-      // cabinet, pas un contenu de suivi. Numa poursuit ensuite si elle a la main.
-      await enqueueMessageJob(tx, ctx, "urgent", messageId);
-      outcome = "urgent";
-    }
-    if (writer.stopRequestedAt) {
-      // Toujours en attente de GROUPE ou TOUT : Numa repose la question, en privé.
-      await enqueueMessageJob(tx, ctx, "stop_clarify", messageId);
-      if (outcome === "stored") outcome = "stop_clarify";
-    } else if (outcome === "urgent") {
-      // La suite de la discussion part avec les consignes d'urgence.
-    } else if (consent?.state === "requested") {
-      // Une seule relance par demande d'accord : la clé de tâche dérive de la demande.
-      await enqueueMessageJob(
-        tx,
-        ctx,
-        "consent_reminder",
-        messageId,
-        consent.id,
-      );
-      outcome = "consent_reminder";
-    } else if (mayReply) {
-      // Fichier refusé, ou photo sans légende : message fixe, sans passer par l'IA.
-      await enqueueMessageJob(
-        tx,
-        ctx,
-        options.media === "refused"
-          ? "file_refused"
-          : options.media === "photo" && text.length === 0
-            ? "photo_received"
-            : "reply",
-        messageId,
-      );
-      outcome = "reply";
-    }
-    // Sinon (repris en main, en pause, arrêté, accord retiré) : conservé pour l'équipe.
+    await scheduleReminders(tx, ctx.followupId, now);
+    return "resumed";
   }
+  return null;
+}
+
+/**
+ * Un message de contenu est toujours évalué, même repris en main ou en pause : l'équipe est
+ * alertée dans tous les cas. Puis consignes d'urgence, relance de l'accord ou réponse de Numa.
+ */
+async function assessContent(
+  inbound: Inbound,
+): Promise<{ outcome: InboundOutcome; triage: TriageLevel }> {
+  const { tx, ctx, writer, reach, consent, messageId, text, media } = inbound;
+  let outcome: InboundOutcome = "stored";
+  const mayReply = mayReach(reach, writer) && (await numaMayReply(tx, ctx));
+  const { level: triage } = await triageOwnerMessage(tx, {
+    organizationId: ctx.organizationId,
+    followupId: ctx.followupId,
+    responsibleMembershipId: ctx.responsibleMembershipId,
+    messageId,
+    body: text,
+    // Le propriétaire réécrit après la fin du suivi automatisé : le vétérinaire est informé.
+    afterAutomaticEnd: mayReply && ctx.status === "ended",
+  });
+  if (triage === "urgent" && consent?.state !== "withdrawn") {
+    // Consignes d'urgence tout de suite, même avant l'accord : ce sont les numéros du
+    // cabinet, pas un contenu de suivi. Numa poursuit ensuite si elle a la main.
+    await enqueueMessageJob(tx, ctx, "urgent", messageId);
+    outcome = "urgent";
+  }
+  if (writer.stopRequestedAt) {
+    // Toujours en attente de GROUPE ou TOUT : Numa repose la question, en privé.
+    await enqueueMessageJob(tx, ctx, "stop_clarify", messageId);
+    if (outcome === "stored") outcome = "stop_clarify";
+  } else if (outcome === "urgent") {
+    // La suite de la discussion part avec les consignes d'urgence.
+  } else if (consent?.state === "requested") {
+    // Une seule relance par demande d'accord : la clé de tâche dérive de la demande.
+    await enqueueMessageJob(tx, ctx, "consent_reminder", messageId, consent.id);
+    outcome = "consent_reminder";
+  } else if (mayReply) {
+    // Fichier refusé, ou photo sans légende : message fixe, sans passer par l'IA.
+    await enqueueMessageJob(
+      tx,
+      ctx,
+      media === "refused"
+        ? "file_refused"
+        : media === "photo" && text.length === 0
+          ? "photo_received"
+          : "reply",
+      messageId,
+    );
+    outcome = "reply";
+  }
+  // Sinon (repris en main, en pause, arrêté, accord retiré) : conservé pour l'équipe.
   return { outcome, triage };
 }
 

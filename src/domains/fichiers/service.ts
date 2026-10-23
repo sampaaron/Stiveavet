@@ -17,12 +17,17 @@ import type {
   ContactRole,
   InboundOutcome,
 } from "@/domains/conversations/service";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { JobError } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
-import type { JobHandler } from "@/domains/taches/worker";
+import type {
+  AnyJobHandler,
+  JobHandler,
+  StagedJobHandler,
+} from "@/domains/taches/worker";
 import {
   animals,
   attachments,
@@ -322,6 +327,9 @@ export async function refuseOwnerMedia(
   );
 }
 
+/** Photo ou vocal d'un dossier, avant signature de son lien. */
+export type ReadableAttachment = { id: string; key: string };
+
 export type MediaService = ReturnType<typeof mediaService>;
 
 export function mediaService(deps: {
@@ -363,6 +371,57 @@ export function mediaService(deps: {
       await storage.deleteObject(key);
       throw error;
     }
+  }
+
+  /** Photos et vocaux lisibles d'un suivi déjà chargé, dans la transaction de l'appelant. */
+  async function readableIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+  ): Promise<ReadableAttachment[]> {
+    assertPermission(actor, "clinical.read");
+    if (followup.access !== "clinical") throw new DomainError("not_found");
+    return tx
+      .select({ id: attachments.id, key: attachments.storageKey })
+      .from(attachments)
+      .where(
+        and(
+          eq(attachments.followupId, followup.id),
+          inArray(attachments.kind, ["photo", "voice"]),
+          isNull(attachments.deletedAt),
+        ),
+      );
+  }
+
+  /**
+   * Liens signés, hors transaction. En stockage simulé seulement, un fichier absent (données
+   * fictives d'exemple) n'a pas de lien ; en production, aucune requête au stockage par fichier.
+   */
+  async function signLinks(
+    actor: Actor,
+    rows: readonly ReadableAttachment[],
+  ): Promise<Record<string, SignedLink>> {
+    const present = storage.simulated
+      ? await Promise.all(
+          rows.map(async (row) =>
+            (await storage.hasObject(row.key)) ? row : null,
+          ),
+        )
+      : rows;
+    const now = new Date();
+    return Object.fromEntries(
+      present
+        .filter((row) => row !== null)
+        .map((row) => [
+          row.id,
+          signReadLink({
+            secret: linkSecret,
+            attachmentId: row.id,
+            membershipId: actor.membershipId,
+            now,
+          }),
+        ]),
+    );
   }
 
   return {
@@ -416,41 +475,14 @@ export function mediaService(deps: {
       followupId: string,
     ): Promise<Record<string, SignedLink>> {
       assertPermission(actor, "clinical.read");
-      const rows = await run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access !== "clinical") throw new DomainError("not_found");
-        return tx
-          .select({ id: attachments.id, key: attachments.storageKey })
-          .from(attachments)
-          .where(
-            and(
-              eq(attachments.followupId, followupId),
-              inArray(attachments.kind, ["photo", "voice"]),
-              isNull(attachments.deletedAt),
-            ),
-          );
-      });
-      // Un fichier absent du stockage (données fictives d'exemple) n'a pas de lien.
-      const present = await Promise.all(
-        rows.map(async (row) =>
-          (await storage.hasObject(row.key)) ? row : null,
-        ),
+      const rows = await run(actor, async (tx) =>
+        readableIn(tx, actor, await loadFollowup(tx, actor, followupId)),
       );
-      const now = new Date();
-      return Object.fromEntries(
-        present
-          .filter((row) => row !== null)
-          .map((row) => [
-            row.id,
-            signReadLink({
-              secret: linkSecret,
-              attachmentId: row.id,
-              membershipId: actor.membershipId,
-              now,
-            }),
-          ]),
-      );
+      return signLinks(actor, rows);
     },
+
+    readableIn,
+    signLinks,
 
     /**
      * Ouverture d'un lien : signature et expiration pour ce membre, puis droits revérifiés
@@ -544,70 +576,100 @@ async function readObject(
 export function mediaHandlers(deps: {
   storage: ObjectStorage;
   ai: AiGateway;
-}): Record<string, JobHandler> {
+}): Record<string, AnyJobHandler> {
   const { storage, ai } = deps;
 
-  const transcribe: JobHandler = async ({ tx, job }) => {
-    const attachment = await loadAttachment(tx, job.payload);
+  /** Vocal à transcrire, ou null s'il n'y a plus rien à faire. */
+  async function voiceToTranscribe(tx: TenantTransaction, payload: unknown) {
+    const attachment = await loadAttachment(tx, payload);
     const { followupId, messageId } = attachment;
     if (attachment.kind !== "voice" || !followupId || !messageId)
       throw new JobError("target_missing");
-    if (attachment.deletedAt) return;
+    if (attachment.deletedAt) return null;
     const [done] = await tx
       .select({ id: voiceTranscripts.id })
       .from(voiceTranscripts)
       .where(eq(voiceTranscripts.attachmentId, attachment.id));
-    if (done) return;
-    const [message] = await tx
-      .select({ language: messages.language })
-      .from(messages)
-      .where(eq(messages.id, messageId));
-    const object = await readObject(storage, attachment.storageKey);
-    let text: string;
-    let language: "fr" | "en";
-    try {
-      ({ text, language } = await ai.transcribeVoice({
-        audio: object.bytes,
-        contentType: object.contentType,
-        languageHint: message?.language ?? "fr",
-      }));
-    } catch {
-      throw new JobError("provider_unavailable");
-    }
-    const transcript = text.trim().slice(0, MAX_TRANSCRIPT);
-    await tx.insert(voiceTranscripts).values({
-      organizationId: job.organizationId,
-      followupId,
-      attachmentId: attachment.id,
-      text: transcript,
-      language,
-    });
-    // La transcription suit le chemin d'un message écrit : accord, triage, réponse.
-    try {
-      await processInbound(tx, followupId, messageId, transcript);
-    } catch (error) {
-      if (error instanceof DomainError) throw new JobError("target_missing");
-      throw error;
-    }
+    if (done) return null;
+    return { ...attachment, followupId, messageId };
+  }
+
+  // En deux temps (ADR 0040) : téléchargement et transcription hors transaction.
+  const transcribe: StagedJobHandler<{
+    text: string;
+    language: "fr" | "en";
+  } | null> = {
+    async prepare({ job, read }) {
+      const target = await read(async (tx) => {
+        const attachment = await voiceToTranscribe(tx, job.payload);
+        if (!attachment) return null;
+        const [message] = await tx
+          .select({ language: messages.language })
+          .from(messages)
+          .where(eq(messages.id, attachment.messageId));
+        return { attachment, languageHint: message?.language ?? "fr" };
+      });
+      if (!target) return null;
+      const object = await readObject(storage, target.attachment.storageKey);
+      try {
+        return await ai.transcribeVoice({
+          audio: object.bytes,
+          contentType: object.contentType,
+          languageHint: target.languageHint,
+        });
+      } catch {
+        throw new JobError("provider_unavailable");
+      }
+    },
+    async commit({ tx, job, prepared }) {
+      if (!prepared) return;
+      // Supprimé ou déjà transcrit pendant l'appel : rien à écrire.
+      const attachment = await voiceToTranscribe(tx, job.payload);
+      if (!attachment) return;
+      const { followupId, messageId } = attachment;
+      const transcript = prepared.text.trim().slice(0, MAX_TRANSCRIPT);
+      await tx.insert(voiceTranscripts).values({
+        organizationId: job.organizationId,
+        followupId,
+        attachmentId: attachment.id,
+        text: transcript,
+        language: prepared.language,
+      });
+      // La transcription suit le chemin d'un message écrit : accord, triage, réponse.
+      try {
+        await processInbound(tx, followupId, messageId, transcript);
+      } catch (error) {
+        if (error instanceof DomainError) throw new JobError("target_missing");
+        throw error;
+      }
+    },
   };
 
-  const observe: JobHandler = async ({ tx, job }) => {
-    const attachment = await loadAttachment(tx, job.payload);
+  /**
+   * Photo à analyser, ou null : supprimée, déjà analysée, réglage coupé ou pas d'accord de
+   * la personne qui l'a envoyée. Relu à l'écriture : un accord retiré pendant l'analyse
+   * empêche d'en garder le résultat.
+   */
+  async function photoToObserve(
+    tx: TenantTransaction,
+    organizationId: string,
+    payload: unknown,
+  ) {
+    const attachment = await loadAttachment(tx, payload);
     const { followupId, messageId } = attachment;
     if (attachment.kind !== "photo" || !followupId || !messageId)
       throw new JobError("target_missing");
-    if (attachment.deletedAt) return;
+    if (attachment.deletedAt) return null;
     const [done] = await tx
       .select({ id: photoObservations.id })
       .from(photoObservations)
       .where(eq(photoObservations.attachmentId, attachment.id));
-    if (done) return;
-    // Réglage coupé entre-temps, ou pas d'accord du propriétaire : aucune analyse.
+    if (done) return null;
     const [settings] = await tx
       .select({ enabled: organizationSettings.photoAnalysisEnabled })
       .from(organizationSettings)
-      .where(eq(organizationSettings.organizationId, job.organizationId));
-    if (!settings?.enabled) return;
+      .where(eq(organizationSettings.organizationId, organizationId));
+    if (!settings?.enabled) return null;
     const [source] = await tx
       .select({ contactId: messages.followupContactId })
       .from(messages)
@@ -616,49 +678,76 @@ export function mediaHandlers(deps: {
     if (
       (await currentConsentState(tx, followupId, source?.contactId)) !== "given"
     )
-      return;
-    const [context] = await tx
-      .select({ animalName: animals.name, language: messages.language })
-      .from(messages)
-      .innerJoin(followups, eq(followups.id, messages.followupId))
-      .innerJoin(animals, eq(animals.id, followups.animalId))
-      .where(eq(messages.id, messageId));
-    if (!context) throw new JobError("target_missing");
-    const object = await readObject(storage, attachment.storageKey);
-    let observations: string[];
-    try {
-      ({ observations } = await ai.observePhoto({
-        image: object.bytes,
-        contentType: object.contentType,
-        language: context.language ?? "fr",
-        animalName: context.animalName,
-      }));
-    } catch {
-      throw new JobError("provider_unavailable");
-    }
-    const kept: string[] = [];
-    for (const raw of observations.slice(0, MAX_OBSERVATIONS)) {
-      const text = raw.replace(/\s+/g, " ").trim();
-      if (!text) continue;
-      const verdict = checkNumaReply(text);
-      if (verdict.ok && text.length <= MAX_OBSERVATION_LENGTH) kept.push(text);
-      else
-        // Un diagnostic, un conseil de traitement ou une réassurance n'est jamais gardé.
-        await recordAudit(
+      return null;
+    return { ...attachment, followupId, messageId };
+  }
+
+  // En deux temps (ADR 0040) : téléchargement et analyse hors transaction.
+  const observe: StagedJobHandler<{ observations: string[] } | null> = {
+    async prepare({ job, read }) {
+      const target = await read(async (tx) => {
+        const attachment = await photoToObserve(
           tx,
-          systemAuthor(job.organizationId),
-          "photo.observation_blocked",
-          { type: "followup", id: followupId },
-          { reason: verdict.ok ? "length" : verdict.reason },
+          job.organizationId,
+          job.payload,
         );
-    }
-    if (kept.length === 0) return;
-    await tx.insert(photoObservations).values({
-      organizationId: job.organizationId,
-      followupId,
-      attachmentId: attachment.id,
-      observations: kept.join("\n"),
-    });
+        if (!attachment) return null;
+        const [context] = await tx
+          .select({ animalName: animals.name, language: messages.language })
+          .from(messages)
+          .innerJoin(followups, eq(followups.id, messages.followupId))
+          .innerJoin(animals, eq(animals.id, followups.animalId))
+          .where(eq(messages.id, attachment.messageId));
+        if (!context) throw new JobError("target_missing");
+        return { attachment, context };
+      });
+      if (!target) return null;
+      const object = await readObject(storage, target.attachment.storageKey);
+      try {
+        return await ai.observePhoto({
+          image: object.bytes,
+          contentType: object.contentType,
+          language: target.context.language ?? "fr",
+          animalName: target.context.animalName,
+        });
+      } catch {
+        throw new JobError("provider_unavailable");
+      }
+    },
+    async commit({ tx, job, prepared }) {
+      if (!prepared) return;
+      const attachment = await photoToObserve(
+        tx,
+        job.organizationId,
+        job.payload,
+      );
+      if (!attachment) return;
+      const { followupId } = attachment;
+      const kept: string[] = [];
+      for (const raw of prepared.observations.slice(0, MAX_OBSERVATIONS)) {
+        const text = raw.replace(/\s+/g, " ").trim();
+        if (!text) continue;
+        const verdict = checkNumaReply(text);
+        if (verdict.ok && text.length <= MAX_OBSERVATION_LENGTH)
+          kept.push(text);
+        else
+          // Un diagnostic, un conseil de traitement ou une réassurance n'est jamais gardé.
+          await recordAudit(
+            tx,
+            systemAuthor(job.organizationId),
+            "photo.observation_blocked",
+            { type: "followup", id: followupId },
+            { reason: verdict.ok ? "length" : verdict.reason },
+          );
+      }
+      if (kept.length === 0) return;
+      await tx.insert(photoObservations).values({
+        organizationId: job.organizationId,
+        followupId,
+        attachmentId: attachment.id,
+        observations: kept.join("\n"),
+      });
+    },
   };
 
   const purge: JobHandler = async ({ tx, job }) => {

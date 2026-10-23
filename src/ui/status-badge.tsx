@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { useAppText } from "@/i18n/app/client";
+import { useSharedText } from "@/i18n/app/shared-client";
 
 import { cn } from "./cn";
 
@@ -66,7 +66,7 @@ export function StatusBadge({
   status: Status;
   label?: string;
 }) {
-  const t = useAppText();
+  const t = useSharedText();
   const { icon: Icon, className } = statuses[status];
   return (
     <span
@@ -76,7 +76,7 @@ export function StatusBadge({
       )}
     >
       <Icon aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
-      {label ?? t.ui.status[status]}
+      {label ?? t.status[status]}
     </span>
   );
 }

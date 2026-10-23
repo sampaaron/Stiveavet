@@ -5,7 +5,7 @@
 import { writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { parisWallMinutes } from "../../src/domains/reglages/content";
+import { parisWallMinutes } from "../../src/domains/heure-paris";
 import { prepareDatabase } from "../support/database";
 
 const adminRoot = process.env.TEST_DATABASE_ADMIN_URL;

@@ -73,7 +73,7 @@ describe("envoi par Scaleway Transactional Email", () => {
     const sender = senderFor(
       emailConfig(scaleway),
       "service",
-      (async () => new Response("{}", { status: 403 })) as typeof fetch,
+      async () => new Response("{}", { status: 403 }),
     );
     const failure = await sender
       .send({

@@ -276,5 +276,3 @@ export function stripeImitation(options: {
     signed,
   };
 }
-
-export type StripeImitation = ReturnType<typeof stripeImitation>;

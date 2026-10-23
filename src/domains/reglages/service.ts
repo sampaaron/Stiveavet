@@ -14,8 +14,8 @@ import {
   DEFAULT_APPOINTMENT_MINUTES,
 } from "@/domains/agenda/rendez-vous";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
@@ -45,10 +45,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import {
-  auditOrganization as audit,
-  recordAudit,
-} from "@/domains/audit/journal";
+import { auditOrganization, recordAudit } from "@/domains/audit/journal";
 
 import {
   DEFAULT_APPOINTMENT_WINDOWS,
@@ -396,7 +393,7 @@ export function settingsService(deps: {
             updatedByMembershipId: actor.membershipId,
           })
           .onConflictDoNothing();
-        await audit(tx, actor, "settings.defaults_applied");
+        await auditOrganization(tx, actor, "settings.defaults_applied");
       });
     },
 
@@ -404,7 +401,7 @@ export function settingsService(deps: {
       const parsed = parse(messageWindowsInput, windows);
       await run(actor, async (tx) => {
         await replaceWindows(tx, actor, parsed);
-        await audit(tx, actor, "settings.message_windows_changed", {
+        await auditOrganization(tx, actor, "settings.message_windows_changed", {
           days: parsed.length,
         });
       });
@@ -415,9 +412,14 @@ export function settingsService(deps: {
       const parsed = parse(messageWindowsInput, windows);
       await run(actor, async (tx) => {
         await replaceWindows(tx, actor, parsed, "appointments");
-        await audit(tx, actor, "settings.appointment_windows_changed", {
-          days: parsed.length,
-        });
+        await auditOrganization(
+          tx,
+          actor,
+          "settings.appointment_windows_changed",
+          {
+            days: parsed.length,
+          },
+        );
       });
     },
 
@@ -444,7 +446,7 @@ export function settingsService(deps: {
                 updatedAt: new Date(),
               },
             });
-        await audit(
+        await auditOrganization(
           tx,
           actor,
           "settings.appointment_durations_changed",
@@ -463,9 +465,14 @@ export function settingsService(deps: {
         throw new DomainError("invalid_target");
       await run(actor, async (tx) => {
         await upsertInstructions(tx, actor, period, text);
-        await audit(tx, actor, "settings.emergency_instructions_changed", {
-          period,
-        });
+        await auditOrganization(
+          tx,
+          actor,
+          "settings.emergency_instructions_changed",
+          {
+            period,
+          },
+        );
       });
     },
 
@@ -487,7 +494,7 @@ export function settingsService(deps: {
           position,
         });
         // Le numéro n'est jamais journalisé.
-        await audit(tx, actor, "settings.emergency_contact_added");
+        await auditOrganization(tx, actor, "settings.emergency_contact_added");
       });
     },
 
@@ -500,7 +507,11 @@ export function settingsService(deps: {
           .where(eq(emergencyContacts.id, contactId))
           .returning({ id: emergencyContacts.id });
         if (!removed.length) throw new DomainError("not_found");
-        await audit(tx, actor, "settings.emergency_contact_removed");
+        await auditOrganization(
+          tx,
+          actor,
+          "settings.emergency_contact_removed",
+        );
       });
     },
 
@@ -508,7 +519,7 @@ export function settingsService(deps: {
       const values = parse(alertSettingsInput, input);
       await run(actor, async (tx) => {
         await upsertSettings(tx, actor, values);
-        await audit(tx, actor, "settings.alerts_changed", values);
+        await auditOrganization(tx, actor, "settings.alerts_changed", values);
       });
     },
 
@@ -561,7 +572,7 @@ export function settingsService(deps: {
           endsAt,
           createdByMembershipId: actor.membershipId,
         });
-        await audit(tx, actor, "settings.on_call_added", {
+        await auditOrganization(tx, actor, "settings.on_call_added", {
           membershipId: input.membershipId,
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
@@ -584,7 +595,7 @@ export function settingsService(deps: {
           )
           .returning({ membershipId: onCallSchedules.membershipId });
         if (!removed.length) throw new DomainError("not_found");
-        await audit(tx, actor, "settings.on_call_removed", {
+        await auditOrganization(tx, actor, "settings.on_call_removed", {
           membershipId: removed[0]?.membershipId ?? null,
         });
       });
@@ -630,7 +641,7 @@ export function settingsService(deps: {
             connectedByMembershipId: actor.membershipId,
           })
           .onConflictDoNothing();
-        await audit(tx, actor, "integration.connected", {
+        await auditOrganization(tx, actor, "integration.connected", {
           provider,
           simulated: true,
         });
@@ -712,7 +723,7 @@ export function settingsService(deps: {
             ],
             set: { mode: "live", displayLabel },
           });
-        await audit(tx, actor, "integration.connected", {
+        await auditOrganization(tx, actor, "integration.connected", {
           provider: "whatsapp",
           simulated: false,
         });
@@ -748,7 +759,7 @@ export function settingsService(deps: {
             throw new DomainError("payment_provider_unavailable");
           throw error;
         }
-        await audit(tx, actor, "integration.mandate_started");
+        await auditOrganization(tx, actor, "integration.mandate_started");
         return url;
       });
     },
@@ -764,7 +775,9 @@ export function settingsService(deps: {
         await tx
           .delete(integrationConnections)
           .where(eq(integrationConnections.provider, provider));
-        await audit(tx, actor, "integration.disconnected", { provider });
+        await auditOrganization(tx, actor, "integration.disconnected", {
+          provider,
+        });
       });
     },
 
@@ -779,7 +792,9 @@ export function settingsService(deps: {
             completedByMembershipId: actor.membershipId,
           })
           .onConflictDoNothing();
-        await audit(tx, actor, "onboarding.step_completed", { step });
+        await auditOrganization(tx, actor, "onboarding.step_completed", {
+          step,
+        });
       });
     },
 

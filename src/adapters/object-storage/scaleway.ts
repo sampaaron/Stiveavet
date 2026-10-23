@@ -16,6 +16,38 @@ export class StorageError extends Error {
   }
 }
 
+/** Paramètres de requête triés et encodés comme l'exige la signature S3 (RFC 3986). */
+function canonicalQuery(query: Record<string, string>): string {
+  const encode = (value: string) =>
+    encodeURIComponent(value).replace(
+      /[!'()*]/g,
+      (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+    );
+  return Object.keys(query)
+    .sort()
+    .map((name) => `${encode(name)}=${encode(query[name] ?? "")}`)
+    .join("&");
+}
+
+const VERSION_ENTRY = /<(Version|DeleteMarker)>([\s\S]*?)<\/\1>/g;
+const XML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+/** Contenu du premier élément `name` d'un fragment XML de réponse S3. */
+function tag(xml: string, name: string): string | undefined {
+  return new RegExp(`<${name}>([^<]*)</${name}>`)
+    .exec(xml)?.[1]
+    ?.replace(
+      /&(amp|lt|gt|quot|apos);/g,
+      (_, entity: string) => XML_ENTITIES[entity] ?? "",
+    );
+}
+
 export function scalewayStorage(options: {
   fetch: typeof fetch;
   bucket: string;
@@ -26,14 +58,15 @@ export function scalewayStorage(options: {
     options.endpoint ?? `https://${options.bucket}.s3.fr-par.scw.cloud`,
   );
 
-  async function call(
+  async function request(
     method: "GET" | "HEAD" | "PUT" | "DELETE",
-    key: string,
+    path: string,
+    query: Record<string, string> = {},
     body: Uint8Array = new Uint8Array(),
     extra: Record<string, string> = {},
   ): Promise<Response> {
-    assertStorageKey(key);
-    const url = new URL(`/${key}`, base);
+    const url = new URL(path, base);
+    url.search = canonicalQuery(query);
     const headers = signRequest({
       method,
       url,
@@ -55,6 +88,43 @@ export function scalewayStorage(options: {
     }
   }
 
+  const call = (
+    method: "GET" | "HEAD" | "PUT" | "DELETE",
+    key: string,
+    query: Record<string, string> = {},
+    body?: Uint8Array,
+    extra?: Record<string, string>,
+  ) => {
+    assertStorageKey(key);
+    return request(method, `/${key}`, query, body, extra);
+  };
+
+  /** Toutes les versions de la clé, marqueurs de suppression compris (liste paginée). */
+  async function versionsOf(key: string): Promise<string[]> {
+    assertStorageKey(key);
+    const versions: string[] = [];
+    let marker: Record<string, string> = {};
+    for (;;) {
+      const response = await request("GET", "/", {
+        versions: "",
+        prefix: key,
+        ...marker,
+      });
+      if (!response.ok) throw new StorageError(response.status);
+      const xml = await response.text();
+      for (const [, , entry = ""] of xml.matchAll(VERSION_ENTRY)) {
+        const versionId = tag(entry, "VersionId");
+        // Le préfixe ramène aussi les clés plus longues : seule la clé exacte compte.
+        if (tag(entry, "Key") === key && versionId) versions.push(versionId);
+      }
+      if (tag(xml, "IsTruncated") !== "true") return versions;
+      marker = {
+        "key-marker": tag(xml, "NextKeyMarker") ?? "",
+        "version-id-marker": tag(xml, "NextVersionIdMarker") ?? "",
+      };
+    }
+  }
+
   const exists = async (key: string) => {
     const response = await call("HEAD", key);
     if (response.status === 404) return false;
@@ -66,7 +136,7 @@ export function scalewayStorage(options: {
     simulated: false,
     async putObject(key, object) {
       // Jamais d'écrasement : écriture conditionnelle, refusée si la clé existe (412).
-      const response = await call("PUT", key, object.bytes, {
+      const response = await call("PUT", key, {}, object.bytes, {
         "content-type": object.contentType,
         "if-none-match": "*",
       });
@@ -83,9 +153,13 @@ export function scalewayStorage(options: {
       };
     },
     async deleteObject(key) {
-      const response = await call("DELETE", key);
-      if (!response.ok && response.status !== 404)
-        throw new StorageError(response.status);
+      // Bucket versionné : un DELETE simple ne poserait qu'un marqueur et garderait le
+      // fichier lisible. Chaque version est donc effacée par son identifiant (ADR 0041).
+      for (const versionId of await versionsOf(key)) {
+        const response = await call("DELETE", key, { versionId });
+        if (!response.ok && response.status !== 404)
+          throw new StorageError(response.status);
+      }
     },
     hasObject: exists,
   };

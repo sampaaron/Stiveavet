@@ -1,13 +1,16 @@
 import { sql } from "drizzle-orm";
 
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
+import { parisDate } from "@/domains/heure-paris";
 
 /**
  * Activité du cabinet pour le tableau de bord (cahier des charges §12) : des totaux, jamais
  * de détail d'un suivi, si bien qu'ils ne dépendent pas des droits sur chaque dossier. Les
- * suivis test de l'installation ne comptent pas.
+ * messages étant filtrés par dossier lisible (`clinical_access`, 0026), leurs compteurs passent
+ * par `app.activity_messages` et `app.activity_answered` (0028), qui ne rendent que des nombres.
+ * Les suivis test de l'installation ne comptent pas.
  */
 
 const ACTIVITY_DAYS = 30;
@@ -31,16 +34,6 @@ export type ActivityStats = {
 
 const int = (value: unknown) => Number(value ?? 0);
 
-/** Jour de Paris (AAAA-MM-JJ) d'un instant. */
-function parisDay(instant: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(instant);
-}
-
 export function statsService(db: Database) {
   const run = tenantRunner(db);
 
@@ -60,10 +53,6 @@ export function statsService(db: Database) {
                 AND f.control_appointment_at >= ${now} AND f.control_appointment_at < ${week}
             ) AS controls,
             count(*) FILTER (
-              WHERE f.started_at >= ${since}
-                AND EXISTS (SELECT 1 FROM messages m WHERE m.followup_id = f.id AND m.author = 'owner')
-            ) AS answered,
-            count(*) FILTER (
               WHERE f.status = 'active' AND EXISTS (
                 SELECT 1 FROM followup_contacts fc
                 JOIN LATERAL (
@@ -76,14 +65,9 @@ export function statsService(db: Database) {
           FROM followups f
           WHERE NOT f.is_test`);
         const messageRows = await tx.execute<Record<string, unknown>>(sql`
-          SELECT
-            (m.occurred_at AT TIME ZONE 'Europe/Paris')::date::text AS day,
-            count(*) FILTER (WHERE m.author = 'owner') AS inbound,
-            count(*) FILTER (WHERE m.direction = 'outbound') AS outbound
-          FROM messages m
-          JOIN followups f ON f.id = m.followup_id
-          WHERE NOT f.is_test AND m.occurred_at >= ${since}
-          GROUP BY 1`);
+          SELECT day, inbound, outbound FROM app.activity_messages(${since})`);
+        const answeredRows = await tx.execute<Record<string, unknown>>(sql`
+          SELECT app.activity_answered(${since}) AS answered`);
         const alertRows = await tx.execute<Record<string, unknown>>(sql`
           SELECT
             count(*) FILTER (WHERE a.created_at >= ${since}) AS created,
@@ -108,7 +92,7 @@ export function statsService(db: Database) {
         );
         const daily: ActivityStats["daily"] = [];
         for (let offset = CHART_DAYS - 1; offset >= 0; offset -= 1) {
-          const day = parisDay(new Date(now.getTime() - offset * 86_400_000));
+          const day = parisDate(new Date(now.getTime() - offset * 86_400_000));
           const row = byDay.get(day);
           daily.push({
             day,
@@ -131,7 +115,7 @@ export function statsService(db: Database) {
           ),
           response: {
             launched: int(counts.launched),
-            answered: int(counts.answered),
+            answered: int(answeredRows.rows[0]?.answered),
           },
           alerts: {
             created: int(alerts.created),

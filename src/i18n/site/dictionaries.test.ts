@@ -36,8 +36,8 @@ describe("dictionnaires du site", () => {
   });
 
   it("aucun texte n'est vide, et chaque traduction garde les mêmes valeurs à remplacer", () => {
-    const english = new Map(strings(en as Tree));
-    for (const [path, text] of strings(fr as Tree)) {
+    const english = new Map(strings(en));
+    for (const [path, text] of strings(fr)) {
       const translation = english.get(path) ?? "";
       if (!ENGLISH_ONLY.has(path)) expect(text.trim(), path).not.toBe("");
       expect(translation.trim(), path).not.toBe("");
@@ -53,7 +53,7 @@ describe("dictionnaires du site", () => {
   });
 
   it("n'emploie jamais l'ancien nom de marque", () => {
-    for (const [path, text] of [...strings(fr as Tree), ...strings(en as Tree)])
+    for (const [path, text] of [...strings(fr), ...strings(en)])
       expect(text, path).not.toMatch(/strivea/i);
   });
 

@@ -5,21 +5,26 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway, simulatedNumaReply } from "@/adapters/ai-gateway/fake";
 import type { AiGateway } from "@/adapters/ai-gateway/types";
+import { fakeWhatsApp } from "@/adapters/whatsapp/fake";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { conversationsService } from "@/domains/conversations/service";
 import { safeFallback } from "@/domains/conversations/guard";
 import { CONSENT_WORDING_VERSION } from "@/domains/conversations/wording";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
-import { withTenant } from "@/server/db/tenant";
+import { simulatedProvider } from "@/domains/whatsapp/connexion";
 
 import { pools } from "./support/db";
-import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
+import {
+  conversationWorker,
+  recordingWhatsApp,
+  replayJob,
+} from "./support/whatsapp";
 
 const { app, admin, appDb } = pools();
 afterAll(async () => {
@@ -45,10 +50,18 @@ const { sent } = whatsapp;
 /** Passerelle IA qui compte ses appels (aucun avant l'accord du propriétaire). */
 let aiCalls = 0;
 let aiOverride: string | null = null;
+/** Rédaction retenue : la passerelle signale qu'elle rédige, puis attend d'être libérée. */
+let aiGate: { drafting: () => void; released: Promise<void> } | null = null;
 const ai: AiGateway = {
   simulated: true,
   async numaReply(input) {
     aiCalls += 1;
+    const gate = aiGate;
+    aiGate = null;
+    if (gate) {
+      gate.drafting();
+      await gate.released;
+    }
     return aiOverride
       ? { text: aiOverride, intent: "ack" }
       : fakeAiGateway.numaReply(input);
@@ -253,21 +266,14 @@ describe("premier message et accord du propriétaire", () => {
   });
 
   it("un premier message rejoué ne part jamais deux fois", async () => {
-    await withTenant(appDb, { organizationId: org }, async (tx) => {
-      const handler = handlers["followup.message"];
-      if (!handler) throw new Error("exécutant manquant");
-      await handler({
-        tx,
-        job: {
-          id: randomUUID(),
-          organizationId: org,
-          kind: "followup.message",
-          attempt: 1,
-          followupId: plume,
-          payload: { step: "intro" },
-          idempotencyKey: `followup:${plume}:intro`,
-        },
-      });
+    await replayJob(appDb, handlers["followup.message"], {
+      id: randomUUID(),
+      organizationId: org,
+      kind: "followup.message",
+      attempt: 1,
+      followupId: plume,
+      payload: { step: "intro" },
+      idempotencyKey: `followup:${plume}:intro`,
     });
     expect(sent).toHaveLength(1);
     expect(await thread(plume)).toHaveLength(1);
@@ -352,6 +358,89 @@ describe("premier message et accord du propriétaire", () => {
       author: "numa",
       delivery: "sent",
     });
+  });
+});
+
+describe("travail hors transaction (ADR 0040)", () => {
+  it("un deuxième message reçu pendant que Numa rédige n'attend pas l'IA", async () => {
+    let drafting = () => {};
+    let release = () => {};
+    const started = new Promise<void>((resolve) => (drafting = resolve));
+    aiGate = {
+      drafting,
+      released: new Promise<void>((resolve) => (release = resolve)),
+    };
+    await owner(plume, "Elle boit normalement");
+    await conversations.makeDueNow(await actor(ids.vet), plume);
+    const pass = worker.runOnce();
+    await started;
+    // Ni verrou sur le suivi, ni connexion gardée (le pool de ce test n'en a qu'une).
+    const second = await Promise.race([
+      owner(plume, "Et elle a joué ce matin"),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("message bloqué par l'IA")), 5_000),
+      ),
+    ]);
+    expect(second.outcome).toBe("reply");
+    release();
+    await pass;
+    await runDue(plume);
+    const replies = (await thread(plume)).filter(
+      (message) => message.author === "numa",
+    );
+    for (const body of ["Elle boit normalement", "Et elle a joué ce matin"])
+      expect(replies.map((message) => message.body)).toContain(
+        simulatedNumaReply({
+          language: "fr",
+          animalName: "Plume",
+          practiceName: PRACTICE,
+          ownerMessage: body,
+        }).text,
+      );
+  });
+
+  it("un envoi dont le bail est perdu pendant l'appel à WhatsApp n'est jamais renvoyé", async () => {
+    // Réponse de Numa écrite, mais son envoi échoue une fois : il attend dans la file.
+    whatsapp.failNext();
+    await owner(plume, "Elle dort sur le canapé");
+    await runDue(plume);
+    const queued = (await thread(plume)).at(-1);
+    expect(queued).toMatchObject({ author: "numa", delivery: "queued" });
+
+    // Pendant l'appel, le bail expire et la tâche est rendue à la file (worker trop lent).
+    const slow: string[] = [];
+    const late = conversationWorker({
+      db: appDb,
+      workerId: "test-bail-perdu",
+      organizationId: () => org,
+      whatsapp: {
+        provider: simulatedProvider({
+          ...whatsapp.connector,
+          async send(input) {
+            slow.push(input.reference);
+            await admin.query(
+              `UPDATE scheduled_jobs SET locked_until = now() - interval '1 second'
+               WHERE organization_id = $1 AND kind = 'whatsapp.send' AND status = 'running'`,
+              [org],
+            );
+            await admin.query("SELECT jobs.recover_expired()");
+            return fakeWhatsApp.send(input);
+          },
+        }),
+      },
+      ai,
+    });
+    await conversations.makeDueNow(await actor(ids.vet), plume);
+    const before = sent.length;
+    expect((await late.worker.runOnce()).lost).toBe(1);
+    expect(slow).toEqual([queued?.id]);
+    // L'envoi parti est gardé ; la tâche reprise ne le renvoie pas.
+    expect((await thread(plume)).at(-1)).toMatchObject({
+      id: queued?.id,
+      delivery: "sent",
+    });
+    await runDue(plume);
+    expect(sent).toHaveLength(before);
   });
 });
 

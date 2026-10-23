@@ -12,6 +12,7 @@ import { Pool } from "pg";
 
 import { aiConfig, aiGatewayFor } from "../src/adapters/ai-gateway";
 import { wakeChannel } from "../src/adapters/queue/config";
+import { workerConfig } from "../src/domains/taches/config";
 import {
   JOB_PLANNERS,
   OUTBOX_ROUTES,
@@ -21,12 +22,6 @@ import { createWorker } from "../src/domains/taches/worker";
 import { providerFor, whatsappConfig } from "../src/domains/whatsapp/connexion";
 import * as schema from "../src/server/db/schema";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  console.error("Configuration invalide : DATABASE_URL");
-  process.exit(1);
-}
-const intervalMs = Number(process.env.WORKER_INTERVAL_MS ?? 5_000);
 const workerId = `worker-${
   hostname()
     .toLowerCase()
@@ -34,13 +29,16 @@ const workerId = `worker-${
     .slice(0, 40) || "local"
 }-${process.pid}`;
 
+let config: ReturnType<typeof workerConfig>;
 let registry: ReturnType<typeof jobRegistry>;
 let wake: ReturnType<typeof wakeChannel>;
 try {
+  config = workerConfig(process.env);
   wake = wakeChannel(process.env);
   registry = jobRegistry({
     whatsapp: providerFor(whatsappConfig(process.env)),
     ai: aiGatewayFor(aiConfig(process.env)),
+    appUrl: config.appUrl,
   });
 } catch (error) {
   // Le message ne cite que des noms de variables, jamais leurs valeurs.
@@ -50,7 +48,14 @@ try {
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: url, max: 4 });
+// Délais plus larges que ceux de l'application web : les balayages de conservation effacent
+// par lots, et une transaction oubliée ouverte est tout de même coupée par PostgreSQL.
+const pool = new Pool({
+  connectionString: config.databaseUrl,
+  max: 4,
+  statement_timeout: 120_000,
+  idle_in_transaction_session_timeout: 60_000,
+});
 const worker = createWorker({
   db: drizzle(pool, { schema }),
   workerId,
@@ -87,7 +92,7 @@ else
   while (!stopping) {
     await pass();
     // Jusqu'au prochain signal de Scaleway Queues, ou l'intervalle fixe sans file.
-    await wake.wait(intervalMs);
+    await wake.wait(config.intervalMs);
   }
 await pool.end();
 console.warn("Worker arrêté.");
