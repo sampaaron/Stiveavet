@@ -19,7 +19,7 @@ import type { BillingProvider } from "@/adapters/billing-provider/types";
 import { auditOrganization } from "@/domains/audit/journal";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
-import { assistantSeats, vetSeats } from "@/domains/equipe/service";
+import { assistantSeats, lockSeats, vetSeats } from "@/domains/equipe/service";
 import { enqueue } from "@/domains/taches/queue";
 import type { JobHandler } from "@/domains/taches/worker";
 import {
@@ -629,6 +629,8 @@ export function billingService(deps: {
         if (facts.plan === parsed.data) return;
         if (facts.cycle === "annual") throw new DomainError("invalid_target");
         const target = PLAN_CATALOG[parsed.data];
+        // Sous le verrou des places : une invitation acceptée en même temps compte avant.
+        await lockSeats(tx);
         if ((await vetSeats(tx)) > target.maxVets)
           throw new DomainError("plan_vet_limit");
         if (

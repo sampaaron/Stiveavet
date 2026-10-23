@@ -15,7 +15,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner, uuidArray } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit } from "@/domains/audit/journal";
+import { auditFollowup } from "@/domains/audit/journal";
 
 import { canManageFollowupAccess, followupAccess } from "./policies";
 import type { FollowupAccess, Viewer } from "./policies";
@@ -315,7 +315,7 @@ export function followupsService(db: Database) {
     const access = followupAccess(actor, facts);
     if (access === "none") return null;
 
-    await audit(tx, actor, "followup.viewed", followupId, { access });
+    await auditFollowup(tx, actor, "followup.viewed", followupId, { access });
     const { animalId } = loaded.row;
     const ownerName = (await firstOwners(tx, [animalId])).get(animalId) ?? null;
     const canManage = canManageFollowupAccess(actor, facts);
@@ -456,7 +456,7 @@ export function followupsService(db: Database) {
               createdAt: new Date(),
             },
           });
-        await audit(tx, actor, "followup.shared", followupId, {
+        await auditFollowup(tx, actor, "followup.shared", followupId, {
           membershipId: input.membershipId,
           expiresAt: input.expiresAt?.toISOString() ?? null,
         });
@@ -480,7 +480,7 @@ export function followupsService(db: Database) {
           )
           .returning({ membershipId: followupShares.membershipId });
         if (!revoked.length) throw new DomainError("invalid_target");
-        await audit(tx, actor, "followup.unshared", followupId, {
+        await auditFollowup(tx, actor, "followup.unshared", followupId, {
           membershipId,
         });
       });
@@ -494,7 +494,7 @@ export function followupsService(db: Database) {
           .update(followups)
           .set({ isPrivate })
           .where(eq(followups.id, followupId));
-        await audit(tx, actor, "followup.privacy_changed", followupId, {
+        await auditFollowup(tx, actor, "followup.privacy_changed", followupId, {
           isPrivate,
         });
       });

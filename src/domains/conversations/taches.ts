@@ -45,7 +45,7 @@ import {
   voiceTranscripts,
 } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit, systemAuthor } from "@/domains/audit/journal";
+import { auditFollowup, systemAuthor } from "@/domains/audit/journal";
 
 import { checkNumaReply, safeFallback } from "./guard";
 import { numaFixedReply } from "./renvois";
@@ -267,7 +267,7 @@ export function conversationHandlers(deps: {
       code: "group_created",
       names: members.map((member) => firstName(member.ownerFullName)),
     });
-    await audit(
+    await auditFollowup(
       tx,
       systemAuthor(ctx.organizationId),
       "conversation.group_created",
@@ -392,7 +392,7 @@ export function conversationHandlers(deps: {
         appointmentWording(ctx, target),
       ),
     );
-    await audit(
+    await auditFollowup(
       tx,
       systemAuthor(ctx.organizationId),
       "appointment.requested",
@@ -477,7 +477,7 @@ export function conversationHandlers(deps: {
         appointmentWording(ctx, target),
       ),
     );
-    await audit(
+    await auditFollowup(
       tx,
       systemAuthor(ctx.organizationId),
       "appointment.proposed",
@@ -602,7 +602,7 @@ export function conversationHandlers(deps: {
     // Fournisseur en panne ou réponse hors format : le propriétaire n'attend pas, il est
     // renvoyé vers l'équipe (ADR 0026). Le message reste lu par le vétérinaire.
     if (!reply)
-      await audit(
+      await auditFollowup(
         tx,
         systemAuthor(ctx.organizationId),
         "numa.ai_unavailable",
@@ -614,7 +614,7 @@ export function conversationHandlers(deps: {
       text = numaFixedReply(reply.intent, { ...ctx, language });
     const verdict = text ? checkNumaReply(text) : null;
     if (verdict && !verdict.ok)
-      await audit(
+      await auditFollowup(
         tx,
         systemAuthor(ctx.organizationId),
         "numa.reply_blocked",
@@ -1137,7 +1137,7 @@ export function conversationHandlers(deps: {
         const draft = drafted(prepared, input);
         if (!draft) {
           // Fournisseur en panne : la prise de nouvelles fixe part à la place (ADR 0026).
-          await audit(
+          await auditFollowup(
             tx,
             systemAuthor(ctx.organizationId),
             "numa.ai_unavailable",
@@ -1148,7 +1148,7 @@ export function conversationHandlers(deps: {
         }
         const verdict = checkNumaReply(draft.text);
         if (!verdict.ok)
-          await audit(
+          await auditFollowup(
             tx,
             systemAuthor(ctx.organizationId),
             "numa.reply_blocked",
