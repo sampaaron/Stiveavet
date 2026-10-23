@@ -17,8 +17,11 @@ import type { Database } from "@/server/db/tenant";
  * stockage objet d'abord, puis la base par `app.purge_followup`, qui revérifie l'échéance
  * avec son horloge et ne garde que des statistiques anonymisées.
  * La tâche d'effacement ne porte pas le suivi en colonne (elle serait effacée avec lui) :
- * seulement son identifiant dans la charge utile.
- * Le même balayage efface les échanges avec Stive de plus de 30 jours (ADR 0034).
+ * seulement son identifiant dans la charge utile. Sa clé dépend du balayage : un effacement
+ * resté en échec est retenté par le balayage du lendemain (ADR 0038).
+ * Le même balayage efface les échanges avec Stive de plus de 30 jours (ADR 0034), les
+ * rendez-vous hors suivi finis depuis un an puis les animaux qui ne servent plus, et les
+ * traces techniques de plus de 90 jours (ADR 0038).
  */
 
 export const SWEEP_KIND = "retention.sweep";
@@ -48,18 +51,25 @@ export function retentionHandlers(deps: {
       .select({ id: followups.id })
       .from(followups)
       .where(
-        sql`app.followup_purge_due(${followups.endedAt}, ${followups.createdAt})`,
+        and(
+          sql`app.followup_purge_due(${followups.endedAt}, ${followups.createdAt})`,
+          // Un effacement encore en cours ou programmé n'est pas doublé.
+          sql`NOT EXISTS (SELECT 1 FROM scheduled_jobs j WHERE j.kind = ${FOLLOWUP_PURGE_KIND}
+            AND j.status IN ('pending', 'running') AND j.payload ->> 'followupId' = ${followups.id}::text)`,
+        ),
       )
       .limit(SWEEP_BATCH);
     for (const { id } of due)
       await enqueue(tx, {
         organizationId: job.organizationId,
         kind: FOLLOWUP_PURGE_KIND,
-        idempotencyKey: `followup:${id}:purge`,
+        idempotencyKey: `followup:${id}:purge:${job.id}`,
         runAt: new Date(),
         followupId: null,
         payload: { followupId: id },
       });
+    // Rendez-vous hors suivi finis depuis un an (migration 0026) : sans eux, l'animal resterait.
+    await tx.execute(sql`SELECT app.purge_past_appointments()`);
     // Animaux du registre restés sans suivi (migration 0021) : effacés quinze mois après leur
     // saisie, comme un suivi jamais terminé. La fonction revérifie tout avec son horloge.
     const idle = await tx
@@ -72,6 +82,8 @@ export function retentionHandlers(deps: {
         ),
       )
       .limit(SWEEP_BATCH);
+    // Tâches, événements, webhooks et notifications de plus de 90 jours (migration 0026).
+    await tx.execute(sql`SELECT app.purge_technical_records()`);
     // Échanges avec Stive : effacés 30 jours après leur création (migration 0024).
     const stive = await tx.execute<{ removed: number }>(
       sql`SELECT app.purge_stive_messages() AS removed`,
