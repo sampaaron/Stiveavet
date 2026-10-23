@@ -324,21 +324,32 @@ describe("rappels planifiés", () => {
       (job) => job.status === "pending",
     );
     if (!next) throw new Error("aucun rappel à venir");
+    // « Avancer » rend dus tous les rappels prévus au même créneau que le prochain : le soir,
+    // plusieurs étapes attendent souvent l'ouverture de la même plage d'envoi.
+    const until = Math.max(next.run_at.getTime(), Date.now()) + 1;
+    const released = (await jobsOf(plume, "followup.reminder")).filter(
+      (job) => job.status === "pending" && job.run_at.getTime() <= until,
+    );
     const before = sent.length;
     await advance(plume);
     expect(sent).toHaveLength(before);
     await launches.changeStatus(leo, plume, "resume");
     const jobs = await jobsOf(plume, "followup.reminder");
-    expect(
-      jobs.filter((job) => job.payload.stepId === next.payload.stepId),
-    ).toEqual([expect.objectContaining({ status: "succeeded" })]);
-    expect(
-      (await messagesOf(plume)).some(
-        (message) => message.idempotency_key === `step:${next.payload.stepId}`,
-      ),
-    ).toBe(false);
+    const messages = await messagesOf(plume);
+    for (const skipped of released) {
+      expect(
+        jobs.filter((job) => job.payload.stepId === skipped.payload.stepId),
+      ).toEqual([expect.objectContaining({ status: "succeeded" })]);
+      expect(
+        messages.some(
+          (message) =>
+            message.idempotency_key === `step:${skipped.payload.stepId}`,
+        ),
+      ).toBe(false);
+    }
+    // Le rappel déjà parti au test précédent, plus ceux passés pendant la pause.
     expect(jobs.filter((job) => job.status === "pending").length).toBe(
-      jobs.length - 2,
+      jobs.length - 1 - released.length,
     );
   });
 
