@@ -43,4 +43,9 @@ Secrets attendus dans `TF_VAR_secrets` : `DATABASE_URL`, `SCW_ACCESS_KEY`, `SCW_
 `SCW_DEFAULT_PROJECT_ID`, `SECRETS_ENCRYPTION_KEYS`, `FILE_LINK_SECRET`, `META_APP_ID`,
 `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`,
 `AI_API_KEY`, `AI_BASE_URL`, `AI_TEXT_MODEL`, `AI_VISION_MODEL`, `AI_TRANSCRIPTION_MODEL`,
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FINGERPRINT_SECRET`.
+
+`FINGERPRINT_SECRET` est la clé HMAC des empreintes d'adresse IP et d'e-mail, commune à
+l'application et au worker (Terraform la refuse absente ou trop courte). Elle se tire une
+fois par environnement, directement dans le gestionnaire de secrets, sans jamais l'écrire
+dans un fichier : `openssl rand -base64 48`.
