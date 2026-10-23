@@ -17,7 +17,7 @@ DROP FUNCTION auth.create_session(bytea, uuid, uuid, interval);
 CREATE FUNCTION auth.create_session(
   p_token_hash bytea, p_user_id uuid, p_membership_id uuid, p_lifetime interval, p_device_label text
 ) RETURNS uuid
-  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
   DECLARE
     v_org uuid;
@@ -40,7 +40,7 @@ DROP FUNCTION auth.trust_device(bytea, uuid, interval);
 CREATE FUNCTION auth.trust_device(
   p_token_hash bytea, p_user_id uuid, p_lifetime interval, p_device_label text
 ) RETURNS void
-  LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     INSERT INTO auth.trusted_devices (token_hash, user_id, expires_at, device_label)
     VALUES (p_token_hash, p_user_id, now() + p_lifetime, left(p_device_label, 60))
@@ -49,7 +49,7 @@ CREATE FUNCTION auth.trust_device(
 -- Personne d'une session active et déverrouillée, d'un membre actif. Fonction interne : seules
 -- les fonctions ci-dessous l'appellent, l'application n'y a pas accès.
 CREATE FUNCTION auth.session_owner(p_session_hash bytea) RETURNS uuid
-  LANGUAGE sql STABLE SET search_path = pg_catalog, public, auth
+  LANGUAGE sql STABLE SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     SELECT s.user_id
     FROM auth.sessions s
@@ -65,7 +65,7 @@ CREATE FUNCTION auth.account_sessions(p_session_hash bytea)
     session_id uuid, device_label text, created_at timestamptz, last_activity_at timestamptz,
     current boolean
   )
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     SELECT s.id, s.device_label, s.created_at, s.last_activity_at, s.token_hash = p_session_hash
     FROM auth.sessions s
@@ -76,7 +76,7 @@ CREATE FUNCTION auth.account_sessions(p_session_hash bytea)
 
 -- Ferme toutes les autres sessions de la personne ; renvoie leur nombre.
 CREATE FUNCTION auth.revoke_other_sessions(p_session_hash bytea) RETURNS integer
-  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
   DECLARE
     v_user uuid := auth.session_owner(p_session_hash);
@@ -95,7 +95,7 @@ CREATE FUNCTION auth.account_trusted_devices(p_session_hash bytea, p_device_hash
     device_id uuid, device_label text, created_at timestamptz, last_used_at timestamptz,
     expires_at timestamptz, current boolean
   )
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     SELECT d.id, d.device_label, d.created_at, d.last_used_at, d.expires_at,
       d.token_hash IS NOT DISTINCT FROM p_device_hash
@@ -107,7 +107,7 @@ CREATE FUNCTION auth.account_trusted_devices(p_session_hash bytea, p_device_hash
 
 -- Retire un appareil de confiance de la personne : le code e-mail y sera de nouveau demandé.
 CREATE FUNCTION auth.revoke_trusted_device(p_session_hash bytea, p_device_id uuid) RETURNS boolean
-  LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     UPDATE auth.trusted_devices d SET revoked_at = now()
     WHERE d.id = p_device_id AND d.user_id = auth.session_owner(p_session_hash)
@@ -120,7 +120,7 @@ CREATE FUNCTION auth.revoke_trusted_device(p_session_hash bytea, p_device_id uui
 -- son adresse (pour l'avertir), ou aucune ligne.
 CREATE FUNCTION auth.change_password(p_session_hash bytea, p_password_hash text)
   RETURNS TABLE (user_id uuid, email text)
-  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
   DECLARE
     v_user uuid := auth.session_owner(p_session_hash);
@@ -138,7 +138,7 @@ CREATE FUNCTION auth.change_password(p_session_hash bytea, p_password_hash text)
 
 -- Ferme les sessions d'un membre retiré du cabinet courant (et de lui seul).
 CREATE FUNCTION auth.revoke_membership_sessions(p_membership_id uuid) RETURNS integer
-  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
   DECLARE
     v_count integer;
@@ -155,7 +155,7 @@ CREATE FUNCTION auth.revoke_membership_sessions(p_membership_id uuid) RETURNS in
 -- Titulaire d'un lien de réinitialisation encore valable.
 CREATE FUNCTION auth.password_reset_owner(p_token_hash bytea)
   RETURNS TABLE (email text, display_name text)
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     SELECT u.email, u.display_name
     FROM auth.password_resets r JOIN users u ON u.id = r.user_id
@@ -169,7 +169,7 @@ CREATE OR REPLACE FUNCTION auth.invitation_for_token(p_token_hash bytea)
     invitation_id uuid, organization_id uuid, organization_name text, email text,
     display_name text, role member_role, email_registered boolean
   )
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp
   AS $$
     SELECT i.id, i.organization_id, o.name, i.email, i.display_name, i.role,
       EXISTS (SELECT 1 FROM users u WHERE u.email = i.email)

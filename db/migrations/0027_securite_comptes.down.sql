@@ -13,7 +13,7 @@ CREATE OR REPLACE FUNCTION auth.invitation_for_token(p_token_hash bytea)
     invitation_id uuid, organization_id uuid, organization_name text, email text,
     display_name text, role member_role, email_registered boolean
   )
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp
   AS $$
     SELECT i.id, i.organization_id, o.name, i.email, i.display_name, i.role,
       EXISTS (SELECT 1 FROM users u WHERE u.email = i.email)
@@ -25,7 +25,7 @@ CREATE OR REPLACE FUNCTION auth.invitation_for_token(p_token_hash bytea)
 DROP FUNCTION auth.trust_device(bytea, uuid, interval, text);
 CREATE FUNCTION auth.trust_device(p_token_hash bytea, p_user_id uuid, p_lifetime interval)
   RETURNS void
-  LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
     INSERT INTO auth.trusted_devices (token_hash, user_id, expires_at)
     VALUES (p_token_hash, p_user_id, now() + p_lifetime)
@@ -35,7 +35,7 @@ DROP FUNCTION auth.create_session(bytea, uuid, uuid, interval, text);
 CREATE FUNCTION auth.create_session(
   p_token_hash bytea, p_user_id uuid, p_membership_id uuid, p_lifetime interval
 ) RETURNS uuid
-  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth, pg_temp
   AS $$
   DECLARE
     v_org uuid;
