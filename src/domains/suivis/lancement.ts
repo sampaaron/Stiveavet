@@ -52,6 +52,7 @@ import {
   stepDueAt,
   suggestProtocol,
 } from "./plan";
+import type { SheetInput } from "./plan";
 import {
   canLaunchFollowup,
   canPrepareFollowup,
@@ -60,6 +61,7 @@ import {
 import type {
   DrVetoSearchHit,
   LaunchSheet,
+  LoadedFollowup,
   SheetStep,
   StatusChange,
 } from "./chargement";
@@ -94,6 +96,252 @@ export type {
   LaunchSheet,
   LoadedFollowup,
 } from "./chargement";
+
+/** Une fiche en cours d'enregistrement, dans la transaction de `save`. */
+type SheetSave = {
+  tx: TenantTransaction;
+  actor: Actor;
+  followupId: string;
+  followup: LoadedFollowup;
+  data: SheetInput;
+  now: Date;
+};
+
+/**
+ * En-tête de la fiche : contrôle, puis, avant le lancement seulement, responsable, premier
+ * message, second propriétaire et accord WhatsApp. Renvoie les changements du suivi.
+ */
+async function applySheetHeader(
+  { tx, actor, followupId, followup, data, now }: SheetSave,
+  launch: boolean,
+): Promise<Partial<typeof followups.$inferInsert>> {
+  const changes: Partial<typeof followups.$inferInsert> = {
+    controlAppointmentAt: data.controlAppointmentAt,
+  };
+  if (
+    data.controlAppointmentAt &&
+    data.controlAppointmentAt.getTime() <= followup.procedureAt.getTime()
+  )
+    throw new DomainError("invalid_target");
+  // Responsable et premier message : seulement avant le lancement.
+  if (followup.status === "draft") {
+    if (
+      data.responsibleMembershipId &&
+      data.responsibleMembershipId !== followup.responsibleMembershipId
+    ) {
+      // Changer de responsable et lancer sont deux décisions distinctes (ADR 0015 §6).
+      // Un vétérinaire ne reprend pas le brouillon d'un confrère : seuls l'équipe qui
+      // prépare, le responsable actuel et un administrateur de l'équipe le réattribuent.
+      if (launch) throw new DomainError("invalid_transition");
+      if (
+        actor.role !== "assistant" &&
+        actor.membershipId !== followup.responsibleMembershipId &&
+        !actor.permissions.has("team.manage")
+      )
+        throw new DomainError("forbidden");
+      const vets = await activeVets(tx);
+      if (
+        !vets.some((vet) => vet.membershipId === data.responsibleMembershipId)
+      )
+        throw new DomainError("invalid_target");
+      changes.responsibleMembershipId = data.responsibleMembershipId;
+      await auditFollowup(tx, actor, "followup.reassigned", followupId, {
+        from: followup.responsibleMembershipId,
+        to: data.responsibleMembershipId,
+      });
+    }
+    if (data.firstContactHours !== undefined)
+      changes.firstContactAt = firstContactAt(
+        followup.procedureAt,
+        data.firstContactHours,
+      );
+    if (data.secondContactActive !== undefined) {
+      const updated = await tx
+        .update(followupContacts)
+        .set({ active: data.secondContactActive })
+        .where(
+          and(
+            eq(followupContacts.followupId, followupId),
+            eq(followupContacts.role, "secondary"),
+          ),
+        )
+        .returning({ id: followupContacts.id });
+      if (data.secondContactActive && !updated.length)
+        throw new DomainError("invalid_target");
+    }
+    if (data.whatsappOptIn !== undefined)
+      await tx
+        .update(followupContacts)
+        .set(
+          data.whatsappOptIn
+            ? {
+                whatsappOptinAt: now,
+                whatsappOptinByMembershipId: actor.membershipId,
+              }
+            : {
+                whatsappOptinAt: null,
+                whatsappOptinByMembershipId: null,
+              },
+        )
+        .where(
+          and(
+            eq(followupContacts.followupId, followupId),
+            // Accord déjà noté : sa date et son auteur restent ceux d'origine.
+            data.whatsappOptIn
+              ? isNull(followupContacts.whatsappOptinAt)
+              : sql`true`,
+          ),
+        );
+    if (data.whatsappOptIn !== undefined)
+      await auditFollowup(tx, actor, "followup.whatsapp_optin", followupId, {
+        given: data.whatsappOptIn,
+      });
+  }
+  return changes;
+}
+
+/** Traitements : décisions de vétérinaire. Renvoie les traitements validés. */
+async function applyTreatmentDecisions(
+  { tx, actor, followupId, data, now }: SheetSave,
+  canSteer: boolean,
+): Promise<string[]> {
+  const touchesTreatments =
+    data.validateTreatmentIds.length +
+    data.removeTreatmentIds.length +
+    data.addTreatments.length;
+  if (touchesTreatments && !canSteer) throw new DomainError("forbidden");
+  const treatments = await tx
+    .select({
+      id: followupTreatments.id,
+      source: followupTreatments.source,
+      validatedAt: followupTreatments.validatedAt,
+    })
+    .from(followupTreatments)
+    .where(
+      and(
+        eq(followupTreatments.followupId, followupId),
+        isNull(followupTreatments.removedAt),
+      ),
+    );
+  const byId = new Map(treatments.map((row) => [row.id, row]));
+  for (const id of data.validateTreatmentIds) {
+    const row = byId.get(id);
+    if (!row || row.source !== "drveto" || row.validatedAt)
+      throw new DomainError("invalid_target");
+  }
+  for (const id of data.removeTreatmentIds)
+    if (!byId.has(id)) throw new DomainError("invalid_target");
+  if (
+    treatments.length -
+      data.removeTreatmentIds.length +
+      data.addTreatments.length >
+    MAX_TREATMENTS
+  )
+    throw new DomainError("invalid_target");
+  const toValidate = data.validateTreatmentIds.filter(
+    (id) => !data.removeTreatmentIds.includes(id),
+  );
+  if (toValidate.length)
+    await tx
+      .update(followupTreatments)
+      .set({
+        validatedByMembershipId: actor.membershipId,
+        validatedAt: now,
+      })
+      .where(inArray(followupTreatments.id, toValidate));
+  if (data.removeTreatmentIds.length)
+    await tx
+      .update(followupTreatments)
+      .set({ removedAt: now })
+      .where(inArray(followupTreatments.id, data.removeTreatmentIds));
+  if (data.addTreatments.length)
+    await tx.insert(followupTreatments).values(
+      data.addTreatments.map((treatment) => ({
+        organizationId: actor.organizationId,
+        followupId,
+        source: "vet" as const,
+        name: treatment.name,
+        instructions: treatment.instructions,
+        validatedByMembershipId: actor.membershipId,
+        validatedAt: now,
+      })),
+    );
+  return toValidate;
+}
+
+/**
+ * Étapes à venir et signes d'alerte remplacés par ceux de la fiche, sous la révision
+ * `revision`. Renvoie le nombre d'étapes du programme.
+ */
+async function replaceFutureSteps(
+  { tx, actor, followupId, followup, data, now }: SheetSave,
+  draft: boolean,
+  revision: number,
+): Promise<number> {
+  // Étapes : un suivi lancé garde ses étapes passées, qui ont pu partir.
+  const current = await currentSteps(tx, followupId);
+  const kept = draft
+    ? []
+    : current.filter((step) =>
+        isPastStep(followup.procedureAt, step.offsetHours, now),
+      );
+  if (
+    !draft &&
+    data.steps.some((step) =>
+      isPastStep(followup.procedureAt, step.offsetHours, now),
+    )
+  )
+    throw new DomainError("past_step");
+  if (kept.length + data.steps.length > MAX_STEPS)
+    throw new DomainError("invalid_target");
+  const keptIds = new Set(kept.map((step) => step.id));
+  const replaced = current
+    .filter((step) => !keptIds.has(step.id))
+    .map((step) => step.id);
+  if (replaced.length)
+    await tx
+      .update(followupSteps)
+      .set({ supersededAt: now })
+      .where(inArray(followupSteps.id, replaced));
+  const start = Math.max(0, ...kept.map((step) => step.position));
+  const ordered = data.steps
+    .map((step, index) => ({ step, index }))
+    .sort(
+      (a, b) => a.step.offsetHours - b.step.offsetHours || a.index - b.index,
+    );
+  if (ordered.length)
+    await tx.insert(followupSteps).values(
+      ordered.map(({ step }, index) => ({
+        organizationId: actor.organizationId,
+        followupId,
+        revision,
+        position: start + index + 1,
+        offsetHours: step.offsetHours,
+        kind: step.kind,
+        content: step.content,
+      })),
+    );
+  await tx
+    .update(followupAlertRules)
+    .set({ supersededAt: now })
+    .where(
+      and(
+        eq(followupAlertRules.followupId, followupId),
+        isNull(followupAlertRules.supersededAt),
+      ),
+    );
+  await tx.insert(followupAlertRules).values(
+    data.alerts.map((alert, index) => ({
+      organizationId: actor.organizationId,
+      followupId,
+      revision,
+      position: index + 1,
+      level: alert.level,
+      description: alert.description,
+    })),
+  );
+  return kept.length + data.steps.length;
+}
 
 /**
  * Lancement manuel d'un suivi (cahier des charges §4 et §5, ADR 0015) :
@@ -767,224 +1015,11 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
         if (!followup.protocolVersionId)
           throw new DomainError("launch_incomplete");
 
-        // Responsable et premier message : seulement avant le lancement.
-        const changes: Partial<typeof followups.$inferInsert> = {
-          controlAppointmentAt: data.controlAppointmentAt,
-        };
-        if (
-          data.controlAppointmentAt &&
-          data.controlAppointmentAt.getTime() <= followup.procedureAt.getTime()
-        )
-          throw new DomainError("invalid_target");
-        if (draft) {
-          if (
-            data.responsibleMembershipId &&
-            data.responsibleMembershipId !== followup.responsibleMembershipId
-          ) {
-            // Changer de responsable et lancer sont deux décisions distinctes (ADR 0015 §6).
-            // Un vétérinaire ne reprend pas le brouillon d'un confrère : seuls l'équipe qui
-            // prépare, le responsable actuel et un administrateur de l'équipe le réattribuent.
-            if (options.launch) throw new DomainError("invalid_transition");
-            if (
-              actor.role !== "assistant" &&
-              actor.membershipId !== followup.responsibleMembershipId &&
-              !actor.permissions.has("team.manage")
-            )
-              throw new DomainError("forbidden");
-            const vets = await activeVets(tx);
-            if (
-              !vets.some(
-                (vet) => vet.membershipId === data.responsibleMembershipId,
-              )
-            )
-              throw new DomainError("invalid_target");
-            changes.responsibleMembershipId = data.responsibleMembershipId;
-            await auditFollowup(tx, actor, "followup.reassigned", followupId, {
-              from: followup.responsibleMembershipId,
-              to: data.responsibleMembershipId,
-            });
-          }
-          if (data.firstContactHours !== undefined)
-            changes.firstContactAt = firstContactAt(
-              followup.procedureAt,
-              data.firstContactHours,
-            );
-          if (data.secondContactActive !== undefined) {
-            const updated = await tx
-              .update(followupContacts)
-              .set({ active: data.secondContactActive })
-              .where(
-                and(
-                  eq(followupContacts.followupId, followupId),
-                  eq(followupContacts.role, "secondary"),
-                ),
-              )
-              .returning({ id: followupContacts.id });
-            if (data.secondContactActive && !updated.length)
-              throw new DomainError("invalid_target");
-          }
-          if (data.whatsappOptIn !== undefined)
-            await tx
-              .update(followupContacts)
-              .set(
-                data.whatsappOptIn
-                  ? {
-                      whatsappOptinAt: now,
-                      whatsappOptinByMembershipId: actor.membershipId,
-                    }
-                  : {
-                      whatsappOptinAt: null,
-                      whatsappOptinByMembershipId: null,
-                    },
-              )
-              .where(
-                and(
-                  eq(followupContacts.followupId, followupId),
-                  // Accord déjà noté : sa date et son auteur restent ceux d'origine.
-                  data.whatsappOptIn
-                    ? isNull(followupContacts.whatsappOptinAt)
-                    : sql`true`,
-                ),
-              );
-          if (data.whatsappOptIn !== undefined)
-            await auditFollowup(
-              tx,
-              actor,
-              "followup.whatsapp_optin",
-              followupId,
-              {
-                given: data.whatsappOptIn,
-              },
-            );
-        }
-
-        // Traitements : décisions de vétérinaire.
-        const touchesTreatments =
-          data.validateTreatmentIds.length +
-          data.removeTreatmentIds.length +
-          data.addTreatments.length;
-        if (touchesTreatments && !canSteer) throw new DomainError("forbidden");
-        const treatments = await tx
-          .select({
-            id: followupTreatments.id,
-            source: followupTreatments.source,
-            validatedAt: followupTreatments.validatedAt,
-          })
-          .from(followupTreatments)
-          .where(
-            and(
-              eq(followupTreatments.followupId, followupId),
-              isNull(followupTreatments.removedAt),
-            ),
-          );
-        const byId = new Map(treatments.map((row) => [row.id, row]));
-        for (const id of data.validateTreatmentIds) {
-          const row = byId.get(id);
-          if (!row || row.source !== "drveto" || row.validatedAt)
-            throw new DomainError("invalid_target");
-        }
-        for (const id of data.removeTreatmentIds)
-          if (!byId.has(id)) throw new DomainError("invalid_target");
-        if (
-          treatments.length -
-            data.removeTreatmentIds.length +
-            data.addTreatments.length >
-          MAX_TREATMENTS
-        )
-          throw new DomainError("invalid_target");
-        const toValidate = data.validateTreatmentIds.filter(
-          (id) => !data.removeTreatmentIds.includes(id),
-        );
-        if (toValidate.length)
-          await tx
-            .update(followupTreatments)
-            .set({
-              validatedByMembershipId: actor.membershipId,
-              validatedAt: now,
-            })
-            .where(inArray(followupTreatments.id, toValidate));
-        if (data.removeTreatmentIds.length)
-          await tx
-            .update(followupTreatments)
-            .set({ removedAt: now })
-            .where(inArray(followupTreatments.id, data.removeTreatmentIds));
-        if (data.addTreatments.length)
-          await tx.insert(followupTreatments).values(
-            data.addTreatments.map((treatment) => ({
-              organizationId: actor.organizationId,
-              followupId,
-              source: "vet" as const,
-              name: treatment.name,
-              instructions: treatment.instructions,
-              validatedByMembershipId: actor.membershipId,
-              validatedAt: now,
-            })),
-          );
-
-        // Étapes : un suivi lancé garde ses étapes passées, qui ont pu partir.
-        const current = await currentSteps(tx, followupId);
-        const kept = draft
-          ? []
-          : current.filter((step) =>
-              isPastStep(followup.procedureAt, step.offsetHours, now),
-            );
-        if (
-          !draft &&
-          data.steps.some((step) =>
-            isPastStep(followup.procedureAt, step.offsetHours, now),
-          )
-        )
-          throw new DomainError("past_step");
-        if (kept.length + data.steps.length > MAX_STEPS)
-          throw new DomainError("invalid_target");
-        const keptIds = new Set(kept.map((step) => step.id));
-        const replaced = current
-          .filter((step) => !keptIds.has(step.id))
-          .map((step) => step.id);
-        if (replaced.length)
-          await tx
-            .update(followupSteps)
-            .set({ supersededAt: now })
-            .where(inArray(followupSteps.id, replaced));
+        const save = { tx, actor, followupId, followup, data, now };
+        const changes = await applySheetHeader(save, options.launch);
+        const toValidate = await applyTreatmentDecisions(save, canSteer);
         const revision = followup.planRevision + 1;
-        const start = Math.max(0, ...kept.map((step) => step.position));
-        const ordered = data.steps
-          .map((step, index) => ({ step, index }))
-          .sort(
-            (a, b) =>
-              a.step.offsetHours - b.step.offsetHours || a.index - b.index,
-          );
-        if (ordered.length)
-          await tx.insert(followupSteps).values(
-            ordered.map(({ step }, index) => ({
-              organizationId: actor.organizationId,
-              followupId,
-              revision,
-              position: start + index + 1,
-              offsetHours: step.offsetHours,
-              kind: step.kind,
-              content: step.content,
-            })),
-          );
-        await tx
-          .update(followupAlertRules)
-          .set({ supersededAt: now })
-          .where(
-            and(
-              eq(followupAlertRules.followupId, followupId),
-              isNull(followupAlertRules.supersededAt),
-            ),
-          );
-        await tx.insert(followupAlertRules).values(
-          data.alerts.map((alert, index) => ({
-            organizationId: actor.organizationId,
-            followupId,
-            revision,
-            position: index + 1,
-            level: alert.level,
-            description: alert.description,
-          })),
-        );
+        const steps = await replaceFutureSteps(save, draft, revision);
 
         await tx
           .update(followups)
@@ -998,7 +1033,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
         await auditFollowup(tx, actor, "followup.plan_updated", followupId, {
           revision,
           status: followup.status,
-          steps: kept.length + data.steps.length,
+          steps,
           alerts: data.alerts.length,
           treatmentsAdded: data.addTreatments.length,
           treatmentsRemoved: data.removeTreatmentIds.length,
