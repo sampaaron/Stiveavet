@@ -57,5 +57,4 @@ L'audit des performances (octobre 2026) a relevé :
 - Restent à faire :
   - la pagination de la liste des suivis ;
   - le passage en flux des fichiers servis (il demande une lecture en flux dans l'adaptateur de stockage) ;
-  - des textes passés par le serveur aux composants partagés avec la vitrine (`ChatThread`, `StatusBadge`, `AssistantAvatar`). La vitrine reçoit encore le dictionnaire de l'espace cabinet par ces composants ;
   - la création et la fermeture des groupes WhatsApp, et la notification des alertes, qui appellent encore Meta sous verrou (délai de 15 s).
