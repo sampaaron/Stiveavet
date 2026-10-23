@@ -1,6 +1,6 @@
 import { foldText } from "@/domains/commun";
 import { numaFixedReply } from "@/domains/conversations/renvois";
-import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
+import { parisLocalToDate, parisWallMinutes } from "@/domains/heure-paris";
 
 import { simulatedSynthesis } from "./simulated-synthesis";
 import { readSimulatedVoiceText } from "./simulated-voice";

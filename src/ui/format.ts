@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/locales";
+import { parisDayIndex } from "@/domains/heure-paris";
 
 /**
  * Dates affichées dans l'interface, dans la langue de la personne (ADR 0022) et toujours à
@@ -92,13 +93,6 @@ const weekday = (value: Date, locale: Locale) =>
 const shortDate = (value: Date, locale: Locale) =>
   formatter(locale, { day: "numeric", month: "short" }).format(value);
 
-const parisDay = (value: Date) =>
-  Math.floor(
-    Date.parse(
-      `${new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(value)}T00:00:00Z`,
-    ) / 86_400_000,
-  );
-
 /**
  * Moment relatif, comme sur un téléphone : l'heure aujourd'hui, « Hier », le jour de la
  * semaine dans les six derniers jours, sinon la date courte.
@@ -108,7 +102,7 @@ export function formatRelativeMoment(
   now: Date,
   locale: Locale,
 ): string {
-  const days = parisDay(now) - parisDay(value);
+  const days = parisDayIndex(now) - parisDayIndex(value);
   if (days <= 0) return formatTime(value, locale);
   if (days === 1) return WORDS[locale].yesterday;
   if (days < 7) return weekday(value, locale);
@@ -121,7 +115,7 @@ export function formatRelativeDayTime(
   now: Date,
   locale: Locale,
 ): string {
-  const days = parisDay(now) - parisDay(value);
+  const days = parisDayIndex(now) - parisDayIndex(value);
   const time = formatTime(value, locale);
   const words = WORDS[locale];
   if (days === 0) return `${words.today}, ${time}`;

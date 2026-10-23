@@ -14,7 +14,8 @@ import { DomainError } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
-import { WEEKDAYS, parisLocalToDate } from "@/domains/reglages/content";
+import { parisLocalToDate } from "@/domains/heure-paris";
+import { WEEKDAYS } from "@/domains/reglages/content";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 

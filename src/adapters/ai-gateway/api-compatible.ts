@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { parisLocalToDate } from "@/domains/reglages/content";
+import { parisLocalToDate } from "@/domains/heure-paris";
 
 import {
   AGENDA_CAPTURE,

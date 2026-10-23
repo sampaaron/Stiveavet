@@ -10,7 +10,7 @@ import {
   simulatedTranscription,
 } from "@/adapters/ai-gateway/fake";
 import { checkNumaReply } from "@/domains/conversations/guard";
-import { parisWallMinutes } from "@/domains/reglages/content";
+import { parisWallMinutes } from "@/domains/heure-paris";
 
 import { durationLabel, sniffAudio, sniffImage, wavDurationMs } from "./media";
 

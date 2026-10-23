@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { Actor } from "@/domains/equipe/actor";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
+import { parisDate } from "@/domains/heure-paris";
 
 /**
  * Activité du cabinet pour le tableau de bord (cahier des charges §12) : des totaux, jamais
@@ -30,16 +31,6 @@ export type ActivityStats = {
 };
 
 const int = (value: unknown) => Number(value ?? 0);
-
-/** Jour de Paris (AAAA-MM-JJ) d'un instant. */
-function parisDay(instant: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(instant);
-}
 
 export function statsService(db: Database) {
   const run = tenantRunner(db);
@@ -108,7 +99,7 @@ export function statsService(db: Database) {
         );
         const daily: ActivityStats["daily"] = [];
         for (let offset = CHART_DAYS - 1; offset >= 0; offset -= 1) {
-          const day = parisDay(new Date(now.getTime() - offset * 86_400_000));
+          const day = parisDate(new Date(now.getTime() - offset * 86_400_000));
           const row = byDay.get(day);
           daily.push({
             day,

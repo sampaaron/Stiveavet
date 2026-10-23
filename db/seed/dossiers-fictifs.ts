@@ -3,8 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 
 import { alertRules } from "../../src/domains/protocoles/schema";
-import { parisLocalToDate } from "../../src/domains/reglages/content";
-import { parisDayIndex } from "../../src/domains/suivis/calendrier";
+import { parisDayIndex, parisLocalToDate } from "../../src/domains/heure-paris";
 import { copyProtocolPlan } from "../../src/domains/suivis/lancement";
 import {
   scheduleAutomaticEnd,

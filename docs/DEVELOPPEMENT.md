@@ -115,9 +115,10 @@ Avant d'écrire une aide, vérifiez qu'elle n'existe pas déjà :
 ## Heure de Paris
 
 Les règles métier (rappels, jour courant, horaires de garde) suivent l'heure murale de Paris.
-Les aides sont `parisWallMinutes` et `parisLocalToDate` dans `src/domains/reglages/content.ts`,
-et `minutesOfDay` dans `src/domains/commun.ts`. N'utilisez jamais `new Date().getHours()` : le
-serveur tourne en UTC. Les tests e2e attendent le jour suivant quand minuit approche à Paris
+Toutes les aides sont dans `src/domains/heure-paris.ts` : `parisWallMinutes` (heure murale),
+`parisLocalToDate` (saisie `datetime-local` lue à Paris), `parisDayIndex` (numéro du jour) et
+`parisDate` (« AAAA-MM-JJ »). `minutesOfDay` est dans `src/domains/commun.ts`. N'en recopiez
+pas une, et n'utilisez jamais `new Date().getHours()` : le serveur tourne en UTC. Les tests e2e attendent le jour suivant quand minuit approche à Paris
 (`tests/e2e/prepare-database.mts`).
 
 ## Journaux, erreurs et données sensibles

@@ -12,8 +12,12 @@ import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
-import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
-import { daysSince, parisDayIndex } from "@/domains/suivis/calendrier";
+import {
+  parisDayIndex,
+  parisLocalToDate,
+  parisWallMinutes,
+} from "@/domains/heure-paris";
+import { daysSince } from "@/domains/suivis/calendrier";
 import { TRANSITIONS } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { canSteerFollowup } from "@/domains/suivis/policies";
