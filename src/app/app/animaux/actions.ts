@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
 import { MAX_OWNERS, patientInput } from "@/domains/patients/content";
-import { parisLocalToDate } from "@/domains/reglages/content";
+import { parisLocalToDate } from "@/domains/heure-paris";
 import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";
 import { memberContext } from "@/server/authz";

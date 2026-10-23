@@ -155,3 +155,13 @@ export function StatCard(props: StatCardProps) {
     </Card>
   );
 }
+
+/** Fait d'une fiche, dans une liste de définitions (`<dl>`) : libellé discret, valeur. */
+export function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className="font-semibold">{value}</dd>
+    </div>
+  );
+}

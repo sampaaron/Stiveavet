@@ -79,7 +79,6 @@ export const fr = {
   },
 
   common: {
-    brandVet: "vet",
     skipToContent: "Aller au contenu",
     ctaTrial: "Démarrer dès {price} HT par mois",
     ctaPlan: "Démarrer à {price} HT par mois",
@@ -88,10 +87,8 @@ export const fr = {
     numaAi: "Assistante IA",
     stiveAi: "Assistant IA",
     exclVat: "HT",
-    perMonth: "par mois",
     soon: "Bientôt disponible",
     atLaunch: "Au lancement",
-    fictionalData: "Données fictives",
   },
 
   nav: {

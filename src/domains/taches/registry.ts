@@ -34,11 +34,12 @@ import type {
 export function jobRegistry(deps: {
   whatsapp: WhatsAppProvider;
   ai: AiGateway;
+  /** Adresse publique de l'application, validée par la configuration de l'appelant. */
+  appUrl: string;
 }): {
   handlers: Readonly<Record<string, JobHandler>>;
   dead: Readonly<Record<string, DeadJobHandler>>;
 } {
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
   const email = workerEmailSender();
   const sends = sendHandlers({ whatsapp: deps.whatsapp });
   const alerts = alertHandlers({ whatsapp: deps.whatsapp });
@@ -52,11 +53,11 @@ export function jobRegistry(deps: {
       ...sends.handlers,
       ...alerts.handlers,
       ...downloads.handlers,
-      ...failureEmailHandlers({ email, appUrl }),
+      ...failureEmailHandlers({ email, appUrl: deps.appUrl }),
       ...followupEndHandlers(),
       ...mediaHandlers({ storage: lazyObjectStorage, ai: deps.ai }),
       ...retentionHandlers({ storage: lazyObjectStorage }),
-      ...billingHandlers({ email, appUrl }),
+      ...billingHandlers({ email, appUrl: deps.appUrl }),
     },
     dead: { ...sends.dead, ...alerts.dead, ...downloads.dead },
   };

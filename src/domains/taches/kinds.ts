@@ -4,7 +4,7 @@
  * tâches et des erreurs sont dans les dictionnaires de l'espace cabinet (`tasks`, ADR 0022).
  */
 
-export const JOB_ERROR_CODES = [
+const JOB_ERROR_CODES = [
   "provider_unavailable",
   "provider_rejected",
   "provider_account",

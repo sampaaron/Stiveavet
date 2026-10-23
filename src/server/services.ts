@@ -218,6 +218,7 @@ export const services = {
     const registry = jobRegistry({
       whatsapp: providerFor(configuredWhatsApp()),
       ai: configuredAiGateway(),
+      appUrl: serverEnv().APP_URL,
     });
     simulatorWorker ??= createWorker({
       db: appDatabase(),

@@ -27,7 +27,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit } from "@/domains/audit/journal";
+import { auditFollowup } from "@/domains/audit/journal";
 
 import { firstName } from "./wording";
 import type {
@@ -320,11 +320,17 @@ export function conversationsService(db: Database) {
             .update(followups)
             .set({ status: "human_takeover" })
             .where(eq(followups.id, followupId));
-          await audit(tx, actor, "followup.human_takeover", followupId);
+          await auditFollowup(tx, actor, "followup.human_takeover", followupId);
         }
-        await audit(tx, actor, "conversation.message_sent", followupId, {
-          messageId,
-        });
+        await auditFollowup(
+          tx,
+          actor,
+          "conversation.message_sent",
+          followupId,
+          {
+            messageId,
+          },
+        );
         return { messageId, takeover };
       });
     },
@@ -356,10 +362,16 @@ export function conversationsService(db: Database) {
           .update(followupContacts)
           .set({ language, languageSource: "vet" })
           .where(eq(followupContacts.id, contact.id));
-        await audit(tx, actor, "followup.owner_language_changed", followupId, {
-          role,
-          language,
-        });
+        await auditFollowup(
+          tx,
+          actor,
+          "followup.owner_language_changed",
+          followupId,
+          {
+            role,
+            language,
+          },
+        );
       });
     },
 
@@ -380,7 +392,7 @@ export function conversationsService(db: Database) {
           .where(eq(followups.id, followupId));
         // Les rappels à venir reprennent ; ceux passés pendant la reprise en main, non.
         await scheduleReminders(tx, followupId, new Date());
-        await audit(tx, actor, "followup.numa_resumed", followupId);
+        await auditFollowup(tx, actor, "followup.numa_resumed", followupId);
       });
     },
 
@@ -417,7 +429,7 @@ export function conversationsService(db: Database) {
         const followup = await loadFollowup(tx, actor, followupId);
         if (followup.access !== "clinical") throw new DomainError("not_found");
         const result = await receiveInTx(tx, followupId, body, from);
-        await audit(tx, actor, "simulator.owner_message", followupId, {
+        await auditFollowup(tx, actor, "simulator.owner_message", followupId, {
           outcome: result.outcome,
         });
         return result;

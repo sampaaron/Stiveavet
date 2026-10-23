@@ -54,7 +54,7 @@ import {
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 import {
-  auditFollowup as audit,
+  auditFollowup,
   recordAudit,
   systemAuthor,
 } from "@/domains/audit/journal";
@@ -288,7 +288,7 @@ export async function triageOwnerMessage(
     .returning({ id: alerts.id });
   if (!alert) throw new Error("Alerte non enregistrée");
   // Traçabilité sans contenu clinique : le niveau et l'identifiant suffisent.
-  await audit(
+  await auditFollowup(
     tx,
     systemAuthor(input.organizationId),
     "alert.raised",
@@ -588,7 +588,7 @@ export function alertHandlers(deps: {
       );
     for (const other of others)
       await notify(tx, alert, other.id, "whatsapp", "escalation");
-    await audit(
+    await auditFollowup(
       tx,
       systemAuthor(alert.organizationId),
       "alert.escalated",
@@ -921,7 +921,7 @@ export function alertsService(db: Database) {
           .update(alerts)
           .set({ status: "acknowledged" })
           .where(eq(alerts.id, alert.id));
-        await audit(tx, actor, "alert.acknowledged", alert.followupId, {
+        await auditFollowup(tx, actor, "alert.acknowledged", alert.followupId, {
           alertId: alert.id,
           level: alert.level,
           escalated: alert.status === "escalated",
@@ -959,7 +959,7 @@ export function alertsService(db: Database) {
           followupId: alert.followupId,
           payload: { alertId: alert.id },
         });
-        await audit(tx, actor, "alert.reassigned", alert.followupId, {
+        await auditFollowup(tx, actor, "alert.reassigned", alert.followupId, {
           alertId: alert.id,
           from: alert.targetMembershipId,
           to: membershipId,
@@ -985,7 +985,7 @@ export function alertsService(db: Database) {
           })
           .where(eq(alerts.id, alert.id));
         await refreshFollowupTriage(tx, alert.followupId);
-        await audit(tx, actor, "alert.resolved", alert.followupId, {
+        await auditFollowup(tx, actor, "alert.resolved", alert.followupId, {
           alertId: alert.id,
           level: alert.level,
         });

@@ -1,5 +1,5 @@
 import { foldText } from "@/domains/commun";
-import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
+import { parisLocalToDate, parisWallMinutes } from "@/domains/heure-paris";
 
 import type {
   DrVetoAgendaEntry,

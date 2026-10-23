@@ -1,5 +1,5 @@
 import { foldText, minutesOfDay } from "@/domains/commun";
-import { parisWallMinutes } from "@/domains/reglages/content";
+import { parisWallMinutes } from "@/domains/heure-paris";
 import { renderTemplate } from "@/domains/whatsapp/modeles";
 import type { RenderedTemplate } from "@/domains/whatsapp/modeles";
 

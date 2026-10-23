@@ -16,7 +16,7 @@ import { z } from "zod";
 
 import { BillingUnavailableError } from "@/adapters/billing-provider/types";
 import type { BillingProvider } from "@/adapters/billing-provider/types";
-import { auditOrganization as audit } from "@/domains/audit/journal";
+import { auditOrganization } from "@/domains/audit/journal";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { assistantSeats, vetSeats } from "@/domains/equipe/service";
@@ -270,7 +270,7 @@ export function billingService(deps: {
       });
     } catch (error) {
       if (!(error instanceof BillingUnavailableError)) throw error;
-      await audit(
+      await auditOrganization(
         tx,
         { organizationId: organizationId, membershipId: null },
         "invoice.collection_deferred",
@@ -299,7 +299,7 @@ export function billingService(deps: {
           ),
         );
       await refreshUnpaid(tx, now);
-      await audit(
+      await auditOrganization(
         tx,
         { organizationId: organizationId, membershipId: null },
         "invoice.submitted",
@@ -423,7 +423,7 @@ export function billingService(deps: {
               usage.map((event) => event.id),
             ),
           );
-      await audit(
+      await auditOrganization(
         tx,
         { organizationId: organizationId, membershipId: null },
         "invoice.issued",
@@ -569,7 +569,7 @@ export function billingService(deps: {
           if (drveto) throw new DomainError("plan_integration_connected");
         }
         await tx.update(subscriptions).set({ plan: parsed.data });
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,
@@ -606,7 +606,7 @@ export function billingService(deps: {
             throw new DomainError("invalid_target");
           await tx.update(subscriptions).set({ cycleChosenAt: now });
         }
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,
@@ -626,7 +626,7 @@ export function billingService(deps: {
         const facts = await editableFacts(tx, actor.organizationId, now);
         const endsAt = cancellationEffectiveAt(facts, now);
         await tx.update(subscriptions).set({ canceledAt: now, endsAt });
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,
@@ -673,7 +673,7 @@ export function billingService(deps: {
           : results.includes("processing")
             ? "processing"
             : "paid";
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,

@@ -74,7 +74,6 @@ export const en: SiteDictionary = {
   },
 
   common: {
-    brandVet: "vet",
     skipToContent: "Skip to content",
     ctaTrial: "Start from {price} excl. VAT per month",
     ctaPlan: "Start at {price} excl. VAT per month",
@@ -83,10 +82,8 @@ export const en: SiteDictionary = {
     numaAi: "AI assistant",
     stiveAi: "AI assistant",
     exclVat: "excl. VAT",
-    perMonth: "per month",
     soon: "Coming soon",
     atLaunch: "At launch",
-    fictionalData: "Fictional data",
   },
 
   nav: {

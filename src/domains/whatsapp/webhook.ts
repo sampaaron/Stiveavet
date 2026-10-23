@@ -267,13 +267,20 @@ async function routeInbound(
 
 const ADVANCE = { sent: "sent", delivered: "delivered", read: "read" } as const;
 
-const STEP: Record<string, number> = {
+const STEP = {
   queued: 0,
   awaiting_reply: 0,
   sent: 1,
   delivered: 2,
   read: 3,
-};
+} as const;
+
+/** Rang d'un statut d'envoi ; -1 pour un statut absent ou inconnu (échec, brouillon…). */
+function stepOf(status: string | null): number {
+  return status !== null && Object.hasOwn(STEP, status)
+    ? STEP[status as keyof typeof STEP]
+    : -1;
+}
 
 async function applyStatus(
   tx: TenantTransaction,
@@ -297,10 +304,10 @@ async function applyStatus(
     .where(and(byRef, eq(messages.direction, "outbound")))
     .for("update");
   if (message) {
-    const current = STEP[message.status ?? ""] ?? -1;
+    const current = stepOf(message.status);
     if (event.status === "failed") {
       // Déjà remis : un échec tardif ne change rien.
-      if (current >= STEP.delivered!) return;
+      if (current >= STEP.delivered) return;
       const failure = classifyGraphError(event.errors?.[0]?.code ?? -1);
       const unreachable = failure === "unreachable";
       await tx
@@ -337,8 +344,8 @@ async function applyStatus(
     const reached = Object.hasOwn(ADVANCE, event.status)
       ? ADVANCE[event.status as keyof typeof ADVANCE]
       : null;
-    const next = reached ? STEP[reached] : undefined;
-    if (!reached || next === undefined || next <= current) return;
+    if (!reached || STEP[reached] <= current) return;
+    const next = STEP[reached];
     await tx
       .update(messages)
       .set({
@@ -347,8 +354,8 @@ async function applyStatus(
         // Marqué en échec à tort (réponse perdue) : Meta l'a bien remis.
         failedAt: null,
         errorCode: null,
-        ...(next >= STEP.sent! && current < STEP.sent! ? { sentAt: at } : {}),
-        ...(next >= STEP.delivered! ? { deliveredAt: at } : {}),
+        ...(next >= STEP.sent && current < STEP.sent ? { sentAt: at } : {}),
+        ...(next >= STEP.delivered ? { deliveredAt: at } : {}),
         ...(next === STEP.read ? { readAt: at } : {}),
       })
       .where(eq(messages.id, message.id));

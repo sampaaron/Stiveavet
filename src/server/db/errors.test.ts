@@ -67,6 +67,31 @@ describe("erreurs de base de données", () => {
     expect(safeDbError(other)).toBe(other);
   });
 
+  it("sans code ni champ texte, l'erreur reste générique", () => {
+    const failure = safeDbError(
+      new DrizzleQueryError("select 1", [], undefined),
+    ) as DatabaseFailure;
+    expect(failure.message).toBe("Requête refusée par la base");
+    expect(failure.cause).toEqual({
+      code: undefined,
+      message: "",
+      constraint: undefined,
+    });
+    const odd = safeDbError(
+      Object.assign(new Error(), {
+        severity: "ERROR",
+        code: 42,
+        message: { texte: "inattendu" },
+        constraint: null,
+      }),
+    ) as DatabaseFailure;
+    expect([odd.code, odd.cause.message, odd.cause.constraint]).toEqual([
+      undefined,
+      "",
+      undefined,
+    ]);
+  });
+
   it("protège chaque méthode d'un dépôt", async () => {
     const repo = withSafeDbErrors({
       fail: () =>
@@ -74,8 +99,10 @@ describe("erreurs de base de données", () => {
           query(pgError({ code: "40001", message: "serialization" })),
         ),
       ok: (value: number) => Promise.resolve(value * 2),
+      label: "dépôt",
     });
     await expect(repo.ok(2)).resolves.toBe(4);
+    expect(repo.label).toBe("dépôt");
     await expect(repo.fail()).rejects.toBeInstanceOf(DatabaseFailure);
   });
 

@@ -11,12 +11,20 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts", "tests/unit/**/*.test.ts"],
+    include: ["src/**/*.test.ts"],
     environment: "node",
-    // Le moteur de règles de facturation doit rester couvert à 100 % (plan de la phase 1).
+    // Couverture totale exigée des règles critiques : facturation (plan de la phase 1), droits
+    // de l'équipe, CSP, assainissement des erreurs de base et adresse IP du client (ADR 0041).
     coverage: {
       provider: "v8",
-      include: ["src/domains/facturation/rules.ts"],
+      include: [
+        "src/domains/facturation/rules.ts",
+        "src/domains/equipe/matrix.ts",
+        "src/domains/equipe/permissions.ts",
+        "src/server/security/csp.ts",
+        "src/server/db/errors.ts",
+        "src/server/http/client-ip.ts",
+      ],
       thresholds: {
         lines: 100,
         branches: 100,

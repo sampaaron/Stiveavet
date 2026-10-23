@@ -78,8 +78,10 @@ describe("triage déterministe", () => {
   });
 
   it("un signe d'alerte demande au moins deux mots significatifs, ou le seul qu'il a", () => {
-    expect(matchesRule("Il ne s'arrête pas de jouer", RULES[0]!)).toBe(false);
-    expect(matchesRule("Un peu d'abattement", RULES[3]!)).toBe(true);
+    const [bleeding, , , lethargy] = RULES;
+    if (!bleeding || !lethargy) throw new Error("règles d'essai");
+    expect(matchesRule("Il ne s'arrête pas de jouer", bleeding)).toBe(false);
+    expect(matchesRule("Un peu d'abattement", lethargy)).toBe(true);
     expect(
       matchesRule("à", { id: "x", level: "watch", description: "Le, la" }),
     ).toBe(false);

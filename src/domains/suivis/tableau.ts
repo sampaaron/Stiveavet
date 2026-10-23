@@ -6,7 +6,7 @@ import { followupActivity } from "@/domains/facturation/service";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
 import type { Actor } from "@/domains/equipe/actor";
-import { parisLocalToDate } from "@/domains/reglages/content";
+import { parisDayIndex, parisLocalToDate } from "@/domains/heure-paris";
 import {
   triageReason,
   triageReasonColumns,
@@ -31,7 +31,6 @@ import {
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
-import { parisDayIndex } from "./calendrier";
 import type {
   FollowupClinical,
   FollowupView,

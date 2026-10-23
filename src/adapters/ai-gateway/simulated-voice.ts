@@ -1,3 +1,4 @@
+import { concatBytes } from "@/domains/commun";
 import { riffChunks } from "@/domains/fichiers/media";
 
 /**
@@ -14,16 +15,6 @@ function chunk(id: string, data: Uint8Array): Uint8Array {
   out.set([...id].map((char) => char.charCodeAt(0)));
   new DataView(out.buffer).setUint32(4, data.length, true);
   out.set(data, 8);
-  return out;
-}
-
-function concat(parts: Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
   return out;
 }
 
@@ -48,17 +39,17 @@ export function buildSimulatedVoiceNote(spokenText: string): Uint8Array {
   view.setUint16(12, 1, true);
   view.setUint16(14, 8, true);
 
-  const info = concat([
+  const info = concatBytes([
     new TextEncoder().encode("INFO"),
-    chunk("ICMT", concat([text, new Uint8Array([0])])),
+    chunk("ICMT", concatBytes([text, new Uint8Array([0])])),
   ]);
-  const body = concat([
+  const body = concatBytes([
     new TextEncoder().encode("WAVE"),
     chunk("fmt ", format),
     chunk("LIST", info),
     chunk("data", samples),
   ]);
-  return concat([chunk("RIFF", body)]);
+  return concatBytes([chunk("RIFF", body)]);
 }
 
 /** Texte « prononcé » d'un vocal simulé, ou null pour tout autre fichier. */

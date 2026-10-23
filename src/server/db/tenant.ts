@@ -20,11 +20,6 @@ const contextSchema = z.object({
 });
 
 /**
- * Seul point d'entrée vers les données métier : ouvre une transaction et y fixe le cabinet
- * (et la personne) courants. Les politiques RLS de PostgreSQL filtrent alors chaque requête ;
- * le réglage est local à la transaction et ne peut pas fuir vers une autre requête du pool.
- */
-/**
  * Réveil du worker après validation (ADR 0028) : une transaction qui inscrit une tâche le
  * demande (`requestWake`), et le signal ne part qu'une fois la transaction validée.
  */
@@ -40,6 +35,11 @@ export function requestWake() {
   if (state) state.wake = true;
 }
 
+/**
+ * Seul point d'entrée vers les données métier : ouvre une transaction et y fixe le cabinet
+ * (et la personne) courants. Les politiques RLS de PostgreSQL filtrent alors chaque requête ;
+ * le réglage est local à la transaction et ne peut pas fuir vers une autre requête du pool.
+ */
 export async function withTenant<T>(
   db: Database,
   context: TenantContext,

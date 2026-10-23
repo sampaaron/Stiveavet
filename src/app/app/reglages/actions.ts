@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
+import { parisLocalToDate } from "@/domains/heure-paris";
 import {
   EMERGENCY_PERIODS,
   ESCALATION_CHOICES,
@@ -13,7 +14,6 @@ import {
   contactInput,
   instructionsInput,
   messageWindowsInput,
-  parisLocalToDate,
 } from "@/domains/reglages/content";
 import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";

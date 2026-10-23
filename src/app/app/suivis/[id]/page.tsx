@@ -26,7 +26,7 @@ import { memberContext } from "@/server/authz";
 import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
-import { SectionCard } from "@/ui/card";
+import { Fact, SectionCard } from "@/ui/card";
 import { AnimalAvatar } from "@/ui/animal-avatar";
 import {
   formatDate,
@@ -501,15 +501,6 @@ function BasicDossier({
         </div>
       </div>
     </>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className="font-semibold">{value}</dd>
-    </div>
   );
 }
 

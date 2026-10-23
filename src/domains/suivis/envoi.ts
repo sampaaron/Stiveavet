@@ -1,8 +1,5 @@
-import {
-  DEFAULT_MESSAGE_WINDOWS,
-  parisLocalToDate,
-  parisWallMinutes,
-} from "@/domains/reglages/content";
+import { parisLocalToDate, parisWallMinutes } from "@/domains/heure-paris";
+import { DEFAULT_MESSAGE_WINDOWS } from "@/domains/reglages/content";
 
 import { minutesOfDay } from "@/domains/commun";
 

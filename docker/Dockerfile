@@ -1,7 +1,8 @@
-# syntax=docker/dockerfile:1.7
-# Image de l'application Stivea Vet : multi-étapes, sortie `standalone`, exécution sans root.
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+# Images de Stivea Vet : multi-étapes, sortie `standalone`, exécution sans root.
+# Images de base épinglées par empreinte (tag en clair pour la lecture) ; Dependabot les relève.
 
-FROM node:22-bookworm-slim AS base
+FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
 WORKDIR /app
@@ -13,19 +14,32 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm build
+RUN pnpm build && pnpm build:scripts
 
-# Worker de la file de tâches (ADR 0014) : même code que l'application, exécuté par tsx,
-# sans root. Construit seulement avec --target worker (Docker Compose) ; l'image par défaut
-# reste celle de l'application, ci-dessous.
-FROM build AS worker
+# Tâches hors Next.js : un fichier compilé par esbuild avec ses dépendances (pnpm
+# build:scripts), sans node_modules, sources ni outils de développement, et sans root.
+FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS node-job
 ENV NODE_ENV=production
-RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea \
-  && mkdir -p /data/objets && chown stivea:stivea /data/objets && chmod 700 /data/objets
-USER stivea
-CMD ["node_modules/.bin/tsx", "scripts/worker.mts"]
+WORKDIR /app
+RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea
 
-FROM node:22-bookworm-slim AS runtime
+# Migrations (ADR 0041) : tâche ponctuelle, seule à recevoir MIGRATOR_DATABASE_URL, lancée
+# depuis le réseau privé avant chaque déploiement. Construite avec --target migrate.
+FROM node-job AS migrate
+COPY --from=build /app/dist/db/migrate.mjs ./dist/db/migrate.mjs
+COPY --from=build /app/db/migrations ./dist/db/migrations
+USER stivea
+CMD ["node", "dist/db/migrate.mjs"]
+
+# Worker de la file de tâches (ADR 0014, 0041). Construit avec --target worker ; l'image
+# par défaut reste celle de l'application, ci-dessous.
+FROM node-job AS worker
+RUN mkdir -p /data/objets && chown stivea:stivea /data/objets && chmod 700 /data/objets
+COPY --from=build /app/dist/scripts/worker.mjs ./dist/worker.mjs
+USER stivea
+CMD ["node", "dist/worker.mjs"]
+
+FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea
