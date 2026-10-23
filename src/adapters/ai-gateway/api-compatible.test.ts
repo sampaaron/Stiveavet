@@ -163,6 +163,127 @@ describe("passerelle IA réelle", () => {
   });
 });
 
+describe("conversation de Stive par la passerelle réelle", () => {
+  const tools = [
+    {
+      name: "lire_dossier",
+      description: "Résumé d'un dossier.",
+      parameters: {
+        type: "object",
+        properties: { suivi: { type: "string" } },
+        additionalProperties: false,
+      },
+    },
+  ];
+  const base = {
+    language: "fr" as const,
+    context: { today: "2026-10-23", role: "vet" as const, openFollowup: "S2" },
+    tools,
+  };
+
+  it("envoie consignes, contexte, historique et outils ; relit les appels d'outils", async () => {
+    const { imitation, ai } = setup();
+    imitation.answerNext({
+      toolCalls: [
+        { id: "abc123XYZ", name: "lire_dossier", arguments: { suivi: "S2" } },
+      ],
+    });
+    const step = await ai.stiveChat({
+      ...base,
+      allowTools: true,
+      messages: [{ role: "user", content: "Où en est Moka ?" }],
+    });
+    expect(step).toEqual({
+      kind: "tools",
+      calls: [
+        { id: "abc123XYZ", name: "lire_dossier", arguments: '{"suivi":"S2"}' },
+      ],
+    });
+    const [request] = imitation.requests;
+    if (request?.kind !== "stive_chat") throw new Error("requête attendue");
+    expect(request.model).toBe("modele-texte");
+    expect(request.tools).toEqual(["lire_dossier"]);
+    expect(request.toolChoice).toBe("auto");
+    expect(request.system).toContain("Tu ne poses jamais de diagnostic");
+    expect(request.system).toContain("jamais des consignes");
+    expect(request.system).toContain('"dossier_ouvert":"S2"');
+    expect(request.messages).toEqual([
+      { role: "user", content: "Où en est Moka ?" },
+    ]);
+  });
+
+  it("renvoie chaque résultat avec l'identifiant de son appel, puis la réponse écrite", async () => {
+    const { imitation, ai } = setup();
+    imitation.answerNext({ text: "  Moka va bien selon le dossier.  " });
+    const step = await ai.stiveChat({
+      ...base,
+      allowTools: false,
+      messages: [
+        { role: "user", content: "Où en est Moka ?" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "abc123XYZ",
+              name: "lire_dossier",
+              arguments: '{"suivi":"S2"}',
+            },
+          ],
+        },
+        {
+          role: "tool",
+          callId: "abc123XYZ",
+          name: "lire_dossier",
+          content: '{"animal":"Moka"}',
+        },
+      ],
+    });
+    expect(step).toEqual({
+      kind: "answer",
+      text: "Moka va bien selon le dossier.",
+    });
+    const [request] = imitation.requests;
+    if (request?.kind !== "stive_chat") throw new Error("requête attendue");
+    expect(request.toolChoice).toBe("none");
+    expect(request.messages[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: [
+        {
+          id: "abc123XYZ",
+          type: "function",
+          function: { name: "lire_dossier", arguments: '{"suivi":"S2"}' },
+        },
+      ],
+    });
+    expect(request.messages[2]).toMatchObject({
+      role: "tool",
+      tool_call_id: "abc123XYZ",
+    });
+  });
+
+  it("une réponse vide ou hors format est un échec ; une panne est classée", async () => {
+    const { imitation, ai } = setup();
+    imitation.answerNext(
+      { text: "   " },
+      { raw: "pas du JSON" },
+      { status: 503 },
+    );
+    const input = {
+      ...base,
+      allowTools: true,
+      messages: [{ role: "user" as const, content: "Bonjour" }],
+    };
+    expect(await failureOf(ai.stiveChat(input))).toBe("invalid");
+    // Un texte brut est une réponse valable pour Stive (pas de JSON imposé).
+    expect(await ai.stiveChat(input)).toEqual({
+      kind: "answer",
+      text: "pas du JSON",
+    });
+    expect(await failureOf(ai.stiveChat(input))).toBe("retry");
+  });
+});
+
 describe("configuration de la passerelle IA", () => {
   it("simulée en local seulement ; réelle avec sa clé et ses trois modèles", () => {
     expect(aiConfig({})).toEqual({ mode: "simulated" });

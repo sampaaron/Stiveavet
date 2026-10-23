@@ -60,7 +60,7 @@ Aaron a choisi de rester en simulation : Stive doit fonctionner sans compte, et 
   - purge à 30 jours limitée au cabinet ;
   - effacement personnel.
 - Tests de bout en bout : point du jour, résumé, rendez-vous confirmé depuis Stive, brouillon envoyé seulement sur clic, accessibilité, écran de 320 px.
-- Vraie IA (plus tard) : brancher la reconnaissance sur la passerelle de l'ADR 0026 avec appel d'outils. Elle n'enverra que la question et le strict nécessaire, avec les consignes de Numa (pas de diagnostic, de dosage ni de réassurance) et une évaluation dédiée avant mise en service.
+- Vraie IA : faite par l'ADR 0042 (conversation libre, outils exécutés avec les droits de la personne, contrôle déterministe des réponses). Les règles écrites restent le mode simulé et le relais si l'IA ne répond pas.
 
 ## Place dans l'interface (23 octobre 2026)
 

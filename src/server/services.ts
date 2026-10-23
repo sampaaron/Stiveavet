@@ -195,7 +195,10 @@ export const services = {
     stats ??= statsService(appDatabase());
     return stats;
   },
-  /** Stive, l'assistant IA de l'équipe : lit par les services des écrans (ADR 0034). */
+  /**
+   * Stive, l'assistant IA de l'équipe : lit par les services des écrans (ADR 0034) ;
+   * conversation libre par la passerelle IA quand elle est branchée (ADR 0042).
+   */
   stive(): StiveService {
     stive ??= stiveService({
       db: appDatabase(),
@@ -207,6 +210,7 @@ export const services = {
       conversations: services.conversations(),
       launch: services.launch(),
       alerts: services.alerts(),
+      ai: configuredAiGateway(),
     });
     return stive;
   },

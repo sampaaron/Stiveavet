@@ -14,9 +14,20 @@ export const stive = {
     `Bonjour ${firstName}, que puis-je préparer pour vous ?`,
   greetingHelp:
     "Posez une question avec vos mots, ou choisissez une suggestion.",
+  greetingHelpAi:
+    "Parlez-moi comme à un collègue : le métier, vos dossiers, vos clients, l'organisation du cabinet. Je prépare, vous décidez.",
+  /** Mode de Stive (ADR 0042). */
+  mode: {
+    simulatedTitle: "Mode simulé",
+    simulated:
+      "Stive ne reconnaît ici que six demandes, par des règles écrites. Pour discuter librement du métier, il faut brancher l'IA : variable AI_PROVIDER et clé AI_API_KEY dans le fichier .env du serveur, jamais dans le code.",
+  },
+  thinking: "Stive réfléchit…",
   ask: {
     label: "Votre demande à Stive",
     placeholder: "Par exemple : mes créneaux libres demain",
+    placeholderAi:
+      "Par exemple : comment annoncer une complication à un propriétaire inquiet ?",
     submit: "Demander",
     empty: "Écrivez votre demande avant de l'envoyer.",
     tooLong: "Votre demande est trop longue (500 caractères au plus).",
@@ -52,6 +63,11 @@ export const stive = {
       "Un brouillon de message, que vous envoyez vous-même",
       "Mettre en pause, reprendre ou arrêter un suivi, après confirmation",
     ],
+    conversation:
+      "Discuter du métier comme avec un collègue : suivi post-opératoire, organisation, communication avec les propriétaires",
+    conversationOff: "Discuter librement du métier : demande l'IA branchée",
+    limits:
+      "Il ne pose jamais de diagnostic sur un animal, ne donne ni dose ni prescription (voyez le RCP ou votre référentiel) et la décision vous revient toujours.",
   },
   privacy: {
     title: "Vos échanges",
@@ -203,6 +219,38 @@ export const stive = {
   unknown: {
     title: "Je ne sais pas encore faire ça.",
     help: "Voici ce que je peux préparer pour vous :",
+    simulated:
+      "En mode simulé, je ne réponds qu'à mes six demandes : la conversation libre sur le métier demande l'IA branchée (variable AI_PROVIDER et clé dans le fichier .env du serveur).",
+    aiUnavailableTitle: "L'IA ne répond pas pour l'instant.",
+    aiUnavailable:
+      "Réessayez dans un moment. En attendant, je peux toujours préparer ceci :",
+  },
+  /** Échanges simples en mode simulé : textes fixes, rien d'inventé. */
+  smalltalk: {
+    greeting:
+      "Bonjour ! Je suis Stive, l'assistant IA de l'équipe. Je prépare, vous décidez.",
+    thanks: "Avec plaisir. Je reste là si vous avez besoin d'autre chose.",
+    identity:
+      "Je suis Stive, une IA, l'assistant de l'équipe du cabinet. Je ne suis pas vétérinaire : je ne pose aucun diagnostic et je ne donne aucune dose ; la décision vous revient toujours.",
+    help: "Voici ce que je peux préparer pour vous :",
+  },
+  /** Réponse libre de l'IA (ADR 0042). */
+  reply: {
+    withheldNote: "Réponse remplacée par les garde-fous de Stive.",
+    withheld: {
+      dosage:
+        "Je ne donne ni dose, ni posologie, ni prescription : référez-vous au RCP du médicament et au référentiel thérapeutique du cabinet. La décision vous revient. Je peux en revanche vous aider à préparer l'explication au propriétaire ou les points de suivi.",
+      prescription:
+        "Je ne donne ni dose, ni posologie, ni prescription : référez-vous au RCP du médicament et au référentiel thérapeutique du cabinet. La décision vous revient. Je peux en revanche vous aider à préparer l'explication au propriétaire ou les points de suivi.",
+      diagnosis:
+        "Je ne pose pas de diagnostic sur un animal : seul l'examen par le vétérinaire le permet. Je peux vous aider à lister les points à vérifier ou à préparer l'échange avec le propriétaire.",
+      identity:
+        "Ma réponse ne respectait pas mes règles : je suis une IA, pas un vétérinaire. Pouvez-vous reformuler votre question ?",
+      contact:
+        "Ma réponse contenait un lien, une adresse ou un numéro, ce que je n'écris jamais. Pouvez-vous reformuler votre question ?",
+      length:
+        "Ma réponse était trop longue pour être affichée. Pouvez-vous poser une question plus précise ?",
+    },
   },
   limit: {
     reached: (limit: number, date: string) =>
