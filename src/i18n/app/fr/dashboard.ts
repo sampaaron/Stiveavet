@@ -7,9 +7,12 @@ export const dashboard = {
   /** Sous-titre avec accès clinique (la date est au-dessus du titre). */
   headlineShort: (urgent: number, watch: number) =>
     `${nombre(urgent, "urgence", "urgences")} et ${watch} cas à surveiller`,
-  /** Le point de Numa, en tête du tableau de bord : des décomptes, jamais un avis médical. */
+  /**
+   * Point du jour, en tête du tableau de bord (porté par Stive quand l'offre le comprend) :
+   * des décomptes, jamais un avis médical.
+   */
   briefing: {
-    title: "Le point de Numa",
+    title: "Votre point du jour",
     clinical: (active: number, urgent: number, watch: number) => {
       const parts = [
         urgent
@@ -22,13 +25,20 @@ export const dashboard = {
       const signals = parts.length
         ? `${parts.join(" et ")}.`
         : "Aucune alerte en attente.";
-      return `J'accompagne ${nombre(active, "animal", "animaux")} en ce moment. ${signals} Je ne pose jamais de diagnostic : la décision reste la vôtre.`;
+      const first = signals.charAt(0).toUpperCase() + signals.slice(1);
+      return `${nombre(active, "animal suivi", "animaux suivis")} en ce moment. ${first}`;
     },
     summary: (active: number) =>
-      `J'accompagne ${nombre(active, "animal", "animaux")} pour le cabinet. Je ne pose jamais de diagnostic et je renvoie toute question médicale à l'équipe.`,
+      `${nombre(active, "animal suivi", "animaux suivis")} en ce moment pour le cabinet.`,
     searchPlaceholder:
       "Rechercher un animal, un propriétaire, une intervention…",
     searchSubmit: "Rechercher dans les suivis",
+  },
+  /** Numa, en retrait : son rôle est auprès des propriétaires. */
+  numa: {
+    title: "Numa",
+    text: (active: number) =>
+      `échange avec les propriétaires de ${nombre(active, "animal suivi", "animaux suivis")} et vous transmet ce qui demande un vétérinaire.`,
   },
   empty: {
     title: "Aucun suivi pour l'instant",
@@ -150,8 +160,6 @@ export const dashboard = {
     appointment: (kind: string, animal: string) => `${kind} · ${animal}`,
     otherAppointment: "Rendez-vous",
   },
-  numa: (animals: number) =>
-    `Suit ${animals} ${animals > 1 ? "animaux" : "animal"} pour la clinique. Elle ne pose jamais de diagnostic et escalade en cas de doute.`,
   notFound: {
     title: "Cet écran n'est pas encore disponible",
     description:

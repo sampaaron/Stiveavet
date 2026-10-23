@@ -61,3 +61,12 @@ Aaron a choisi de rester en simulation : Stive doit fonctionner sans compte, et 
   - effacement personnel.
 - Tests de bout en bout : point du jour, résumé, rendez-vous confirmé depuis Stive, brouillon envoyé seulement sur clic, accessibilité, écran de 320 px.
 - Vraie IA (plus tard) : brancher la reconnaissance sur la passerelle de l'ADR 0026 avec appel d'outils. Elle n'enverra que la question et le strict nécessaire, avec les consignes de Numa (pas de diagnostic, de dosage ni de réassurance) et une évaluation dédiée avant mise en service.
+
+## Place dans l'interface (23 octobre 2026)
+
+À la demande d'Aaron, Stive passe au premier plan de l'espace cabinet, comme assistant du vétérinaire ; Numa, dont le rôle est auprès des propriétaires, s'y fait plus discret.
+
+- Le tableau de bord s'ouvre sur « Le point de Stive » : décomptes du jour, ce qui attend une décision (alertes, rendez-vous à confirmer, fiches à finir), prochain rendez-vous et une barre « Demander à Stive » dont la réponse s'ouvre dans l'écran de Stive. Sans Stive (offre Starter, droit retiré), le même point du jour s'affiche sans assistant, avec la recherche des suivis.
+- Stive est la deuxième entrée du menu, juste après « Aujourd'hui ». La rubrique « Assistants IA » disparaît : les réglages de Numa rejoignent « Cabinet ».
+- Numa n'apparaît plus sur le tableau de bord qu'en une ligne : elle échange avec les propriétaires et transmet ce qui demande un vétérinaire. Elle reste présente là où elle agit : conversations, dossiers, réglages WhatsApp.
+- Les deux restent présentés comme des IA, et aucun ne prend de décision médicale.

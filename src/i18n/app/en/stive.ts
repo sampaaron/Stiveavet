@@ -217,6 +217,9 @@ export const stive: AppDictionary["stive"] = {
   },
   dashboard: {
     title: "Stive's briefing",
+    promise: "I prepare, you decide: I never make a diagnosis.",
+    askPlaceholder:
+      "Ask Stive: a file summary, your free slots, a draft message…",
     calm: "Nothing to confirm for now.",
     drafts: (count: number) =>
       `${plural(count, "launch sheet", "launch sheets")} to finish`,

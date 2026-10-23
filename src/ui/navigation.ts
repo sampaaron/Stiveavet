@@ -27,7 +27,7 @@ export type NavItem = {
   icon: LucideIcon;
   /** Visible si la personne a au moins une de ces permissions (aucune : visible de tous). */
   anyOf?: readonly string[];
-  /** Portrait de l'assistant IA affiché à la place de l'icône (section « Assistants IA »). */
+  /** Portrait de l'assistant IA affiché à la place de l'icône. */
   assistant?: "numa" | "stive";
   /** Pastille du nombre d'alertes sans accusé de réception. */
   badge?: "alerts";
@@ -42,6 +42,14 @@ export const appNavigation: NavSection[] = [
   {
     items: [
       { href: "/app", label: "today", icon: Sun },
+      {
+        href: "/app/stive",
+        label: "stive",
+        icon: Sparkles,
+        // Sans Stive dans la formule, l'administrateur y voit la présentation de l'offre.
+        anyOf: ["stive.use", "billing.manage"],
+        assistant: "stive",
+      },
       {
         href: "/app/suivis",
         label: "followups",
@@ -74,28 +82,14 @@ export const appNavigation: NavSection[] = [
     ],
   },
   {
-    label: "assistants",
+    label: "practice",
     items: [
       {
         href: "/app/reglages",
         label: "settings",
         icon: Settings2,
         anyOf: ["organization.settings"],
-        assistant: "numa",
       },
-      {
-        href: "/app/stive",
-        label: "stive",
-        icon: Sparkles,
-        // Sans Stive dans la formule, l'administrateur y voit la présentation de l'offre.
-        anyOf: ["stive.use", "billing.manage"],
-        assistant: "stive",
-      },
-    ],
-  },
-  {
-    label: "practice",
-    items: [
       {
         href: "/app/protocoles",
         label: "protocols",

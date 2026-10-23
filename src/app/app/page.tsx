@@ -31,7 +31,7 @@ import type {
 import type { AgendaEvent as AgendaEventData } from "@/ui/types";
 import { AgendaEvent } from "@/ui/agenda-event";
 import { AlertBanner } from "@/ui/alert-banner";
-import { AiBadge, AssistantAvatar, AssistantCard } from "@/ui/assistant-card";
+import { AiBadge, AssistantAvatar } from "@/ui/assistant-card";
 import { ButtonLink } from "@/ui/button";
 import { CapacityMeter } from "@/ui/capacity-meter";
 import { Card, SectionCard, StatGrid, StatTile } from "@/ui/card";
@@ -56,6 +56,7 @@ import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
 import { ActivityPanel, NextActions } from "./activity-panel";
+import { AskStiveBar } from "./stive/stive-forms";
 import { triageReasonText } from "./triage-reason";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -166,23 +167,13 @@ function toAgendaEvent(
   };
 }
 
-/** Carte « Le point de Stive » : ce qui attend une décision, et le prochain rendez-vous. */
-function StiveBriefingCard({
-  t,
-  locale,
-  briefing,
-  now,
-}: {
-  t: AppDictionary;
-  locale: Locale;
-  briefing: StiveBriefing;
-  now: Date;
-}) {
+/**
+ * Ce que Stive a relevé pour l'équipe : alertes sans accusé, rendez-vous à confirmer, fiches
+ * à finir. Des raccourcis, jamais une décision : chaque lien ouvre l'écran où l'on décide.
+ */
+function stiveChips(t: AppDictionary, briefing: StiveBriefing): Chip[] {
   const words = t.stive;
-  const next = briefing.agenda?.find(
-    (item) => new Date(item.startsAt).getTime() > now.getTime(),
-  );
-  const lines = [
+  return [
     briefing.unacknowledged
       ? {
           href: "/app/alertes",
@@ -206,61 +197,36 @@ function StiveBriefingCard({
           label: words.dashboard.drafts(briefing.drafts.length),
         }
       : null,
-  ].filter((line) => line !== null);
-  return (
-    <AssistantCard
-      assistant="stive"
-      action={
-        <ButtonLink
-          href="/app/stive"
-          variant="secondary"
-          size="sm"
-          icon={<Sparkles aria-hidden="true" className="size-4" />}
-        >
-          {words.dashboard.open}
-        </ButtonLink>
-      }
-    >
-      <p className="mb-2 font-semibold">{words.dashboard.title}</p>
-      {lines.length ? (
-        <ul className="grid gap-1.5">
-          {lines.map(({ href, icon: Icon, label }) => (
-            <li key={href}>
-              <Link
-                href={href}
-                className="inline-flex items-center gap-2 font-medium text-brand-ink underline-offset-2 hover:underline"
-              >
-                <Icon aria-hidden="true" className="size-4 shrink-0" />
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-ink-muted">{words.dashboard.calm}</p>
-      )}
-      {next ? (
-        <p className="mt-2 text-ink-muted">
-          {words.dashboard.nextAppointment(
-            formatTime(new Date(next.startsAt), locale),
-            "appointment" in next.title
-              ? t.dashboard.agenda.appointment(
-                  next.title.appointment === "other"
-                    ? t.dashboard.agenda.otherAppointment
-                    : t.labels.appointmentKinds[next.title.appointment],
-                  next.title.animalName,
-                )
-              : next.title.text,
-          )}
-        </p>
-      ) : null}
-    </AssistantCard>
+  ].filter((chip) => chip !== null);
+}
+
+/** Prochain rendez-vous de l'agenda lu par Stive, en une ligne. */
+function nextAppointmentLine(
+  t: AppDictionary,
+  locale: Locale,
+  briefing: StiveBriefing,
+  now: Date,
+): string | null {
+  const next = briefing.agenda?.find(
+    (item) => new Date(item.startsAt).getTime() > now.getTime(),
+  );
+  if (!next) return null;
+  return t.stive.dashboard.nextAppointment(
+    formatTime(new Date(next.startsAt), locale),
+    "appointment" in next.title
+      ? t.dashboard.agenda.appointment(
+          next.title.appointment === "other"
+            ? t.dashboard.agenda.otherAppointment
+            : t.labels.appointmentKinds[next.title.appointment],
+          next.title.animalName,
+        )
+      : next.title.text,
   );
 }
 
 type Chip = { href: string; label: string; icon: LucideIcon };
 
-/** Raccourcis sous le point de Numa, selon les droits et ce qu'il y a à faire. */
+/** Raccourcis sous le point du jour, selon les droits et ce qu'il y a à faire. */
 function quickActions(
   t: AppDictionary,
   can: (permission: PermissionKey) => boolean,
@@ -296,56 +262,78 @@ function quickActions(
   ].filter((chip) => chip !== null);
 }
 
-/** Le point de Numa : décomptes du jour, recherche et raccourcis. */
-function NumaBriefing({
+/**
+ * En tête du tableau de bord : le point de Stive, l'assistant IA de l'équipe (décomptes du
+ * jour, ce qui attend une décision, une demande en une ligne). Sans Stive dans la formule ou
+ * dans les droits, le même point du jour, sans assistant, avec la recherche des suivis.
+ */
+function TodayBriefing({
   t,
+  locale,
+  now,
   clinical,
   today,
   urgent,
   watch,
   canSearch,
   chips,
+  stive,
 }: {
   t: AppDictionary;
+  locale: Locale;
+  now: Date;
   clinical: boolean;
   today: TodayView;
   urgent: number;
   watch: number;
   canSearch: boolean;
   chips: Chip[];
+  stive: StiveBriefing | null;
 }) {
   const text = t.dashboard;
+  const links = stive ? [...stiveChips(t, stive), ...chips] : chips;
+  const next = stive ? nextAppointmentLine(t, locale, stive, now) : null;
   return (
     <section
-      aria-labelledby="point-de-numa"
-      className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(8_122_84/0.35)] assistant-glow sm:p-8"
+      aria-labelledby="point-du-jour"
+      className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(91_79_224/0.35)] assistant-glow sm:p-8"
     >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-25 blur-3xl"
       />
       <div className="flex items-start gap-4">
-        <AssistantAvatar
-          assistant="numa"
-          size={56}
-          className="size-11 ring-4 ring-brand-soft sm:size-14"
-        />
+        {stive ? (
+          <AssistantAvatar
+            assistant="stive"
+            size={56}
+            className="size-11 ring-4 ring-accent/15 sm:size-14"
+          />
+        ) : null}
         <div className="min-w-0">
           <h2
-            id="point-de-numa"
+            id="point-du-jour"
             className="flex flex-wrap items-center gap-2 font-bold"
           >
-            {text.briefing.title}
-            <AiBadge assistant="numa" />
+            {stive ? t.stive.dashboard.title : text.briefing.title}
+            {stive ? <AiBadge assistant="stive" /> : null}
           </h2>
           <p className="mt-2 max-w-3xl font-display text-lg leading-snug tracking-[-0.01em] text-balance sm:text-[1.375rem]">
             {clinical
               ? text.briefing.clinical(today.activeFollowups, urgent, watch)
               : text.briefing.summary(today.activeFollowups)}
           </p>
+          {stive ? (
+            <p className="mt-2 text-sm text-ink-muted">
+              {t.stive.dashboard.promise}
+              {next ? ` ${next}` : null}
+            </p>
+          ) : null}
         </div>
       </div>
-      {canSearch ? (
+      {stive ? (
+        <AskStiveBar placeholder={t.stive.dashboard.askPlaceholder} />
+      ) : canSearch ? (
         <form action="/app/suivis" role="search" className="relative mt-5">
           <label htmlFor="recherche-globale" className="sr-only">
             {t.shell.search.label}
@@ -372,10 +360,10 @@ function NumaBriefing({
           </button>
         </form>
       ) : null}
-      {chips.length > 0 ? (
+      {links.length > 0 ? (
         <ul className="mt-4 flex flex-wrap gap-2">
-          {chips.map(({ href, label, icon: Icon }) => (
-            <li key={href}>
+          {links.map(({ href, label, icon: Icon }) => (
+            <li key={`${href}-${label}`}>
               <Link
                 href={href}
                 className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line/80 bg-surface/70 px-4 text-sm font-medium text-ink backdrop-blur transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:bg-surface hover:shadow-[0_8px_20px_-10px_rgb(8_122_84/0.5)]"
@@ -387,7 +375,35 @@ function NumaBriefing({
           ))}
         </ul>
       ) : null}
+      {stive ? (
+        <div className="mt-4">
+          <ButtonLink
+            href="/app/stive"
+            variant="quiet"
+            size="sm"
+            icon={<Sparkles aria-hidden="true" className="size-4" />}
+          >
+            {t.stive.dashboard.open}
+          </ButtonLink>
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+/**
+ * Numa, en retrait : son rôle est auprès des propriétaires. Une ligne pour rappeler ce qu'elle
+ * fait pour le cabinet, sans décompte ni avis.
+ */
+function NumaNote({ t, active }: { t: AppDictionary; active: number }) {
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-panel)] border border-line/70 bg-surface/60 px-4 py-3 text-sm text-ink-muted">
+      <AssistantAvatar assistant="numa" size={32} className="size-8" />
+      <p className="min-w-0">
+        <span className="font-semibold text-ink">{t.dashboard.numa.title}</span>{" "}
+        <AiBadge assistant="numa" /> {t.dashboard.numa.text(active)}
+      </p>
+    </div>
   );
 }
 
@@ -736,14 +752,17 @@ export default async function TodayPage() {
       />
 
       <div className="grid gap-6">
-        <NumaBriefing
+        <TodayBriefing
           t={t}
+          locale={locale}
+          now={now}
           clinical={clinical}
           today={today}
           urgent={urgent.length}
           watch={watch.length}
           canSearch={canSearch}
           chips={chips}
+          stive={briefing}
         />
 
         <UrgentBanners t={t} locale={locale} now={now} urgent={urgent} />
@@ -782,13 +801,8 @@ export default async function TodayPage() {
               links={{ followups: views.length > 0, alerts: clinical }}
             />
 
-            {briefing ? (
-              <StiveBriefingCard
-                t={t}
-                locale={locale}
-                briefing={briefing}
-                now={now}
-              />
+            {today.activeFollowups > 0 ? (
+              <NumaNote t={t} active={today.activeFollowups} />
             ) : null}
           </div>
         </div>
