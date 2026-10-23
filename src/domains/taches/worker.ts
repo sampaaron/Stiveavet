@@ -51,12 +51,17 @@ export type JobReader = <T>(
  * Exécutant en deux temps, pour une tâche qui appelle un prestataire lent (IA, Meta) :
  * - `prepare` lit ce qu'il lui faut (`read`, sans verrou), puis appelle le prestataire hors
  *   de toute transaction : aucune connexion ni aucun verrou n'est gardé pendant l'appel ;
- * - `commit` reprend les verrous, revérifie l'état et écrit, sans appel extérieur. Il doit
- *   être idempotent : son écriture est gardée même si le bail a été perdu pendant l'appel,
- *   pour que la reprise de la tâche ailleurs ne refasse pas ce qui est déjà parti.
+ * - `commit` reprend les verrous, revérifie l'état et écrit, sans appel extérieur.
  * Une erreur levée par l'une ou l'autre étape suit le chemin d'échec habituel.
  */
 export type StagedJobHandler<Prepared> = {
+  /**
+   * Effet chez le prestataire qui ne doit jamais être refait (message WhatsApp parti) :
+   * l'écriture qui le constate est gardée même si le bail a été perdu pendant l'appel, pour
+   * que la reprise de la tâche ailleurs le voie. `commit` doit alors être idempotent sous
+   * verrou. Sinon, comme pour un exécutant simple, un bail perdu annule l'écriture.
+   */
+  keepOnLostLease?: boolean;
   prepare(context: { job: ClaimedJob; read: JobReader }): Promise<Prepared>;
   commit(context: {
     tx: TenantTransaction;
@@ -274,10 +279,11 @@ export function createWorker(options: WorkerOptions) {
         return fn(tx);
       });
     const prepared = await handler.prepare({ job, read });
-    // L'appel a eu lieu : son résultat est écrit même si le bail a expiré entre-temps.
     return withTenant(db, tenant, async (tx) => {
       await handler.commit({ tx, job, prepared });
-      return complete(tx, job);
+      const done = await complete(tx, job);
+      if (!done && !handler.keepOnLostLease) throw new LeaseLost();
+      return done;
     });
   }
 

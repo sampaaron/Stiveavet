@@ -99,6 +99,7 @@ function onlyFor(
           },
         ];
       const staged: StagedJobHandler<{ prepared: unknown } | null> = {
+        keepOnLostLease: handler.keepOnLostLease,
         async prepare(context) {
           return mine(context.job)
             ? { prepared: await handler.prepare(context) }
