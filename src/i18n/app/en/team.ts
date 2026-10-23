@@ -63,6 +63,7 @@ export const team: AppDictionary["team"] = {
     email_invalid: "Invalid e-mail address.",
     name_missing: "Enter the person's name.",
     name_too_long: "Name too long.",
+    name_chars: "Enter a name, without any link or e-mail address.",
     fallback: "Check the name, e-mail address and role.",
   },
 };

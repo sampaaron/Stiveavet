@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 import {
   FICTIONAL_LOGIN_PHRASE,
@@ -21,6 +23,7 @@ import {
 } from "@/domains/equipe/service";
 import { followupsService } from "@/domains/suivis/service";
 import { followups as fixtureFollowups } from "@/fixtures/cabinet-tilleuls";
+import * as schema from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
 import { asApp, errorCode, pools } from "./support/db";
@@ -471,17 +474,48 @@ describe("équipe et droits", () => {
     await team.revokeInvitation(adminActor, pending?.id ?? "");
     expect(await previewInvitation(appDb, revokedToken)).toBeNull();
 
+    // Adresse déjà inscrite : aucune invitation ni aucun e-mail (ADR 0039).
+    const sentBefore = mailbox.sent.length;
+    expect(
+      await domainError(
+        team.invite(adminActor, {
+          email: "paul.martin@cabinet-martin.test",
+          displayName: "Dr Paul Martin",
+          role: "assistant",
+        }),
+      ),
+    ).toBe("email_registered");
+    expect(mailbox.sent.length).toBe(sentBefore);
+
+    // Adresse inscrite ailleurs après l'envoi de l'invitation : l'acceptation est refusée.
+    const later = `plus-tard-${tag}@essai.test`;
     await team.invite(adminActor, {
-      email: "paul.martin@cabinet-martin.test",
-      displayName: "Dr Paul Martin",
+      email: later,
+      displayName: "Inscrit Plus Tard",
       role: "assistant",
     });
     const token =
       new URL(
-        /(http\S+jeton=[\w-]+)/.exec(
-          mailbox.lastTo("paul.martin@cabinet-martin.test")?.text ?? "",
-        )?.[1] ?? "http://x",
+        /(http\S+jeton=[\w-]+)/.exec(mailbox.lastTo(later)?.text ?? "")?.[1] ??
+          "http://x",
       ).searchParams.get("jeton") ?? undefined;
+    const registered = await authService({
+      db: appDb,
+      email: mailbox,
+      appUrl: "http://localhost",
+    }).register(
+      {
+        organizationName: "Autre cabinet",
+        displayName: "Dr Ailleurs",
+        email: later,
+        plan: "premium",
+        password: "une phrase de passe du second cabinet",
+        acceptTerms: true,
+        authorized: true,
+      },
+      { ip: null, userAgent: null },
+    );
+    expect(registered.status).toBe("code_required");
     expect((await previewInvitation(appDb, token))?.emailRegistered).toBe(true);
     expect(
       await acceptInvitation(appDb, {
@@ -573,5 +607,256 @@ describe("équipe et droits", () => {
       [log.actions.map((event) => event.id)],
     );
     expect(rows).toEqual([{ organization_id: org }]);
+  });
+});
+
+describe("invitations, départs et places (ADR 0039)", () => {
+  // Cabinet propre à ce bloc : deux administrateurs, un vétérinaire, deux assistants.
+  const other = randomUUID();
+  const otherTag = other.slice(0, 8);
+  let m: {
+    ada: string;
+    bob: string;
+    vet: string;
+    asv1: string;
+    asv2: string;
+  };
+
+  beforeAll(async () => {
+    const [ada, bob, vet, asv1, asv2] = await createOrganization(
+      appDb,
+      other,
+      "Clinique d'essai des départs",
+      [
+        {
+          email: `ada-${otherTag}@essai.test`,
+          displayName: "Dr Ada",
+          role: "admin_vet",
+        },
+        {
+          email: `bob-${otherTag}@essai.test`,
+          displayName: "Dr Bob",
+          role: "admin_vet",
+        },
+        {
+          email: `vet-${otherTag}@essai.test`,
+          displayName: "Dr Vic",
+          role: "vet",
+        },
+        {
+          email: `asv1-${otherTag}@essai.test`,
+          displayName: "Asv Un",
+          role: "assistant",
+        },
+        {
+          email: `asv2-${otherTag}@essai.test`,
+          displayName: "Asv Deux",
+          role: "assistant",
+        },
+      ],
+    );
+    if (!ada || !bob || !vet || !asv1 || !asv2) throw new Error("cabinet");
+    m = { ada, bob, vet, asv1, asv2 };
+  });
+
+  const tokenFor = (address: string) =>
+    new URL(
+      /(http\S+jeton=[\w-]+)/.exec(mailbox.lastTo(address)?.text ?? "")?.[1] ??
+        "http://x",
+    ).searchParams.get("jeton") ?? undefined;
+
+  it("au départ de son auteur, une invitation est annulée et journalisée", async () => {
+    const ada = await actor(m.ada, other);
+    const bob = await actor(m.bob, other);
+    const address = `invite-bob-${otherTag}@essai.test`;
+    await team.invite(bob, {
+      email: address,
+      displayName: "Invité de Bob",
+      role: "assistant",
+    });
+    const token = tokenFor(address);
+    expect(await previewInvitation(appDb, token)).not.toBeNull();
+
+    await team.deactivate(ada, m.bob, null);
+    expect(await previewInvitation(appDb, token)).toBeNull();
+    expect(
+      await acceptInvitation(appDb, {
+        token,
+        displayName: "Invité de Bob",
+        passwordHash: await hashPassword("une phrase pour l'invité"),
+      }),
+    ).toBe("expired");
+    const { rows } = await admin.query(
+      "SELECT metadata FROM audit_events WHERE organization_id = $1 AND action = 'invitation.revoked'",
+      [other],
+    );
+    expect(rows).toEqual([{ metadata: { reason: "member_deactivated" } }]);
+    await team.reactivate(ada, m.bob);
+  });
+
+  it("une invitation dont l'auteur est retiré hors service ne vaut plus non plus", async () => {
+    const bob = await actor(m.bob, other);
+    const address = `invite-ancienne-${otherTag}@essai.test`;
+    await team.invite(bob, {
+      email: address,
+      displayName: "Ancienne",
+      role: "assistant",
+    });
+    const token = tokenFor(address);
+    await admin.query(
+      "UPDATE memberships SET deactivated_at = now() WHERE id = $1",
+      [m.bob],
+    );
+    try {
+      expect(await previewInvitation(appDb, token)).toBeNull();
+      expect(
+        await acceptInvitation(appDb, {
+          token,
+          displayName: "Ancienne",
+          passwordHash: await hashPassword("une phrase pour l'ancienne"),
+        }),
+      ).toBe("expired");
+    } finally {
+      await admin.query(
+        "UPDATE memberships SET deactivated_at = NULL WHERE id = $1",
+        [m.bob],
+      );
+    }
+  });
+
+  it("le départ ferme les sessions : elles ne reviennent pas avec l'accès", async () => {
+    const auth = authService({
+      db: appDb,
+      email: mailbox,
+      appUrl: "http://localhost",
+    });
+    const login = await auth.login(
+      {
+        email: `asv1-${otherTag}@essai.test`,
+        password: FICTIONAL_LOGIN_PHRASE,
+      },
+      { ip: null, userAgent: null },
+    );
+    if (login.status !== "signed_in") throw new Error("session attendue");
+    const ada = await actor(m.ada, other);
+    await team.deactivate(ada, m.asv1, null);
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM auth.sessions WHERE membership_id = $1 AND revoked_at IS NULL",
+      [m.asv1],
+    );
+    expect(rows[0]?.n).toBe(0);
+    await team.reactivate(ada, m.asv1);
+    expect(await auth.resolveSession(login.sessionToken)).toBeNull();
+  });
+
+  it("ne ferme jamais les sessions d'un autre cabinet ni d'un membre encore actif", async () => {
+    const auth = authService({
+      db: appDb,
+      email: mailbox,
+      appUrl: "http://localhost",
+    });
+    const login = await auth.login(
+      {
+        email: `asv2-${otherTag}@essai.test`,
+        password: FICTIONAL_LOGIN_PHRASE,
+      },
+      { ip: null, userAgent: null },
+    );
+    if (login.status !== "signed_in") throw new Error("session attendue");
+    const revoke = (organizationId: string) =>
+      asApp(app, organizationId, async (client) => {
+        const { rows } = await client.query(
+          "SELECT auth.revoke_membership_sessions($1) AS n",
+          [m.asv2],
+        );
+        return (rows[0] as { n: number } | undefined)?.n;
+      });
+    // Membre actif : rien n'est fermé, même depuis son cabinet.
+    expect(await revoke(other)).toBe(0);
+    await admin.query(
+      "UPDATE memberships SET deactivated_at = now() WHERE id = $1",
+      [m.asv2],
+    );
+    try {
+      // Membre retiré, mais d'un autre cabinet que le cabinet courant.
+      expect(await revoke(org)).toBe(0);
+      expect(await revoke(other)).toBe(1);
+    } finally {
+      await admin.query(
+        "UPDATE memberships SET deactivated_at = NULL WHERE id = $1",
+        [m.asv2],
+      );
+    }
+  });
+
+  it("au plus 20 invitations par jour et par cabinet, annulées comprises", async () => {
+    const ada = await actor(m.ada, other);
+    let sent = 0;
+    // Les invitations déjà envoyées par ce cabinet comptent aussi.
+    for (let index = 0; index < 25; index += 1) {
+      const outcome = await domainError(
+        team.invite(ada, {
+          email: `lot-${index}-${otherTag}@essai.test`,
+          displayName: `Invité ${index}`,
+          role: "assistant",
+        }),
+      );
+      if (outcome === "invitation_limit") break;
+      expect(outcome).toBeUndefined();
+      sent += 1;
+      const [pending] = (await team.pendingInvitations(ada)).filter(
+        (invitation) =>
+          invitation.email === `lot-${index}-${otherTag}@essai.test`,
+      );
+      await team.revokeInvitation(ada, pending?.id ?? "");
+    }
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM invitations WHERE organization_id = $1",
+      [other],
+    );
+    expect(rows[0]?.n).toBe(20);
+    expect(sent).toBeLessThan(20);
+  });
+
+  it("le dernier administrateur actif ne peut être retiré : refus métier", async () => {
+    const ada = await actor(m.ada, other);
+    await team.changeRole(ada, m.bob, "vet");
+    try {
+      // Acteur fictif doté de team.manage : seule la base peut encore refuser.
+      const vic = {
+        ...(await actor(m.vet, other)),
+        permissions: new Set(["team.manage"] as const),
+      };
+      expect(await domainError(team.changeRole(vic, m.ada, "vet"))).toBe(
+        "last_admin",
+      );
+      expect(await domainError(team.deactivate(vic, m.ada, null))).toBe(
+        "last_admin",
+      );
+    } finally {
+      await team.changeRole(ada, m.bob, "admin_vet");
+    }
+  });
+
+  it("deux changements de rôle simultanés ne dépassent pas la limite de vétérinaires", async () => {
+    // 3 vétérinaires actifs (Ada, Bob, Vic) : passer Vic assistant libère une seule place.
+    const ada = await actor(m.ada, other);
+    await team.changeRole(ada, m.vet, "assistant");
+    const parallel = new Pool({ connectionString: inject("appUrl"), max: 4 });
+    try {
+      const concurrent = teamService({
+        db: drizzle(parallel, { schema }),
+        email: mailbox,
+        appUrl: "http://localhost",
+      });
+      const outcomes = await Promise.all(
+        [m.vet, m.asv2].map((id) =>
+          domainError(concurrent.changeRole(ada, id, "vet")),
+        ),
+      );
+      expect(outcomes.sort()).toEqual([undefined, "vet_limit"].sort());
+    } finally {
+      await parallel.end();
+    }
   });
 });

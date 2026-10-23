@@ -16,6 +16,13 @@ const email = z
   .max(254, "email_too_long")
   .pipe(z.email("email_invalid"));
 
+/**
+ * Nom repris dans un e-mail envoyé à un tiers (cabinet, personne invitée) : un nom, pas un
+ * message. Ni lien, ni adresse, ni caractère invisible ou de contrôle (même règle que le nom
+ * du cabinet de la démo, ADR 0036).
+ */
+export const PLAIN_NAME = /^(?!.*(?:https?:|www\.|:\/\/))[^\p{C}<>@]*$/iu;
+
 // Pas de règle de complexité à la connexion : seulement une borne contre les entrées géantes.
 const anyPassword = z
   .string()
@@ -38,6 +45,18 @@ export const codeInput = z.object({
 
 export const unlockInput = z.object({ password: anyPassword });
 
+/** « Sécurité du compte » : l'ancien mot de passe, puis le nouveau deux fois. */
+export const passwordChangeInput = z
+  .object({
+    current: anyPassword,
+    password: newPassword,
+    confirmation: newPassword,
+  })
+  .refine((value) => value.password === value.confirmation, {
+    message: "passwords_mismatch",
+    path: ["confirmation"],
+  });
+
 export const resetRequestInput = z.object({ email });
 
 export const newPasswordInput = z
@@ -57,7 +76,8 @@ export const signupInput = z
       .string()
       .trim()
       .min(2, "organization_name_short")
-      .max(160, "organization_name_long"),
+      .max(160, "organization_name_long")
+      .regex(PLAIN_NAME, "organization_name_chars"),
     displayName: z
       .string()
       .trim()
