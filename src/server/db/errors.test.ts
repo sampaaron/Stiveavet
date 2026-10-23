@@ -62,7 +62,7 @@ describe("erreurs de base de données", () => {
 
   it("sans code ni champ texte, l'erreur reste générique", () => {
     const failure = safeDbError(
-      new DrizzleQueryError("select 1", [], undefined as unknown as Error),
+      new DrizzleQueryError("select 1", [], undefined),
     ) as DatabaseFailure;
     expect(failure.message).toBe("Requête refusée par la base");
     expect(failure.cause).toEqual({

@@ -481,8 +481,10 @@ export async function seedFictionalCabinets(db: Database) {
   }).connect(paul, "payment_mandate", "");
 
   await withTenant(db, { organizationId: SEED.martin }, async (tx) => {
+    const model = tilleulsFollowups[1];
+    if (!model) throw new Error("Suivi fictif introuvable");
     const sushi: Followup = {
-      ...structuredClone(tilleulsFollowups[1]!),
+      ...structuredClone(model),
       id: "e3a9c4d1-8b2f-4e67-a0d5-2c7f1b9e6a38",
       animal: {
         name: "Sushi",

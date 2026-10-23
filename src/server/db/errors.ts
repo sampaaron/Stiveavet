@@ -51,9 +51,7 @@ export function withSafeDbErrors<T extends object>(methods: T): T {
       typeof method === "function"
         ? async (...args: unknown[]) => {
             try {
-              return (await (method as (...a: unknown[]) => unknown)(
-                ...args,
-              )) as unknown;
+              return await (method as (...a: unknown[]) => unknown)(...args);
             } catch (error) {
               throw safeDbError(error);
             }

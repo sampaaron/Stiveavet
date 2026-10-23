@@ -78,9 +78,9 @@ describe("réveil du worker par Scaleway Queues", () => {
   });
 
   it("file injoignable : le worker retombe sur l'attente fixe", async () => {
-    const channel = wakeChannel(scaleway, (async () => {
+    const channel = wakeChannel(scaleway, async () => {
       throw new Error("réseau");
-    }) as typeof fetch);
+    });
     await expect(channel.wait(10)).resolves.toBeUndefined();
     await expect(channel.notify()).rejects.toThrow("queue:0");
   });

@@ -41,8 +41,8 @@ function sample(leaf: string | Text): string {
   }
 }
 
-const french = leaves(fr as unknown as Tree);
-const english = new Map(leaves(en as unknown as Tree));
+const french = leaves(fr);
+const english = new Map(leaves(en));
 
 describe("dictionnaires de l'espace cabinet", () => {
   it("le français et l'anglais ont exactement la même structure", () => {

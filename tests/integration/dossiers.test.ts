@@ -17,7 +17,11 @@ afterAll(async () => {
 });
 
 const suivis = followupsService(appDb);
-const caramel = fixtureFollowups[0]!;
+const caramel = (() => {
+  const [first] = fixtureFollowups;
+  if (!first) throw new Error("dossier fictif");
+  return first;
+})();
 
 async function actor(email: string): Promise<Actor> {
   const { rows } = await admin.query(
@@ -135,7 +139,8 @@ describe("contenu du dossier selon les droits", () => {
         acknowledgedBy: [],
       }),
     ]);
-    const alert = record.alerts[0]!;
+    const [alert] = record.alerts;
+    if (!alert) throw new Error("alerte");
     const delay =
       (alert.escalateAt?.getTime() ?? 0) - alert.createdAt.getTime();
     expect(delay).toBe(240 * 60_000);
