@@ -8,6 +8,10 @@ export const errors: AppDictionary["errors"] = {
       "Your plan has no vet seats left (pending invitations included). Change plan in Billing.",
     already_member: "This address already belongs to a member of the practice.",
     already_invited: "An invitation is already pending for this address.",
+    email_registered:
+      "This address already has a Stivea Vet account: an account belongs to a single practice for now. Invite the person with another address.",
+    invitation_limit:
+      "The practice has sent 20 invitations today, cancelled ones included. Try again tomorrow.",
     invalid_target:
       "This choice is no longer available. Please reload the page.",
     self_action: "You cannot change your own access.",

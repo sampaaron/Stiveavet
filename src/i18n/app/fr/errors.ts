@@ -7,6 +7,10 @@ export const errors = {
       "Votre formule est au complet en vétérinaires (invitations en attente comprises). Changez de formule dans Facturation.",
     already_member: "Cette adresse appartient déjà à un membre du cabinet.",
     already_invited: "Une invitation est déjà en attente pour cette adresse.",
+    email_registered:
+      "Cette adresse a déjà un compte Stivea Vet : un compte n'appartient qu'à un seul cabinet pour l'instant. Invitez la personne avec une autre adresse.",
+    invitation_limit:
+      "Le cabinet a envoyé 20 invitations aujourd'hui, annulées comprises. Réessayez demain.",
     invalid_target: "Ce choix n'est plus possible. Rechargez la page.",
     self_action: "Vous ne pouvez pas modifier votre propre accès.",
     last_admin:

@@ -29,6 +29,12 @@ export const journal = {
       `${actor} a changé le rôle de ${member}`,
   },
   byMember: {
+    "account.password_changed": (actor: string) =>
+      `${actor} a changé son mot de passe`,
+    "account.sessions_revoked": (actor: string) =>
+      `${actor} a déconnecté ses autres appareils`,
+    "account.device_revoked": (actor: string) =>
+      `${actor} a retiré un de ses appareils de confiance`,
     "animal.created": (actor: string) =>
       `${actor} a enregistré un animal dans le registre`,
     "animal.updated": (actor: string) =>

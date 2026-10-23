@@ -20,6 +20,8 @@ export class DomainError extends Error {
       | "vet_limit"
       | "already_member"
       | "already_invited"
+      | "email_registered"
+      | "invitation_limit"
       | "invalid_target"
       | "self_action"
       | "last_admin"

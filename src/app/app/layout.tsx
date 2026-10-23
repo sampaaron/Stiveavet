@@ -1,6 +1,7 @@
 import "@fontsource-variable/fraunces";
 
-import { LockKeyhole, LogOut } from "lucide-react";
+import { LockKeyhole, LogOut, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AUTH_POLICY } from "@/domains/auth/policy";
@@ -48,6 +49,14 @@ export default async function CabinetLayout({
       locale={locale}
       accountActions={
         <div className="flex shrink-0 gap-0.5">
+          <Link
+            href="/app/compte"
+            title={t.shell.account}
+            className="grid size-9 place-items-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-mint"
+          >
+            <ShieldCheck aria-hidden="true" className="size-4" />
+            <span className="sr-only">{t.shell.account}</span>
+          </Link>
           <form action={lockAction}>
             <button
               type="submit"

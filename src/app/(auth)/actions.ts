@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import type { z } from "zod";
 
 import {
   codeInput,
@@ -13,10 +12,8 @@ import {
   unlockInput,
 } from "@/domains/auth/validators";
 import { hashPassword, passwordProblems } from "@/domains/auth/password";
-import type { PasswordProblem } from "@/domains/auth/password";
 import { acceptInvitation, previewInvitation } from "@/domains/equipe/service";
 import { appText } from "@/i18n/app/server";
-import type { AppDictionary } from "@/i18n/app/types";
 import { auth } from "@/server/auth";
 import {
   clearAuthCookie,
@@ -30,6 +27,7 @@ import { appDatabase } from "@/server/db/client";
 import { syncUiLocaleCookie } from "@/server/ui-locale";
 
 import type { FormState } from "./form-state";
+import { fieldErrors, passwordErrors } from "./messages";
 
 function fields(form: FormData, names: readonly string[]) {
   return Object.fromEntries(
@@ -38,46 +36,6 @@ function fields(form: FormData, names: readonly string[]) {
       return [name, typeof value === "string" ? value : ""];
     }),
   );
-}
-
-type AuthText = AppDictionary["auth"];
-
-/** Code de validation du domaine (voir `validators.ts`) vers son message ; inconnu : message générique. */
-function validationText(t: AuthText, code: string): string {
-  return Object.hasOwn(t.validation, code)
-    ? t.validation[code as keyof AuthText["validation"]]
-    : t.invalidField;
-}
-
-function fieldErrors(t: AuthText, error: z.ZodError): FormState["fieldErrors"] {
-  const result: Record<string, string[]> = {};
-  for (const issue of error.issues) {
-    const key = String(issue.path[0] ?? "form");
-    (result[key] ??= []).push(validationText(t, issue.message));
-  }
-  return result;
-}
-
-function passwordProblemText(t: AuthText, problem: PasswordProblem): string {
-  switch (problem.code) {
-    case "too_short":
-      return t.passwordProblems.too_short(problem.min);
-    case "too_long":
-      return t.passwordProblems.too_long(problem.max);
-    case "repetitive":
-    case "common":
-    case "personal":
-      return t.passwordProblems[problem.code];
-  }
-}
-
-function passwordErrors(
-  t: AuthText,
-  problems: readonly PasswordProblem[],
-): FormState["fieldErrors"] {
-  return {
-    password: problems.map((problem) => passwordProblemText(t, problem)),
-  };
 }
 
 export async function loginAction(

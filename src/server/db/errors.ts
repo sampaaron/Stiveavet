@@ -43,6 +43,25 @@ export function safeDbError(error: unknown): unknown {
   );
 }
 
+/** Code SQLSTATE d'une erreur de base (Drizzle, pilote ou déjà réduite) ; `undefined` sinon. */
+export function pgErrorCode(error: unknown): string | undefined {
+  const failure = safeDbError(error);
+  return failure instanceof DatabaseFailure ? failure.code : undefined;
+}
+
+/** Contrainte en cause d'une erreur de base, si PostgreSQL la nomme. */
+export function pgConstraint(error: unknown): string | undefined {
+  const failure = safeDbError(error);
+  return failure instanceof DatabaseFailure
+    ? failure.cause.constraint
+    : undefined;
+}
+
+/** Doublon refusé par une contrainte d'unicité (23505). */
+export function isUniqueViolation(error: unknown): boolean {
+  return pgErrorCode(error) === "23505";
+}
+
 /** Mêmes méthodes, dont les erreurs de base sont relancées sans les données de la requête. */
 export function withSafeDbErrors<T extends object>(methods: T): T {
   return Object.fromEntries(

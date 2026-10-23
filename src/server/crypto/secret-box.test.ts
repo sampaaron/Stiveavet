@@ -34,6 +34,25 @@ describe("coffre des secrets", () => {
     );
   });
 
+  it("refuse une étiquette tronquée ou un vecteur de mauvaise longueur", () => {
+    const box = secretBox(parseSecretKeys(`k1:${keyA}`));
+    const parts = box.seal("secret", "ctx").split(".");
+    const tag = Buffer.from(parts[4] ?? "", "base64url");
+    const iv = Buffer.from(parts[2] ?? "", "base64url");
+    expect(tag).toHaveLength(16);
+    expect(iv).toHaveLength(12);
+    for (const [index, value] of [
+      [4, tag.subarray(0, 4)],
+      [4, tag.subarray(0, 12)],
+      [2, iv.subarray(0, 8)],
+      [2, Buffer.concat([iv, iv])],
+    ] as const) {
+      const altered = [...parts];
+      altered[index] = value.toString("base64url");
+      expect(() => box.open(altered.join("."), "ctx")).toThrow(SecretBoxError);
+    }
+  });
+
   it("rotation : la nouvelle clé chiffre, l'ancienne déchiffre encore", () => {
     const before = secretBox(parseSecretKeys(`k1:${keyA}`));
     const sealed = before.seal("secret", "ctx");

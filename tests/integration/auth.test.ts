@@ -544,6 +544,215 @@ describe("réinitialisation du mot de passe", () => {
   });
 });
 
+describe("réinitialisation : mot de passe personnel", () => {
+  it("refuse un nouveau mot de passe qui contient le nom ou l'adresse du titulaire", async () => {
+    const account = await newAdmin();
+    await service.requestPasswordReset({ email: account.email }, origin);
+    const token = resetLinkSentTo(account.email);
+    const local = account.email.split("@")[0] ?? "";
+    for (const password of [
+      "la clinique essai en hiver",
+      `${local} en vacances au soleil`,
+    ]) {
+      const result = await service.resetPassword({ token, password }, origin);
+      expect(result).toEqual({
+        status: "invalid_password",
+        problems: [{ code: "personal" }],
+      });
+    }
+    expect(await service.passwordResetValid(token)).toBe(true);
+  });
+});
+
+describe("sécurité du compte", () => {
+  const firefox: RequestOrigin = {
+    ip: null,
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+  };
+
+  /** Deuxième session de la même personne, depuis son appareil de confiance. */
+  async function secondSession(email: string, deviceToken?: string) {
+    const signedIn = await service.login(
+      { email, password: STRONG, deviceToken },
+      firefox,
+    );
+    if (signedIn.status !== "signed_in") throw new Error("session attendue");
+    return signedIn.sessionToken;
+  }
+
+  it("liste les sessions et appareils de la personne seulement, libellés sans version", async () => {
+    const account = await newAdmin();
+    const other = await secondSession(account.email, account.deviceToken);
+    const stranger = await newAdmin();
+
+    const security = await service.accountSecurity(
+      account.sessionToken,
+      account.deviceToken,
+    );
+    expect(security.sessions).toHaveLength(2);
+    expect(security.sessions[0]?.current).toBe(true);
+    expect(security.sessions[1]?.deviceLabel).toBe("Firefox · Windows");
+    expect(security.devices).toHaveLength(1);
+    expect(security.devices[0]?.current).toBe(true);
+    const strangerView = await service.accountSecurity(
+      stranger.sessionToken,
+      undefined,
+    );
+    expect(strangerView.sessions.map((session) => session.id)).not.toContain(
+      security.sessions[1]?.id,
+    );
+
+    // Session verrouillée : plus rien n'est visible ni modifiable.
+    await service.lock(other);
+    expect(await service.accountSecurity(other, undefined)).toEqual({
+      sessions: [],
+      devices: [],
+    });
+    expect(await service.revokeOtherSessions(other)).toBe(0);
+  });
+
+  it("déconnecte les autres appareils et retire un appareil de confiance, journalisé", async () => {
+    const account = await newAdmin();
+    const other = await secondSession(account.email, account.deviceToken);
+    expect(await service.revokeOtherSessions(account.sessionToken)).toBe(1);
+    expect(await service.resolveSession(other)).toBeNull();
+    expect(await service.resolveSession(account.sessionToken)).not.toBeNull();
+
+    const [device] = (
+      await service.accountSecurity(account.sessionToken, account.deviceToken)
+    ).devices;
+    const stranger = await newAdmin();
+    // Un appareil ne se retire que par la personne à qui il appartient.
+    expect(
+      await service.revokeTrustedDevice(
+        stranger.sessionToken,
+        device?.id ?? "",
+      ),
+    ).toBe(false);
+    expect(
+      await service.revokeTrustedDevice(account.sessionToken, device?.id ?? ""),
+    ).toBe(true);
+    expect(
+      await service.revokeTrustedDevice(account.sessionToken, "pas-un-uuid"),
+    ).toBe(false);
+    // Le code e-mail est de nouveau demandé sur cet appareil.
+    expect(
+      (
+        await service.login(
+          {
+            email: account.email,
+            password: STRONG,
+            deviceToken: account.deviceToken,
+          },
+          origin,
+        )
+      ).status,
+    ).toBe("code_required");
+
+    const session = await service.resolveSession(account.sessionToken);
+    const { rows } = await admin.query(
+      "SELECT action, metadata FROM audit_events WHERE actor_membership_id = $1 AND action LIKE 'account.%' ORDER BY occurred_at",
+      [session?.membershipId],
+    );
+    expect(rows).toEqual([
+      { action: "account.sessions_revoked", metadata: { count: 1 } },
+      { action: "account.device_revoked", metadata: {} },
+    ]);
+  });
+
+  it("change le mot de passe : ancien exigé, règles appliquées, autres sessions fermées, e-mail sans lien", async () => {
+    const account = await newAdmin();
+    const other = await secondSession(account.email, account.deviceToken);
+    const { sessionToken } = account;
+    const fresh = "une toute autre phrase de passe";
+
+    expect(
+      await service.changePassword(
+        { sessionToken, currentPassword: "mauvais", password: fresh },
+        origin,
+      ),
+    ).toEqual({ status: "invalid_current" });
+    expect(
+      await service.changePassword(
+        { sessionToken, currentPassword: STRONG, password: STRONG },
+        origin,
+      ),
+    ).toEqual({
+      status: "invalid_password",
+      problems: [{ code: "unchanged" }],
+    });
+    expect(
+      (
+        await service.changePassword(
+          {
+            sessionToken,
+            currentPassword: STRONG,
+            password: "Motdepasse2026!",
+          },
+          origin,
+        )
+      ).status,
+    ).toBe("invalid_password");
+    expect(await service.resolveSession(other)).not.toBeNull();
+
+    const since = mailbox.sent.length;
+    expect(
+      await service.changePassword(
+        { sessionToken, currentPassword: STRONG, password: fresh },
+        origin,
+      ),
+    ).toEqual({ status: "changed" });
+    expect(await service.resolveSession(other)).toBeNull();
+    expect(await service.resolveSession(sessionToken)).not.toBeNull();
+    const notice = mailbox.sent
+      .slice(since)
+      .find((m) => m.to === account.email);
+    expect(notice?.subject).toMatch(/mot de passe/);
+    expect(notice?.text).not.toMatch(/https?:/);
+    expect(
+      (await service.login({ email: account.email, password: STRONG }, origin))
+        .status,
+    ).toBe("invalid");
+    const session = await service.resolveSession(sessionToken);
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM audit_events WHERE actor_membership_id = $1 AND action = 'account.password_changed'",
+      [session?.membershipId],
+    );
+    expect(rows[0]?.n).toBe(1);
+  });
+
+  it("trop d'erreurs sur l'ancien mot de passe ferment la session", async () => {
+    const { sessionToken } = await newAdmin();
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      expect(
+        (
+          await service.changePassword(
+            {
+              sessionToken,
+              currentPassword: "mauvais",
+              password: "une toute autre phrase de passe",
+            },
+            origin,
+          )
+        ).status,
+      ).toBe("invalid_current");
+    expect(
+      (
+        await service.changePassword(
+          {
+            sessionToken,
+            currentPassword: STRONG,
+            password: "une toute autre phrase de passe",
+          },
+          origin,
+        )
+      ).status,
+    ).toBe("signed_out");
+    expect(await service.resolveSession(sessionToken)).toBeNull();
+  });
+});
+
 describe("inscription", () => {
   it("crée le cabinet, l'administrateur et l'audit ; la session attend le code", async () => {
     const { sessionToken } = await newAdmin();

@@ -1,7 +1,14 @@
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { describe, expect, it } from "vitest";
 
-import { DatabaseFailure, safeDbError, withSafeDbErrors } from "./errors";
+import {
+  DatabaseFailure,
+  isUniqueViolation,
+  pgConstraint,
+  pgErrorCode,
+  safeDbError,
+  withSafeDbErrors,
+} from "./errors";
 
 function pgError(fields: Record<string, string>) {
   return Object.assign(new Error(fields.message), {
@@ -70,5 +77,24 @@ describe("erreurs de base de données", () => {
     });
     await expect(repo.ok(2)).resolves.toBe(4);
     await expect(repo.fail()).rejects.toBeInstanceOf(DatabaseFailure);
+  });
+
+  it("lit le code et la contrainte de toute erreur, sans jamais lever", () => {
+    const duplicate = query(
+      pgError({
+        code: "23505",
+        message: "duplicate key",
+        constraint: "users_email_key",
+      }),
+    );
+    expect(pgErrorCode(duplicate)).toBe("23505");
+    expect(isUniqueViolation(duplicate)).toBe(true);
+    expect(isUniqueViolation(safeDbError(duplicate))).toBe(true);
+    expect(pgConstraint(duplicate)).toBe("users_email_key");
+    for (const other of [null, undefined, "texte", 42, new Error("autre")]) {
+      expect(pgErrorCode(other)).toBeUndefined();
+      expect(pgConstraint(other)).toBeUndefined();
+      expect(isUniqueViolation(other)).toBe(false);
+    }
   });
 });

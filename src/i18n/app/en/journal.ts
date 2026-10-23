@@ -26,6 +26,12 @@ export const journal: AppDictionary["journal"] = {
       `${actor} changed the role of ${member}`,
   },
   byMember: {
+    "account.password_changed": (actor: string) =>
+      `${actor} changed their password`,
+    "account.sessions_revoked": (actor: string) =>
+      `${actor} signed out their other devices`,
+    "account.device_revoked": (actor: string) =>
+      `${actor} removed one of their trusted devices`,
     "animal.created": (actor: string) => `${actor} registered an animal`,
     "animal.updated": (actor: string) => `${actor} edited an animal's record`,
     "animal.viewed": (actor: string) => `${actor} viewed an animal's record`,

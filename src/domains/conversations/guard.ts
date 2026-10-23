@@ -4,10 +4,17 @@ import { foldText } from "@/domains/commun";
  * Garde-fous déterministes de Numa (cahier des charges §3, architecture §10) : appliqués à
  * toute réponse de la passerelle IA avant envoi, quel que soit le prestataire. Une réponse
  * qui ressemble à un dosage, une prescription, un diagnostic ou une réassurance médicale est
- * remplacée par un message sûr qui renvoie au vétérinaire.
+ * remplacée par un message sûr qui renvoie au vétérinaire. De même pour un lien, une adresse
+ * e-mail, un numéro (6 chiffres ou plus) ou une phrase où Numa se dirait vétérinaire : Numa
+ * est une IA et n'oriente jamais vers un contact que le cabinet n'a pas validé.
  */
 export type GuardReason =
-  "dosage" | "prescription" | "diagnosis" | "reassurance" | "length";
+  | "dosage"
+  | "prescription"
+  | "diagnosis"
+  | "reassurance"
+  | "content"
+  | "length";
 
 export type GuardVerdict = { ok: true } | { ok: false; reason: GuardReason };
 
@@ -62,6 +69,22 @@ const RULES: [GuardReason, RegExp][] = [
   [
     "reassurance",
     /(rien de grave|ce n'est pas grave|c'est pas grave|pas grave|aucune inquietude|pas d'inquietude|ne vous inquietez pas|inutile de vous inquieter|tout va bien|c'est normal|c'est tout a fait normal|pas de souci a se faire|nothing serious|nothing to worry|don'?t worry|no need to worry|it'?s normal|perfectly normal|everything is fine)/,
+  ],
+  [
+    "content",
+    new RegExp(
+      [
+        // Lien ou nom de domaine.
+        `https?:|\\bwww\\.|\\b[a-z0-9-]+\\.(com|fr|net|org|io|eu|be|ch|ca|info|me|app|link|ly)\\b`,
+        // Adresse e-mail.
+        `[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)+`,
+        // Six chiffres ou plus, même espacés (numéro de téléphone, code, compte).
+        `\\d(?:[ .-]?\\d){5,}`,
+        // Numa qui se présenterait comme vétérinaire ou docteur.
+        `\\b(je suis|moi,? c'est|ici|en tant que) (le |la |un |une |votre |ton |ta )?(docteur|dr|veterinaire|veto)\\b`,
+        `\\b(i am|i'm|this is|speaking as) (the |a |an |your )?(vet|veterinarian|veterinary surgeon|doctor|dr)\\b`,
+      ].join("|"),
+    ),
   ],
 ];
 

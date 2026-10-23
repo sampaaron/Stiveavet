@@ -49,3 +49,11 @@ export function passwordChangedEmail(to: string): EmailMessage {
     "Si vous n'êtes pas à l'origine de ce changement, contactez immédiatement le vétérinaire administrateur de votre cabinet.",
   ]);
 }
+
+/** Changement fait depuis « Sécurité du compte » : aucun lien, la personne sait où agir. */
+export function passwordChangedInAccountEmail(to: string): EmailMessage {
+  return message(to, "Votre mot de passe Stivea Vet a été modifié", [
+    "Le mot de passe de votre compte vient d'être modifié depuis votre espace Stivea Vet. Vos autres sessions ont été fermées.",
+    "Si vous n'êtes pas à l'origine de ce changement, choisissez un nouveau mot de passe depuis « Mot de passe oublié » sur la page de connexion, puis prévenez le vétérinaire administrateur de votre cabinet.",
+  ]);
+}

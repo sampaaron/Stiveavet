@@ -18,6 +18,7 @@ import { tasks } from "./tasks";
 import { agenda } from "./agenda";
 import { patients } from "./patients";
 import { stive } from "./stive";
+import { account } from "./account";
 
 export const fr = {
   common,
@@ -39,4 +40,5 @@ export const fr = {
   agenda,
   patients,
   stive,
+  account,
 };
