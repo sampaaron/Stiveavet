@@ -8,7 +8,7 @@ import {
   vets,
 } from "../../src/fixtures/cabinet-tilleuls";
 import { SEED } from "../../src/fixtures/seed-ids";
-import type { Followup } from "../../src/fixtures/types";
+import type { Followup } from "../../src/ui/types";
 import {
   agendaFreeSlots,
   animalOwners,

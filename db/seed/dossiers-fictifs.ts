@@ -10,7 +10,7 @@ import {
   scheduleReminders,
 } from "../../src/domains/suivis/rappels";
 import { assessOwnerMessage } from "../../src/domains/urgences/triage";
-import type { Followup, Message, Triage } from "../../src/fixtures/types";
+import type { Followup, Message, Triage } from "../../src/ui/types";
 import {
   acknowledgements,
   alerts,

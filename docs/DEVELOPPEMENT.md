@@ -17,7 +17,7 @@ règles de sécurité dans `docs/securite/`.
 | `src/server`             | Socle transversal : configuration (`env.ts`), base (`db/`), sessions (`auth/`), droits (`authz/`), en-têtes et CSP.      |
 | `src/server/services.ts` | Assemble les services (base, adaptateurs, configuration). L'interface ne crée jamais un service elle-même.               |
 | `src/i18n`               | Dictionnaires. Le français fait foi ; l'anglais est typé sur le français, une clé oubliée ne compile pas.                |
-| `src/ui`                 | Composants visuels partagés et formats (dates, montants).                                                                |
+| `src/ui`                 | Composants visuels partagés, formats (dates, montants) et formes d'affichage d'un suivi (`types.ts`).                    |
 | `infra/scaleway`         | Infrastructure du staging en Terraform (ADR 0028). Rien n'est créé sans feu vert.                                        |
 | `db/migrations`          | Migrations SQL numérotées, chacune avec son `.up.sql` et son `.down.sql`.                                                |
 | `db/seed`                | Données fictives : les Tilleuls (Claire, Hugo, Inès, Léa) et le cabinet du Dr Martin.                                    |

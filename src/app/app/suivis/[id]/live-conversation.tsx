@@ -8,7 +8,7 @@ import type {
 } from "@/domains/conversations/service";
 import type { SignedLink } from "@/domains/fichiers/liens";
 import { durationLabel } from "@/domains/fichiers/media";
-import type { Attachment, Message } from "@/fixtures/types";
+import type { Attachment, Message } from "@/ui/types";
 import type { AppDictionary } from "@/i18n/app/types";
 import type { Locale } from "@/i18n/locales";
 import { Card } from "@/ui/card";

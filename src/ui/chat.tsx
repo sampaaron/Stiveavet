@@ -2,13 +2,13 @@
 
 import { FileX, ImageIcon, Mic, ScanEye } from "lucide-react";
 
-import type { Message } from "@/fixtures/types";
 import { useAppText } from "@/i18n/app/client";
 import type { AppDictionary } from "@/i18n/app/types";
 
 import { AssistantAvatar } from "./assistant-card";
 import { cn } from "./cn";
 import { StatusBadge } from "./status-badge";
+import type { Message } from "./types";
 
 /** Fil de conversation, groupé par jour. */
 export function ChatThread({ messages }: { messages: Message[] }) {

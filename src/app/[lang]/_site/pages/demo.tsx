@@ -8,7 +8,7 @@ import {
   todayLabel,
   vetById,
 } from "@/fixtures/cabinet-tilleuls";
-import type { Followup } from "@/fixtures/types";
+import type { Followup } from "@/ui/types";
 import { pathFor } from "@/i18n/routes";
 import { fill } from "@/i18n/site";
 import { readAuthCookie } from "@/server/auth/cookies";
