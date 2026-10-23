@@ -71,7 +71,8 @@ file de PostgreSQL (ADR 0014). Le code est dans `src/domains/taches/`.
   cabinet.
 
 Pour observer la file en local, lancez `pnpm worker --once` : il fait un seul passage et
-n'affiche que des compteurs.
+n'affiche que des compteurs. Sa configuration est validée au démarrage (`taches/config.ts`) ; en image
+Docker, le worker est un seul fichier compilé par `pnpm build:scripts` (ADR 0041).
 
 ## Base de données et migrations
 
@@ -79,6 +80,8 @@ n'affiche que des compteurs.
   - Le superutilisateur ne sert qu'à créer les rôles et les bases de test.
   - `stivea_migrator` possède le schéma et applique les migrations.
   - `stivea_app` est le rôle de l'application, soumis à la RLS.
+- **Hors local, les migrations sont une tâche ponctuelle** (image `--target migrate`) : l'URL
+  du migrateur n'entre jamais dans les conteneurs de l'application ni du worker (ADR 0041).
 - **Ajouter une migration.** Créez `db/migrations/00NN_nom.up.sql` et `.down.sql`, puis lancez
   `pnpm db:migrate`. Pour annuler la dernière migration : `pnpm db:migrate down`. Le test
   `tests/integration/migrations.test.ts` vérifie que chaque migration a son inverse et que
@@ -107,10 +110,12 @@ n'affiche que des compteurs.
 
 Avant d'écrire une aide, vérifiez qu'elle n'existe pas déjà :
 
-- `text` et `parseJson` (`src/app/app/form-data.ts`) lisent les champs d'un formulaire dans une Server Action.
+- `text`, `fields` et `parseJson` (`src/app/app/form-data.ts`) lisent les champs d'un formulaire dans une Server Action.
 - `parseConfig` (`src/server/config.ts`) valide une configuration. En cas d'erreur, il ne cite que les noms des variables, jamais leurs valeurs.
 - `activeVets` (`src/domains/equipe/veterinaires.ts`) liste les vétérinaires actifs du cabinet courant.
 - `loadFacts` (`src/domains/facturation/faits.ts`) lit l'abonnement du cabinet courant.
+- `formatEuros`, `initials` et les dates (`src/ui/format.ts`), `Fact` (`src/ui/card.tsx`) pour l'affichage.
+- `concatBytes` et `foldText` (`src/domains/commun.ts`), `clientIp` (`src/server/http/client-ip.ts`).
 
 ## Heure de Paris
 
