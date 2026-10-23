@@ -63,11 +63,14 @@ const { sent } = whatsapp;
 
 /** IA simulée, avec des réponses imposées pour éprouver les garde-fous. */
 let observationsOverride: string[] | null = null;
+/** Appelé pendant l'analyse, hors de toute transaction du worker (ADR 0040). */
+let duringObserve: (() => Promise<void>) | null = null;
 let agendaFailure = false;
 let keysSeenWhileReading: string[] = [];
 const ai: AiGateway = {
   ...fakeAiGateway,
   async observePhoto(input) {
+    await duringObserve?.();
     return observationsOverride
       ? { observations: observationsOverride }
       : fakeAiGateway.observePhoto(input);
@@ -337,6 +340,40 @@ describe("photos du propriétaire", () => {
       escalationDelayMinutes: 240,
       photoAnalysisEnabled: false,
     });
+  });
+});
+
+describe("analyse photo hors transaction (ADR 0040)", () => {
+  it("un réglage coupé pendant l'analyse : le résultat n'est pas gardé", async () => {
+    const lou = await actor(ids.admin);
+    const alertSettings = (photoAnalysisEnabled: boolean) =>
+      settings.saveAlertSettings(lou, {
+        escalationDelayMinutes: 240,
+        photoAnalysisEnabled,
+      });
+    await alertSettings(true);
+    // Le worker ne garde aucune transaction pendant l'appel : le réglage s'écrit aussitôt.
+    duringObserve = () => alertSettings(false);
+    try {
+      const { attachmentId } = await media.receiveOwnerMedia(org, plume, {
+        kind: "photo",
+        bytes: fictionalPng(24, 24),
+      });
+      await drain();
+      const { rows } = await admin.query(
+        "SELECT 1 FROM photo_observations WHERE attachment_id = $1",
+        [attachmentId],
+      );
+      expect(rows).toEqual([]);
+      const { rows: jobs } = await admin.query(
+        "SELECT status FROM scheduled_jobs WHERE organization_id = $1 AND kind = 'media.observe' AND payload ->> 'attachmentId' = $2",
+        [org, attachmentId],
+      );
+      expect(jobs).toEqual([{ status: "succeeded" }]);
+    } finally {
+      duringObserve = null;
+      await alertSettings(false);
+    }
   });
 });
 
