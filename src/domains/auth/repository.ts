@@ -320,5 +320,3 @@ export function authRepository(db: Executor) {
     },
   });
 }
-
-export type AuthRepository = ReturnType<typeof authRepository>;

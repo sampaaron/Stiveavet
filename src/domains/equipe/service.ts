@@ -45,7 +45,7 @@ import {
 } from "@/server/db/errors";
 import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { recordAudit as audit } from "@/domains/audit/journal";
+import { recordAudit } from "@/domains/audit/journal";
 
 import { DomainError, assertPermission } from "./actor";
 import type { Actor } from "./actor";
@@ -342,7 +342,7 @@ export function teamService(deps: {
             throw new DomainError("already_invited");
           throw error;
         }
-        await audit(
+        await recordAudit(
           tx,
           actor,
           "invitation.created",
@@ -386,7 +386,7 @@ export function teamService(deps: {
           )
           .returning({ id: invitations.id });
         if (!revoked.length) throw new DomainError("not_found");
-        await audit(tx, actor, "invitation.revoked", {
+        await recordAudit(tx, actor, "invitation.revoked", {
           type: "invitation",
           id: invitationId,
         });
@@ -448,7 +448,7 @@ export function teamService(deps: {
               grantedByMembershipId: actor.membershipId,
             })),
           );
-        await audit(
+        await recordAudit(
           tx,
           actor,
           "membership.permissions_changed",
@@ -484,7 +484,7 @@ export function teamService(deps: {
             throw new DomainError("reassignment_required");
         }
         await updateMembership(tx, membershipId, { role });
-        await audit(
+        await recordAudit(
           tx,
           actor,
           "membership.role_changed",
@@ -553,7 +553,7 @@ export function teamService(deps: {
               ),
             );
           for (const followup of open)
-            await audit(
+            await recordAudit(
               tx,
               actor,
               "followup.reassigned",
@@ -592,14 +592,14 @@ export function teamService(deps: {
           )
           .returning({ id: invitations.id });
         for (const invitation of revoked)
-          await audit(
+          await recordAudit(
             tx,
             actor,
             "invitation.revoked",
             { type: "invitation", id: invitation.id },
             { reason: "member_deactivated" },
           );
-        await audit(
+        await recordAudit(
           tx,
           actor,
           "membership.deactivated",
@@ -616,7 +616,7 @@ export function teamService(deps: {
         if (!member.deactivatedAt) return;
         await assertSeat(tx, member.role);
         await updateMembership(tx, membershipId, { deactivatedAt: null });
-        await audit(tx, actor, "membership.reactivated", {
+        await recordAudit(tx, actor, "membership.reactivated", {
           type: "membership",
           id: membershipId,
         });
@@ -811,7 +811,7 @@ export async function acceptInvitation(
         await tx.execute(
           sql`SELECT auth.set_initial_password(${userId}, ${input.passwordHash})`,
         );
-        await audit(
+        await recordAudit(
           tx,
           {
             organizationId: invitation.organization_id,
