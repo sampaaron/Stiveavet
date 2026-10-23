@@ -13,7 +13,7 @@ import { synthesisService } from "@/domains/suivis/synthese";
 import { todayService } from "@/domains/suivis/tableau";
 import { followups as fixtureFollowups } from "@/fixtures/cabinet-tilleuls";
 
-import { pools } from "./support/db";
+import { asApp, errorCode, pools } from "./support/db";
 
 /**
  * Lot 17 (ADR 0020) : le tableau de bord « Aujourd'hui » et la synthèse pré-consultation
@@ -378,9 +378,31 @@ describe("activité du cabinet (totaux du tableau de bord)", () => {
       tilleuls.daily.reduce((sum, day) => sum + day.inbound, 0),
     ).toBeLessThanOrEqual(tilleuls.ownerMessages);
 
-    // Un autre cabinet ne voit pas ces totaux ; l'assistante voit les mêmes que l'administratrice.
+    // Un autre cabinet ne voit pas ces totaux ; l'assistante, sans accès au contenu clinique
+    // (politique `clinical_access`, 0026), voit exactement les mêmes que l'administratrice.
     const martin = await stats.activity(paul);
     expect(martin.ongoing).toBeLessThan(tilleuls.ongoing);
-    expect((await stats.activity(lea)).ongoing).toBe(tilleuls.ongoing);
+    expect(lea.permissions.has("clinical.read")).toBe(false);
+    expect(await stats.activity(lea)).toEqual(tilleuls);
+  });
+
+  it("les compteurs de messages ne se lisent que dans un cabinet, sans aucun identifiant", async () => {
+    for (const query of [
+      "SELECT * FROM app.activity_messages(now() - interval '30 days')",
+      "SELECT app.activity_answered(now() - interval '30 days')",
+    ])
+      expect(
+        await asApp(app, null, (client) => errorCode(client.query(query))),
+      ).toBe("42501");
+    const { fields } = await asApp(app, SEED.tilleuls, (client) =>
+      client.query(
+        "SELECT * FROM app.activity_messages(now() - interval '30 days')",
+      ),
+    );
+    expect(fields.map((field) => field.name)).toEqual([
+      "day",
+      "inbound",
+      "outbound",
+    ]);
   });
 });
