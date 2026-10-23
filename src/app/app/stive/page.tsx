@@ -100,18 +100,15 @@ export default async function StivePage({
 
   const { suivi, fait } = await searchParams;
   const now = new Date();
-  const [conversation, views, profile] = await Promise.all([
+  // Dossier d'où vient la demande : seulement s'il est lisible en clinique par la personne.
+  const [conversation, origin, profile] = await Promise.all([
     services.stive().conversation(context, now),
-    services.followups().list(context),
+    typeof suivi === "string" && uuid.test(suivi)
+      ? services.followups().find(context, suivi)
+      : null,
     memberProfile(context),
   ]);
-  // Dossier d'où vient la demande : seulement s'il est lisible en clinique par la personne.
-  const followup =
-    typeof suivi === "string" && uuid.test(suivi)
-      ? (views.find(
-          (view) => view.id === suivi && view.access === "clinical",
-        ) ?? null)
-      : null;
+  const followup = origin?.access === "clinical" ? origin : null;
   const lastStive = conversation.entries.findLast(
     (entry) => entry.author === "stive",
   );

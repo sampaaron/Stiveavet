@@ -232,6 +232,31 @@ describe("synthèse pré-consultation", () => {
     expect(synthesis?.simulated).toBe(true);
   });
 
+  it("une synthèse par langue : un lecteur anglais ne fait pas réécrire celle du lecteur français", async () => {
+    const generated = async () =>
+      Number(
+        (
+          await admin.query(
+            `SELECT count(*)::int AS n FROM audit_events
+             WHERE action = 'synthesis.generated' AND target_id = $1`,
+            [caramel],
+          )
+        ).rows[0]?.n,
+      );
+    const fr = await syntheses.forFollowup(claire, caramel, { language: "fr" });
+    const en = await syntheses.forFollowup(claire, caramel, { language: "en" });
+    const before = await generated();
+    const frAgain = await syntheses.forFollowup(claire, caramel, {
+      language: "fr",
+    });
+    const enAgain = await syntheses.forFollowup(claire, caramel, {
+      language: "en",
+    });
+    expect(frAgain?.generatedAt.getTime()).toBe(fr?.generatedAt.getTime());
+    expect(enAgain?.generatedAt.getTime()).toBe(en?.generatedAt.getTime());
+    expect(await generated()).toBe(before);
+  });
+
   it("gardée en base, refaite seulement si les échanges changent ; journalisée sans contenu", async () => {
     const first = await syntheses.forFollowup(claire, moka);
     const again = await syntheses.forFollowup(claire, moka);

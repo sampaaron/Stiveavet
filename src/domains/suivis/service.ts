@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domains/equipe/actor";
@@ -13,7 +13,7 @@ import {
   protocolVersions,
   users,
 } from "@/server/db/schema";
-import { tenantRunner } from "@/server/db/tenant";
+import { tenantRunner, uuidArray } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 import { auditFollowup as audit } from "@/domains/audit/journal";
 
@@ -22,7 +22,9 @@ import type { FollowupAccess, Viewer } from "./policies";
 import { loadFollowupRecord } from "./record";
 import { activeVets } from "@/domains/equipe/veterinaires";
 
-type Status = "draft" | "active" | "paused" | "human_takeover" | "ended";
+export type FollowupStatus =
+  "draft" | "active" | "paused" | "human_takeover" | "ended";
+type Status = FollowupStatus;
 type Triage = "normal" | "watch" | "urgent";
 
 /** Ce que voit une personne autorisée « organisation seulement » : aucune donnée clinique. */
@@ -62,6 +64,7 @@ export type FollowupShareView = {
 
 type Row = {
   id: string;
+  animalId: string;
   animalName: string;
   species: "dog" | "cat";
   status: Status;
@@ -126,6 +129,7 @@ function selectRows(tx: TenantTransaction) {
   return tx
     .select({
       id: followups.id,
+      animalId: followups.animalId,
       animalName: animals.name,
       species: animals.species,
       status: followups.status,
@@ -169,7 +173,7 @@ async function activeShares(tx: TenantTransaction, followupIds: string[]) {
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(
       and(
-        inArray(followupShares.followupId, followupIds),
+        sql`${followupShares.followupId} = ANY(${uuidArray(followupIds)})`,
         isNull(followupShares.revokedAt),
         isNull(memberships.deactivatedAt),
         or(
@@ -223,7 +227,7 @@ async function firstOwners(tx: TenantTransaction, animalIds: string[]) {
     .select({ animalId: animalOwners.animalId, name: owners.fullName })
     .from(animalOwners)
     .innerJoin(owners, eq(owners.id, animalOwners.ownerId))
-    .where(inArray(animalOwners.animalId, animalIds))
+    .where(sql`${animalOwners.animalId} = ANY(${uuidArray(animalIds)})`)
     .orderBy(asc(animalOwners.createdAt), asc(owners.fullName));
   const result = new Map<string, string>();
   for (const row of rows)
@@ -240,14 +244,6 @@ export function followupsService(db: Database) {
     if (!row) return null;
     const shares = (await activeShares(tx, [row.id])).get(row.id) ?? [];
     return { row, shares };
-  }
-
-  async function animalIdOf(tx: TenantTransaction, followupId: string) {
-    const [row] = await tx
-      .select({ animalId: followups.animalId })
-      .from(followups)
-      .where(eq(followups.id, followupId));
-    return row?.animalId;
   }
 
   /** Vérifie que l'acteur est le vétérinaire responsable ; sinon le dossier « n'existe pas ». */
@@ -272,39 +268,59 @@ export function followupsService(db: Database) {
     return loaded;
   }
 
-  return {
-    /** Suivis visibles par l'acteur, chacun au niveau de détail autorisé. */
-    async list(actor: Actor): Promise<FollowupView[]> {
-      return run(actor, async (tx) => {
-        const rows = await selectRows(tx).orderBy(asc(animals.name));
-        const shares = await activeShares(
-          tx,
-          rows.map((row) => row.id),
-        );
-        const animalRows = await tx
-          .select({ id: followups.id, animalId: followups.animalId })
-          .from(followups);
-        const animalOf = new Map(animalRows.map((r) => [r.id, r.animalId]));
-        const ownerOf = await firstOwners(tx, [...new Set(animalOf.values())]);
+  /** Vues des suivis lus, au niveau de détail autorisé ; ceux que l'acteur ne voit pas sont omis. */
+  async function viewsOf(
+    tx: TenantTransaction,
+    actor: Actor,
+    rows: readonly Row[],
+  ): Promise<FollowupView[]> {
+    const shares = await activeShares(
+      tx,
+      rows.map((row) => row.id),
+    );
+    const visible = rows.flatMap((row) => {
+      const access = followupAccess(actor, {
+        responsibleMembershipId: row.responsibleMembershipId,
+        isPrivate: row.isPrivate,
+        sharedWith: (shares.get(row.id) ?? []).map((s) => s.membershipId),
+      });
+      return access === "none" ? [] : [{ row, access }];
+    });
+    const ownerOf = await firstOwners(tx, [
+      ...new Set(visible.map(({ row }) => row.animalId)),
+    ]);
+    return visible.map(({ row, access }) =>
+      toView(row, ownerOf.get(row.animalId) ?? null, access),
+    );
+  }
 
-        const views: FollowupView[] = [];
-        for (const row of rows) {
-          const access = followupAccess(actor, {
-            responsibleMembershipId: row.responsibleMembershipId,
-            isPrivate: row.isPrivate,
-            sharedWith: (shares.get(row.id) ?? []).map((s) => s.membershipId),
-          });
-          if (access === "none") continue;
-          const animalId = animalOf.get(row.id);
-          views.push(
-            toView(
-              row,
-              animalId ? (ownerOf.get(animalId) ?? null) : null,
-              access,
-            ),
-          );
-        }
-        return views;
+  return {
+    /**
+     * Suivis visibles par l'acteur, chacun au niveau de détail autorisé. `statuses` filtre
+     * dans la base : le tableau de bord ne relit pas l'historique des suivis terminés.
+     */
+    async list(
+      actor: Actor,
+      options: { statuses?: readonly Status[] } = {},
+    ): Promise<FollowupView[]> {
+      return run(actor, async (tx) => {
+        const rows = await selectRows(tx)
+          .where(
+            options.statuses
+              ? inArray(followups.status, [...options.statuses])
+              : undefined,
+          )
+          .orderBy(asc(animals.name));
+        return viewsOf(tx, actor, rows);
+      });
+    },
+
+    /** Un suivi visible par l'acteur, sans journal de consultation ; null sinon. */
+    async find(actor: Actor, followupId: string): Promise<FollowupView | null> {
+      if (!idSchema.safeParse(followupId).success) return null;
+      return run(actor, async (tx) => {
+        const rows = await selectRows(tx).where(eq(followups.id, followupId));
+        return (await viewsOf(tx, actor, rows))[0] ?? null;
       });
     },
 
@@ -326,10 +342,9 @@ export function followupsService(db: Database) {
         if (access === "none") return null;
 
         await audit(tx, actor, "followup.viewed", followupId, { access });
-        const animalId = await animalIdOf(tx, followupId);
-        const ownerName = animalId
-          ? ((await firstOwners(tx, [animalId])).get(animalId) ?? null)
-          : null;
+        const { animalId } = loaded.row;
+        const ownerName =
+          (await firstOwners(tx, [animalId])).get(animalId) ?? null;
         const canManage = canManageFollowupAccess(actor, facts);
         return {
           followup: toView(loaded.row, ownerName, access),
