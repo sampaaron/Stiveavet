@@ -233,15 +233,16 @@ export function authRepository(db: Executor) {
       const result = await rows<{
         session_id: string;
         device_label: string | null;
-        created_at: Date;
-        last_activity_at: Date;
+        created_at: string;
+        last_activity_at: string;
         current: boolean;
       }>(db, sql`SELECT * FROM auth.account_sessions(${sessionHash})`);
+      // Requête brute : Drizzle laisse les horodatages en texte, convertis ici.
       return result.map((row) => ({
         id: row.session_id,
         deviceLabel: row.device_label,
-        createdAt: row.created_at,
-        lastActivityAt: row.last_activity_at,
+        createdAt: new Date(row.created_at),
+        lastActivityAt: new Date(row.last_activity_at),
         current: row.current,
       }));
     },
@@ -253,9 +254,9 @@ export function authRepository(db: Executor) {
       const result = await rows<{
         device_id: string;
         device_label: string | null;
-        created_at: Date;
-        last_used_at: Date;
-        expires_at: Date;
+        created_at: string;
+        last_used_at: string;
+        expires_at: string;
         current: boolean;
       }>(
         db,
@@ -264,9 +265,9 @@ export function authRepository(db: Executor) {
       return result.map((row) => ({
         id: row.device_id,
         deviceLabel: row.device_label,
-        createdAt: row.created_at,
-        lastUsedAt: row.last_used_at,
-        expiresAt: row.expires_at,
+        createdAt: new Date(row.created_at),
+        lastUsedAt: new Date(row.last_used_at),
+        expiresAt: new Date(row.expires_at),
         current: row.current,
       }));
     },

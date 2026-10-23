@@ -595,6 +595,9 @@ describe("sécurité du compte", () => {
     expect(security.sessions[1]?.deviceLabel).toBe("Firefox · Windows");
     expect(security.devices).toHaveLength(1);
     expect(security.devices[0]?.current).toBe(true);
+    // Des dates, pas le texte brut de la base : la page les formate.
+    expect(security.sessions[0]?.lastActivityAt).toBeInstanceOf(Date);
+    expect(security.devices[0]?.expiresAt).toBeInstanceOf(Date);
     const strangerView = await service.accountSecurity(
       stranger.sessionToken,
       undefined,
