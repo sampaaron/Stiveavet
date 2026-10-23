@@ -3,7 +3,9 @@
  * Aucun domaine tiers n'est autorisé : polices, images et scripts sont servis par l'application.
  * Seule exception : la page de connexion du numéro WhatsApp réel, qui charge l'inscription
  * intégrée de Meta (`metaSignup`, ADR 0024) ; ses domaines ne valent que sur cette page.
- * `'unsafe-eval'` n'est accepté qu'en développement (exigence de React pour ses traces d'erreur).
+ * En développement seulement : `'unsafe-eval'` (traces d'erreur de React) et des styles en ligne
+ * sans nonce, pour que la fenêtre d'erreurs de Next.js s'affiche mise en forme au lieu de
+ * s'empiler sous la page.
  */
 const META_SIGNUP_HOSTS = {
   script: ["https://connect.facebook.net"],
@@ -35,7 +37,8 @@ export function buildContentSecurityPolicy(
       ...(isDev ? ["'unsafe-eval'"] : []),
       ...(meta ? META_SIGNUP_HOSTS.script : []),
     ],
-    "style-src": ["'self'", `'nonce-${nonce}'`],
+    // Un nonce rendrait `'unsafe-inline'` sans effet : en développement, l'un remplace l'autre.
+    "style-src": ["'self'", isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`],
     // Attributs `style="…"` seulement (posés par React et next/image) : ils ne peuvent pas
     // exécuter de script. Les balises <style> restent soumises au nonce.
     "style-src-attr": ["'unsafe-inline'"],

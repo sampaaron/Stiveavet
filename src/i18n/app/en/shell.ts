@@ -6,7 +6,7 @@ export const shell: AppDictionary["shell"] = {
   closeMenu: "Close menu",
   mainNavigation: "Main navigation",
   lock: "Lock",
-  account: "Account security",
+  account: "My account",
   logout: "Sign out",
   newFollowup: "New follow-up",
   search: {

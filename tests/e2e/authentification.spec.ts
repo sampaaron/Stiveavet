@@ -135,7 +135,7 @@ test("mot de passe oublié : lien à usage unique, sessions fermées", async ({
   await other.close();
 });
 
-test("sécurité du compte : nouveau mot de passe, autres sessions fermées", async ({
+test("mon compte : nouveau mot de passe, autres sessions fermées", async ({
   page,
   browser,
 }) => {
@@ -146,10 +146,11 @@ test("sécurité du compte : nouveau mot de passe, autres sessions fermées", as
   await loginWithCode(otherPage, account.email, account.password);
 
   await openAccountMenu(page);
-  await page.getByRole("link", { name: "Sécurité du compte" }).click();
+  await page.getByRole("link", { name: /^Mon compte :/ }).click();
   await expect(
-    page.getByRole("heading", { level: 1, name: "Sécurité du compte" }),
+    page.getByRole("heading", { level: 1, name: "Mon compte" }),
   ).toBeVisible();
+  await expect(page.getByText(account.email, { exact: true })).toBeVisible();
   await expect(page.getByText(/· Cet appareil/).first()).toBeVisible();
   await expectAccessible(page);
 
