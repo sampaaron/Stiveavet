@@ -33,7 +33,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit } from "@/domains/audit/journal";
+import { auditFollowup } from "@/domains/audit/journal";
 
 import {
   programmeOf,
@@ -185,7 +185,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
       aggregateType: "followup",
       aggregateId: followupId,
     });
-    await audit(tx, actor, "followup.launched", followupId, {
+    await auditFollowup(tx, actor, "followup.launched", followupId, {
       protocolVersionId: followup.protocolVersionId,
       firstContactHours: firstContactHours(
         followup.procedureAt,
@@ -402,7 +402,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
               instructions: treatment.instructions.slice(0, 300),
             })),
           );
-        await audit(tx, actor, "followup.prepared", followupId, {
+        await auditFollowup(tx, actor, "followup.prepared", followupId, {
           source: "drveto_simulated",
           treatments: treatments.length,
           protocolSuggested: versionId !== null,
@@ -506,7 +506,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           versionId,
           contacts,
         });
-        await audit(tx, actor, "followup.prepared", followupId, {
+        await auditFollowup(tx, actor, "followup.prepared", followupId, {
           source: "manual",
           treatments: 0,
           protocolSuggested: versionId !== null,
@@ -732,7 +732,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           .update(followups)
           .set({ protocolVersionId: choice.versionId, planRevision: revision })
           .where(eq(followups.id, followupId));
-        await audit(tx, actor, "followup.protocol_chosen", followupId, {
+        await auditFollowup(tx, actor, "followup.protocol_chosen", followupId, {
           protocolVersionId: choice.versionId,
           revision,
           ...copied,
@@ -799,7 +799,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             )
               throw new DomainError("invalid_target");
             changes.responsibleMembershipId = data.responsibleMembershipId;
-            await audit(tx, actor, "followup.reassigned", followupId, {
+            await auditFollowup(tx, actor, "followup.reassigned", followupId, {
               from: followup.responsibleMembershipId,
               to: data.responsibleMembershipId,
             });
@@ -847,9 +847,15 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
                 ),
               );
           if (data.whatsappOptIn !== undefined)
-            await audit(tx, actor, "followup.whatsapp_optin", followupId, {
-              given: data.whatsappOptIn,
-            });
+            await auditFollowup(
+              tx,
+              actor,
+              "followup.whatsapp_optin",
+              followupId,
+              {
+                given: data.whatsappOptIn,
+              },
+            );
         }
 
         // Traitements : décisions de vétérinaire.
@@ -989,7 +995,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           await scheduleReminders(tx, followupId, now);
           await scheduleAutomaticEnd(tx, followupId, now);
         }
-        await audit(tx, actor, "followup.plan_updated", followupId, {
+        await auditFollowup(tx, actor, "followup.plan_updated", followupId, {
           revision,
           status: followup.status,
           steps: kept.length + data.steps.length,
@@ -998,9 +1004,15 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           treatmentsRemoved: data.removeTreatmentIds.length,
         });
         if (toValidate.length)
-          await audit(tx, actor, "followup.treatments_validated", followupId, {
-            count: toValidate.length,
-          });
+          await auditFollowup(
+            tx,
+            actor,
+            "followup.treatments_validated",
+            followupId,
+            {
+              count: toValidate.length,
+            },
+          );
         if (options.launch) await launchInTx(tx, actor, followupId, now);
       });
     },
@@ -1076,7 +1088,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
             },
             now,
           );
-        await audit(tx, actor, transition.action, followupId, {
+        await auditFollowup(tx, actor, transition.action, followupId, {
           from: followup.status,
         });
       });

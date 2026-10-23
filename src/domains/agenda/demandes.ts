@@ -20,7 +20,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit } from "@/domains/audit/journal";
+import { auditFollowup } from "@/domains/audit/journal";
 
 import {
   DEFAULT_APPOINTMENT_MINUTES,
@@ -383,9 +383,15 @@ export function appointmentsService(db: Database) {
           "appointment_confirmed",
           row.id,
         );
-        await audit(tx, actor, "appointment.confirmed", row.followupId, {
-          appointmentId: row.id,
-        });
+        await auditFollowup(
+          tx,
+          actor,
+          "appointment.confirmed",
+          row.followupId,
+          {
+            appointmentId: row.id,
+          },
+        );
       });
     },
 
@@ -406,7 +412,7 @@ export function appointmentsService(db: Database) {
           "appointment_declined",
           row.id,
         );
-        await audit(tx, actor, "appointment.declined", row.followupId, {
+        await auditFollowup(tx, actor, "appointment.declined", row.followupId, {
           appointmentId: row.id,
         });
       });
@@ -440,7 +446,7 @@ export function appointmentsService(db: Database) {
             closedByMembershipId: actor.membershipId,
           })
           .where(eq(appointmentRequests.id, request.id));
-        await audit(
+        await auditFollowup(
           tx,
           actor,
           "appointment.callback_done",

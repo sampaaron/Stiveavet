@@ -8,7 +8,7 @@ import { releaseHeld } from "@/domains/whatsapp/envoi";
 import { emit } from "@/domains/taches/queue";
 import { followupContacts, messages } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
-import { auditFollowup as audit, systemAuthor } from "@/domains/audit/journal";
+import { auditFollowup, systemAuthor } from "@/domains/audit/journal";
 
 import { ownerKeyword } from "./keywords";
 import { detectLanguage } from "./language";
@@ -114,7 +114,7 @@ async function learnLanguage(
     .where(eq(followupContacts.id, writer.id));
   writer.language = detected;
   writer.languageSource = "detected";
-  await audit(
+  await auditFollowup(
     tx,
     systemAuthor(ctx.organizationId),
     "followup.owner_language_detected",
@@ -195,7 +195,7 @@ export async function processInbound(
     if (keyword === "leave_group") {
       await setContact({ leftGroupAt: now, stopRequestedAt: null });
       await enqueueMessageJob(tx, ctx, "left_group", messageId);
-      await audit(
+      await auditFollowup(
         tx,
         systemAuthor(ctx.organizationId),
         "conversation.left_group",
@@ -214,7 +214,7 @@ export async function processInbound(
         "followup",
       );
       await enqueueMessageJob(tx, ctx, "stopped_all", messageId);
-      await audit(
+      await auditFollowup(
         tx,
         systemAuthor(ctx.organizationId),
         "conversation.owner_stopped_all",
