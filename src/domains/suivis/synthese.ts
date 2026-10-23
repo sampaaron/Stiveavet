@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { AiGateway, SynthesisEvent } from "@/adapters/ai-gateway/types";
 import { auditFollowup } from "@/domains/audit/journal";
@@ -235,7 +235,12 @@ export function synthesisService(deps: { db: Database; ai: AiGateway }) {
         const [stored] = await tx
           .select()
           .from(followupSyntheses)
-          .where(eq(followupSyntheses.followupId, followupId));
+          .where(
+            and(
+              eq(followupSyntheses.followupId, followupId),
+              eq(followupSyntheses.language, language),
+            ),
+          );
         return {
           draft: false as const,
           followup,
@@ -284,12 +289,13 @@ export function synthesisService(deps: { db: Database; ai: AiGateway }) {
           .values({
             followupId,
             organizationId: actor.organizationId,
+            language,
             content,
             sourceDigest: read.sources.digest,
             generatedAt,
           })
           .onConflictDoUpdate({
-            target: followupSyntheses.followupId,
+            target: [followupSyntheses.followupId, followupSyntheses.language],
             set: { content, sourceDigest: read.sources.digest, generatedAt },
           });
         // Motifs des lignes écartées seulement : jamais leur contenu.

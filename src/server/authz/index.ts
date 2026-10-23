@@ -7,12 +7,12 @@ import { cache } from "react";
 import type { Actor } from "@/domains/equipe/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { restrictPermissions } from "@/domains/facturation/rules";
-import type { Access } from "@/domains/facturation/rules";
+import type { Access, Plan } from "@/domains/facturation/rules";
+import { billingSnapshot } from "@/domains/facturation/service";
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import { requireSession } from "@/server/auth";
 import { appDatabase } from "@/server/db/client";
 import { membershipPermissions } from "@/server/db/schema";
-import { services } from "@/server/services";
 import { withTenant } from "@/server/db/tenant";
 
 /**
@@ -26,29 +26,28 @@ export type MemberContext = Actor & {
   billing: Access;
   /** Choix entre engagement annuel et mensuel à faire (ADR 0023). */
   commitmentReminder: boolean;
+  /** Formule du cabinet ; null pour un cabinet antérieur aux abonnements. */
+  plan: Plan | null;
+  /** Suivis actifs du cabinet (hors suivis test), déjà comptés pour la facturation. */
+  activeFollowups: number;
 };
 
 export const memberContext = cache(async (): Promise<MemberContext> => {
   const session = await requireSession();
-  const rows = await withTenant(
+  // Droits et facturation lus dans la même transaction, sans rien écrire (ADR 0040).
+  const { rows, snapshot } = await withTenant(
     appDatabase(),
     { organizationId: session.organizationId, userId: session.userId },
-    (tx) =>
-      tx
+    async (tx) => ({
+      rows: await tx
         .select({ permission: membershipPermissions.permission })
         .from(membershipPermissions)
         .where(eq(membershipPermissions.membershipId, session.membershipId)),
+      snapshot: await billingSnapshot(tx),
+    }),
   );
   // En lecture seule ou après la fin de l'accès, seuls les droits de consultation restent
   // effectifs, et Stive suit l'offre ; les droits en base ne changent pas.
-  const {
-    access: billing,
-    commitmentReminder,
-    plan,
-  } = await services.billing().accessFor({
-    organizationId: session.organizationId,
-    userId: session.userId,
-  });
   return {
     organizationId: session.organizationId,
     userId: session.userId,
@@ -56,11 +55,13 @@ export const memberContext = cache(async (): Promise<MemberContext> => {
     role: session.role,
     permissions: restrictPermissions(
       new Set(rows.map((row) => row.permission).filter(isPermissionKey)),
-      billing,
-      plan,
+      snapshot.access,
+      snapshot.plan,
     ),
-    billing,
-    commitmentReminder,
+    billing: snapshot.access,
+    commitmentReminder: snapshot.commitmentReminder,
+    plan: snapshot.plan,
+    activeFollowups: snapshot.activeFollowups,
   };
 });
 

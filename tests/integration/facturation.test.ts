@@ -19,7 +19,9 @@ import {
 } from "@/domains/facturation/rules";
 import type { Plan } from "@/domains/facturation/rules";
 import {
+  BILLING_SYNC_JOB,
   billingService,
+  billingSyncHandlers,
   recordUsage,
   startSubscription,
 } from "@/domains/facturation/service";
@@ -267,6 +269,43 @@ describe("échéances et prélèvements simulés", () => {
       kind: "full",
     });
     expect(await domainError(paying.settle(owner))).toBe("invalid_target");
+  });
+});
+
+describe("échéances hors des pages (ADR 0040)", () => {
+  it("la garde des droits ne fait que lire ; la tâche quotidienne émet et prélève, une seule fois", async () => {
+    const { org, owner } = await cabinet(addMonths(new Date(), -2));
+    const invoicesOf = async () =>
+      (
+        await admin.query(
+          "SELECT status FROM invoices WHERE organization_id = $1",
+          [org],
+        )
+      ).rows as { status: string }[];
+
+    expect((await paying.accessFor(owner)).access).toEqual({ kind: "full" });
+    expect(await invoicesOf()).toEqual([]);
+
+    const sync = billingSyncHandlers({ provider: fakeBillingProvider() })[
+      BILLING_SYNC_JOB
+    ];
+    if (!sync) throw new Error("exécutant manquant");
+    const job = {
+      id: randomUUID(),
+      organizationId: org,
+      kind: BILLING_SYNC_JOB,
+      attempt: 1,
+      followupId: null,
+      payload: {},
+      idempotencyKey: "billing:sync:essai",
+    };
+    for (let run = 0; run < 2; run += 1)
+      await withTenant(appDb, { organizationId: org }, (tx) =>
+        sync({ tx, job }),
+      );
+    const issued = await invoicesOf();
+    expect(issued).toHaveLength(3);
+    expect(issued.every((invoice) => invoice.status === "paid")).toBe(true);
   });
 });
 
