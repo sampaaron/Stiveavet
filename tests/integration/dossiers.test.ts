@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SEED } from "../../db/seed/cabinets-fictifs";
@@ -174,6 +175,60 @@ describe("contenu du dossier selon les droits", () => {
   it("un autre cabinet n'obtient pas le dossier", async () => {
     const paul = await actor("paul.martin@cabinet-martin.test");
     expect(await suivis.open(paul, caramel.id)).toBeNull();
+  });
+});
+
+describe("page dossier en une transaction (ADR 0040)", () => {
+  const viewed = async (who: Actor) =>
+    (
+      await one<{ n: number }>(
+        "SELECT count(*)::int AS n FROM audit_events WHERE action = 'followup.viewed' AND target_id = $1 AND actor_membership_id = $2",
+        [caramel.id, who.membershipId],
+      )
+    ).n;
+
+  it("les lectures cliniques partagent la transaction de l'ouverture journalisée", async () => {
+    const before = await viewed(claire);
+    const { n: everyone } = await one<{ n: number }>(
+      "SELECT count(*)::int AS n FROM audit_events WHERE action = 'followup.viewed' AND target_id = $1",
+      [caramel.id],
+    );
+    const opened = await suivis.dossier(
+      claire,
+      caramel.id,
+      async (tx, loaded) => {
+        const { rows } = await tx.execute<{ n: number }>(
+          sql`SELECT count(*)::int AS n FROM audit_events WHERE action = 'followup.viewed' AND target_id = ${caramel.id}`,
+        );
+        return { access: loaded.access, auditsSeen: rows[0]?.n ?? 0 };
+      },
+    );
+    expect(opened?.clinical?.access).toBe("clinical");
+    // La lecture voit la trace pas encore validée : c'est la même transaction.
+    expect(opened?.clinical?.auditsSeen).toBe(everyone + 1);
+    expect(await viewed(claire)).toBe(before + 1);
+
+    // Une lecture qui échoue annule aussi la trace : rien n'a été montré.
+    await expect(
+      suivis.dossier(claire, caramel.id, () =>
+        Promise.reject(new Error("lecture")),
+      ),
+    ).rejects.toThrow("lecture");
+    expect(await viewed(claire)).toBe(before + 1);
+  });
+
+  it("sans accès clinique, aucune lecture clinique n'est faite ; sans accès, aucun dossier", async () => {
+    let called = false;
+    const read = async () => {
+      called = true;
+      return null;
+    };
+    const summary = await suivis.dossier(lea, caramel.id, read);
+    expect(summary?.record.access).toBe("summary");
+    expect(summary?.clinical).toBeNull();
+    expect(await suivis.dossier(hugo, caramel.id, read)).toBeNull();
+    expect(await suivis.dossier(lea, "pas-un-uuid", read)).toBeNull();
+    expect(called).toBe(false);
   });
 });
 

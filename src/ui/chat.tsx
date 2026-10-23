@@ -116,10 +116,12 @@ function AttachmentView({
     return (
       <figure className="mb-2">
         {attachment.src ? (
-          // Lien signé de deux minutes, servi par l'application : pas d'optimisation d'image.
+          // Lien signé de deux minutes, servi par l'application : pas d'optimisation d'image,
+          // ni de chargement différé (le lien aurait expiré quand l'image entre à l'écran).
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={attachment.src}
+            decoding="async"
             alt={t.photoAlt(ownerName)}
             className="max-h-72 w-auto max-w-full rounded-xl border border-line bg-surface object-contain"
           />

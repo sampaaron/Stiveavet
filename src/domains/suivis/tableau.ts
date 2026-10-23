@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, gte, inArray, lt, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from "drizzle-orm";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
 import type { AppointmentKind } from "@/domains/agenda/rendez-vous";
 import { followupActivity } from "@/domains/facturation/service";
 import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
+import type { Plan } from "@/domains/facturation/rules";
 import type { Actor } from "@/domains/equipe/actor";
 import { parisDayIndex, parisLocalToDate } from "@/domains/heure-paris";
 import {
@@ -28,7 +29,7 @@ import {
   users,
   voiceTranscripts,
 } from "@/server/db/schema";
-import { withTenant } from "@/server/db/tenant";
+import { uuidArray, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
 import type {
@@ -116,6 +117,7 @@ export type TodayView = {
 };
 
 const ONGOING = new Set(["active", "paused", "human_takeover"]);
+const OPEN_STATUSES = ["draft", "active", "paused", "human_takeover"] as const;
 const MAX_EXCERPT = 120;
 
 const APPOINTMENT_KINDS = {
@@ -163,25 +165,45 @@ async function clinicalFacts(tx: TenantTransaction, ids: string[]) {
       consent: new Map<string, "requested" | "given" | "withdrawn">(),
     };
 
-  const latest = await tx
-    .selectDistinctOn([messages.followupId], {
-      followupId: messages.followupId,
-      at: messages.occurredAt,
-    })
-    .from(messages)
-    .where(inArray(messages.followupId, ids))
-    .orderBy(messages.followupId, desc(messages.occurredAt));
-
-  const owner = await tx
-    .selectDistinctOn([messages.followupId], {
-      followupId: messages.followupId,
-      id: messages.id,
-      body: messages.body,
-      at: messages.occurredAt,
-    })
-    .from(messages)
-    .where(and(inArray(messages.followupId, ids), eq(messages.author, "owner")))
-    .orderBy(messages.followupId, desc(messages.occurredAt));
+  // Dernier message et dernière nouvelle du propriétaire, un seul de chaque par suivi : la
+  // base suit l'index (suivi, heure) à rebours au lieu de trier tous les messages. Les
+  // heures reviennent en texte (lecture SQL brute).
+  const last = await tx.execute<{
+    followup_id: string;
+    last_at: string | null;
+    owner_id: string | null;
+    owner_body: string | null;
+    owner_at: string | null;
+  }>(sql`
+    SELECT f.id AS followup_id, l.occurred_at AS last_at,
+           o.id AS owner_id, o.body AS owner_body, o.occurred_at AS owner_at
+    FROM unnest(${uuidArray(ids)}) AS f(id)
+    LEFT JOIN LATERAL (
+      SELECT m.occurred_at FROM ${messages} m WHERE m.followup_id = f.id
+      ORDER BY m.occurred_at DESC LIMIT 1
+    ) l ON true
+    LEFT JOIN LATERAL (
+      SELECT m.id, m.body, m.occurred_at FROM ${messages} m
+      WHERE m.followup_id = f.id AND m.author = 'owner'
+      ORDER BY m.occurred_at DESC LIMIT 1
+    ) o ON true`);
+  const latest = last.rows.flatMap((row) =>
+    row.last_at
+      ? [{ followupId: row.followup_id, at: new Date(row.last_at) }]
+      : [],
+  );
+  const owner = last.rows.flatMap((row) =>
+    row.owner_id && row.owner_at
+      ? [
+          {
+            followupId: row.followup_id,
+            id: row.owner_id,
+            body: row.owner_body ?? "",
+            at: new Date(row.owner_at),
+          },
+        ]
+      : [],
+  );
   const files = owner.length
     ? await tx
         .select({
@@ -303,14 +325,24 @@ export function todayService(deps: {
   const { db, followups, drveto } = deps;
 
   return {
-    async today(actor: Actor, now = new Date()): Promise<TodayView> {
+    /**
+     * `billing` : formule et suivis actifs déjà lus par la garde des droits (contexte du
+     * membre), pour ne pas les relire.
+     */
+    async today(
+      actor: Actor,
+      now = new Date(),
+      billing?: { plan: Plan | null; activeFollowups: number },
+    ): Promise<TodayView> {
       const can = (permission: Parameters<typeof actor.permissions.has>[0]) =>
         actor.permissions.has(permission);
+      // Brouillons et suivis en cours seulement : l'historique des suivis terminés reste
+      // dans la liste des suivis.
       const views =
         can("followups.read_all") ||
         can("followups.read_own") ||
         can("followups.read_summary")
-          ? await followups.list(actor)
+          ? await followups.list(actor, { statuses: OPEN_STATUSES })
           : [];
       const clinical = views.filter(
         (view): view is FollowupClinical =>
@@ -350,7 +382,9 @@ export function todayService(deps: {
                   (a.lastActivityAt?.getTime() ?? 0),
             );
 
-          const activity = await followupActivity(tx);
+          const activeFollowups =
+            billing?.activeFollowups ??
+            (await followupActivity(tx, { lastEnd: false })).activeFollowups;
           let agenda: DashboardAgendaItem[] | null = null;
           let stiveaAppointments = 0;
           if (can("agenda.read")) {
@@ -425,9 +459,10 @@ export function todayService(deps: {
           return {
             views,
             followups: rows,
-            activeFollowups: activity.activeFollowups,
-            includedFollowups: planDefinition(await currentPlan(tx))
-              .includedActiveFollowups,
+            activeFollowups,
+            includedFollowups: planDefinition(
+              billing ? billing.plan : await currentPlan(tx),
+            ).includedActiveFollowups,
             agenda,
             stiveaAppointments,
           };

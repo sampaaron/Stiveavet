@@ -8,12 +8,12 @@ import { AUTH_POLICY } from "@/domains/auth/policy";
 import { appText } from "@/i18n/app/server";
 import { memberProfile } from "@/server/auth/profile";
 import { memberContext } from "@/server/authz";
-import { services } from "@/server/services";
 import { AppShell } from "@/ui/app-shell";
 
 import { lockAction, logoutAction } from "../(auth)/actions";
 import { LanguageSwitch } from "../language-switch";
 
+import { pendingAlertCounts } from "./alert-counts";
 import { AlertsNotice } from "./alerts-notice";
 import { BillingNotice } from "./billing-notice";
 import { IdleLock } from "./idle-lock";
@@ -30,16 +30,12 @@ export default async function CabinetLayout({
   const { t, locale } = await appText();
   const [profile, alerts] = await Promise.all([
     memberProfile(context),
-    services.alerts().open(context),
+    pendingAlertCounts(context),
   ]);
-
-  const pendingAlerts = alerts.filter(
-    (alert) => alert.status === "open" || alert.status === "escalated",
-  ).length;
 
   return (
     <AppShell
-      pendingAlerts={pendingAlerts}
+      pendingAlerts={alerts.pending}
       organizationName={profile.organizationName}
       user={{
         name: profile.displayName,
@@ -87,7 +83,7 @@ export default async function CabinetLayout({
         canManage={context.permissions.has("billing.manage")}
         commitmentReminder={context.commitmentReminder}
       />
-      <AlertsNotice alerts={alerts} />
+      <AlertsNotice counts={alerts} />
       {children}
     </AppShell>
   );

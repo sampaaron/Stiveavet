@@ -22,7 +22,11 @@ import {
 import { withTenant } from "@/server/db/tenant";
 
 import { pools } from "./support/db";
-import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
+import {
+  conversationWorker,
+  recordingWhatsApp,
+  replayJob,
+} from "./support/whatsapp";
 
 /**
  * Lot 15 : rappels planifiés et fin du suivi automatisé (ADR 0018). Les heures d'envoi sont
@@ -301,21 +305,14 @@ describe("rappels planifiés", () => {
     });
 
     // Rejouée, l'étape ne repart pas.
-    await withTenant(appDb, { organizationId: org }, async (tx) => {
-      const handler = allHandlers["followup.reminder"];
-      if (!handler) throw new Error("exécutant manquant");
-      await handler({
-        tx,
-        job: {
-          id: randomUUID(),
-          organizationId: org,
-          kind: "followup.reminder",
-          attempt: 1,
-          followupId: plume,
-          payload: { stepId: step.id },
-          idempotencyKey: `followup:${plume}:step:${step.id}`,
-        },
-      });
+    await replayJob(appDb, allHandlers["followup.reminder"], {
+      id: randomUUID(),
+      organizationId: org,
+      kind: "followup.reminder",
+      attempt: 1,
+      followupId: plume,
+      payload: { stepId: step.id },
+      idempotencyKey: `followup:${plume}:step:${step.id}`,
     });
     expect(sent).toHaveLength(before + 1);
   });
@@ -405,21 +402,14 @@ describe("rappels planifiés", () => {
     const stale = ends.find((job) => job.status === "cancelled");
     if (!stale) throw new Error("ancienne fin");
     // Une tâche de fin périmée ne termine rien.
-    await withTenant(appDb, { organizationId: org }, async (tx) => {
-      const handler = allHandlers["followup.end"];
-      if (!handler) throw new Error("exécutant manquant");
-      await handler({
-        tx,
-        job: {
-          id: randomUUID(),
-          organizationId: org,
-          kind: "followup.end",
-          attempt: 1,
-          followupId: plume,
-          payload: stale.payload,
-          idempotencyKey: `followup:${plume}:end:stale`,
-        },
-      });
+    await replayJob(appDb, allHandlers["followup.end"], {
+      id: randomUUID(),
+      organizationId: org,
+      kind: "followup.end",
+      attempt: 1,
+      followupId: plume,
+      payload: stale.payload,
+      idempotencyKey: `followup:${plume}:end:stale`,
     });
     expect((await followupRow(plume)).status).toBe("active");
   });

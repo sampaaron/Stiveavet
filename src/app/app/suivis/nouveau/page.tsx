@@ -52,10 +52,7 @@ export default async function NewFollowupPage({
       : [],
     query.length >= 2
       ? []
-      : services
-          .followups()
-          .list(context)
-          .then((views) => views.filter((view) => view.status === "draft")),
+      : services.followups().list(context, { statuses: ["draft"] }),
   ]);
   const { t, locale } = await appText();
   const text = t.followups.create;

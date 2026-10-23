@@ -1,4 +1,3 @@
-import type { AlertView } from "@/domains/urgences/service";
 import { appText } from "@/i18n/app/server";
 import { AlertBanner } from "@/ui/alert-banner";
 import { ButtonLink } from "@/ui/button";
@@ -12,16 +11,13 @@ import { HiddenOn } from "./hidden-on";
  * montrent déjà. Aucun contenu clinique : un simple décompte.
  */
 export async function AlertsNotice({
-  alerts,
+  counts,
 }: {
-  alerts: readonly AlertView[];
+  counts: { pending: number; urgent: number };
 }) {
-  const pending = alerts.filter(
-    (alert) => alert.status === "open" || alert.status === "escalated",
-  );
-  const urgent = pending.filter((alert) => alert.level === "urgent").length;
+  const { urgent } = counts;
   if (!urgent) return null;
-  const watch = pending.length - urgent;
+  const watch = counts.pending - urgent;
   const { t } = await appText();
   const text = t.alerts.notice;
   return (

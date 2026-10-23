@@ -243,9 +243,7 @@ export function stiveService(deps: {
     });
     const clinical = can(actor, "clinical.read");
     const unacknowledged = clinical
-      ? (await deps.alerts.open(actor)).filter(
-          (alert) => alert.status === "open" || alert.status === "escalated",
-        ).length
+      ? (await deps.alerts.pendingCounts(actor)).pending
       : null;
     const pending = can(actor, "agenda.read")
       ? (await deps.appointments.desk(actor, now)).pending.length

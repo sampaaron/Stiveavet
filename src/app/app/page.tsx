@@ -651,7 +651,7 @@ export default async function TodayPage() {
   const now = new Date();
   // Suivis visibles selon les droits ; le détail clinique seulement avec l'accès clinique.
   const [today, stats] = await Promise.all([
-    services.today().today(context, now),
+    services.today().today(context, now, context),
     services.stats().activity(context, now),
   ]);
   // Le point de Stive reprend la vue déjà lue : ni demande comptée, ni échange enregistré.

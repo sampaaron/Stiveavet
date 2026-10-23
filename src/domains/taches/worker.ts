@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { outboxEvents } from "@/server/db/schema";
+import { outboxEvents, scheduledJobs } from "@/server/db/schema";
 import type { JobPayload } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
@@ -15,10 +15,12 @@ import type { EnqueueInput } from "./queue";
  * Worker de la file de tâches (architecture §9). Un passage :
  * 0. laisse les planificateurs inscrire les tâches périodiques du jour (balayage quotidien) ;
  * 1. publie les événements de l'outbox en tâches (idempotent) ;
- * 2. prend les tâches dues qu'il sait exécuter (`jobs.claim`, jamais deux fois la même) ;
- * 3. exécute chacune dans la transaction de son cabinet, puis la marque réussie dans cette
- *    même transaction ; en cas d'échec, programme la tentative suivante ou la met en échec
- *    (tout de suite pour un échec définitif), et prévient l'exécutant d'échec du type ;
+ * 2. prend quelques tâches dues qu'il sait exécuter (`jobs.claim`, jamais deux fois la même) ;
+ * 3. les exécute en parallèle d'un suivi à l'autre, dans l'ordre pour un même suivi : chacune
+ *    dans la transaction de son cabinet, marquée réussie dans cette même transaction ; en cas
+ *    d'échec, programme la tentative suivante ou la met en échec (tout de suite pour un échec
+ *    définitif), et prévient l'exécutant d'échec du type. Un exécutant en deux temps appelle
+ *    son prestataire (IA, Meta) hors transaction, après avoir prolongé son bail (ADR 0040) ;
  * 4. reprend les tâches devenues dues entre-temps (un envoi inscrit par un message), en
  *    quelques tours au plus.
  * Les journaux du worker ne contiennent que des identifiants, des types et des codes.
@@ -39,6 +41,36 @@ export type JobHandler = (context: {
   tx: TenantTransaction;
   job: ClaimedJob;
 }) => Promise<void>;
+
+/** Courte transaction de lecture dans le cabinet de la tâche ; prolonge d'abord son bail. */
+export type JobReader = <T>(
+  run: (tx: TenantTransaction) => Promise<T>,
+) => Promise<T>;
+
+/**
+ * Exécutant en deux temps, pour une tâche qui appelle un prestataire lent (IA, Meta) :
+ * - `prepare` lit ce qu'il lui faut (`read`, sans verrou), puis appelle le prestataire hors
+ *   de toute transaction : aucune connexion ni aucun verrou n'est gardé pendant l'appel ;
+ * - `commit` reprend les verrous, revérifie l'état et écrit, sans appel extérieur.
+ * Une erreur levée par l'une ou l'autre étape suit le chemin d'échec habituel.
+ */
+export type StagedJobHandler<Prepared> = {
+  /**
+   * Effet chez le prestataire qui ne doit jamais être refait (message WhatsApp parti) :
+   * l'écriture qui le constate est gardée même si le bail a été perdu pendant l'appel, pour
+   * que la reprise de la tâche ailleurs le voie. `commit` doit alors être idempotent sous
+   * verrou. Sinon, comme pour un exécutant simple, un bail perdu annule l'écriture.
+   */
+  keepOnLostLease?: boolean;
+  prepare(context: { job: ClaimedJob; read: JobReader }): Promise<Prepared>;
+  commit(context: {
+    tx: TenantTransaction;
+    job: ClaimedJob;
+    prepared: Prepared;
+  }): Promise<void>;
+};
+
+export type AnyJobHandler = JobHandler | StagedJobHandler<unknown>;
 
 export type OutboxEvent = {
   id: string;
@@ -71,11 +103,16 @@ export type JobPlanner = (db: Database) => Promise<number>;
 export type WorkerOptions = {
   db: Database;
   workerId: string;
-  handlers: Readonly<Record<string, JobHandler>>;
+  handlers: Readonly<Record<string, AnyJobHandler>>;
   deadHandlers?: Readonly<Record<string, DeadJobHandler>>;
   routes?: Readonly<Record<string, OutboxRoute>>;
   planners?: readonly JobPlanner[];
+  /**
+   * Tâches prises ensemble et exécutées en parallèle (une connexion chacune au plus) : à
+   * garder sous la taille du pool. Petit, pour que le bail ne coure que sur peu de tâches.
+   */
   batchSize?: number;
+  /** Bail d'une tâche, prolongé avant chaque appel à un prestataire. */
   leaseSeconds?: number;
   /** Tours de prise par passage : une tâche inscrite par une autre part dans le même passage. */
   rounds?: number;
@@ -110,6 +147,8 @@ const workerIdSchema = z.string().regex(/^[a-z0-9-]{1,64}$/);
 /** Le bail n'a pas survécu à l'exécution : la transaction est annulée. */
 class LeaseLost extends Error {}
 
+const OUTBOX_BATCH = 20;
+
 function errorCodeOf(error: unknown): JobErrorCode {
   return error instanceof JobError ? error.code : "unexpected_error";
 }
@@ -125,9 +164,9 @@ export function createWorker(options: WorkerOptions) {
     deadHandlers = {},
     routes = {},
     planners = [],
-    batchSize = 20,
+    batchSize = 3,
     leaseSeconds = 300,
-    rounds = 5,
+    rounds = 30,
   } = options;
   const workerId = workerIdSchema.parse(options.workerId);
   const kinds = Object.keys(handlers);
@@ -140,7 +179,7 @@ export function createWorker(options: WorkerOptions) {
       event_id: string;
       organization_id: string;
     }>(
-      sql`SELECT event_id, organization_id FROM jobs.pending_outbox(${batchSize})`,
+      sql`SELECT event_id, organization_id FROM jobs.pending_outbox(${OUTBOX_BATCH})`,
     );
     let published = 0;
     for (const {
@@ -196,22 +235,61 @@ export function createWorker(options: WorkerOptions) {
     });
   }
 
-  async function run(job: ClaimedJob): Promise<keyof PassResult> {
+  async function complete(tx: TenantTransaction, job: ClaimedJob) {
+    const done = await tx.execute<{ ok: boolean }>(
+      sql`SELECT jobs.complete(${job.id}, ${workerId}, ${job.attempt}) AS ok`,
+    );
+    return done.rows[0]?.ok === true;
+  }
+
+  /** Bail prolongé de `leaseSeconds` ; faux s'il a déjà été perdu (tâche reprise ailleurs). */
+  async function renewLease(tx: TenantTransaction, job: ClaimedJob) {
+    const renewed = await tx
+      .update(scheduledJobs)
+      .set({
+        lockedUntil: sql`now() + make_interval(secs => ${leaseSeconds})`,
+      })
+      .where(
+        and(
+          eq(scheduledJobs.id, job.id),
+          eq(scheduledJobs.status, "running"),
+          eq(scheduledJobs.lockedBy, workerId),
+          eq(scheduledJobs.attempts, job.attempt),
+        ),
+      )
+      .returning({ id: scheduledJobs.id });
+    return renewed.length === 1;
+  }
+
+  /** Exécute la tâche ; vrai si elle est réussie, faux si le bail a été perdu entre-temps. */
+  async function execute(job: ClaimedJob): Promise<boolean> {
     const handler = handlers[job.kind];
+    const tenant = { organizationId: job.organizationId };
+    if (!handler) throw new JobError("unexpected_error");
+    if (typeof handler === "function")
+      return withTenant(db, tenant, async (tx) => {
+        await handler({ tx, job });
+        if (!(await complete(tx, job))) throw new LeaseLost();
+        return true;
+      });
+    const read: JobReader = (fn) =>
+      withTenant(db, tenant, async (tx) => {
+        // Aucun appel au prestataire sans bail valide pour toute sa durée.
+        if (!(await renewLease(tx, job))) throw new LeaseLost();
+        return fn(tx);
+      });
+    const prepared = await handler.prepare({ job, read });
+    return withTenant(db, tenant, async (tx) => {
+      await handler.commit({ tx, job, prepared });
+      const done = await complete(tx, job);
+      if (!done && !handler.keepOnLostLease) throw new LeaseLost();
+      return done;
+    });
+  }
+
+  async function run(job: ClaimedJob): Promise<keyof PassResult> {
     try {
-      await withTenant(
-        db,
-        { organizationId: job.organizationId },
-        async (tx) => {
-          if (!handler) throw new JobError("unexpected_error");
-          await handler({ tx, job });
-          const done = await tx.execute<{ ok: boolean }>(
-            sql`SELECT jobs.complete(${job.id}, ${workerId}, ${job.attempt}) AS ok`,
-          );
-          if (!done.rows[0]?.ok) throw new LeaseLost();
-        },
-      );
-      return "succeeded";
+      return (await execute(job)) ? "succeeded" : "lost";
     } catch (error) {
       if (error instanceof LeaseLost) return "lost";
       const code = errorCodeOf(error);
@@ -246,6 +324,26 @@ export function createWorker(options: WorkerOptions) {
     }
   }
 
+  /**
+   * Parallèle d'un suivi à l'autre ; dans l'ordre de prise pour un même suivi (les messages
+   * d'une conversation partent dans l'ordre où ils ont été écrits).
+   */
+  async function runBatch(batch: readonly ClaimedJob[]) {
+    const lanes = new Map<string, ClaimedJob[]>();
+    for (const job of batch) {
+      const lane = job.followupId ?? job.id;
+      lanes.set(lane, [...(lanes.get(lane) ?? []), job]);
+    }
+    const outcomes = await Promise.all(
+      [...lanes.values()].map(async (jobs) => {
+        const done: Array<keyof PassResult> = [];
+        for (const job of jobs) done.push(await run(job));
+        return done;
+      }),
+    );
+    return outcomes.flat();
+  }
+
   return {
     workerId,
     /** Un passage complet ; renvoie des compteurs seulement. */
@@ -263,7 +361,7 @@ export function createWorker(options: WorkerOptions) {
       for (let round = 0; round < rounds; round += 1) {
         const batch = await claim();
         if (batch.length === 0) break;
-        for (const job of batch) result[await run(job)] += 1;
+        for (const outcome of await runBatch(batch)) result[outcome] += 1;
       }
       return result;
     },

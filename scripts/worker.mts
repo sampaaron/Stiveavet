@@ -48,7 +48,14 @@ try {
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: config.databaseUrl, max: 4 });
+// Délais plus larges que ceux de l'application web : les balayages de conservation effacent
+// par lots, et une transaction oubliée ouverte est tout de même coupée par PostgreSQL.
+const pool = new Pool({
+  connectionString: config.databaseUrl,
+  max: 4,
+  statement_timeout: 120_000,
+  idle_in_transaction_session_timeout: 60_000,
+});
 const worker = createWorker({
   db: drizzle(pool, { schema }),
   workerId,

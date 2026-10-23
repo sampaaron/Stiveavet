@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import { sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
@@ -63,11 +64,11 @@ function transaction<T>(
   run: (tx: TenantTransaction) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
+    // Une seule instruction : un aller-retour de moins par transaction. Sans personne, la
+    // chaîne vide vaut NULL pour `app.current_user_id()`.
     await tx.execute(
-      sql`SELECT set_config('app.organization_id', ${organizationId}, true)`,
+      sql`SELECT set_config('app.organization_id', ${organizationId}, true), set_config('app.user_id', ${userId ?? ""}, true)`,
     );
-    if (userId)
-      await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
     return run(tx);
   });
 }
@@ -83,4 +84,12 @@ export function tenantRunner(db: Database) {
       { organizationId: member.organizationId, userId: member.userId },
       run,
     );
+}
+
+/**
+ * Identifiants passés en un seul paramètre tableau (`colonne = ANY(…)`) : une liste longue
+ * n'approche jamais la limite de 65 535 paramètres de PostgreSQL.
+ */
+export function uuidArray(ids: readonly string[]): SQL {
+  return sql`${sql.param([...ids])}::uuid[]`;
 }
