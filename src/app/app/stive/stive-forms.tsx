@@ -103,7 +103,7 @@ export function AskStiveBar({ placeholder }: { placeholder: string }) {
       <div className="relative">
         <Sparkles
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-accent"
+          className="pointer-events-none absolute top-1/2 left-5 z-10 size-5 -translate-y-1/2 text-accent"
         />
         <input
           id={id}

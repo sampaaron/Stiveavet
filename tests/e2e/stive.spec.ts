@@ -185,7 +185,7 @@ test("résumé, rendez-vous confirmé et brouillon envoyé seulement au clic", a
   ).toBeVisible();
   await page.goto("/app");
   await expect(
-    page.getByText("Le point de Stive", { exact: true }),
+    page.getByRole("heading", { level: 2, name: /^Le point de Stive/ }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Ouvrir Stive" })).toBeVisible();
 });
