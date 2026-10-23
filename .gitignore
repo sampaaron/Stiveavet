@@ -57,3 +57,6 @@ tests/e2e/.auth/
 /infra/**/.terraform/
 /infra/**/*.tfstate*
 /infra/**/*.tfvars
+
+# Worker compilé (image Docker)
+/dist/
