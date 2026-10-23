@@ -1,4 +1,4 @@
-import { foldText } from "@/domains/commun";
+import { foldText } from "@/domains/commun/utilitaires";
 
 /**
  * Garde-fous déterministes de Numa (cahier des charges §3, architecture §10) : appliqués à

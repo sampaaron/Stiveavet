@@ -8,7 +8,7 @@ import {
   vets,
 } from "../../src/fixtures/cabinet-tilleuls";
 import { SEED } from "../../src/fixtures/seed-ids";
-import type { Followup } from "../../src/fixtures/types";
+import type { Followup } from "../../src/ui/types";
 import {
   agendaFreeSlots,
   animalOwners,
@@ -23,7 +23,7 @@ import {
   users,
 } from "../../src/server/db/schema";
 import { hashPassword } from "../../src/domains/auth/password";
-import type { Actor } from "../../src/domains/equipe/actor";
+import type { Actor } from "../../src/domains/commun/actor";
 import { ROLE_PERMISSIONS } from "../../src/domains/equipe/permissions";
 import { PROTOCOL_LIBRARY } from "../../src/domains/protocoles/library";
 import { protocolsService } from "../../src/domains/protocoles/service";

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { loadFollowup, setStatusReason } from "@/domains/suivis/lancement";
 import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { canResumeNuma, canWriteToOwner } from "@/domains/suivis/policies";

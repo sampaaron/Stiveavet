@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { buildSimulatedVoiceNote } from "@/adapters/ai-gateway/simulated-voice";
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import {
   contactRoleInput,
   ownerMessageInput,

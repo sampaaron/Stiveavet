@@ -2,7 +2,7 @@ import "server-only";
 
 import { notFound } from "next/navigation";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { memberContext } from "@/server/authz";
 import { services } from "@/server/services";
 

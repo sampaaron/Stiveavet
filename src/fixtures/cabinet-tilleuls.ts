@@ -1,4 +1,4 @@
-import type { AgendaEvent, Followup, Vet } from "./types";
+import type { AgendaEvent, Followup } from "@/ui/types";
 
 /**
  * Cabinet entièrement fictif. Les numéros utilisent les plages réservées à la fiction
@@ -10,6 +10,8 @@ export const cabinet = {
   emergencyPhone: "01 99 00 12 34",
   onCallPhone: "01 99 00 56 78",
 };
+
+type Vet = { id: string; name: string; shortName: string };
 
 export const vets: Vet[] = [
   { id: "vet-fontaine", name: "Dr Claire Fontaine", shortName: "Dr Fontaine" },

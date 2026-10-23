@@ -9,7 +9,7 @@ import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { createMemoryStorage } from "@/adapters/object-storage/memory";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { conversationsService } from "@/domains/conversations/service";
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { mediaHandlers, mediaService } from "@/domains/fichiers/service";
 import { protocolsService } from "@/domains/protocoles/service";

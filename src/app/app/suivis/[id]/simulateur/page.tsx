@@ -7,7 +7,7 @@ import type {
   ConversationMessage,
   ConversationView,
 } from "@/domains/conversations/service";
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import type { SignedLink } from "@/domains/fichiers/liens";
 import { durationLabel } from "@/domains/fichiers/media";
 import { appText } from "@/i18n/app/server";

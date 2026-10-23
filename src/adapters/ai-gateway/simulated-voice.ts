@@ -1,4 +1,4 @@
-import { concatBytes } from "@/domains/commun";
+import { concatBytes } from "@/domains/commun/utilitaires";
 import { riffChunks } from "@/domains/fichiers/media";
 
 /**

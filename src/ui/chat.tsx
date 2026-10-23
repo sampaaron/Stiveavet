@@ -2,20 +2,20 @@
 
 import { FileX, ImageIcon, Mic, ScanEye } from "lucide-react";
 
-import type { Message } from "@/fixtures/types";
-import { useAppText } from "@/i18n/app/client";
-import type { AppDictionary } from "@/i18n/app/types";
+import { useSharedText } from "@/i18n/app/shared-client";
+import type { SharedDictionary } from "@/i18n/app/types";
 
 import { AssistantAvatar } from "./assistant-card";
 import { cn } from "./cn";
 import { StatusBadge } from "./status-badge";
+import type { Message } from "./types";
 
 /** Fil de conversation, groupé par jour. */
 export function ChatThread({ messages }: { messages: Message[] }) {
-  const t = useAppText();
+  const t = useSharedText();
   const days = groupByDay(messages);
   return (
-    <ol aria-label={t.ui.chat.conversation} className="flex flex-col gap-3">
+    <ol aria-label={t.chat.conversation} className="flex flex-col gap-3">
       {days.map(({ day, items }) => (
         <li key={day} className="flex flex-col gap-3">
           <p className="self-center rounded-full bg-canvas-subtle px-3 py-0.5 text-xs font-semibold text-ink-muted">
@@ -35,7 +35,7 @@ export function ChatThread({ messages }: { messages: Message[] }) {
 }
 
 function ChatBubble({ message }: { message: Message }) {
-  const t = useAppText();
+  const t = useSharedText();
   if (message.author === "system") {
     return (
       <p className="mx-auto max-w-md text-center text-xs text-ink-muted">
@@ -74,7 +74,7 @@ function ChatBubble({ message }: { message: Message }) {
         {message.attachment ? (
           <AttachmentView
             attachment={message.attachment}
-            ownerName={message.authorName ?? t.ui.chat.theOwner}
+            ownerName={message.authorName ?? t.chat.theOwner}
           />
         ) : null}
         {message.text ? (
@@ -86,14 +86,14 @@ function ChatBubble({ message }: { message: Message }) {
   );
 }
 
-function authorLabel(message: Message, t: AppDictionary): string {
+function authorLabel(message: Message, t: SharedDictionary): string {
   switch (message.author) {
     case "numa":
-      return t.ui.chat.numaAuthor;
+      return t.chat.numaAuthor;
     case "vet":
-      return t.ui.chat.vetAuthor(message.authorName ?? null);
+      return t.chat.vetAuthor(message.authorName ?? null);
     default:
-      return message.authorName ?? t.ui.chat.owner;
+      return message.authorName ?? t.chat.owner;
   }
 }
 
@@ -104,7 +104,7 @@ function AttachmentView({
   attachment: NonNullable<Message["attachment"]>;
   ownerName: string;
 }) {
-  const t = useAppText().ui.chat;
+  const t = useSharedText().chat;
   if (attachment.kind === "deleted")
     return (
       <p className="mb-1 flex items-center gap-2 rounded-xl bg-surface/70 p-2.5 text-sm text-ink-muted">

@@ -22,6 +22,9 @@ L'audit complet d'octobre 2026 a relevé des failles d'infrastructure : secrets 
    - ESLint applique `no-floating-promises`, `no-misused-promises`, `no-non-null-assertion` et `no-unnecessary-type-assertion`.
    - La couverture de 100 % s'étend aux droits, à la CSP, à l'assainissement des erreurs de base et à l'adresse IP du client.
    - Les tests de facturation tournent à horloge fixe, avec un cas avant et un cas après la fin de l'offre de lancement.
+   - `Actor`, `DomainError` et `assertPermission`, communs à tous les domaines, vivent dans `domains/commun/actor.ts`, à côté des petites aides de `domains/commun/utilitaires.ts`.
+   - Les formes d'affichage d'un suivi (`Message`, `Attachment`, `Followup`, `AgendaEvent`) vivent dans `src/ui/types.ts` ; les données fictives les importent.
+   - Les composants partagés avec la vitrine (`StatusBadge`, `AssistantAvatar`, `ChatThread`) lisent un petit dictionnaire dédié (`i18n/app/<langue>/shared.ts`, `useSharedText`), repris tel quel dans `ui` : le code client de la vitrine passe de 235 à 59 Ko et n'embarque plus le dictionnaire de l'espace cabinet.
 
 ## Conséquences
 

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
 import { activeVets } from "@/domains/equipe/veterinaires";
 import { recordUsage } from "@/domains/facturation/service";

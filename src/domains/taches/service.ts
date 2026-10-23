@@ -2,8 +2,8 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { recordAudit } from "@/domains/audit/journal";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { scheduledJobs } from "@/server/db/schema";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";

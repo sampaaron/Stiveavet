@@ -28,7 +28,7 @@ import type {
   DashboardSummary,
   TodayView,
 } from "@/domains/suivis/tableau";
-import type { AgendaEvent as AgendaEventData } from "@/fixtures/types";
+import type { AgendaEvent as AgendaEventData } from "@/ui/types";
 import { AgendaEvent } from "@/ui/agenda-event";
 import { AlertBanner } from "@/ui/alert-banner";
 import { AiBadge, AssistantAvatar, AssistantCard } from "@/ui/assistant-card";

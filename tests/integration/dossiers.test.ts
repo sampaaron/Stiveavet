@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SEED } from "../../db/seed/cabinets-fictifs";
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { ROLE_PERMISSIONS } from "@/domains/equipe/permissions";
 import { followupsService } from "@/domains/suivis/service";
 import { followups as fixtureFollowups } from "@/fixtures/cabinet-tilleuls";

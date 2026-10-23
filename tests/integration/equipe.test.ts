@@ -13,8 +13,8 @@ import {
 import { MemoryEmailSender } from "@/adapters/email/memory";
 import { hashPassword } from "@/domains/auth/password";
 import { authService } from "@/domains/auth/service";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import {
   acceptInvitation,

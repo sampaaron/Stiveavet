@@ -65,10 +65,10 @@ describe("dictionnaires de l'espace cabinet", () => {
   });
 
   it("présente toujours Numa et Stive comme des IA", () => {
-    expect(fr.common.numaAi).toBe("Assistante IA");
-    expect(fr.common.stiveAi).toBe("Assistant IA");
-    expect(en.common.numaAi).toBe("AI assistant");
-    expect(en.common.stiveAi).toBe("AI assistant");
+    expect(fr.ui.assistants.numaAi).toBe("Assistante IA");
+    expect(fr.ui.assistants.stiveAi).toBe("Assistant IA");
+    expect(en.ui.assistants.numaAi).toBe("AI assistant");
+    expect(en.ui.assistants.stiveAi).toBe("AI assistant");
     expect(en.ui.chat.numaAuthor).toContain("AI assistant");
   });
 

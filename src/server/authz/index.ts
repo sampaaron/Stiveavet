@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import { restrictPermissions } from "@/domains/facturation/rules";
 import type { Access, Plan } from "@/domains/facturation/rules";

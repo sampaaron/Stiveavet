@@ -22,7 +22,7 @@ import {
   wantsAppointment,
 } from "@/domains/agenda/rendez-vous";
 import type { AppointmentWording } from "@/domains/agenda/rendez-vous";
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { REMINDER_KIND } from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
 import { emergencyGuidance } from "@/domains/urgences/service";

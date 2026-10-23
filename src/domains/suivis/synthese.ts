@@ -4,8 +4,8 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { AiGateway, SynthesisEvent } from "@/adapters/ai-gateway/types";
 import { auditFollowup } from "@/domains/audit/journal";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import {
   triageReason,
   triageReasonColumns,

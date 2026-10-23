@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { MAX_OWNERS, patientInput } from "@/domains/patients/content";
 import { parisLocalToDate } from "@/domains/heure-paris";
 import { appText } from "@/i18n/app/server";

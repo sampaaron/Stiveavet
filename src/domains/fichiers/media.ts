@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { concatBytes } from "@/domains/commun";
+import { concatBytes } from "@/domains/commun/utilitaires";
 
 /**
  * Fichiers acceptés (architecture §7, ADR 0019) : le type est lu dans les premiers octets

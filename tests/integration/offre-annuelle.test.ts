@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { MemoryEmailSender } from "@/adapters/email/memory";
 import { fakeBillingProvider } from "@/adapters/billing-provider/fake";
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { isPermissionKey } from "@/domains/equipe/permissions";
 import {
   ANNUAL_OFFER_JOB,

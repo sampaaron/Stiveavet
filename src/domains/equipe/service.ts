@@ -47,8 +47,8 @@ import { tenantRunner, withTenant } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 import { recordAudit } from "@/domains/audit/journal";
 
-import { DomainError, assertPermission } from "./actor";
-import type { Actor } from "./actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { invitationEmail } from "./emails";
 import {
   PERMISSION_KEYS,

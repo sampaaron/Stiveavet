@@ -17,7 +17,7 @@ règles de sécurité dans `docs/securite/`.
 | `src/server`             | Socle transversal : configuration (`env.ts`), base (`db/`), sessions (`auth/`), droits (`authz/`), en-têtes et CSP.      |
 | `src/server/services.ts` | Assemble les services (base, adaptateurs, configuration). L'interface ne crée jamais un service elle-même.               |
 | `src/i18n`               | Dictionnaires. Le français fait foi ; l'anglais est typé sur le français, une clé oubliée ne compile pas.                |
-| `src/ui`                 | Composants visuels partagés et formats (dates, montants).                                                                |
+| `src/ui`                 | Composants visuels partagés, formats (dates, montants) et formes d'affichage d'un suivi (`types.ts`).                    |
 | `infra/scaleway`         | Infrastructure du staging en Terraform (ADR 0028). Rien n'est créé sans feu vert.                                        |
 | `db/migrations`          | Migrations SQL numérotées, chacune avec son `.up.sql` et son `.down.sql`.                                                |
 | `db/seed`                | Données fictives : les Tilleuls (Claire, Hugo, Inès, Léa) et le cabinet du Dr Martin.                                    |
@@ -44,7 +44,7 @@ Exemple : un vétérinaire relance une tâche en échec (`src/app/app/taches/act
 5. **Dans la transaction,** le service fait le changement métier et l'inscrit au journal
    (`src/domains/audit/journal.ts`). S'il le faut, il ajoute une tâche avec `enqueue`, ou un
    événement avec `emit`. Tout est validé ensemble ou annulé ensemble.
-6. **Retour.** Un refus métier lève une `DomainError` (`src/domains/equipe/actor.ts`), que
+6. **Retour.** Un refus métier lève une `DomainError` (`src/domains/commun/actor.ts`), que
    `attempt()` ou `domainFailure()` traduit dans la langue de la personne. Toute autre erreur
    remonte vers la page d'erreur générique, sans détail.
 
@@ -154,14 +154,14 @@ Avant d'écrire une aide, vérifiez qu'elle n'existe pas déjà :
 - `activeVets` (`src/domains/equipe/veterinaires.ts`) liste les vétérinaires actifs du cabinet courant.
 - `loadFacts` (`src/domains/facturation/faits.ts`) lit l'abonnement du cabinet courant.
 - `formatEuros`, `initials` et les dates (`src/ui/format.ts`), `Fact` (`src/ui/card.tsx`) pour l'affichage.
-- `concatBytes` et `foldText` (`src/domains/commun.ts`), `clientIp` (`src/server/http/client-ip.ts`).
+- `concatBytes` et `foldText` (`src/domains/commun/utilitaires.ts`), `clientIp` (`src/server/http/client-ip.ts`).
 
 ## Heure de Paris
 
 Les règles métier (rappels, jour courant, horaires de garde) suivent l'heure murale de Paris.
 Toutes les aides sont dans `src/domains/heure-paris.ts` : `parisWallMinutes` (heure murale),
 `parisLocalToDate` (saisie `datetime-local` lue à Paris), `parisDayIndex` (numéro du jour) et
-`parisDate` (« AAAA-MM-JJ »). `minutesOfDay` est dans `src/domains/commun.ts`. N'en recopiez
+`parisDate` (« AAAA-MM-JJ »). `minutesOfDay` est dans `src/domains/commun/utilitaires.ts`. N'en recopiez
 pas une, et n'utilisez jamais `new Date().getHours()` : le serveur tourne en UTC. Les tests e2e attendent le jour suivant quand minuit approche à Paris
 (`tests/e2e/prepare-database.mts`).
 

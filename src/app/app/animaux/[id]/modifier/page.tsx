@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";

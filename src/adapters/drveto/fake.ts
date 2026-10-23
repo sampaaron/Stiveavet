@@ -1,4 +1,4 @@
-import { foldText } from "@/domains/commun";
+import { foldText } from "@/domains/commun/utilitaires";
 import { parisLocalToDate, parisWallMinutes } from "@/domains/heure-paris";
 
 import type {

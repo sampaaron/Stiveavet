@@ -1,4 +1,4 @@
-import type { Actor } from "@/domains/equipe/actor";
+import type { Actor } from "@/domains/commun/actor";
 import type { FollowupShareView } from "@/domains/suivis/service";
 import { appText } from "@/i18n/app/server";
 import { services } from "@/server/services";

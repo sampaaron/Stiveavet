@@ -1,6 +1,6 @@
 import type { MemberRole } from "@/domains/auth/repository";
 
-import type { PermissionKey } from "./permissions";
+import type { PermissionKey } from "@/domains/equipe/permissions";
 
 /** Personne qui agit, telle qu'établie par la garde serveur (session + permissions en base). */
 export type Actor = {
