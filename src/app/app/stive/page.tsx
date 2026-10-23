@@ -1,4 +1,10 @@
-import { LockKeyhole, PawPrint, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  LockKeyhole,
+  PawPrint,
+  PlugZap,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -109,9 +115,16 @@ export default async function StivePage({
     memberProfile(context),
   ]);
   const followup = origin?.access === "clinical" ? origin : null;
-  const lastStive = conversation.entries.findLast(
-    (entry) => entry.author === "stive",
+  const simulated = conversation.mode === "simulated";
+  // Une réponse peut tenir en plusieurs bulles (texte puis cartes) : l'ancre vise la première.
+  const lastQuestion = conversation.entries.findLastIndex(
+    (entry) => entry.author === "member",
   );
+  const lastStive =
+    conversation.entries
+      .slice(lastQuestion + 1)
+      .find((entry) => entry.author === "stive") ??
+    conversation.entries.findLast((entry) => entry.author === "stive");
   const answerProps = {
     t,
     locale,
@@ -153,6 +166,23 @@ export default async function StivePage({
             />
             <p>{text.aiNotice}</p>
           </div>
+          {simulated ? (
+            <div
+              role="note"
+              className="flex items-start gap-2 border-b border-line bg-watch-soft/60 px-5 py-3 text-sm"
+            >
+              <PlugZap
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-watch"
+              />
+              <p>
+                <span className="font-semibold">
+                  {text.mode.simulatedTitle}
+                </span>{" "}
+                · {text.mode.simulated}
+              </p>
+            </div>
+          ) : null}
 
           {followup ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
@@ -228,7 +258,7 @@ export default async function StivePage({
                   {text.greeting(profile.firstName)}
                 </p>
                 <p className="max-w-md text-sm text-ink-muted">
-                  {text.greetingHelp}
+                  {simulated ? text.greetingHelp : text.greetingHelpAi}
                 </p>
               </div>
             )}
@@ -237,16 +267,27 @@ export default async function StivePage({
           <AskStive
             followupId={followup?.id ?? null}
             suggestions={suggestionsFor(t, followup)}
+            placeholder={
+              simulated ? text.ask.placeholder : text.ask.placeholderAi
+            }
           />
         </Card>
 
         <div className="flex min-w-0 flex-col gap-6">
           <SectionCard title={text.capabilities.title}>
-            <ul className="grid list-disc gap-1.5 pl-5 text-sm">
-              {text.capabilities.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+            <div className="grid gap-3 text-sm">
+              <ul className="grid list-disc gap-1.5 pl-5">
+                <li className={simulated ? "text-ink-muted" : "font-medium"}>
+                  {simulated
+                    ? text.capabilities.conversationOff
+                    : text.capabilities.conversation}
+                </li>
+                {text.capabilities.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <p className="text-ink-muted">{text.capabilities.limits}</p>
+            </div>
           </SectionCard>
           <SectionCard title={text.privacy.title}>
             <div className="grid gap-3 text-sm">
