@@ -24,6 +24,7 @@ import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { loadFollowup } from "@/domains/suivis/lancement";
 import { followupAccess } from "@/domains/suivis/policies";
+import { followupAccessMap } from "@/domains/suivis/service";
 import { messageWindows } from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
 import type { JobErrorCode } from "@/domains/taches/kinds";
@@ -891,6 +892,41 @@ export function alertsService(db: Database) {
     async open(actor: Actor): Promise<AlertView[]> {
       if (!actor.permissions.has("clinical.read")) return [];
       return run(actor, (tx) => listAlerts(tx, actor, { view: "open" }));
+    },
+
+    /**
+     * Alertes sans accusé de réception (ouvertes ou escaladées) des dossiers que l'acteur lit
+     * en clinique : deux décomptes seulement, pour la cloche et le bandeau de chaque page.
+     */
+    async pendingCounts(
+      actor: Actor,
+    ): Promise<{ pending: number; urgent: number }> {
+      if (!actor.permissions.has("clinical.read"))
+        return { pending: 0, urgent: 0 };
+      return run(actor, async (tx) => {
+        const rows = await tx
+          .select({
+            level: alerts.level,
+            followupId: alerts.followupId,
+            responsibleMembershipId: followups.responsibleMembershipId,
+            isPrivate: followups.isPrivate,
+          })
+          .from(alerts)
+          .innerJoin(followups, eq(followups.id, alerts.followupId))
+          .where(inArray(alerts.status, ["open", "escalated"]));
+        const access = await followupAccessMap(tx, actor, [
+          ...new Map(
+            rows.map((row) => [row.followupId, { ...row, id: row.followupId }]),
+          ).values(),
+        ]);
+        const readable = rows.filter(
+          (row) => access.get(row.followupId) === "clinical",
+        );
+        return {
+          pending: readable.length,
+          urgent: readable.filter((row) => row.level === "urgent").length,
+        };
+      });
     },
 
     /** Historique : les 100 dernières alertes closes, avec qui les a closes. */

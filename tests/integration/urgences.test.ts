@@ -574,6 +574,10 @@ describe("droits, isolation et garde-fous de la base", () => {
   it("une assistante ne voit les alertes qu'avec l'accès clinique, et ne décide jamais", async () => {
     const lina = await actor(ids.assistant);
     expect(await alertsApi.open(lina)).toEqual([]);
+    expect(await alertsApi.pendingCounts(lina)).toEqual({
+      pending: 0,
+      urgent: 0,
+    });
     expect(await domainError(alertsApi.acknowledge(lina, alertId))).toBe(
       "not_found",
     );
@@ -584,6 +588,15 @@ describe("droits, isolation et garde-fous de la base", () => {
     const allowed = await actor(ids.assistant);
     const [seen] = await alertsApi.open(allowed);
     expect(seen).toMatchObject({ id: alertId, canAcknowledge: false });
+    // Les décomptes de la cloche disent la même chose que la liste, sans la relire.
+    const pending = (await alertsApi.open(allowed)).filter(
+      (alert) => alert.status === "open" || alert.status === "escalated",
+    );
+    expect(pending.length).toBeGreaterThan(0);
+    expect(await alertsApi.pendingCounts(allowed)).toEqual({
+      pending: pending.length,
+      urgent: pending.filter((alert) => alert.level === "urgent").length,
+    });
     expect(await domainError(alertsApi.acknowledge(allowed, alertId))).toBe(
       "forbidden",
     );
@@ -595,6 +608,7 @@ describe("droits, isolation et garde-fous de la base", () => {
   it("un autre cabinet ne voit ni ne touche rien", async () => {
     const olga = await actor(ids.outsider, other);
     expect(await alertsApi.open(olga)).toEqual([]);
+    expect((await alertsApi.pendingCounts(olga)).pending).toBe(0);
     expect(await domainError(alertsApi.acknowledge(olga, alertId))).toBe(
       "not_found",
     );
