@@ -2,7 +2,6 @@ import { CircleDashed, ShieldAlert } from "lucide-react";
 
 import {
   FEATURED_PLAN,
-  INTRO_OFFER,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
@@ -27,7 +26,7 @@ import {
   TextLink,
   TextSections,
 } from "../blocks";
-import { CtaLink } from "../chrome";
+import { CtaLink, introOfferValues } from "../chrome";
 import type { SiteProps } from "../chrome";
 import { PricingVisual, SecurityVisual, SupportVisual } from "../illustrations";
 
@@ -36,14 +35,7 @@ export function PricingPage({ locale, t }: SiteProps) {
   const pricing = t.pricing;
   const price = (cents: number) => formatPrice(cents, locale);
   const intro = introOfferOpen(new Date());
-  const introValues = {
-    percent: INTRO_OFFER.discountPercent,
-    months: INTRO_OFFER.months,
-    date: new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", {
-      dateStyle: "long",
-      timeZone: "Europe/Paris",
-    }).format(new Date(INTRO_OFFER.signupsUntil.getTime() - 1)),
-  };
+  const introValues = introOfferValues(locale);
   return (
     <>
       <PageIntro
@@ -51,7 +43,7 @@ export function PricingPage({ locale, t }: SiteProps) {
         lead={pricing.lead}
         aside={<PricingVisual locale={locale} t={t} />}
       />
-      <Section labelledBy="formules">
+      <Section labelledBy="formules" theme="billing">
         <SectionTitle id="formules" title={pricing.plansTitle} />
         {intro ? (
           <Card className="mt-6 border-brand bg-brand-soft p-6">
@@ -154,7 +146,7 @@ export function PricingPage({ locale, t }: SiteProps) {
         </Card>
       </Section>
 
-      <Section labelledBy="usage" className="bg-surface">
+      <Section labelledBy="usage" tinted theme="billing">
         <div className="grid gap-10 lg:grid-cols-2">
           <div>
             <SectionTitle id="usage" title={pricing.usageTitle} />
@@ -177,9 +169,7 @@ export function PricingPage({ locale, t }: SiteProps) {
           </div>
         </div>
       </Section>
-      <div className="bg-surface">
-        <CtaBand locale={locale} t={t} title={t.home.finalCta.title} />
-      </div>
+      <CtaBand locale={locale} t={t} title={t.home.finalCta.title} />
     </>
   );
 }
@@ -214,7 +204,7 @@ export function SecurityPage({ locale, t }: SiteProps) {
         lead={security.lead}
         aside={<SecurityVisual t={t} />}
       />
-      <Section>
+      <Section theme="team">
         <TextSections sections={security.sections} />
         <Card className="mt-4 flex gap-4 p-6">
           <ShieldAlert
@@ -246,7 +236,7 @@ export function HelpPage({ t }: SiteProps) {
         lead={help.lead}
         aside={<SupportVisual t={t} />}
       />
-      <Section>
+      <Section theme="help">
         <div className="grid grid-cols-1 gap-x-10 gap-y-12 lg:grid-cols-2">
           {help.topics.map((topic, index) => (
             <section key={topic.title} aria-labelledby={`aide-${index}`}>
@@ -271,7 +261,7 @@ export function StatusPage({ t }: SiteProps) {
   return (
     <>
       <PageIntro title={status.title} lead={status.lead} />
-      <Section>
+      <Section theme="journal">
         <Card className="divide-y divide-line">
           {status.components.map((component) => (
             <div
@@ -302,7 +292,7 @@ export function TrialPage({ locale, t }: SiteProps) {
           price: formatPrice(STARTING_PRICE_CENTS, locale),
         })}
       />
-      <Section labelledBy="deroulement">
+      <Section labelledBy="deroulement" theme="onboarding">
         <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
           <Card className="p-6 sm:p-8">
             <h2 id="deroulement" className="text-xl font-bold">
@@ -352,7 +342,7 @@ export function LegalPage({
           <LegalDraft t={t} />
         </div>
       </PageIntro>
-      <Section>
+      <Section theme="protocols">
         <TextSections sections={content.sections} />
       </Section>
     </>

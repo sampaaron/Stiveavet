@@ -105,7 +105,8 @@ test.describe("pages du site", () => {
     await expect(
       page.getByRole("img", { name: "Stive, Assistant IA" }),
     ).toBeVisible();
-    await expect(page.getByText("Conversation fictive")).toBeVisible();
+    // Deux conversations fictives sur l'accueil (onglet Numa, téléphone WhatsApp), toutes étiquetées.
+    await expect(page.getByText("Conversation fictive").first()).toBeVisible();
   });
 
   test("tarifs : les prix HT du cahier des charges", async ({ page }) => {

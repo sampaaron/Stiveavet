@@ -32,13 +32,13 @@ export function HowPage({ locale, t }: SiteProps) {
         lead={how.lead}
         aside={<HowVisual t={t} />}
       />
-      <Section labelledBy="parcours">
+      <Section labelledBy="parcours" theme="followups">
         <SectionTitle id="parcours" title={how.journeyTitle} />
-        <ol className="mt-10 grid gap-4">
+        <ol className="relative mt-10 grid gap-4 before:absolute before:top-6 before:bottom-6 before:left-[2.6rem] before:hidden before:w-px before:bg-gradient-to-b before:from-[var(--section-accent)]/40 before:to-transparent sm:before:block">
           {how.journey.map((step, index) => (
             <li key={step.title}>
-              <Card className="flex gap-5 p-6">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft font-bold text-brand-ink">
+              <Card className="flex gap-5 rounded-[22px] p-6 transition-transform duration-300 hover:translate-x-1">
+                <span className="relative grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--section-accent)] font-display text-lg font-semibold text-white shadow-[0_10px_24px_-10px_var(--section-accent)]">
                   {index + 1}
                 </span>
                 <div>
@@ -51,7 +51,7 @@ export function HowPage({ locale, t }: SiteProps) {
         </ol>
       </Section>
 
-      <Section labelledBy="triage" className="bg-surface">
+      <Section labelledBy="triage" tinted theme="alerts">
         <SectionTitle id="triage" title={how.triageTitle} />
         <div className="mt-10 grid gap-3 md:hidden">
           {how.triage.map((row) => (
@@ -102,7 +102,7 @@ export function HowPage({ locale, t }: SiteProps) {
         <p className="mt-6 max-w-3xl text-ink-muted">{how.triageNote}</p>
       </Section>
 
-      <Section labelledBy="controle">
+      <Section labelledBy="controle" theme="agenda">
         <SectionTitle id="controle" title={how.controlTitle} />
         <CheckList items={how.control} className="mt-8 max-w-3xl" />
       </Section>
@@ -120,7 +120,7 @@ export function NumaPage({ locale, t }: SiteProps) {
           <AssistantPortrait assistant="numa" t={t} size={88} onDark />
         </div>
       </PageIntro>
-      <Section labelledBy="numa-fait">
+      <Section labelledBy="numa-fait" theme="assistants">
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="p-6 sm:p-8">
             <h2 id="numa-fait" className="text-xl font-bold">
@@ -161,7 +161,7 @@ export function StivePage({ locale, t }: SiteProps) {
           <AssistantPortrait assistant="stive" t={t} size={88} onDark />
         </div>
       </PageIntro>
-      <Section labelledBy="stive-prepare">
+      <Section labelledBy="stive-prepare" theme="assistants">
         <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
           <Card className="p-6 sm:p-8">
             <h2 id="stive-prepare" className="text-xl font-bold">
@@ -199,7 +199,7 @@ export function IntegrationsPage({ locale, t }: SiteProps) {
         lead={integrations.lead}
         aside={<IntegrationsVisual t={t} />}
       />
-      <Section>
+      <Section theme="onboarding">
         <ul className="grid gap-4 md:grid-cols-2">
           {integrations.items.map((item) => {
             const launch = item.status === "launch";

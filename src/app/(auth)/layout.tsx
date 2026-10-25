@@ -1,5 +1,3 @@
-import "@fontsource-variable/fraunces";
-
 import Image from "next/image";
 import type { ReactNode } from "react";
 

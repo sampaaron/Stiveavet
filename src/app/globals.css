@@ -29,10 +29,11 @@
 
   --color-accent: #5b4fe0;
 
-  /* Site public uniquement : touche éditoriale du héros et nuit des sections sombres. */
-  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
-  --color-night: #0b1220;
-  --color-night-soft: #141d2e;
+  /* Titres : la même grotesque que le texte, en graisse forte (plus d'empattement ni d'italique). */
+  --font-display: var(--font-sans);
+  /* Nuit verte, commune au site public, aux écrans d'accès et à la barre latérale (ADR 0043). */
+  --color-night: #08130f;
+  --color-night-soft: #10231b;
   --color-mint: #8ce8c3;
 
   --radius-card: 20px;
@@ -42,6 +43,85 @@
   --shadow-card:
     0 1px 2px rgb(11 18 32 / 0.04), 0 6px 20px -8px rgb(11 18 32 / 0.08);
   --shadow-pill: 0 1px 2px rgb(11 18 32 / 0.06), 0 2px 8px rgb(11 18 32 / 0.04);
+}
+
+/*
+ * Site public en thème sombre (ADR 0043), dans l'esprit de Limova : nuit verte, textes
+ * clairs, cartes en verre fumé. Les contrastes restent au-dessus de 4,5:1 sur la nuit.
+ */
+.theme-site {
+  --color-canvas: #07110d;
+  --color-canvas-subtle: #0d1c15;
+  --color-surface: #0f2019;
+  --color-line: #1e3a2c;
+  --color-ink: #eef6f2;
+  --color-ink-muted: #a7bcb2;
+  --color-brand-soft: #123b2a;
+  --color-brand-ink: #8ce8c3;
+  --color-watch: #f6c879;
+  --color-watch-soft: #3a2c12;
+  --color-urgent: #ff9a85;
+  --color-urgent-soft: #3d1b15;
+  --color-accent: #b4abff;
+  --shadow-card:
+    0 1px 0 rgb(255 255 255 / 0.04) inset, 0 20px 50px -30px rgb(0 0 0 / 0.9);
+  --shadow-pill: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* Aperçus du logiciel dans le site sombre : ils gardent les couleurs claires de l'application. */
+.theme-site .theme-light {
+  --color-canvas: #f6f8f7;
+  --color-canvas-subtle: #edf2ef;
+  --color-surface: #ffffff;
+  --color-line: #e2e8e4;
+  --color-ink: #0b1220;
+  --color-ink-muted: #56636f;
+  --color-brand-soft: #dcf5ea;
+  --color-brand-ink: #07603f;
+  --color-watch: #87561d;
+  --color-watch-soft: #f8eedd;
+  --color-urgent: #a8412f;
+  --color-urgent-soft: #f8e3dd;
+  --color-accent: #5b4fe0;
+  --shadow-card:
+    0 1px 2px rgb(11 18 32 / 0.04), 0 6px 20px -8px rgb(11 18 32 / 0.08);
+  color: var(--color-ink);
+}
+
+/*
+ * Lueur de fond du héros du site : deux halos et un horizon vert, comme une planète.
+ * `--glow-bleed` : hauteur dont la couche déborde sous son bloc ; l'horizon reste à sa place.
+ */
+@utility hero-glow {
+  background:
+    radial-gradient(
+      60rem 26rem at 50% calc(115% - var(--glow-bleed, 0rem) * 1.15),
+      rgb(8 122 84 / 0.55),
+      transparent 70%
+    ),
+    radial-gradient(
+      40rem 22rem at 50% calc(104% - var(--glow-bleed, 0rem) * 1.04),
+      rgb(140 232 195 / 0.28),
+      transparent 70%
+    ),
+    radial-gradient(
+      36rem 24rem at 15% 0%,
+      rgb(140 232 195 / 0.1),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 22rem at 90% 10%,
+      rgb(245 196 107 / 0.08),
+      transparent 70%
+    );
+}
+
+/* Texte en dégradé menthe → blanc (accent du titre, sans italique). */
+@utility text-gradient-mint {
+  background: linear-gradient(100deg, #8ce8c3 10%, #d6fff0 55%, #f5c46b 120%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @layer base {
@@ -120,26 +200,29 @@
 }
 
 /*
- * Halos très discrets du héros du site public (référence visuelle) : menthe, turquoise et
- * violet sur fond bleu nuit. Décor seulement, jamais porteur d'information.
+ * Halos des fonds sombres du site public, aux teintes de l'espace cabinet (ADR 0043) :
+ * menthe, vert du cabinet et or du matin, sur la nuit verte, avec une trame de points.
+ * Décor seulement, jamais porteur d'information.
  */
 @utility site-halos {
   background:
     radial-gradient(
-      38rem 26rem at 12% 8%,
-      rgb(140 232 195 / 0.16),
+      38rem 26rem at 10% 0%,
+      rgb(140 232 195 / 0.2),
       transparent 70%
     ),
     radial-gradient(
-      30rem 24rem at 88% 22%,
-      rgb(91 79 224 / 0.22),
+      32rem 26rem at 92% 18%,
+      rgb(8 122 84 / 0.45),
       transparent 70%
     ),
     radial-gradient(
-      34rem 26rem at 60% 110%,
-      rgb(45 212 191 / 0.14),
+      30rem 22rem at 70% 115%,
+      rgb(245 196 107 / 0.14),
       transparent 70%
-    );
+    ),
+    radial-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px) 0 0 / 22px
+      22px;
 }
 
 /*
@@ -159,6 +242,44 @@
       transparent 70%
     );
   mask-image: linear-gradient(to bottom, black 35%, transparent);
+}
+
+/*
+ * Variante du site public : le même fond, mais dans une boîte qui déborde de 10rem au-dessus
+ * de la section ; les lueurs sont au cœur de la boîte et le masque l'efface en haut comme en
+ * bas. Deux sections voisines se recouvrent ainsi en fondu, sans ligne de coupure.
+ */
+@utility section-backdrop-blend {
+  background:
+    radial-gradient(
+      44rem 22rem at 88% 32%,
+      color-mix(in oklab, var(--section-glow) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      32rem 18rem at 28% 26%,
+      color-mix(in oklab, var(--section-accent) 11%, transparent),
+      transparent 70%
+    );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 30%,
+    black 45%,
+    transparent
+  );
+}
+
+/*
+ * Fond qui déborde sous son bloc (héros, en-tête des pages) et s'efface progressivement :
+ * la section suivante commence dans la lueur au lieu de la trancher.
+ */
+@utility fade-out-bottom {
+  mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - var(--fade-length, 45%)),
+    transparent
+  );
 }
 
 /* Motif de la rubrique : traits fins, fondus vers la gauche et vers le bas. */
@@ -183,4 +304,71 @@
 
 @utility animate-rise-in {
   animation: rise-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/*
+ * Transitions entre les pages du site (ADR 0043), par l'API View Transitions et le composant
+ * ViewTransition de React. La page sortante s'efface vite, la page entrante monte en douceur,
+ * l'en-tête et le pied de page ne bougent pas, et le grand titre glisse d'une page à l'autre.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(.site-chrome) {
+  display: none;
+}
+
+::view-transition-new(.site-chrome) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(.site-page-exit) {
+    animation: site-page-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  ::view-transition-new(.site-page-enter) {
+    animation: site-page-in 480ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
+  }
+
+  ::view-transition-group(.site-title-morph) {
+    animation-duration: 560ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  ::view-transition-image-pair(.site-title-morph) {
+    animation-name: site-title-blur;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@keyframes site-page-out {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(-10px) scale(0.995);
+  }
+}
+
+@keyframes site-page-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(18px) scale(0.995);
+  }
+}
+
+@keyframes site-title-blur {
+  40% {
+    filter: blur(4px);
+  }
 }

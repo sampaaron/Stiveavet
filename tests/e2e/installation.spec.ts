@@ -101,7 +101,10 @@ test.describe("nouveau cabinet", () => {
     await page
       .getByRole("button", { name: "Signer le mandat (simulé)" })
       .click();
-    await expect(page.getByText("Mandat de prélèvement simulé")).toBeVisible();
+    // Le titre de la carte (« Mandat de prélèvement » et son badge « Simulé ») correspond aussi.
+    await expect(
+      page.getByText("Connecté : Mandat de prélèvement simulé"),
+    ).toBeVisible();
     await progress(page, 7);
 
     await page.getByRole("button", { name: "Créer le suivi test" }).click();

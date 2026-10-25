@@ -160,11 +160,62 @@ export const en: SiteDictionary = {
         },
       ],
     },
+    announcement: "New: Numa, the AI assistant that checks in on your patients",
+    announcementLink: "See the demo",
+    launchAnnouncement:
+      "Launch offer: −{percent}% for {months} months for any sign-up by {date}",
+    launchAnnouncementLink: "See pricing",
+    ask: {
+      label: "Example question to Numa (fictional)",
+      prompt: "How is Caramel doing since her spay?",
+      who: "Asked to Numa · AI assistant",
+    },
+    film: {
+      label: "Stivea Vet presentation film (1 minute, subtitled in French)",
+      soundOn: "Turn sound on",
+      soundOff: "Turn sound off",
+      play: "Play the film",
+      pause: "Pause the film",
+    },
+    badges: {
+      assistants: "Two AI assistants",
+      whatsapp: "On the practice's WhatsApp",
+      change: "Day to day",
+      integrations: "Integrations",
+      steps: "Guided setup",
+      faq: "Frequently asked questions",
+    },
+    whatsapp: {
+      title: "Follow-up happens where your clients already are: on WhatsApp",
+      lead: "Numa writes from the practice's WhatsApp Business number. Owners simply reply; the team sees everything in Stivea Vet and takes over whenever it wants.",
+    },
+    integrationsBlock: {
+      title: "Stivea Vet builds on the practice's tools",
+      link: "See integrations",
+    },
+    preview: {
+      label: "Fictional preview of the Stivea Vet practice workspace",
+      today: "Today",
+      greeting: "Good morning, Claire",
+      briefingTitle: "Stive's briefing",
+      briefing:
+        "Numa is following 7 patients. 1 case is to watch. The decision stays yours.",
+      rows: [
+        {
+          name: "Caramel",
+          status: "watch",
+          line: "Redness on the scar · Day 1",
+        },
+        { name: "Moka", status: "normal", line: "Ate the whole meal · Day 3" },
+        {
+          name: "Pixel",
+          status: "normal",
+          line: "Check-up on Thursday · Day 6",
+        },
+      ],
+    },
     alert: {
       level: "To watch",
-      title: "Caramel · Day 1 · spay",
-      body: "Redness reported on the scar, photo received.",
-      footer: "Dr Fontaine notified on the practice computer",
     },
     beforeAfter: {
       title: "What changes for the practice",
