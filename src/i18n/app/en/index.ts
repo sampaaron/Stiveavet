@@ -1,6 +1,7 @@
 /** Practice workspace in English. Same structure as the French reference (fr/). */
 import type { AppDictionary } from "../types";
 
+import { account } from "./account";
 import { common } from "./common";
 import { shell } from "./shell";
 import { labels } from "./labels";
@@ -19,8 +20,10 @@ import { journal } from "./journal";
 import { tasks } from "./tasks";
 import { agenda } from "./agenda";
 import { patients } from "./patients";
+import { stive } from "./stive";
 
 export const en: AppDictionary = {
+  account,
   common,
   shell,
   labels,
@@ -39,4 +42,5 @@ export const en: AppDictionary = {
   tasks,
   agenda,
   patients,
+  stive,
 };

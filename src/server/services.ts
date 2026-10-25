@@ -30,6 +30,8 @@ import type { SettingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
+import { stiveService } from "@/domains/stive/service";
+import type { StiveService } from "@/domains/stive/service";
 import { statsService } from "@/domains/suivis/statistiques";
 import type { StatsService } from "@/domains/suivis/statistiques";
 import { synthesisService } from "@/domains/suivis/synthese";
@@ -68,6 +70,7 @@ let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
 let today: TodayService | undefined;
 let stats: StatsService | undefined;
+let stive: StiveService | undefined;
 let simulatorWorker: ReturnType<typeof createWorker> | undefined;
 
 declare global {
@@ -190,6 +193,18 @@ export const services = {
   stats(): StatsService {
     stats ??= statsService(appDatabase());
     return stats;
+  },
+  /**
+   * Stive, l'assistant IA du vétérinaire (ADR 0035) : passerelle IA configurée, dossiers lus
+   * par le service des suivis (RLS, accès au dossier, accès clinique).
+   */
+  stive(): StiveService {
+    stive ??= stiveService({
+      db: appDatabase(),
+      ai: configuredAiGateway(),
+      followups: services.followups(),
+    });
+    return stive;
   },
   /**
    * Passage du worker déclenché par le simulateur du propriétaire, en local seulement

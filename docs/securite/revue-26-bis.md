@@ -23,7 +23,7 @@ Revue du code de `main` + lots 20 à 26, avant le feu vert pour les comptes rée
 ## À vérifier en staging (partie B)
 
 - **Adresse IP du client** : `src/server/auth/origin.ts` prend la dernière valeur de `X-Forwarded-For`. C'est juste si l'entrée HTTPS de Scaleway est le seul relais qui l'écrit. À contrôler sur une vraie requête : sinon toutes les connexions partageraient une seule limite par IP.
-- **`APP_ENV`** vaut `local` par défaut. Terraform le fixe pour le staging et la production ; une image lancée sans lui garderait les réglages du poste local (cookies non `Secure`, IP ignorée). À vérifier dans la configuration des conteneurs avant tout trafic.
+- **`APP_ENV`** vaut `local` par défaut. Terraform le fixe pour le staging et la production. Depuis le 20 octobre 2026, le mode `local` n'est accepté que si `APP_URL` désigne le poste local (`localhost`, `127.0.0.1`, `[::1]`, `*.localhost`) : une image lancée en ligne sans `APP_ENV` refuse de démarrer au lieu de garder des cookies non `Secure`. Reste à vérifier la valeur dans la configuration des conteneurs avant tout trafic.
 
 ## Vérifié et conforme
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useId } from "react";
 
 import {
+  LAUNCH_OFFER,
   PLANS,
   PLAN_CATALOG,
   FEATURED_PLAN,
@@ -201,7 +202,7 @@ export function NewPasswordForm({ token }: { token: string }) {
   );
 }
 
-export function SignupForm() {
+export function SignupForm({ launchOffer }: { launchOffer: boolean }) {
   const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     signupAction,
@@ -236,7 +237,11 @@ export function SignupForm() {
         defaultValue={state.values?.email}
         errors={state.fieldErrors?.email}
       />
-      <PlanChoice value={state.values?.plan} errors={state.fieldErrors?.plan} />
+      <PlanChoice
+        value={state.values?.plan}
+        errors={state.fieldErrors?.plan}
+        launchOffer={launchOffer}
+      />
       <TextField
         label={t.fields.password}
         name="password"
@@ -393,9 +398,12 @@ function Consents({
 function PlanChoice({
   value,
   errors,
+  launchOffer,
 }: {
   value?: string;
   errors?: readonly string[];
+  /** Offre de lancement ouverte : prix des premiers mois affichés. */
+  launchOffer: boolean;
 }) {
   const id = useId();
   const text = useAppText();
@@ -428,7 +436,12 @@ function PlanChoice({
               <span className="block font-semibold">
                 {t.option(
                   text.labels.plans[plan].name,
-                  formatEuros(definition.monthlyCents, locale),
+                  formatEuros(
+                    launchOffer
+                      ? definition.launchMonthlyCents
+                      : definition.monthlyCents,
+                    locale,
+                  ),
                 )}
                 {plan === FEATURED_PLAN ? (
                   <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-white">
@@ -439,9 +452,22 @@ function PlanChoice({
               <span className="block text-ink-muted">
                 {t.details(
                   planHighlights(text.labels, plan).join(" · "),
-                  formatEuros(definition.annualMonthlyCents, locale),
+                  formatEuros(
+                    launchOffer
+                      ? definition.launchAnnualMonthlyCents
+                      : definition.annualMonthlyCents,
+                    locale,
+                  ),
                 )}
               </span>
+              {launchOffer ? (
+                <span className="mt-1 block font-semibold text-brand-ink">
+                  {t.launch(
+                    LAUNCH_OFFER.months,
+                    formatEuros(definition.monthlyCents, locale),
+                  )}
+                </span>
+              ) : null}
             </span>
           </label>
         );

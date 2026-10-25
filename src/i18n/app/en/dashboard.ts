@@ -8,7 +8,8 @@ export const dashboard: AppDictionary["dashboard"] = {
   headlineShort: (urgent: number, watch: number) =>
     `${urgent} ${urgent === 1 ? "emergency" : "emergencies"} and ${watch} ${watch === 1 ? "case" : "cases"} to watch`,
   briefing: {
-    title: "Numa's update",
+    title: "Stive's update",
+    titleWithoutStive: "Today's update",
     clinical: (active: number, urgent: number, watch: number) => {
       const parts = [
         urgent
@@ -22,10 +23,10 @@ export const dashboard: AppDictionary["dashboard"] = {
         ? `${parts.join(" and ")}.`
         : "No alert pending.";
       const first = signals.charAt(0).toUpperCase() + signals.slice(1);
-      return `I'm following ${active} ${active === 1 ? "animal" : "animals"} right now. ${first} I never make a diagnosis: the decision is always yours.`;
+      return `Numa is following ${active} ${active === 1 ? "animal" : "animals"} right now. ${first} Nothing is decided without you.`;
     },
     summary: (active: number) =>
-      `I'm following ${active} ${active === 1 ? "animal" : "animals"} for the practice. I never make a diagnosis and I refer every medical question to the team.`,
+      `Numa is following ${active} ${active === 1 ? "animal" : "animals"} for the practice. Every medical question goes back to the team.`,
     searchPlaceholder: "Search for an animal, an owner, a procedure…",
     searchSubmit: "Search follow-ups",
   },
@@ -138,9 +139,7 @@ export const dashboard: AppDictionary["dashboard"] = {
   },
   quickActions: "Quick actions",
   numa: (animals: number) =>
-    `Follows ${animals} ${animals === 1 ? "animal" : "animals"} for the practice. She never makes a diagnosis and escalates whenever in doubt.`,
-  stive:
-    "Your daily briefing will be ready here. Any real action will wait for your confirmation.",
+    `Writes to the owners of ${animals} ${animals === 1 ? "animal" : "animals"}. She never makes a diagnosis and escalates whenever in doubt.`,
   notFound: {
     title: "This screen is not available yet",
     description:

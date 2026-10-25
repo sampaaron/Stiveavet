@@ -46,6 +46,14 @@ const serverEnvSchema = z
         path: ["FILE_LINK_SECRET"],
         message: "requis",
       });
+    // Le mode local (cookies non Secure, IP ignorée) n'est accepté que sur le poste local :
+    // une image lancée en ligne sans APP_ENV refuse de démarrer (revue 26 bis, partie B).
+    if (env.APP_ENV === "local" && !isLocalUrl(env.APP_URL))
+      context.addIssue({
+        code: "custom",
+        path: ["APP_ENV"],
+        message: "local réservé à localhost",
+      });
     // Hors local, les cookies d'authentification doivent être Secure.
     if (env.APP_ENV !== "local" && !env.APP_URL.startsWith("https://"))
       context.addIssue({
@@ -76,4 +84,15 @@ let cached: ServerEnv | undefined;
 export function serverEnv(): ServerEnv {
   cached ??= parseServerEnv(process.env);
   return cached;
+}
+
+/** Adresse du poste local : localhost, 127.0.0.1, [::1] ou un nom en .localhost. */
+function isLocalUrl(url: string): boolean {
+  const { hostname } = new URL(url);
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname.endsWith(".localhost")
+  );
 }

@@ -1,4 +1,5 @@
 /** Espace cabinet en français : la référence. Chaque partie est dans son propre fichier. */
+import { account } from "./account";
 import { common } from "./common";
 import { shell } from "./shell";
 import { labels } from "./labels";
@@ -17,8 +18,10 @@ import { journal } from "./journal";
 import { tasks } from "./tasks";
 import { agenda } from "./agenda";
 import { patients } from "./patients";
+import { stive } from "./stive";
 
 export const fr = {
+  account,
   common,
   shell,
   labels,
@@ -37,4 +40,5 @@ export const fr = {
   tasks,
   agenda,
   patients,
+  stive,
 };

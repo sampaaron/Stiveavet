@@ -20,6 +20,8 @@ export function annualOfferEmail(
     /** Date avant laquelle choisir (début du 7e mois). */
     decideBefore: string;
     url: string;
+    /** Offre de lancement en cours (ADR 0031) : prix réduits jusqu'à la fin du 6e mois. */
+    launch?: { annualPrice: string; monthlyPrice: string; months: number };
   },
 ): EmailMessage {
   const intro =
@@ -30,6 +32,11 @@ export function annualOfferEmail(
     `Bonjour ${details.displayName},`,
     intro,
     `Avec engagement : ${details.annualPrice} HT par mois pendant 12 mois, à partir du prélèvement du ${details.startsOn}. Sans engagement : ${details.monthlyPrice} HT par mois.`,
+    ...(details.launch
+      ? [
+          `Offre de lancement : jusqu'à la fin du ${details.launch.months}e mois, ${details.launch.annualPrice} HT par mois avec engagement, ou ${details.launch.monthlyPrice} HT sans engagement.`,
+        ]
+      : []),
     "Sans réponse de votre part, vous restez au mois : rien ne bascule automatiquement.",
     `Pour choisir : ${details.url}`,
     "L'équipe Stivea Vet",

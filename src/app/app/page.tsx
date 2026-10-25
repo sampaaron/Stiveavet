@@ -10,6 +10,7 @@ import {
   PawPrint,
   Plus,
   Search,
+  Sparkles,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -166,6 +167,8 @@ export default async function TodayPage() {
   const profile = await memberProfile(context);
   const { t, locale } = await appText();
   const text = t.dashboard;
+  // Stive, l'assistant du vétérinaire, mène le point du jour quand l'offre l'inclut.
+  const withStive = can("stive.use");
   const now = new Date();
   // Suivis visibles selon les droits ; le détail clinique seulement avec l'accès clinique.
   const [today, stats] = await Promise.all([
@@ -276,7 +279,7 @@ export default async function TodayPage() {
 
       <div className="grid gap-6">
         <section
-          aria-labelledby="point-de-numa"
+          aria-labelledby="point-du-jour"
           className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(8_122_84/0.35)] assistant-glow sm:p-8"
         >
           <div
@@ -284,18 +287,22 @@ export default async function TodayPage() {
             className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-25 blur-3xl"
           />
           <div className="flex items-start gap-4">
-            <AssistantAvatar
-              assistant="numa"
-              size={56}
-              className="size-11 ring-4 ring-brand-soft sm:size-14"
-            />
+            {withStive ? (
+              <AssistantAvatar
+                assistant="stive"
+                size={56}
+                className="size-11 ring-4 ring-brand-soft sm:size-14"
+              />
+            ) : null}
             <div className="min-w-0">
               <h2
-                id="point-de-numa"
+                id="point-du-jour"
                 className="flex flex-wrap items-center gap-2 font-bold"
               >
-                {text.briefing.title}
-                <AiBadge assistant="numa" />
+                {withStive
+                  ? text.briefing.title
+                  : text.briefing.titleWithoutStive}
+                {withStive ? <AiBadge assistant="stive" /> : null}
               </h2>
               <p className="mt-2 max-w-3xl font-display text-lg leading-snug tracking-[-0.01em] text-balance sm:text-[1.375rem]">
                 {clinical
@@ -307,7 +314,25 @@ export default async function TodayPage() {
                   : text.briefing.summary(today.activeFollowups)}
               </p>
             </div>
+            {withStive ? (
+              <ButtonLink
+                href="/app/stive"
+                className="ml-auto shrink-0 max-sm:hidden"
+                icon={<Sparkles aria-hidden="true" className="size-4" />}
+              >
+                {t.stive.talk}
+              </ButtonLink>
+            ) : null}
           </div>
+          {withStive ? (
+            <ButtonLink
+              href="/app/stive"
+              className="mt-4 w-full sm:hidden"
+              icon={<Sparkles aria-hidden="true" className="size-4" />}
+            >
+              {t.stive.talk}
+            </ButtonLink>
+          ) : null}
           {canSearch ? (
             <form action="/app/suivis" role="search" className="relative mt-5">
               <label htmlFor="recherche-globale" className="sr-only">
@@ -548,9 +573,9 @@ export default async function TodayPage() {
               links={{ followups: views.length > 0, alerts: clinical }}
             />
 
-            {can("stive.use") ? (
-              <AssistantCard assistant="stive">{text.stive}</AssistantCard>
-            ) : null}
+            <AssistantCard assistant="numa">
+              {text.numa(today.activeFollowups)}
+            </AssistantCard>
           </div>
         </div>
 

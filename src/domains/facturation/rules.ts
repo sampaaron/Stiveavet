@@ -21,6 +21,10 @@ export type PlanDefinition = {
   monthlyCents: number;
   /** Prix mensuel avec engagement annuel. */
   annualMonthlyCents: number;
+  /** Offre de lancement (`LAUNCH_OFFER`) : prix mensuel sans engagement, arrondi. */
+  launchMonthlyCents: number;
+  /** Offre de lancement : prix mensuel avec engagement annuel, arrondi. */
+  launchAnnualMonthlyCents: number;
   maxVets: number;
   /** Assistants vétérinaires ; null : sans limite. */
   maxAssistants: number | null;
@@ -37,8 +41,10 @@ export type PlanDefinition = {
 export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   starter: {
     label: "Starter",
-    monthlyCents: 7_900,
-    annualMonthlyCents: 6_700,
+    monthlyCents: 11_900,
+    annualMonthlyCents: 9_900,
+    launchMonthlyCents: 8_900,
+    launchAnnualMonthlyCents: 7_400,
     maxVets: 1,
     maxAssistants: 1,
     includedActiveFollowups: 15,
@@ -48,8 +54,10 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   pro: {
     label: "Pro",
-    monthlyCents: 12_900,
-    annualMonthlyCents: 10_900,
+    monthlyCents: 18_900,
+    annualMonthlyCents: 15_900,
+    launchMonthlyCents: 14_200,
+    launchAnnualMonthlyCents: 11_900,
     maxVets: 2,
     maxAssistants: 3,
     includedActiveFollowups: 40,
@@ -59,8 +67,10 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   premium: {
     label: "Premium",
-    monthlyCents: 19_900,
-    annualMonthlyCents: 16_900,
+    monthlyCents: 28_900,
+    annualMonthlyCents: 24_500,
+    launchMonthlyCents: 21_700,
+    launchAnnualMonthlyCents: 18_400,
     maxVets: 3,
     maxAssistants: null,
     includedActiveFollowups: 100,
@@ -73,10 +83,43 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
 /** Offre mise en avant (inscription, tarifs). */
 export const FEATURED_PLAN: Plan = "pro";
 
-/** Prix d'entrée affiché sur le site (« à partir de »). */
+/** Prix d'entrée hors offre de lancement (« à partir de »). */
 export const STARTING_PRICE_CENTS = Math.min(
   ...PLANS.map((plan) => PLAN_CATALOG[plan].monthlyCents),
 );
+
+/**
+ * Offre de lancement (ADR 0031) : environ 25 % de remise, arrondie dans le catalogue, sur les
+ * premiers mois des cabinets dont l'abonnement démarre pendant la période de lancement.
+ * Le prix ne bascule jamais en cours de mois : il dépend du mois d'abonnement, pas du jour.
+ */
+export const LAUNCH_OFFER = {
+  percentOff: 25,
+  months: 6,
+  /** Inclus, heure de Paris. */
+  opensAt: new Date("2026-10-20T00:00:00+02:00"),
+  /** Exclu : dernier jour d'inscription le 31 décembre 2026. */
+  closesAt: new Date("2027-01-01T00:00:00+01:00"),
+} as const;
+
+/** La période d'inscription à l'offre de lancement est-elle ouverte ? */
+export function launchOfferOpen(now: Date): boolean {
+  return now >= LAUNCH_OFFER.opensAt && now < LAUNCH_OFFER.closesAt;
+}
+
+/** Le cabinet a-t-il démarré son abonnement pendant l'offre de lancement ? */
+export function hasLaunchOffer(
+  facts: Pick<SubscriptionFacts, "startedAt">,
+): boolean {
+  return launchOfferOpen(facts.startedAt);
+}
+
+/** Prix d'entrée affiché sur le site à l'instant `now` : celui de l'offre si elle est ouverte. */
+export function startingPriceCents(now: Date): number {
+  return launchOfferOpen(now)
+    ? Math.min(...PLANS.map((plan) => PLAN_CATALOG[plan].launchMonthlyCents))
+    : STARTING_PRICE_CENTS;
+}
 
 /** Cabinet antérieur aux abonnements : limites de la formule la plus complète. */
 const LEGACY_PLAN: Plan = "premium";
@@ -166,15 +209,24 @@ export function phase(facts: SubscriptionFacts, now: Date): Phase {
   return "settled";
 }
 
+/** L'offre de lancement s'applique-t-elle au mois d'abonnement `month` ? */
+export function isLaunchMonth(
+  facts: Pick<SubscriptionFacts, "startedAt">,
+  month: number,
+): boolean {
+  return hasLaunchOffer(facts) && month <= LAUNCH_OFFER.months;
+}
+
 /** Prix HT du mois d'abonnement `month`. */
 export function monthlyPriceCents(
-  facts: Pick<SubscriptionFacts, "plan" | "cycle">,
+  facts: Pick<SubscriptionFacts, "plan" | "cycle" | "startedAt">,
   month: number,
 ): number {
   const plan = PLAN_CATALOG[facts.plan];
-  return facts.cycle === "annual" && month > TRIAL_MONTHS
-    ? plan.annualMonthlyCents
-    : plan.monthlyCents;
+  const annual = facts.cycle === "annual" && month > TRIAL_MONTHS;
+  if (isLaunchMonth(facts, month))
+    return annual ? plan.launchAnnualMonthlyCents : plan.launchMonthlyCents;
+  return annual ? plan.annualMonthlyCents : plan.monthlyCents;
 }
 
 export function isCanceled(facts: SubscriptionFacts, now: Date): boolean {
@@ -333,14 +385,14 @@ export type InvoiceDraft = {
  * (« prélevés avec l'abonnement suivant »).
  */
 export function draftInvoice(
-  facts: Pick<SubscriptionFacts, "plan" | "cycle">,
+  facts: Pick<SubscriptionFacts, "plan" | "cycle" | "startedAt">,
   month: number,
   usage: { kind: UsageKind; amountCents: number }[],
 ): InvoiceDraft {
   const plan = PLAN_CATALOG[facts.plan];
   const lines: InvoiceLine[] = [
     {
-      label: `Formule ${plan.label}, ${facts.cycle === "annual" && month > TRIAL_MONTHS ? "engagement annuel" : "sans engagement"}, mois ${month}`,
+      label: `Formule ${plan.label}, ${facts.cycle === "annual" && month > TRIAL_MONTHS ? "engagement annuel" : "sans engagement"}, mois ${month}${isLaunchMonth(facts, month) ? `, offre de lancement −${LAUNCH_OFFER.percentOff} %` : ""}`,
       amountCents: monthlyPriceCents(facts, month),
     },
   ];

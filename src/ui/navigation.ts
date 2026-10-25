@@ -10,6 +10,7 @@ import {
   MessagesSquare,
   PawPrint,
   Settings2,
+  Sparkles,
   Sun,
   Users,
 } from "lucide-react";
@@ -75,6 +76,13 @@ export const appNavigation: NavSection[] = [
   {
     label: "assistants",
     items: [
+      {
+        href: "/app/stive",
+        label: "stive",
+        icon: Sparkles,
+        anyOf: ["stive.use"],
+        assistant: "stive",
+      },
       {
         href: "/app/reglages",
         label: "settings",

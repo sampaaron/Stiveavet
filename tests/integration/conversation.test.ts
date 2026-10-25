@@ -58,6 +58,7 @@ const ai: AiGateway = {
   observePhoto: fakeAiGateway.observePhoto,
   readAgendaCapture: fakeAiGateway.readAgendaCapture,
   summarizeFollowup: fakeAiGateway.summarizeFollowup,
+  stiveChat: fakeAiGateway.stiveChat,
 };
 // Base partagée : les tâches laissées par les autres fichiers de test ne sont pas exécutées.
 const { conversation: handlers, worker } = conversationWorker({

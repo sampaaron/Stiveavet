@@ -88,6 +88,8 @@ export const auth: AppDictionary["auth"] = {
         `${name} · ${price} excl. VAT per month`,
       details: (summary: string, annualPrice: string) =>
         `${summary}. With an annual commitment: ${annualPrice} excl. VAT per month.`,
+      launch: (months: number, regularPrice: string) =>
+        `Launch offer −25% for the first ${months} months, then ${regularPrice} excl. VAT per month.`,
     },
     consents: {
       termsBefore: "I accept the ",

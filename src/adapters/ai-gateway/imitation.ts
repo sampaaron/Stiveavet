@@ -12,7 +12,7 @@ const chatRequest = z.object({
   messages: z
     .array(
       z.object({
-        role: z.enum(["system", "user"]),
+        role: z.enum(["system", "user", "assistant"]),
         content: z.union([
           z.string(),
           z.array(
@@ -29,7 +29,7 @@ const chatRequest = z.object({
         ]),
       }),
     )
-    .length(2),
+    .min(2),
   response_format: z.object({
     type: z.literal("json_schema"),
     json_schema: z.object({
@@ -46,9 +46,11 @@ export type ImitatedAiRequest =
       schema: string;
       model: string;
       system: string;
-      /** Données transmises au modèle, relues depuis le JSON envoyé. */
+      /** Données transmises au modèle, relues depuis le JSON envoyé (ou le texte, pour Stive). */
       data: unknown;
       image: boolean;
+      /** Tours de conversation envoyés avant le dernier message (Stive). */
+      history: { role: string; content: string }[];
     }
   | { kind: "transcription"; model: string; language: string; bytes: number };
 
@@ -63,6 +65,7 @@ const DEFAULTS: Record<string, unknown> = {
   numa_step: { text: "Bonjour, comment va votre animal aujourd'hui ?" },
   photo_observations: { observations: ["Pansement visible et propre."] },
   agenda_slots: { slots: [] },
+  stive_reply: { text: "Réponse de Stive imitée pour les tests." },
   followup_synthesis: {
     evolution: "Le propriétaire donne des nouvelles régulières.",
     positives: [],
@@ -70,6 +73,14 @@ const DEFAULTS: Record<string, unknown> = {
     openQuestions: [],
   },
 };
+
+function readData(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
 
 export function aiImitation(options: { apiKey: string }) {
   const requests: ImitatedAiRequest[] = [];
@@ -116,7 +127,15 @@ export function aiImitation(options: { apiKey: string }) {
       JSON.parse(typeof init.body === "string" ? init.body : "null"),
     );
     if (!parsed.success) return Response.json({ error: {} }, { status: 400 });
-    const [system, user] = parsed.data.messages;
+    const messages = parsed.data.messages;
+    const system = messages[0];
+    const user = messages.at(-1);
+    if (system?.role !== "system" || user?.role !== "user")
+      return Response.json({ error: {} }, { status: 400 });
+    const history = messages.slice(1, -1).map((message) => ({
+      role: message.role,
+      content: typeof message.content === "string" ? message.content : "",
+    }));
     const parts =
       typeof user?.content === "string"
         ? [{ type: "text" as const, text: user.content }]
@@ -128,8 +147,9 @@ export function aiImitation(options: { apiKey: string }) {
       schema,
       model: parsed.data.model,
       system: typeof system?.content === "string" ? system.content : "",
-      data: JSON.parse(text && "text" in text ? text.text : "null"),
+      data: readData(text && "text" in text ? text.text : "null"),
       image: parts.some((part) => part.type === "image_url"),
+      history,
     });
     return reply(queued.shift() ?? { content: DEFAULTS[schema] ?? {} });
   }

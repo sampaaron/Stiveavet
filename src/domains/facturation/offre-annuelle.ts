@@ -20,12 +20,14 @@ import { annualOfferEmail } from "./emails";
 import {
   ANNUAL_REMINDER_MONTH,
   COMMITMENT_DECISION_MONTH,
+  LAUNCH_OFFER,
   PLAN_CATALOG,
   annualOfferOpensAt,
   annualStartsAt,
   billingPeriod,
   commitmentReminder,
   formatEuros,
+  hasLaunchOffer,
 } from "./rules";
 import type { SubscriptionFacts } from "./rules";
 
@@ -134,6 +136,15 @@ export function billingHandlers(deps: {
                 "fr",
               ),
               url,
+              ...(hasLaunchOffer(facts)
+                ? {
+                    launch: {
+                      annualPrice: formatEuros(plan.launchAnnualMonthlyCents),
+                      monthlyPrice: formatEuros(plan.launchMonthlyCents),
+                      months: LAUNCH_OFFER.months,
+                    },
+                  }
+                : {}),
             }),
           );
         } catch {

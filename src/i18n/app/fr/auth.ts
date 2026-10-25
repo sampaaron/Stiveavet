@@ -90,6 +90,9 @@ export const auth = {
       option: (name: string, price: string) => `${name} · ${price} HT par mois`,
       details: (summary: string, annualPrice: string) =>
         `${summary}. Avec engagement annuel : ${annualPrice} HT par mois.`,
+      /** Offre de lancement (ADR 0031) : prix des premiers mois, puis prix normal. */
+      launch: (months: number, regularPrice: string) =>
+        `Offre de lancement −25 % les ${months} premiers mois, puis ${regularPrice} HT par mois.`,
     },
     /** Phrase des conditions découpée autour de ses deux liens. */
     consents: {

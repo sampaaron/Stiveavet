@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ViewTransition } from "react";
 import type { ReactNode } from "react";
 
 import { isLocale, LOCALES } from "@/i18n/locales";
@@ -99,11 +100,27 @@ export default async function SitePage({
       >
         {t.common.skipToContent}
       </a>
-      <SiteHeader locale={locale} t={t} page={page} />
+      {/*
+       * Transitions entre les pages du site (ADR 0034) : l'en-tête et le pied de page restent
+       * en place, l'ancienne page s'efface, la nouvelle monte en douceur, et le grand titre
+       * glisse d'une page à l'autre. Aucune animation si la personne demande moins de mouvement.
+       */}
+      <ViewTransition name="site-header" default="site-chrome">
+        <SiteHeader locale={locale} t={t} page={page} />
+      </ViewTransition>
       <main id="contenu" className="flex-1">
-        {content[page]()}
+        <ViewTransition
+          key={page}
+          enter="site-page-enter"
+          exit="site-page-exit"
+          default="none"
+        >
+          <div>{content[page]()}</div>
+        </ViewTransition>
       </main>
-      <SiteFooter locale={locale} t={t} page={page} />
+      <ViewTransition name="site-footer" default="site-chrome">
+        <SiteFooter locale={locale} t={t} page={page} />
+      </ViewTransition>
     </div>
   );
 }

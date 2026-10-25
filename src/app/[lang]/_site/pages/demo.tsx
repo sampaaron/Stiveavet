@@ -91,7 +91,8 @@ export async function DemoSpacePage({
         ) : null}
       </PageIntro>
 
-      <Section className="py-10 sm:py-12">
+      {/* Espace de démonstration : les couleurs claires du logiciel, sur la nuit du site. */}
+      <Section className="theme-light py-10 sm:py-12" theme="today">
         {selected ? (
           <DemoFollowup followup={selected} t={t} back={base} />
         ) : (

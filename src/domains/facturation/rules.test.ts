@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   FEATURED_PLAN,
+  LAUNCH_OFFER,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
@@ -18,12 +19,15 @@ import {
   commitmentReminder,
   draftInvoice,
   formatEuros,
+  hasLaunchOffer,
   isCanceled,
+  launchOfferOpen,
   maxAssistants,
   maxVets,
   monthlyPriceCents,
   phase,
   restrictPermissions,
+  startingPriceCents,
   subscriptionMonth,
   usageChargeCents,
   withinFollowupCap,
@@ -52,15 +56,15 @@ const idle = { activeFollowups: 0, lastFollowupEndedAt: null };
 const busy = { activeFollowups: 3, lastFollowupEndedAt: null };
 
 describe("catalogue (cahier des charges §13)", () => {
-  it("Starter 79 €, Pro 129 € (offre phare), Premium 199 € HT par mois", () => {
+  it("Starter 119 €, Pro 189 € (offre phare), Premium 289 € HT par mois", () => {
     expect(PLANS.map((plan) => PLAN_CATALOG[plan].monthlyCents)).toEqual([
-      7_900, 12_900, 19_900,
+      11_900, 18_900, 28_900,
     ]);
     expect(PLANS.map((plan) => PLAN_CATALOG[plan].annualMonthlyCents)).toEqual([
-      6_700, 10_900, 16_900,
+      9_900, 15_900, 24_500,
     ]);
     expect(FEATURED_PLAN).toBe("pro");
-    expect(STARTING_PRICE_CENTS).toBe(7_900);
+    expect(STARTING_PRICE_CENTS).toBe(11_900);
   });
 
   it("quotas : places, suivis actifs, Stive et intégrations", () => {
@@ -80,7 +84,7 @@ describe("catalogue (cahier des charges §13)", () => {
   });
 
   it("affiche les montants en euros", () => {
-    expect(formatEuros(7_900).replace(/\s/g, " ")).toBe("79,00 €");
+    expect(formatEuros(11_900).replace(/\s/g, " ")).toBe("119,00 €");
   });
 });
 
@@ -114,10 +118,10 @@ describe("calendrier de l'abonnement", () => {
 
 describe("prix", () => {
   it("prix de la formule dès le 1er mois ; tarif annuel à partir du 3e", () => {
-    expect(monthlyPriceCents(facts(), 1)).toBe(19_900);
-    expect(monthlyPriceCents(facts({ cycle: "annual" }), 2)).toBe(19_900);
-    expect(monthlyPriceCents(facts(), 3)).toBe(19_900);
-    expect(monthlyPriceCents(facts({ cycle: "annual" }), 3)).toBe(16_900);
+    expect(monthlyPriceCents(facts(), 1)).toBe(28_900);
+    expect(monthlyPriceCents(facts({ cycle: "annual" }), 2)).toBe(28_900);
+    expect(monthlyPriceCents(facts(), 3)).toBe(28_900);
+    expect(monthlyPriceCents(facts({ cycle: "annual" }), 3)).toBe(24_500);
   });
 
   it("aucune bascule annuelle automatique avant (ni après) le 7e mois", () => {
@@ -364,7 +368,7 @@ describe("factures", () => {
     expect(invoice.lines).toEqual([
       {
         label: "Formule Premium, sans engagement, mois 4",
-        amountCents: 19_900,
+        amountCents: 28_900,
       },
       {
         label: "2 lancements au-delà de 100 suivis actifs",
@@ -375,9 +379,9 @@ describe("factures", () => {
         amountCents: 126,
       },
     ]);
-    expect(invoice.subtotalCents).toBe(20_526);
-    expect(invoice.vatCents).toBe(4_105);
-    expect(invoice.totalCents).toBe(24_631);
+    expect(invoice.subtotalCents).toBe(29_526);
+    expect(invoice.vatCents).toBe(5_905);
+    expect(invoice.totalCents).toBe(35_431);
   });
 
   it("premiers mois et engagement annuel", () => {
@@ -386,7 +390,7 @@ describe("factures", () => {
     ).toEqual([
       {
         label: "Formule Starter, sans engagement, mois 1",
-        amountCents: 7_900,
+        amountCents: 11_900,
       },
     ]);
     expect(
@@ -394,7 +398,72 @@ describe("factures", () => {
     ).toEqual([
       {
         label: "Formule Starter, engagement annuel, mois 8",
-        amountCents: 6_700,
+        amountCents: 9_900,
+      },
+    ]);
+  });
+});
+
+describe("offre de lancement", () => {
+  const launched = new Date("2026-11-05T09:00:00Z");
+
+  it("environ 25 % de remise, arrondie, sur chaque offre", () => {
+    expect(
+      PLANS.map((plan) => [
+        PLAN_CATALOG[plan].launchMonthlyCents,
+        PLAN_CATALOG[plan].launchAnnualMonthlyCents,
+      ]),
+    ).toEqual([
+      [8_900, 7_400],
+      [14_200, 11_900],
+      [21_700, 18_400],
+    ]);
+    for (const plan of PLANS) {
+      const { monthlyCents, launchMonthlyCents } = PLAN_CATALOG[plan];
+      expect(launchMonthlyCents / monthlyCents).toBeCloseTo(
+        1 - LAUNCH_OFFER.percentOff / 100,
+        1,
+      );
+    }
+  });
+
+  it("inscriptions du 20 octobre au 31 décembre 2026 inclus", () => {
+    expect(launchOfferOpen(new Date("2026-10-19T21:59:59Z"))).toBe(false);
+    expect(launchOfferOpen(new Date("2026-10-19T22:00:00Z"))).toBe(true);
+    expect(launchOfferOpen(new Date("2026-12-31T22:59:59Z"))).toBe(true);
+    expect(launchOfferOpen(new Date("2026-12-31T23:00:00Z"))).toBe(false);
+    expect(hasLaunchOffer(facts())).toBe(false);
+    expect(hasLaunchOffer(facts({ startedAt: launched }))).toBe(true);
+  });
+
+  it("prix d'entrée du site : celui de l'offre tant qu'elle est ouverte", () => {
+    expect(startingPriceCents(launched)).toBe(8_900);
+    expect(startingPriceCents(new Date("2027-01-02T10:00:00Z"))).toBe(
+      STARTING_PRICE_CENTS,
+    );
+  });
+
+  it("les 6 premiers mois au prix de lancement, puis le prix normal", () => {
+    const monthly = facts({ startedAt: launched });
+    expect(monthlyPriceCents(monthly, 1)).toBe(21_700);
+    expect(monthlyPriceCents(monthly, 6)).toBe(21_700);
+    expect(monthlyPriceCents(monthly, 7)).toBe(28_900);
+
+    const annual = facts({ startedAt: launched, cycle: "annual" });
+    expect(monthlyPriceCents(annual, 2)).toBe(21_700);
+    expect(monthlyPriceCents(annual, 3)).toBe(18_400);
+    expect(monthlyPriceCents(annual, 7)).toBe(24_500);
+  });
+
+  it("la facture signale l'offre de lancement", () => {
+    expect(
+      draftInvoice(facts({ startedAt: launched, plan: "starter" }), 2, [])
+        .lines,
+    ).toEqual([
+      {
+        label:
+          "Formule Starter, sans engagement, mois 2, offre de lancement −25 %",
+        amountCents: 8_900,
       },
     ]);
   });

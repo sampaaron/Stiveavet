@@ -94,8 +94,55 @@ export type SynthesisDraft = {
   openQuestions: string[];
 };
 
+/**
+ * Dossier évoqué dans une conversation avec Stive (ADR 0035), réduit au strict utile : le
+ * prénom de l'animal, jamais le nom ni le numéro d'un propriétaire, ni un nom de l'équipe.
+ * Les éléments cliniques ne sont présents que si la personne a l'accès clinique au dossier.
+ */
+export type StiveCase = {
+  animal: string;
+  species: "dog" | "cat";
+  status: "draft" | "active" | "paused" | "human_takeover" | "ended";
+  clinical: StiveClinicalCase | null;
+};
+
+export type StiveClinicalCase = {
+  procedure: string;
+  /** Jours écoulés depuis l'intervention (J+n), heure de Paris. */
+  dayNumber: number;
+  triage: "normal" | "watch" | "urgent";
+  breed: string | null;
+  ageYears: number | null;
+  weightKg: number | null;
+  /** Traitements du dossier ; `validated` : validé par un vétérinaire. */
+  treatments: { name: string; instructions: string; validated: boolean }[];
+  allergies: string[];
+  antecedents: string[];
+  openAlerts: { level: "watch" | "urgent"; status: string }[];
+  /** Derniers échanges utiles avec le propriétaire, coordonnées masquées. */
+  recentExchanges: {
+    dayNumber: number;
+    from: "owner" | "numa" | "vet";
+    text: string;
+    media: "photo" | "voice" | "document" | null;
+  }[];
+};
+
+/** Tour d'une conversation avec Stive : le vétérinaire, ou la réponse de Stive. */
+export type StiveTurn = { from: "vet" | "stive"; text: string };
+
+export type StiveChatInput = {
+  /** Langue d'interface du vétérinaire (Stive suit celle de son dernier message). */
+  language: "fr" | "en";
+  /** Tours précédents, puis le dernier message du vétérinaire en dernier. */
+  turns: StiveTurn[];
+  case: StiveCase | null;
+};
+
 export type AiGateway = {
   readonly simulated: boolean;
+  /** Conversation libre du vétérinaire avec Stive, l'assistant interne (ADR 0035). */
+  stiveChat(input: StiveChatInput): Promise<{ text: string }>;
   numaReply(input: NumaReplyInput): Promise<NumaReply>;
   numaStep(input: NumaStepInput): Promise<{ text: string }>;
   transcribeVoice(input: VoiceTranscriptionInput): Promise<VoiceTranscription>;

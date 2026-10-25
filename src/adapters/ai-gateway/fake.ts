@@ -2,6 +2,7 @@ import { foldText } from "@/domains/commun";
 import { numaFixedReply } from "@/domains/conversations/renvois";
 import { parisLocalToDate, parisWallMinutes } from "@/domains/reglages/content";
 
+import { simulatedStiveReply } from "./simulated-stive";
 import { simulatedSynthesis } from "./simulated-synthesis";
 import { readSimulatedVoiceText } from "./simulated-voice";
 import type {
@@ -156,6 +157,9 @@ export function simulatedAgendaReading(input: AgendaCaptureInput): {
 
 export const fakeAiGateway: AiGateway = {
   simulated: true,
+  async stiveChat(input) {
+    return simulatedStiveReply(input);
+  },
   async numaReply(input) {
     return simulatedNumaReply(input);
   },

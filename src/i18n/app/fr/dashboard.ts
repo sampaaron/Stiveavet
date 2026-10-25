@@ -10,9 +10,14 @@ export const dashboard = {
   /** Sous-titre court (la date est au-dessus du titre). */
   headlineShort: (urgent: number, watch: number) =>
     `${nombre(urgent, "urgence", "urgences")} et ${watch} cas à surveiller`,
-  /** Le point de Numa, en tête du tableau de bord : des décomptes, jamais un avis médical. */
+  /**
+   * Le point de Stive, en tête du tableau de bord : Stive assiste le vétérinaire, Numa
+   * reste auprès des propriétaires. Des décomptes, jamais un avis médical.
+   */
   briefing: {
-    title: "Le point de Numa",
+    title: "Le point de Stive",
+    /** Offre sans Stive : le même point, sans assistant. */
+    titleWithoutStive: "Le point du jour",
     clinical: (active: number, urgent: number, watch: number) => {
       const parts = [
         urgent
@@ -25,10 +30,10 @@ export const dashboard = {
       const signals = parts.length
         ? `${parts.join(" et ")}.`
         : "Aucune alerte en attente.";
-      return `J'accompagne ${nombre(active, "animal", "animaux")} en ce moment. ${signals} Je ne pose jamais de diagnostic : la décision reste la vôtre.`;
+      return `Numa accompagne ${nombre(active, "animal", "animaux")} en ce moment. ${signals} Rien n'est décidé sans vous.`;
     },
     summary: (active: number) =>
-      `J'accompagne ${nombre(active, "animal", "animaux")} pour le cabinet. Je ne pose jamais de diagnostic et je renvoie toute question médicale à l'équipe.`,
+      `Numa accompagne ${nombre(active, "animal", "animaux")} pour le cabinet. Toute question médicale revient à l'équipe.`,
     searchPlaceholder:
       "Rechercher un animal, un propriétaire, une intervention…",
     searchSubmit: "Rechercher dans les suivis",
@@ -156,9 +161,7 @@ export const dashboard = {
   },
   quickActions: "Actions rapides",
   numa: (animals: number) =>
-    `Suit ${animals} ${animals > 1 ? "animaux" : "animal"} pour la clinique. Elle ne pose jamais de diagnostic et escalade en cas de doute.`,
-  stive:
-    "Votre point du jour sera prêt ici. Toute action réelle attendra votre confirmation.",
+    `Écrit aux propriétaires de ${animals} ${animals > 1 ? "animaux" : "animal"}. Elle ne pose jamais de diagnostic et escalade en cas de doute.`,
   notFound: {
     title: "Cet écran n'est pas encore disponible",
     description:

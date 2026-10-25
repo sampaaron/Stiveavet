@@ -30,6 +30,18 @@ describe("parseServerEnv", () => {
     ).toBe(true);
   });
 
+  it("refuse le mode local sur une adresse publique", () => {
+    expect(() => parseServerEnv({ APP_URL: "https://app.stivea.fr" })).toThrow(
+      "APP_ENV",
+    );
+    expect(parseServerEnv({ APP_URL: "http://localhost:3001" }).APP_ENV).toBe(
+      "local",
+    );
+    expect(parseServerEnv({ APP_URL: "http://127.0.0.1:3000" }).APP_ENV).toBe(
+      "local",
+    );
+  });
+
   it("refuse une clé de liens trop courte et un dossier de stockage relatif", () => {
     expect(() => parseServerEnv({ FILE_LINK_SECRET: "court" })).toThrow(
       "FILE_LINK_SECRET",

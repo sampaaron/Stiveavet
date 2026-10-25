@@ -199,3 +199,66 @@ describe("configuration de la passerelle IA", () => {
     expect(error).not.toContain("court");
   });
 });
+
+describe("Stive par la passerelle réelle", () => {
+  it("envoie la conversation en tours, le dossier réduit dans la consigne, et relit la réponse", async () => {
+    const { imitation, ai } = setup();
+    imitation.answerNext({ content: { text: "  Voici quelques pistes.  " } });
+    const reply = await ai.stiveChat({
+      language: "fr",
+      turns: [
+        { from: "vet", text: "Bonjour" },
+        { from: "stive", text: "Bonjour, je vous écoute." },
+        { from: "vet", text: "Comment va Plume ?" },
+      ],
+      case: {
+        animal: "Plume",
+        species: "cat",
+        status: "active",
+        clinical: null,
+      },
+    });
+    expect(reply).toEqual({ text: "Voici quelques pistes." });
+    const [request] = imitation.requests;
+    expect(request).toMatchObject({
+      kind: "chat",
+      schema: "stive_reply",
+      model: "modele-texte",
+      data: "Comment va Plume ?",
+      history: [
+        { role: "user", content: "Bonjour" },
+        { role: "assistant", content: "Bonjour, je vous écoute." },
+      ],
+    });
+    const system = request?.kind === "chat" ? request.system : "";
+    expect(system).toContain("Tu es Stive");
+    expect(system).toContain("diagnostic définitif");
+    expect(system).toContain('"animal":"Plume"');
+  });
+
+  it("ne garde que les derniers tours et refuse une réponse vide ou hors format", async () => {
+    const { imitation, ai } = setup();
+    const turns = Array.from({ length: 31 }, (_, index) => ({
+      from: index % 2 === 0 ? ("vet" as const) : ("stive" as const),
+      text: `tour ${index}`,
+    }));
+    await ai.stiveChat({ language: "fr", turns, case: null });
+    const [request] = imitation.requests;
+    expect(request?.kind === "chat" && request.history).toHaveLength(11);
+    expect(request?.kind === "chat" && request.data).toBe("tour 30");
+
+    imitation.answerNext({ content: { text: "   " } }, { raw: "texte libre" });
+    const input = {
+      language: "fr" as const,
+      turns: [{ from: "vet" as const, text: "Bonjour" }],
+      case: null,
+    };
+    expect(await failureOf(ai.stiveChat(input))).toBe("invalid");
+    expect(await failureOf(ai.stiveChat(input))).toBe("invalid");
+    expect(
+      await failureOf(
+        ai.stiveChat({ ...input, turns: [{ from: "stive", text: "?" }] }),
+      ),
+    ).toBe("rejected");
+  });
+});

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { launchOfferOpen } from "@/domains/facturation/rules";
 import { appText } from "@/i18n/app/server";
 
 import { AuthHeading } from "../auth-heading";
@@ -18,7 +19,7 @@ export default async function SignupPage() {
       <AuthHeading title={t.auth.signup.heading}>
         {t.auth.signup.intro}
       </AuthHeading>
-      <SignupForm />
+      <SignupForm launchOffer={launchOfferOpen(new Date())} />
       <p className="mt-6 border-t border-line pt-4 text-center text-sm text-ink-muted">
         {t.auth.signup.haveAccount}{" "}
         <Link

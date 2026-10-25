@@ -75,7 +75,11 @@ export function AppShell({
         }
         footer={
           <div className="flex flex-col gap-1 rounded-[var(--radius-card)] bg-white/6 p-2 ring-1 ring-white/10">
-            <div className="flex items-center gap-2.5 p-1">
+            <Link
+              href="/app/compte"
+              title={appDictionary(locale).account.open}
+              className="flex items-center gap-2.5 rounded-[calc(var(--radius-card)-4px)] p-1 transition-colors hover:bg-white/8 focus-visible:outline-mint"
+            >
               <span
                 aria-hidden="true"
                 className="grid size-9 shrink-0 place-items-center rounded-full bg-mint text-sm font-bold text-night"
@@ -90,7 +94,7 @@ export function AppShell({
                   {user.roleLabel}
                 </span>
               </span>
-            </div>
+            </Link>
             <div className="flex items-center gap-1 border-t border-white/10 pt-1">
               <div className="min-w-0 flex-1">{accountFooter}</div>
               {accountActions}

@@ -2,11 +2,13 @@ import { CircleDashed, LifeBuoy, ShieldAlert } from "lucide-react";
 
 import {
   FEATURED_PLAN,
+  LAUNCH_OFFER,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
   REACTIVATION_SURCHARGE_CENTS,
-  STARTING_PRICE_CENTS,
+  launchOfferOpen,
+  startingPriceCents,
 } from "@/domains/facturation/rules";
 import type { PlanDefinition } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
@@ -31,10 +33,11 @@ import type { SiteProps } from "../chrome";
 export function PricingPage({ locale, t }: SiteProps) {
   const pricing = t.pricing;
   const price = (cents: number) => formatPrice(cents, locale);
+  const launch = launchOfferOpen(new Date());
   return (
     <>
       <PageIntro title={pricing.title} lead={pricing.lead} />
-      <Section labelledBy="formules">
+      <Section labelledBy="formules" theme="billing">
         <SectionTitle id="formules" title={pricing.plansTitle} />
         <ul className="mt-8 grid gap-4 lg:grid-cols-3">
           {PLANS.map((plan) => {
@@ -59,14 +62,45 @@ export function PricingPage({ locale, t }: SiteProps) {
                     ) : null}
                   </div>
                   <p className="mt-1 text-sm text-ink-muted">{copy.pitch}</p>
-                  <p className="mt-5">
+                  {launch ? (
+                    <p className="mt-5 w-fit rounded-full bg-mint/10 px-3 py-1 text-xs font-bold text-mint ring-1 ring-mint/30">
+                      {fill(pricing.launch.badge, {
+                        percent: String(LAUNCH_OFFER.percentOff),
+                      })}
+                    </p>
+                  ) : null}
+                  <p className={launch ? "mt-3" : "mt-5"}>
                     <span className="text-3xl font-bold tracking-tight">
-                      {price(definition.monthlyCents)}
+                      {price(
+                        launch
+                          ? definition.launchMonthlyCents
+                          : definition.monthlyCents,
+                      )}
                     </span>{" "}
                     <span className="text-sm text-ink-muted">
                       {pricing.perMonthExclVat} · {pricing.monthly}
                     </span>
+                    {launch ? (
+                      <span className="mt-1 block text-sm text-ink-muted">
+                        <s aria-hidden="true">
+                          {price(definition.monthlyCents)}
+                        </s>{" "}
+                        <span className="sr-only">
+                          {fill(pricing.launch.instead, {
+                            price: price(definition.monthlyCents),
+                          })}
+                        </span>
+                      </span>
+                    ) : null}
                   </p>
+                  {launch ? (
+                    <p className="mt-2 text-sm text-mint">
+                      {fill(pricing.launch.terms, {
+                        months: String(LAUNCH_OFFER.months),
+                        price: price(definition.launchAnnualMonthlyCents),
+                      })}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-sm text-ink-muted">
                     {fill(pricing.annual, {
                       price: price(definition.annualMonthlyCents),
@@ -82,7 +116,16 @@ export function PricingPage({ locale, t }: SiteProps) {
                       tone={featured ? "primary" : "outline"}
                       className="w-full"
                     >
-                      {trialCta(locale, t)}
+                      {/* La formule d'entrée garde « dès » ; les autres affichent leur prix. */}
+                      {plan === PLANS[0]
+                        ? trialCta(locale, t)
+                        : fill(t.common.ctaPlan, {
+                            price: price(
+                              launch
+                                ? definition.launchMonthlyCents
+                                : definition.monthlyCents,
+                            ),
+                          })}
                     </CtaLink>
                   </div>
                 </Card>
@@ -96,7 +139,7 @@ export function PricingPage({ locale, t }: SiteProps) {
         </Card>
       </Section>
 
-      <Section labelledBy="usage" className="bg-surface">
+      <Section labelledBy="usage" tinted theme="billing">
         <div className="grid gap-10 lg:grid-cols-2">
           <div>
             <SectionTitle id="usage" title={pricing.usageTitle} />
@@ -119,9 +162,7 @@ export function PricingPage({ locale, t }: SiteProps) {
           </div>
         </div>
       </Section>
-      <div className="bg-surface">
-        <CtaBand locale={locale} t={t} title={t.home.finalCta.title} />
-      </div>
+      <CtaBand locale={locale} t={t} title={t.home.finalCta.title} />
     </>
   );
 }
@@ -152,7 +193,7 @@ export function SecurityPage({ locale, t }: SiteProps) {
   return (
     <>
       <PageIntro title={security.title} lead={security.lead} />
-      <Section>
+      <Section theme="team">
         <TextSections sections={security.sections} />
         <Card className="mt-4 flex gap-4 p-6">
           <ShieldAlert
@@ -179,7 +220,7 @@ export function HelpPage({ t }: SiteProps) {
   return (
     <>
       <PageIntro title={help.title} lead={help.lead} />
-      <Section>
+      <Section theme="help">
         <ul className="grid gap-3 md:grid-cols-2">
           {help.topics.map((topic) => (
             <li key={topic}>
@@ -213,7 +254,7 @@ export function StatusPage({ t }: SiteProps) {
   return (
     <>
       <PageIntro title={status.title} lead={status.lead} />
-      <Section>
+      <Section theme="journal">
         <Card className="divide-y divide-line">
           {status.components.map((component) => (
             <div
@@ -241,10 +282,10 @@ export function TrialPage({ locale, t }: SiteProps) {
       <PageIntro
         title={trial.title}
         lead={fill(trial.lead, {
-          price: formatPrice(STARTING_PRICE_CENTS, locale),
+          price: formatPrice(startingPriceCents(new Date()), locale),
         })}
       />
-      <Section labelledBy="deroulement">
+      <Section labelledBy="deroulement" theme="onboarding">
         <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
           <Card className="p-6 sm:p-8">
             <h2 id="deroulement" className="text-xl font-bold">
@@ -294,7 +335,7 @@ export function LegalPage({
           <LegalDraft t={t} />
         </div>
       </PageIntro>
-      <Section>
+      <Section theme="protocols">
         <TextSections sections={content.sections} />
       </Section>
     </>

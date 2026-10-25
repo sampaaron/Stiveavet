@@ -12,3 +12,4 @@ export * from "@/domains/agenda/schema";
 export * from "@/domains/taches/schema";
 export * from "@/domains/notifications/schema";
 export * from "@/domains/whatsapp/schema";
+export * from "@/domains/stive/schema";
