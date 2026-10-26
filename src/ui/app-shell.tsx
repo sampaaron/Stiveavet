@@ -4,12 +4,13 @@ import type { ReactNode } from "react";
 
 import { appDictionary } from "@/i18n/app";
 import type { Locale } from "@/i18n/locales";
+import { pathFor } from "@/i18n/routes";
 
 import { AppTopbar } from "./app-topbar";
 import { initials } from "./format";
+import { LogoMark } from "./logo";
 import { SectionFrame } from "./section-frame";
 import { SidebarNav } from "./sidebar-nav";
-import { LogoMark } from "@/ui/logo";
 
 type AppShellProps = {
   organizationName: string;
@@ -59,10 +60,15 @@ export function AppShell({
         permissions={permissions}
         pendingAlerts={pendingAlerts}
         brand={
-          <Link href="/app" className="flex min-w-0 items-center gap-3">
+          <Link
+            href={pathFor("home", locale)}
+            title={text.backToSite}
+            className="flex min-w-0 items-center gap-3"
+          >
             <LogoMark className="h-9 w-auto shrink-0 text-white" />
             <span className="min-w-0 leading-tight">
               <span className="block text-[15px] font-bold tracking-tight">
+                <span className="sr-only">{text.backToSite} : </span>
                 stivea <span className="text-mint">vet</span>
               </span>
               <span className="block truncate text-xs text-white/60">

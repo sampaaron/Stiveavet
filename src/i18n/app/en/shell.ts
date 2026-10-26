@@ -7,6 +7,8 @@ export const shell: AppDictionary["shell"] = {
   mainNavigation: "Main navigation",
   lock: "Lock",
   account: "My account",
+  /** Stivea Vet logo: it leads back to the public website. */
+  backToSite: "Back to the Stivea Vet website",
   logout: "Sign out",
   newFollowup: "New follow-up",
   search: {

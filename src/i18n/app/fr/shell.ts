@@ -6,6 +6,8 @@ export const shell = {
   mainNavigation: "Navigation principale",
   lock: "Verrouiller",
   account: "Mon compte",
+  /** Logo Stivea Vet : il ramène au site public. */
+  backToSite: "Retour au site Stivea Vet",
   logout: "Déconnexion",
   newFollowup: "Nouveau suivi",
   search: {
