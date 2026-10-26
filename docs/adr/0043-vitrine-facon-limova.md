@@ -45,3 +45,7 @@ Aaron trouve la vitrine trop éloignée du logiciel. Il demande :
 ## Intégration à la version GitHub (25 octobre 2026)
 
 Cette vitrine a d'abord été faite sur le poste d'Aaron, puis reprise sur la branche auditée (ADR 0038 à 0041). Seuls le site public, le thème, les motifs partagés et le retrait de Fraunces sont repris. Les prix, l'offre de lancement (ADR 0037), Stive et « Mon compte » restent ceux de la version GitHub : le bandeau d'annonce lit le taux, la durée et la date de fin dans `INTRO_OFFER`, sans les recopier. Le visuel propre à chaque page intérieure et le centre d'aide gardent leur contenu. Le bouton final du film affichait « dès 119 € » : il est corrigé à « dès 89 € » directement dans l'image, le reste du film est inchangé.
+
+## Logo (26 octobre 2026)
+
+Aaron fournit un nouveau logo : le monogramme « SV » blanc. Il est vectorisé dans `src/ui/logo.tsx` et prend la couleur du texte. Il s'affiche sans fond partout où le fond est sombre (en-tête et pied du site, barre latérale, écran de connexion), et en vert nuit sur fond clair (connexion sur mobile). Les icônes de l'onglet et de l'écran d'accueil du téléphone (`src/app/icon.png`, `apple-icon.png`) le posent sur la nuit verte, car une icône a besoin d'un fond. L'ouverture du film et sa miniature montrent ce logo à la place de l'ancien.

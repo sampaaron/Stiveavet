@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import type { SiteDictionary } from "@/i18n/site";
+import { LogoMark } from "@/ui/logo";
 import { StatusBadge } from "@/ui/status-badge";
 import { cn } from "@/ui/cn";
 
@@ -91,12 +92,7 @@ export function AppPreview({ t }: { t: SiteDictionary }) {
           aria-hidden="true"
           className="flex flex-col items-center gap-3 py-4 sidebar-glow"
         >
-          <Image
-            src="/logo-stivea-vet-blanc.png"
-            alt=""
-            width={17}
-            height={25}
-          />
+          <LogoMark className="h-6 w-auto text-white" />
           {["#f5c46b", "#7fe3d6", "#c9b8ff", "#ffb39e", "#a9c1ff"].map(
             (glow, index) => (
               <span

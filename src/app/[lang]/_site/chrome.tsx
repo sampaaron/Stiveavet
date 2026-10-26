@@ -1,5 +1,4 @@
 import { Menu } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -16,6 +15,7 @@ import { fill } from "@/i18n/site";
 import type { SiteDictionary } from "@/i18n/site";
 import { ButtonLink } from "@/ui/button";
 import { cn } from "@/ui/cn";
+import { LogoMark } from "@/ui/logo";
 
 export type SiteProps = { locale: Locale; t: SiteDictionary };
 
@@ -156,13 +156,7 @@ export function SiteHeader({
           href={pathFor("home", locale)}
           className="flex shrink-0 items-center gap-2.5 rounded-[10px]"
         >
-          <Image
-            src="/logo-stivea-vet-blanc.png"
-            alt=""
-            width={20}
-            height={30}
-            priority
-          />
+          <LogoMark className="h-8 w-auto text-ink" />
           <Wordmark />
         </Link>
 
@@ -291,12 +285,7 @@ export function SiteFooter({
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div className="max-w-xs">
           <p className="flex items-center gap-2.5 text-lg font-bold tracking-tight text-white">
-            <Image
-              src="/logo-stivea-vet-blanc.png"
-              alt=""
-              width={19}
-              height={28}
-            />
+            <LogoMark className="h-7 w-auto" />
             <span>
               stivea <span className="text-mint">vet</span>
             </span>

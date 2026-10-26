@@ -1,5 +1,4 @@
 import { ChevronRight } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -10,6 +9,7 @@ import { AppTopbar } from "./app-topbar";
 import { initials } from "./format";
 import { SectionFrame } from "./section-frame";
 import { SidebarNav } from "./sidebar-nav";
+import { LogoMark } from "@/ui/logo";
 
 type AppShellProps = {
   organizationName: string;
@@ -60,13 +60,7 @@ export function AppShell({
         pendingAlerts={pendingAlerts}
         brand={
           <Link href="/app" className="flex min-w-0 items-center gap-3">
-            <Image
-              src="/logo-stivea-vet-blanc.png"
-              alt=""
-              width={23}
-              height={34}
-              className="shrink-0"
-            />
+            <LogoMark className="h-9 w-auto shrink-0 text-white" />
             <span className="min-w-0 leading-tight">
               <span className="block text-[15px] font-bold tracking-tight">
                 stivea <span className="text-mint">vet</span>

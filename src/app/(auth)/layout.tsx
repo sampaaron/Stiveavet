@@ -5,6 +5,7 @@ import { appText } from "@/i18n/app/server";
 import { serverEnv } from "@/server/env";
 
 import { LanguageSwitch } from "../language-switch";
+import { LogoMark } from "@/ui/logo";
 
 /**
  * Écrans d'accès : panneau de marque à gauche sur grand écran (ADR 0033), carte du
@@ -24,12 +25,7 @@ export default async function AuthLayout({
         <span className="absolute -right-24 -bottom-40 -z-10 size-[26rem] rounded-full bg-[radial-gradient(circle,#f5c46b,transparent_65%)] opacity-20 blur-2xl" />
         <span className="absolute inset-0 -z-10 bg-[radial-gradient(rgb(255_255_255/0.07)_1px,transparent_1px)] [mask-image:linear-gradient(to_bottom,black,transparent)] [background-size:22px_22px]" />
         <div className="flex items-center gap-3">
-          <Image
-            src="/logo-stivea-vet-blanc.png"
-            alt=""
-            width={26}
-            height={38}
-          />
+          <LogoMark className="h-10 w-auto" />
           <span className="text-lg font-bold tracking-tight">
             stivea <span className="text-mint">vet</span>
           </span>
@@ -61,14 +57,7 @@ export default async function AuthLayout({
       </aside>
       <main className="relative flex min-h-screen flex-col items-center justify-center gap-6 bg-[radial-gradient(60rem_30rem_at_100%_0%,color-mix(in_oklab,#8ce8c3_25%,transparent),transparent_70%)] px-4 py-10">
         <div className="flex items-center gap-3 lg:hidden">
-          <Image
-            src="/logo-stivea-vet.png"
-            alt=""
-            width={40}
-            height={40}
-            className="rounded-[10px]"
-            priority
-          />
+          <LogoMark className="h-10 w-auto text-night" />
           <span className="text-lg font-bold tracking-tight">
             stivea <span className="text-brand">vet</span>
           </span>
