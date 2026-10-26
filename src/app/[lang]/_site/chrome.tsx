@@ -157,11 +157,10 @@ export function SiteHeader({
           className="flex shrink-0 items-center gap-2.5 rounded-[10px]"
         >
           <Image
-            src="/logo-stivea-vet.png"
+            src="/logo-stivea-vet-blanc.png"
             alt=""
-            width={32}
+            width={20}
             height={30}
-            className="rounded-lg"
             priority
           />
           <Wordmark />
@@ -293,11 +292,10 @@ export function SiteFooter({
         <div className="max-w-xs">
           <p className="flex items-center gap-2.5 text-lg font-bold tracking-tight text-white">
             <Image
-              src="/logo-stivea-vet.png"
+              src="/logo-stivea-vet-blanc.png"
               alt=""
-              width={30}
+              width={19}
               height={28}
-              className="rounded-[8px] ring-1 ring-white/15"
             />
             <span>
               stivea <span className="text-mint">vet</span>

@@ -25,11 +25,10 @@ export default async function AuthLayout({
         <span className="absolute inset-0 -z-10 bg-[radial-gradient(rgb(255_255_255/0.07)_1px,transparent_1px)] [mask-image:linear-gradient(to_bottom,black,transparent)] [background-size:22px_22px]" />
         <div className="flex items-center gap-3">
           <Image
-            src="/logo-stivea-vet.png"
+            src="/logo-stivea-vet-blanc.png"
             alt=""
-            width={40}
+            width={26}
             height={38}
-            className="rounded-[10px] ring-1 ring-white/20"
           />
           <span className="text-lg font-bold tracking-tight">
             stivea <span className="text-mint">vet</span>
@@ -66,7 +65,7 @@ export default async function AuthLayout({
             src="/logo-stivea-vet.png"
             alt=""
             width={40}
-            height={38}
+            height={40}
             className="rounded-[10px]"
             priority
           />

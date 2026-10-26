@@ -92,11 +92,10 @@ export function AppPreview({ t }: { t: SiteDictionary }) {
           className="flex flex-col items-center gap-3 py-4 sidebar-glow"
         >
           <Image
-            src="/logo-stivea-vet.png"
+            src="/logo-stivea-vet-blanc.png"
             alt=""
-            width={26}
+            width={17}
             height={25}
-            className="rounded-[7px] ring-1 ring-white/15"
           />
           {["#f5c46b", "#7fe3d6", "#c9b8ff", "#ffb39e", "#a9c1ff"].map(
             (glow, index) => (

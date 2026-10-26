@@ -61,11 +61,11 @@ export function AppShell({
         brand={
           <Link href="/app" className="flex min-w-0 items-center gap-3">
             <Image
-              src="/logo-stivea-vet.png"
+              src="/logo-stivea-vet-blanc.png"
               alt=""
-              width={36}
+              width={23}
               height={34}
-              className="shrink-0 rounded-[10px] ring-1 ring-white/15"
+              className="shrink-0"
             />
             <span className="min-w-0 leading-tight">
               <span className="block text-[15px] font-bold tracking-tight">
