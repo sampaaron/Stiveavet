@@ -47,10 +47,22 @@ export function AssistantAvatar({
   );
 }
 
-export function AiBadge({ assistant }: { assistant: Assistant }) {
+export function AiBadge({
+  assistant,
+  onDark = false,
+}: {
+  assistant: Assistant;
+  /** Sur un fond sombre (le point de Stive) : menthe sur verre. */
+  onDark?: boolean;
+}) {
   const t = useSharedText();
   return (
-    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-xs font-semibold",
+        onDark ? "bg-white/12 text-mint" : "bg-accent/10 text-accent",
+      )}
+    >
       {assistantText(t, assistant).aiLabel}
     </span>
   );

@@ -14,9 +14,9 @@ const FIELD_TYPES: Record<Integration, "tel" | "text" | null> = {
   payment_mandate: null,
 };
 
-const PROVIDERS = Object.keys(FIELD_TYPES) as Integration[];
+export const PROVIDERS = Object.keys(FIELD_TYPES) as Integration[];
 
-function SimulatedBadge({ label }: { label: string }) {
+export function SimulatedBadge({ label }: { label: string }) {
   return (
     <span className="rounded-full bg-watch-soft px-2 py-0.5 text-[12px] font-semibold text-watch">
       {label}
@@ -99,31 +99,6 @@ export async function IntegrationPanel({
           field={field}
         />
       )}
-    </div>
-  );
-}
-
-export function IntegrationList({
-  integrations,
-  advancedIntegrations,
-}: {
-  integrations: SettingsView["integrations"];
-  advancedIntegrations: boolean;
-}) {
-  return (
-    <div className="grid gap-6">
-      {PROVIDERS.map((provider, index) => (
-        <div
-          key={provider}
-          className={index > 0 ? "border-t border-line pt-6" : undefined}
-        >
-          <IntegrationPanel
-            provider={provider}
-            connection={integrations[provider]}
-            included={provider !== "drveto" || advancedIntegrations}
-          />
-        </div>
-      ))}
     </div>
   );
 }

@@ -221,6 +221,28 @@ test("le point du jour de Stive, en un clic", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("un raccourci ouvre la réponse de Stive ; ses brouillons sont dans Contenus", async ({
+  page,
+}) => {
+  await page.goto("/app/raccourcis");
+  await page
+    .getByRole("button", { name: "Demander à Stive : Mon point du jour" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/stive#derniere-reponse$/);
+  await expect(
+    thread(page).getByRole("heading", { name: "Votre point du jour" }).last(),
+  ).toBeVisible();
+
+  await page.goto("/app/contenus");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Contenus" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Vos brouillons ne sont visibles que par vous/),
+  ).toBeVisible();
+  await expectAccessible(page);
+});
+
 /** Conversation en mode simulé (ADR 0042) : Stive échange simplement, sans rien inventer. */
 async function ask(page: Page, question: string) {
   await page.getByLabel("Votre demande à Stive").fill(question);

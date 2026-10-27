@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { Workflow } from "lucide-react";
 import Link from "next/link";
 
 import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
+import { ButtonLink } from "@/ui/button";
 import { SectionCard } from "@/ui/card";
 import { formatDateTime } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
@@ -55,7 +57,35 @@ export default async function FailedJobsPage({
         </p>
       ) : null}
       <SectionCard
-        title={
+        title={t.tasks.automations.title}
+        action={
+          <ButtonLink href="/app/reglages" variant="quiet" size="sm">
+            {t.tasks.automations.settings}
+          </ButtonLink>
+        }
+        className="mb-6"
+      >
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {t.tasks.automations.items.map((item) => (
+            <li
+              key={item.title}
+              className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-4"
+            >
+              <p className="flex items-center gap-2 font-semibold">
+                <Workflow
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-[var(--section-accent,var(--color-brand))]"
+                />
+                {item.title}
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">{item.text}</p>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+      <SectionCard
+        title={t.tasks.failedTitle}
+        description={
           failures.length ? t.tasks.count(failures.length) : t.tasks.allGood
         }
       >

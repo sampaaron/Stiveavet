@@ -15,7 +15,6 @@ import { PageSections } from "@/ui/page-sections";
 import { formatDateTime, formatMinutes, toDateTimeInput } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 
-import { IntegrationList } from "./integrations";
 import {
   AlertSettingsForm,
   AppointmentDurationsForm,
@@ -65,7 +64,6 @@ export default async function SettingsPage() {
             ["contacts", text.contacts.title],
             ["regles-alerte", text.alerts.title],
             ["garde", text.onCall.title],
-            ["connexions", text.integrations.title],
           ] as const
         ).map(([id, title]) => ({ id, title }))}
       >
@@ -228,17 +226,6 @@ export default async function SettingsPage() {
             defaultEnd={toDateTimeInput(
               new Date(nextHour.getTime() + 12 * 3_600_000),
             )}
-          />
-        </SectionCard>
-
-        <SectionCard
-          id="connexions"
-          title={text.integrations.title}
-          description={text.integrations.description}
-        >
-          <IntegrationList
-            integrations={settings.integrations}
-            advancedIntegrations={settings.advancedIntegrations}
           />
         </SectionCard>
       </PageSections>

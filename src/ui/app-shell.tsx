@@ -10,6 +10,7 @@ import { AppTopbar } from "./app-topbar";
 import { initials } from "./format";
 import { LogoMark } from "./logo";
 import { SectionFrame } from "./section-frame";
+import { SectionTabs } from "./section-tabs";
 import { SidebarNav } from "./sidebar-nav";
 
 type AppShellProps = {
@@ -122,7 +123,13 @@ export function AppShell({
               id="contenu"
               className="min-w-0 px-4 pt-6 pb-10 sm:px-8 lg:px-10 lg:pt-8"
             >
-              <div className="mx-auto max-w-6xl">{children}</div>
+              <div className="mx-auto max-w-6xl">
+                <SectionTabs
+                  permissions={permissions}
+                  pendingAlerts={pendingAlerts}
+                />
+                {children}
+              </div>
             </main>
           </SectionFrame>
         </div>

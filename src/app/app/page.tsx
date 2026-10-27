@@ -296,35 +296,35 @@ function TodayBriefing({
   return (
     <section
       aria-labelledby="point-du-jour"
-      className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(91_79_224/0.35)] assistant-glow sm:p-8"
+      className="relative isolate overflow-hidden rounded-[var(--radius-panel)] bg-night-soft p-5 text-white shadow-[0_1px_2px_rgb(11_18_32/0.08),0_28px_56px_-28px_rgb(8_19_15/0.7)] sm:p-8"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-25 blur-3xl"
+        className="pointer-events-none absolute -top-28 -right-20 -z-10 size-80 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-20 blur-3xl"
       />
       <div className="flex items-start gap-4">
         {stive ? (
           <AssistantAvatar
             assistant="stive"
-            size={56}
-            className="size-11 ring-4 ring-accent/15 sm:size-14"
+            size={64}
+            className="size-12 ring-2 ring-mint/50 sm:size-16"
           />
         ) : null}
         <div className="min-w-0">
           <h2
             id="point-du-jour"
-            className="flex flex-wrap items-center gap-2 font-bold"
+            className="flex flex-wrap items-center gap-2 text-sm font-semibold text-mint"
           >
             {stive ? t.stive.dashboard.title : text.briefing.title}
-            {stive ? <AiBadge assistant="stive" /> : null}
+            {stive ? <AiBadge assistant="stive" onDark /> : null}
           </h2>
-          <p className="mt-2 max-w-3xl font-display text-lg leading-snug tracking-[-0.01em] text-balance sm:text-[1.375rem]">
+          <p className="mt-2 max-w-3xl font-display text-xl leading-snug font-semibold tracking-[-0.01em] text-balance sm:text-[1.5rem]">
             {clinical
               ? text.briefing.clinical(today.activeFollowups, urgent, watch)
               : text.briefing.summary(today.activeFollowups)}
           </p>
           {stive ? (
-            <p className="mt-2 text-sm text-ink-muted">
+            <p className="mt-2 text-sm text-white/70">
               {t.stive.dashboard.promise}
               {next ? ` ${next}` : null}
             </p>
@@ -349,7 +349,7 @@ function TodayBriefing({
             autoComplete="off"
             maxLength={80}
             placeholder={text.briefing.searchPlaceholder}
-            className="h-14 w-full rounded-full border border-line/80 bg-surface/90 pr-16 pl-13 text-[15px] text-ink shadow-[0_1px_2px_rgb(11_18_32/0.05),0_10px_30px_-12px_rgb(11_18_32/0.18)] backdrop-blur placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+            className="h-14 w-full rounded-full border border-white/20 bg-surface pr-16 pl-13 text-[15px] text-ink shadow-[0_10px_30px_-12px_rgb(0_0_0/0.5)] placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mint"
           />
           <button
             type="submit"
@@ -360,32 +360,31 @@ function TodayBriefing({
           </button>
         </form>
       ) : null}
-      {links.length > 0 ? (
+      {links.length > 0 || stive ? (
         <ul className="mt-4 flex flex-wrap gap-2">
           {links.map(({ href, label, icon: Icon }) => (
             <li key={`${href}-${label}`}>
               <Link
                 href={href}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line/80 bg-surface/70 px-4 text-sm font-medium text-ink backdrop-blur transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:bg-surface hover:shadow-[0_8px_20px_-10px_rgb(8_122_84/0.5)]"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-white/14 focus-visible:outline-mint"
               >
-                <Icon aria-hidden="true" className="size-4 text-brand" />
+                <Icon aria-hidden="true" className="size-4 text-mint" />
                 {label}
               </Link>
             </li>
           ))}
+          {stive ? (
+            <li>
+              <Link
+                href="/app/stive"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full bg-mint px-4 text-sm font-bold text-night transition-colors hover:bg-white focus-visible:outline-mint"
+              >
+                <Sparkles aria-hidden="true" className="size-4" />
+                {t.stive.dashboard.open}
+              </Link>
+            </li>
+          ) : null}
         </ul>
-      ) : null}
-      {stive ? (
-        <div className="mt-4">
-          <ButtonLink
-            href="/app/stive"
-            variant="quiet"
-            size="sm"
-            icon={<Sparkles aria-hidden="true" className="size-4" />}
-          >
-            {t.stive.dashboard.open}
-          </ButtonLink>
-        </div>
       ) : null}
     </section>
   );
