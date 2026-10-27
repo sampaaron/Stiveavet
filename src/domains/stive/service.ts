@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { AiGatewayError } from "@/adapters/ai-gateway/api-compatible";
+import type { AiGateway } from "@/adapters/ai-gateway/types";
 import type { AgendaService } from "@/domains/agenda/captures";
+import { detectLanguage } from "@/domains/conversations/language";
 import type { AppointmentsService } from "@/domains/agenda/demandes";
 import { auditFollowup, auditOrganization } from "@/domains/audit/journal";
 import type { ConversationsService } from "@/domains/conversations/service";
@@ -42,16 +45,28 @@ import {
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 
+import { runStiveTurn, chatMessages, StiveTurnError } from "./agent";
+import type { HistoryEntry, ToolExecutor } from "./agent";
+import { recognizeSmallTalk } from "./bavardage";
 import { draftMessage } from "./brouillons";
-import { recognize } from "./demandes";
+import { findTarget, findVet, recognize } from "./demandes";
 import type {
   DraftTemplate,
+  RecognitionContext,
   SlotPeriod,
   StatusChange,
   StiveRequest,
   Target,
   VetChoice,
 } from "./demandes";
+import { checkStiveReply } from "./garde";
+import {
+  followupRefs,
+  parseToolCall,
+  searchResult,
+  slotPeriod,
+  toolResult,
+} from "./outils";
 import { followupsOf, stiveAnswer, visibleAnswer } from "./reponses";
 import type { StiveAnswer } from "./reponses";
 
@@ -64,7 +79,10 @@ import type { StiveAnswer } from "./reponses";
  *   été préparée par Stive. Un brouillon n'est envoyé que par le bouton Envoyer du dossier.
  * - Ses échanges ne sont visibles que par leur auteur (la base l'impose) et effacés à 30 jours.
  * - Chaque demande compte dans la limite mensuelle de la formule.
- * La reconnaissance des demandes est simulée par des règles écrites (`demandes.ts`).
+ * Avec l'IA branchée (ADR 0042), la personne converse librement : le modèle choisit parmi les
+ * mêmes demandes, devenues des outils exécutés ici avec ses droits, et sa réponse passe le
+ * contrôle de `garde.ts`. En mode simulé, ou si l'IA ne répond pas, les demandes sont
+ * reconnues par des règles écrites (`demandes.ts`).
  */
 
 const STIVE_RETENTION_DAYS = 30;
@@ -104,6 +122,8 @@ export type StiveConversation = {
   entries: StiveEntry[];
   proposals: Record<string, StiveProposalView>;
   usage: { used: number; limit: number };
+  /** « simulated » : règles écrites seulement ; « ai » : conversation libre (ADR 0042). */
+  mode: "simulated" | "ai";
 };
 
 const OUTCOMES: Record<StatusChange, StiveOutcome> = {
@@ -145,6 +165,7 @@ export function stiveService(deps: {
   conversations: ConversationsService;
   launch: LaunchService;
   alerts: AlertsService;
+  ai: AiGateway;
 }) {
   const { db } = deps;
   const run = tenantRunner(db);
@@ -588,6 +609,321 @@ export function stiveService(deps: {
     }
   }
 
+  /**
+   * Échanges des 30 derniers jours de la personne, tels qu'elle peut encore les voir : une
+   * réponse sur un dossier devenu inaccessible, ou sur un droit retiré, est masquée.
+   */
+  async function visibleEntries(
+    tx: TenantTransaction,
+    actor: Actor,
+    now: Date,
+  ): Promise<StiveEntry[]> {
+    const since = new Date(now.getTime() - STIVE_RETENTION_DAYS * DAY_MS);
+    const rows = (
+      await tx
+        .select()
+        .from(stiveMessages)
+        .where(
+          and(
+            eq(stiveMessages.membershipId, actor.membershipId),
+            gt(stiveMessages.createdAt, since),
+          ),
+        )
+        .orderBy(desc(stiveMessages.createdAt))
+        .limit(MAX_MESSAGES)
+    ).reverse();
+
+    const answers = new Map<string, StiveAnswer>();
+    for (const row of rows) {
+      const parsed = stiveAnswer.safeParse(row.answer);
+      if (row.author === "stive" && parsed.success)
+        answers.set(row.id, parsed.data);
+    }
+    const cited = [
+      ...new Set(
+        [...answers.values()].flatMap((a) => followupsOf(a).map((f) => f.id)),
+      ),
+    ];
+    const facts = cited.length
+      ? await tx
+          .select({
+            id: followups.id,
+            responsibleMembershipId: followups.responsibleMembershipId,
+            isPrivate: followups.isPrivate,
+          })
+          .from(followups)
+          .where(inArray(followups.id, cited))
+      : [];
+    const access = await followupAccessMap(tx, actor, facts);
+    const rights = {
+      clinical: can(actor, "clinical.read"),
+      agenda: can(actor, "agenda.read"),
+      launch: can(actor, "followups.launch"),
+    };
+    return rows.map((row): StiveEntry => {
+      if (row.author === "member")
+        return {
+          id: row.id,
+          author: "member",
+          at: row.createdAt,
+          question: row.question ?? "",
+        };
+      const parsed = answers.get(row.id);
+      return {
+        id: row.id,
+        author: "stive",
+        at: row.createdAt,
+        answer: parsed ? visibleAnswer(parsed, access, rights) : null,
+      };
+    });
+  }
+
+  // Tours de conversation ----------------------------------------------------------------
+
+  /** Réponses d'un tour, dans l'ordre d'affichage, et dossiers consultés (journalisés). */
+  type Turn = {
+    replies: (Built & { id: string })[];
+    viewed: string[];
+  };
+
+  type TurnContext = {
+    views: FollowupView[];
+    vets: { membershipId: string; name: string }[];
+    now: Date;
+    locale: "fr" | "en";
+    recognition: RecognitionContext;
+  };
+
+  /** Dossier devenu inaccessible entre-temps : même réponse qu'un dossier inexistant. */
+  async function orUnavailable(build: () => Promise<Built>): Promise<Built> {
+    try {
+      return await build();
+    } catch (error) {
+      if (!(error instanceof DomainError) || error.code !== "not_found")
+        throw error;
+      return only({
+        kind: "unavailable",
+        reason: "not_clinical",
+        animalName: null,
+        change: null,
+      });
+    }
+  }
+
+  /**
+   * Tour par règles écrites (ADR 0034) : mode simulé, ou IA injoignable. Hors des six
+   * demandes, un échange simple (salutation, aide) en mode simulé, sinon une réponse honnête
+   * qui dit pourquoi Stive ne peut pas répondre librement.
+   */
+  async function ruleTurn(
+    actor: Actor,
+    question: string,
+    context: TurnContext,
+    mode: "simulated" | "ai_unavailable",
+    viewed: string[] = [],
+  ): Promise<Turn> {
+    const id = randomUUID();
+    const request = recognize(question, context.recognition);
+    if (request.kind === "unknown") {
+      const topic = mode === "simulated" ? recognizeSmallTalk(question) : null;
+      return {
+        replies: [
+          {
+            id,
+            ...only(
+              topic ? { kind: "smalltalk", topic } : { kind: "unknown", mode },
+            ),
+          },
+        ],
+        viewed,
+      };
+    }
+    const built = await orUnavailable(() =>
+      answer(actor, request, { ...context, messageId: id }),
+    );
+    return {
+      replies: [{ id, ...built }],
+      viewed: built.viewed ? [...viewed, built.viewed] : viewed,
+    };
+  }
+
+  /** Suivi désigné par les arguments d'un outil : référence, prénom, ou dossier ouvert. */
+  function toolTarget(
+    args: { suivi?: string; animal?: string },
+    refs: ReturnType<typeof followupRefs>,
+    recognition: RecognitionContext,
+  ): Target {
+    if (args.suivi) {
+      const id = refs.idOf(args.suivi);
+      return id ? { kind: "one", followupId: id } : { kind: "none" };
+    }
+    if (args.animal)
+      return findTarget(args.animal, { ...recognition, followupId: undefined });
+    return recognition.followupId
+      ? { kind: "one", followupId: recognition.followupId }
+      : { kind: "none" };
+  }
+
+  /**
+   * Tour avec l'IA (ADR 0042). Les outils sont exécutés ici, avec les droits de la personne,
+   * par les mêmes fonctions que les demandes reconnues par règles ; chaque carte produite
+   * s'affiche sous la réponse. Si l'IA ne répond pas, le tour repasse par les règles.
+   */
+  async function aiTurn(
+    actor: Actor,
+    question: string,
+    context: TurnContext,
+  ): Promise<Turn> {
+    const { views, vets, now, locale, recognition } = context;
+    const refs = followupRefs(views);
+    const history = await run(actor, (tx) => visibleEntries(tx, actor, now));
+    const cards: Turn["replies"] = [];
+    const viewed: string[] = [];
+    const sources = new Map<string, "summary" | "clinical">();
+    let agenda = false;
+
+    const cite = (id: string, access: "summary" | "clinical") => {
+      if (sources.get(id) !== "clinical") sources.set(id, access);
+    };
+    const shown = new Set<StiveAnswer["kind"]>([
+      "briefing",
+      "summary",
+      "slots",
+      "appointments",
+      "draft",
+      "status",
+    ]);
+
+    const execute: ToolExecutor = async (call) => {
+      const parsed = parseToolCall(call);
+      if (!parsed) return { erreur: "Outil inconnu ou arguments invalides." };
+      if (parsed.name === "chercher_suivis") {
+        const result = searchResult(views, parsed.args, refs, now);
+        for (const view of views)
+          if (result.suivis.some((line) => line.ref === refs.refOf(view.id)))
+            cite(view.id, view.access);
+        return result;
+      }
+      const id = randomUUID();
+      let built: Built;
+      try {
+        switch (parsed.name) {
+          case "point_du_jour":
+            built = only(await briefing(actor, now));
+            break;
+          case "lire_dossier":
+            built = await orUnavailable(() =>
+              summary(
+                actor,
+                views,
+                toolTarget(parsed.args, refs, recognition),
+                { now, locale },
+              ),
+            );
+            break;
+          case "creneaux_libres": {
+            const period = slotPeriod(parsed.args, recognition.today);
+            if (!period)
+              return {
+                erreur:
+                  "Date hors de portée : choisis un jour entre aujourd'hui et 31 jours.",
+              };
+            const vet = findVet(parsed.args.veterinaire ?? "", recognition);
+            built = only(await slots(actor, period, vet, vets));
+            break;
+          }
+          case "rendez_vous_demandes":
+            built = await requested(actor, id, now);
+            break;
+          case "preparer_brouillon":
+            built = await orUnavailable(() =>
+              draft(
+                actor,
+                views,
+                toolTarget(parsed.args, refs, recognition),
+                parsed.args.modele,
+                id,
+              ),
+            );
+            break;
+          case "proposer_changement_suivi":
+            built = status(
+              actor,
+              views,
+              toolTarget(parsed.args, refs, recognition),
+              parsed.args.changement,
+              id,
+            );
+            break;
+        }
+      } catch (error) {
+        // Un refus métier est une réponse pour le modèle, jamais une panne du tour.
+        if (!(error instanceof DomainError)) throw error;
+        return { refus: "Action impossible avec les droits de la personne." };
+      }
+      if (built.viewed) viewed.push(built.viewed);
+      for (const source of followupsOf(built.answer))
+        cite(source.id, source.access);
+      if (
+        built.answer.kind === "slots" ||
+        built.answer.kind === "appointments" ||
+        (built.answer.kind === "briefing" && built.answer.agenda !== null)
+      )
+        agenda = true;
+      if (shown.has(built.answer.kind)) cards.push({ id, ...built });
+      return toolResult(built.answer, refs, views);
+    };
+
+    const entries: HistoryEntry[] = history.map((entry) =>
+      entry.author === "member"
+        ? { author: "member", question: entry.question }
+        : { author: "stive", answer: entry.answer },
+    );
+    const openFollowup = recognition.followupId
+      ? (refs.refOf(recognition.followupId) ?? null)
+      : null;
+    let text: string;
+    try {
+      ({ text } = await runStiveTurn({
+        ai: deps.ai,
+        language: detectLanguage(question) ?? locale,
+        context: {
+          today: isoDay(recognition.today),
+          role: recognition.isVet ? "vet" : "assistant",
+          openFollowup,
+        },
+        messages: chatMessages(entries, question),
+        execute,
+      }));
+    } catch (error) {
+      if (
+        !(error instanceof AiGatewayError) &&
+        !(error instanceof StiveTurnError)
+      )
+        throw error;
+      // IA injoignable ou hors format : les règles écrites prennent le relais. Les dossiers
+      // déjà lus ont été transmis au prestataire : leur consultation reste tracée.
+      return ruleTurn(actor, question, context, "ai_unavailable", viewed);
+    }
+
+    const verdict = checkStiveReply(text);
+    const reply: StiveAnswer = {
+      kind: "reply",
+      text: verdict.ok ? text.trim() : null,
+      withheld: verdict.ok ? null : verdict.reason,
+      sources: {
+        followups: [...sources]
+          .slice(0, 60)
+          .map(([id, access]) => ({ id, access })),
+        agenda,
+      },
+    };
+    return {
+      replies: [{ id: randomUUID(), ...only(reply) }, ...cards],
+      viewed,
+    };
+  }
+
   return {
     /** Échanges des 30 derniers jours de la personne, tels qu'elle peut encore les voir. */
     async conversation(
@@ -596,47 +932,8 @@ export function stiveService(deps: {
     ): Promise<StiveConversation> {
       assertPermission(actor, "stive.use");
       return run(actor, async (tx) => {
-        const since = new Date(now.getTime() - STIVE_RETENTION_DAYS * DAY_MS);
-        const rows = (
-          await tx
-            .select()
-            .from(stiveMessages)
-            .where(
-              and(
-                eq(stiveMessages.membershipId, actor.membershipId),
-                gt(stiveMessages.createdAt, since),
-              ),
-            )
-            .orderBy(desc(stiveMessages.createdAt))
-            .limit(MAX_MESSAGES)
-        ).reverse();
-
-        const answers = new Map<string, StiveAnswer>();
-        for (const row of rows) {
-          const parsed = stiveAnswer.safeParse(row.answer);
-          if (row.author === "stive" && parsed.success)
-            answers.set(row.id, parsed.data);
-        }
-        const cited = [
-          ...new Set(
-            [...answers.values()].flatMap((a) =>
-              followupsOf(a).map((f) => f.id),
-            ),
-          ),
-        ];
-        const facts = cited.length
-          ? await tx
-              .select({
-                id: followups.id,
-                responsibleMembershipId: followups.responsibleMembershipId,
-                isPrivate: followups.isPrivate,
-              })
-              .from(followups)
-              .where(inArray(followups.id, cited))
-          : [];
-        const access = await followupAccessMap(tx, actor, facts);
-
-        const proposalRows = rows.length
+        const entries = await visibleEntries(tx, actor, now);
+        const proposalRows = entries.length
           ? await tx
               .select({
                 id: stiveProposals.id,
@@ -649,7 +946,7 @@ export function stiveService(deps: {
               .where(
                 inArray(
                   stiveProposals.messageId,
-                  rows.map((row) => row.id),
+                  entries.map((entry) => entry.id),
                 ),
               )
           : [];
@@ -665,32 +962,13 @@ export function stiveService(deps: {
             ),
           );
 
-        const rights = {
-          clinical: can(actor, "clinical.read"),
-          agenda: can(actor, "agenda.read"),
-          launch: can(actor, "followups.launch"),
-        };
         return {
-          entries: rows.map((row): StiveEntry => {
-            if (row.author === "member")
-              return {
-                id: row.id,
-                author: "member",
-                at: row.createdAt,
-                question: row.question ?? "",
-              };
-            const parsed = answers.get(row.id);
-            return {
-              id: row.id,
-              author: "stive",
-              at: row.createdAt,
-              answer: parsed ? visibleAnswer(parsed, access, rights) : null,
-            };
-          }),
+          entries,
           proposals: Object.fromEntries(
             proposalRows.map((row) => [row.id, row]),
           ),
           usage: { used: usage?.requests ?? 0, limit },
+          mode: deps.ai.simulated ? "simulated" : "ai",
         };
       });
     },
@@ -726,46 +1004,42 @@ export function stiveService(deps: {
         };
       });
 
-      const messageId = randomUUID();
-      let built: Built;
+      let turn: Turn;
       if (!quota.counted)
-        built = only({
-          kind: "limit",
-          limit: quota.limit,
-          resetsOn: nextParisMonth(now),
-          upgrade: (quota.plan ?? "premium") !== "premium",
-        });
+        turn = {
+          replies: [
+            {
+              id: randomUUID(),
+              ...only({
+                kind: "limit",
+                limit: quota.limit,
+                resetsOn: nextParisMonth(now),
+                upgrade: (quota.plan ?? "premium") !== "premium",
+              }),
+            },
+          ],
+          viewed: [],
+        };
       else {
         const views = await deps.followups.list(actor);
-        const request = recognize(question.data, {
+        const recognition: RecognitionContext = {
           followups: views,
           vets: quota.vets,
           isVet: VET_ROLES.has(actor.role),
           followupId: contextId?.data,
           today: parisDayIndex(now),
-        });
-        try {
-          built = await answer(actor, request, {
-            views,
-            vets: quota.vets,
-            messageId,
-            now,
-            locale,
-          });
-        } catch (error) {
-          // Dossier devenu inaccessible entre-temps : même réponse qu'un dossier inexistant.
-          if (!(error instanceof DomainError) || error.code !== "not_found")
-            throw error;
-          built = only({
-            kind: "unavailable",
-            reason: "not_clinical",
-            animalName: null,
-            change: null,
-          });
-        }
+        };
+        const context = { views, vets: quota.vets, now, locale, recognition };
+        turn = deps.ai.simulated
+          ? await ruleTurn(actor, question.data, context, "simulated")
+          : await aiTurn(actor, question.data, context);
       }
 
-      const saved = stiveAnswer.parse(built.answer);
+      // Validées avant toute écriture : une réponse hors format n'est jamais gardée.
+      const saved = turn.replies.map((reply) => ({
+        ...reply,
+        answer: stiveAnswer.parse(reply.answer),
+      }));
       await run(actor, async (tx) => {
         await tx.insert(stiveMessages).values([
           {
@@ -775,25 +1049,27 @@ export function stiveService(deps: {
             question: question.data,
             createdAt: now,
           },
-          {
-            id: messageId,
+          ...saved.map((reply, index) => ({
+            id: reply.id,
             organizationId: actor.organizationId,
             membershipId: actor.membershipId,
-            author: "stive",
-            answer: saved,
-            createdAt: new Date(now.getTime() + 1),
-          },
+            author: "stive" as const,
+            answer: reply.answer,
+            createdAt: new Date(now.getTime() + 1 + index),
+          })),
         ]);
-        if (built.proposals.length)
-          await tx.insert(stiveProposals).values(built.proposals);
+        const proposals = saved.flatMap((reply) => reply.proposals);
+        if (proposals.length) await tx.insert(stiveProposals).values(proposals);
         // Consultation du détail d'un dossier : tracée comme à l'écran, sans la question.
-        if (built.viewed)
-          await auditFollowup(tx, actor, "followup.viewed", built.viewed, {
+        for (const followupId of new Set(turn.viewed))
+          await auditFollowup(tx, actor, "followup.viewed", followupId, {
             access: "clinical",
             via: "stive",
           });
       });
-      return saved;
+      const [first] = saved;
+      if (!first) throw new Error("Tour de Stive sans réponse");
+      return first.answer;
     },
 
     /**

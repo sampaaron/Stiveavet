@@ -12,6 +12,8 @@ import type {
   NumaReplyInput,
   NumaStepInput,
   PhotoObservationInput,
+  StiveChatInput,
+  StiveChatStep,
   VoiceTranscription,
   VoiceTranscriptionInput,
 } from "./types";
@@ -154,6 +156,21 @@ export function simulatedAgendaReading(input: AgendaCaptureInput): {
   return { slots };
 }
 
+/**
+ * Conversation libre simulée : aucune réponse métier n'est inventée. Stive simulé répond par
+ * ses règles écrites (`domains/stive/demandes.ts`) et n'appelle jamais cette méthode ; elle
+ * reste honnête si un appelant le fait quand même.
+ */
+export function simulatedStiveChat(input: StiveChatInput): StiveChatStep {
+  return {
+    kind: "answer",
+    text:
+      input.language === "en"
+        ? "Simulated mode: free conversation needs the AI to be connected."
+        : "Mode simulé : la conversation libre demande l'IA branchée.",
+  };
+}
+
 export const fakeAiGateway: AiGateway = {
   simulated: true,
   async numaReply(input) {
@@ -173,5 +190,8 @@ export const fakeAiGateway: AiGateway = {
   },
   async summarizeFollowup(input) {
     return simulatedSynthesis(input);
+  },
+  async stiveChat(input) {
+    return simulatedStiveChat(input);
   },
 };

@@ -158,7 +158,44 @@ export const stiveAnswer = z.discriminatedUnion("kind", [
     animalName: name.nullable(),
     change: change.nullable(),
   }),
-  z.object({ kind: z.literal("unknown") }),
+  z.object({
+    kind: z.literal("unknown"),
+    /**
+     * Pourquoi Stive n'a pas pu répondre librement : mode simulé (absent dans les réponses
+     * d'avant l'ADR 0042), ou IA branchée mais injoignable.
+     */
+    mode: z.enum(["simulated", "ai_unavailable"]).optional(),
+  }),
+  /** Échange simple en mode simulé : salutation, remerciement, présentation, aide. */
+  z.object({
+    kind: z.literal("smalltalk"),
+    topic: z.enum(["greeting", "thanks", "identity", "help"]),
+  }),
+  /**
+   * Réponse libre de l'IA (ADR 0042), déjà passée par le contrôle déterministe. `text` est
+   * null quand la réponse a été écartée (`withheld`) : rien n'en est gardé. `sources` : ce que
+   * les outils ont lu pour l'écrire, pour la masquer à qui n'y a plus accès.
+   */
+  z.object({
+    kind: z.literal("reply"),
+    text: z.string().min(1).max(3000).nullable(),
+    withheld: z
+      .enum([
+        "dosage",
+        "prescription",
+        "diagnosis",
+        "identity",
+        "contact",
+        "length",
+      ])
+      .nullable(),
+    sources: z.object({
+      followups: z
+        .array(z.object({ id, access: z.enum(["summary", "clinical"]) }))
+        .max(60),
+      agenda: z.boolean(),
+    }),
+  }),
   z.object({
     kind: z.literal("limit"),
     limit: count,
@@ -205,6 +242,8 @@ export function followupsOf(
         id: candidate.id,
         access: "clinical",
       }));
+    case "reply":
+      return answer.sources.followups;
     default:
       return [];
   }
@@ -268,6 +307,15 @@ export function visibleAnswer(
         ...answer,
         candidates: answer.candidates.filter((c) => can(c.id, "clinical")),
       };
+    // Un texte libre ne se découpe pas : il disparaît dès qu'une de ses sources n'est plus
+    // visible pour la personne.
+    case "reply":
+      return (answer.sources.agenda && !rights.agenda) ||
+        answer.sources.followups.some(
+          (source) => !can(source.id, source.access),
+        )
+        ? null
+        : answer;
     default:
       return answer;
   }

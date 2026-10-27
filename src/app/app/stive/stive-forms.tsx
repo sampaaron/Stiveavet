@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Eraser, Send, Sparkles, X } from "lucide-react";
+import { Check, Eraser, LoaderCircle, Send, Sparkles, X } from "lucide-react";
 import { useActionState, useId } from "react";
 
 import { useAppText } from "@/i18n/app/client";
@@ -19,16 +19,19 @@ const MAX_QUESTION = 500;
 export function AskStive({
   followupId,
   suggestions,
+  placeholder,
 }: {
   followupId: string | null;
   suggestions: string[];
+  placeholder: string;
 }) {
   const [state, action, pending] = useActionState(
     askStiveAction,
     initialActionState,
   );
   const id = useId();
-  const text = useAppText().stive.ask;
+  const words = useAppText().stive;
+  const text = words.ask;
   const context = followupId ? (
     <input type="hidden" name="followupId" value={followupId} />
   ) : null;
@@ -66,7 +69,7 @@ export function AskStive({
             rows={2}
             required
             maxLength={MAX_QUESTION}
-            placeholder={text.placeholder}
+            placeholder={placeholder}
             className="min-h-11 min-w-0 flex-1 resize-y rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-[15px] placeholder:text-ink-muted"
           />
           <Button
@@ -79,6 +82,14 @@ export function AskStive({
           </Button>
         </div>
       </form>
+      <p role="status" className="min-h-0 text-sm text-ink-muted empty:hidden">
+        {pending ? (
+          <span className="inline-flex items-center gap-2">
+            <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+            {words.thinking}
+          </span>
+        ) : null}
+      </p>
       <ActionMessage state={state} />
     </div>
   );

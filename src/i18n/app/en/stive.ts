@@ -16,9 +16,19 @@ export const stive: AppDictionary["stive"] = {
   greeting: (firstName: string) =>
     `Hello ${firstName}, what can I prepare for you?`,
   greetingHelp: "Ask in your own words, or pick a suggestion.",
+  greetingHelpAi:
+    "Talk to me as you would to a colleague: the job, your files, your clients, how the practice runs. I prepare, you decide.",
+  mode: {
+    simulatedTitle: "Simulated mode",
+    simulated:
+      "Here Stive only recognises six requests, through written rules. To talk freely about the job, the AI must be connected: AI_PROVIDER variable and AI_API_KEY key in the server's .env file, never in the code.",
+  },
+  thinking: "Stive is thinking…",
   ask: {
     label: "Your request to Stive",
     placeholder: "For example: my free slots tomorrow",
+    placeholderAi:
+      "For example: how do I tell a worried owner about a complication?",
     submit: "Ask",
     empty: "Write your request before sending it.",
     tooLong: "Your request is too long (500 characters at most).",
@@ -52,6 +62,11 @@ export const stive: AppDictionary["stive"] = {
       "A message draft, which you send yourself",
       "Pause, resume or stop a follow-up, after confirmation",
     ],
+    conversation:
+      "Talk about the job as with a colleague: post-operative follow-up, organisation, communicating with owners",
+    conversationOff: "Talk freely about the job: needs the AI to be connected",
+    limits:
+      "It never diagnoses an animal, never gives a dose or a prescription (see the SPC or your formulary), and the decision is always yours.",
   },
   privacy: {
     title: "Your conversation",
@@ -200,6 +215,36 @@ export const stive: AppDictionary["stive"] = {
   unknown: {
     title: "I can't do that yet.",
     help: "Here is what I can prepare for you:",
+    simulated:
+      "In simulated mode I only answer my six requests: free conversation about the job needs the AI to be connected (AI_PROVIDER variable and key in the server's .env file).",
+    aiUnavailableTitle: "The AI isn't answering right now.",
+    aiUnavailable:
+      "Please try again in a moment. Meanwhile, I can still prepare this:",
+  },
+  smalltalk: {
+    greeting:
+      "Hello! I'm Stive, the team's AI assistant. I prepare, you decide.",
+    thanks: "You're welcome. I'm here if you need anything else.",
+    identity:
+      "I'm Stive, an AI, the practice team's assistant. I'm not a vet: I never diagnose and never give a dose; the decision is always yours.",
+    help: "Here is what I can prepare for you:",
+  },
+  reply: {
+    withheldNote: "Answer replaced by Stive's safeguards.",
+    withheld: {
+      dosage:
+        "I don't give doses, dosing or prescriptions: please refer to the medicine's SPC and the practice's formulary. The decision is yours. I can help you prepare the explanation for the owner or the follow-up points.",
+      prescription:
+        "I don't give doses, dosing or prescriptions: please refer to the medicine's SPC and the practice's formulary. The decision is yours. I can help you prepare the explanation for the owner or the follow-up points.",
+      diagnosis:
+        "I don't diagnose an animal: only the vet's examination can. I can help you list the points to check or prepare the conversation with the owner.",
+      identity:
+        "My answer broke my rules: I'm an AI, not a vet. Could you rephrase your question?",
+      contact:
+        "My answer contained a link, an address or a number, which I never write. Could you rephrase your question?",
+      length:
+        "My answer was too long to display. Could you ask a more specific question?",
+    },
   },
   limit: {
     reached: (limit: number, date: string) =>

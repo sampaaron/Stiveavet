@@ -5,6 +5,7 @@ import {
   CircleSlash,
   ClipboardPen,
   MessageSquareText,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -569,6 +570,118 @@ function LimitAnswer({
   );
 }
 
+/** Passages en gras d'une ligne (« **texte** »), le reste en texte brut. */
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/\*\*([^*]+)\*\*/g);
+  return (
+    <>
+      {parts.map((part, index) =>
+        index % 2 === 1 ? (
+          <strong key={index}>{part}</strong>
+        ) : (
+          <span key={index}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+const BULLET = /^\s*(?:[-•*]|\d+[.)])\s+/;
+
+/**
+ * Texte libre de l'IA, affiché comme du texte (jamais comme du HTML) : paragraphes, listes
+ * simples et gras ; titres et autres marques réduits à leur texte.
+ */
+function FreeText({ text }: { text: string }) {
+  const blocks = text
+    .replace(/\r\n/g, "\n")
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block
+        .split("\n")
+        .map((line) => line.replace(/^\s*#{1,6}\s+/, "").trimEnd())
+        .filter((line) => line.trim()),
+    )
+    .filter((lines) => lines.length);
+  return (
+    <div className="grid gap-2">
+      {blocks.map((lines, index) => {
+        const items = lines.filter((line) => BULLET.test(line));
+        if (items.length === lines.length)
+          return (
+            <ul key={index} className="grid list-disc gap-1 pl-5">
+              {items.map((line, item) => (
+                <li key={item}>
+                  <Inline text={line.replace(BULLET, "")} />
+                </li>
+              ))}
+            </ul>
+          );
+        return (
+          <p key={index} className="whitespace-pre-line">
+            <Inline text={lines.join("\n")} />
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Réponse libre de l'IA, ou son remplaçant sûr si les garde-fous l'ont écartée. */
+function ReplyAnswer({
+  answer,
+  t,
+}: Props & { answer: Extract<StiveAnswer, { kind: "reply" }> }) {
+  const words = t.stive.reply;
+  if (answer.text) return <FreeText text={answer.text} />;
+  return (
+    <div className="grid gap-2">
+      <p>{words.withheld[answer.withheld ?? "length"]}</p>
+      <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+        <ShieldCheck aria-hidden="true" className="size-3.5" />
+        {words.withheldNote}
+      </p>
+    </div>
+  );
+}
+
+/** Échange simple du mode simulé : textes fixes. */
+function SmallTalkAnswer({
+  answer,
+  t,
+}: Props & { answer: Extract<StiveAnswer, { kind: "smalltalk" }> }) {
+  const text = t.stive;
+  return (
+    <div className="grid gap-2">
+      <p>{text.smalltalk[answer.topic]}</p>
+      {answer.topic === "help" || answer.topic === "greeting" ? (
+        <>
+          {answer.topic === "greeting" ? <p>{text.smalltalk.help}</p> : null}
+          <Bullets items={text.capabilities.items} />
+          <p className="text-sm text-ink-muted">{text.unknown.simulated}</p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Hors des six demandes, sans IA : une réponse honnête, jamais inventée. */
+function UnknownAnswer({
+  answer,
+  t,
+}: Props & { answer: Extract<StiveAnswer, { kind: "unknown" }> }) {
+  const text = t.stive.unknown;
+  const unavailable = answer.mode === "ai_unavailable";
+  return (
+    <div className="grid gap-2">
+      <Heading>{unavailable ? text.aiUnavailableTitle : text.title}</Heading>
+      <p>{unavailable ? text.aiUnavailable : text.simulated}</p>
+      {unavailable ? null : <p>{text.help}</p>}
+      <Bullets items={t.stive.capabilities.items} />
+    </div>
+  );
+}
+
 /** Réponse de Stive mise en mots dans la langue de la personne. */
 export function StiveAnswerView({
   answer,
@@ -596,13 +709,11 @@ export function StiveAnswerView({
       return <UnavailableAnswer answer={answer} {...props} />;
     case "limit":
       return <LimitAnswer answer={answer} {...props} />;
-    default:
-      return (
-        <div className="grid gap-2">
-          <Heading>{text.unknown.title}</Heading>
-          <p>{text.unknown.help}</p>
-          <Bullets items={text.capabilities.items} />
-        </div>
-      );
+    case "reply":
+      return <ReplyAnswer answer={answer} {...props} />;
+    case "smalltalk":
+      return <SmallTalkAnswer answer={answer} {...props} />;
+    case "unknown":
+      return <UnknownAnswer answer={answer} {...props} />;
   }
 }

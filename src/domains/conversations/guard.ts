@@ -30,6 +30,21 @@ const CONDITIONS_FR =
   "infection|allergie|hernie|abces|fracture|torsion|seroma|eventration|otite|cystite|gastro";
 const CONDITIONS_EN = "infection|allergy|hernia|abscess|fracture";
 
+/**
+ * Lien, nom de domaine, adresse e-mail ou numéro (six chiffres ou plus, même espacés), sur un
+ * texte replié (`foldText`). Repris par le contrôle des réponses de Stive (ADR 0042).
+ */
+export const CONTACT_PATTERN = new RegExp(
+  [
+    // Lien ou nom de domaine.
+    `https?:|\\bwww\\.|\\b[a-z0-9-]+\\.(com|fr|net|org|io|eu|be|ch|ca|info|me|app|link|ly)\\b`,
+    // Adresse e-mail.
+    `[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)+`,
+    // Six chiffres ou plus, même espacés (numéro de téléphone, code, compte).
+    `\\d(?:[ .-]?\\d){5,}`,
+  ].join("|"),
+);
+
 const RULES: [GuardReason, RegExp][] = [
   [
     "dosage",
@@ -74,12 +89,7 @@ const RULES: [GuardReason, RegExp][] = [
     "content",
     new RegExp(
       [
-        // Lien ou nom de domaine.
-        `https?:|\\bwww\\.|\\b[a-z0-9-]+\\.(com|fr|net|org|io|eu|be|ch|ca|info|me|app|link|ly)\\b`,
-        // Adresse e-mail.
-        `[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)+`,
-        // Six chiffres ou plus, même espacés (numéro de téléphone, code, compte).
-        `\\d(?:[ .-]?\\d){5,}`,
+        CONTACT_PATTERN.source,
         // Numa qui se présenterait comme vétérinaire ou docteur.
         `\\b(je suis|moi,? c'est|ici|en tant que) (le |la |un |une |votre |ton |ta )?(docteur|dr|veterinaire|veto)\\b`,
         `\\b(i am|i'm|this is|speaking as) (the |a |an |your )?(vet|veterinarian|veterinary surgeon|doctor|dr)\\b`,
