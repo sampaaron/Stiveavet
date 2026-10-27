@@ -1,4 +1,4 @@
-/** Pages ajoutées par la refonte du menu (ADR 0044) : assistants, raccourcis, intégrations, contenus. */
+/** Pages ajoutées par la refonte du menu (ADR 0044) : assistants, raccourcis, intégrations, documents, contenus. */
 export const hub = {
   assistants: {
     title: "Assistants IA",
@@ -109,6 +109,65 @@ export const hub = {
         "Réponses écrites d'avance : aucun texte ne quitte Stivea Vet.",
       connected: (provider: string) => `Branché : ${provider}.`,
       providers: { scaleway: "Scaleway (Paris)", mistral: "Mistral AI" },
+    },
+  },
+  documents: {
+    title: "Documents",
+    description:
+      "La bibliothèque du cabinet : fiches de consignes remises aux propriétaires, procédures internes, documents administratifs.",
+    notice:
+      "Pas de dossier patient ici : ces documents sont visibles par toute l'équipe qui voit les protocoles.",
+    categories: {
+      owner_sheet: "Fiche pour les propriétaires",
+      procedure: "Procédure interne",
+      admin: "Administratif",
+      other: "Autre",
+    },
+    count: (n: number) =>
+      n === 0 ? "Aucun document" : n === 1 ? "1 document" : `${n} documents`,
+    added: (when: string, by: string | null) =>
+      by ? `Ajouté ${when} par ${by}` : `Ajouté ${when}`,
+    open: "Ouvrir",
+    download: "Télécharger",
+    openLabel: (title: string) => `Ouvrir ${title}`,
+    downloadLabel: (title: string) => `Télécharger ${title}`,
+    missing: "Fichier d'exemple absent du stockage local.",
+    expired:
+      "Ce lien a expiré : pour votre sécurité, il ne vaut que quelques minutes. Rouvrez le document ci-dessous.",
+    upload: {
+      title: "Ajouter un document",
+      description:
+        "PDF, JPEG, PNG ou WebP, 5 Mo au plus. Les photos perdent leurs métadonnées (position, appareil).",
+      titleLabel: "Titre",
+      titlePlaceholder: "Consignes après stérilisation",
+      categoryLabel: "Catégorie",
+      fileLabel: "Fichier",
+      submit: "Ajouter le document",
+    },
+    remove: {
+      trigger: "Supprimer",
+      triggerLabel: (title: string) => `Supprimer ${title}`,
+      title: (title: string) => `Supprimer « ${title} » ?`,
+      description:
+        "Le fichier est effacé du stockage. Le journal d'activité garde la trace de la suppression.",
+      confirm: "Supprimer le document",
+    },
+    done: {
+      added: "Document ajouté.",
+      removed: "Document supprimé.",
+    },
+    validation: {
+      title: "Donnez un titre de 120 caractères au plus.",
+      category: "Choisissez une catégorie.",
+      file: "Choisissez un fichier.",
+      tooLarge: "Ce fichier dépasse 5 Mo.",
+      type: "Fichier refusé : envoyez un PDF ou une image JPEG, PNG ou WebP de 5 Mo au plus.",
+    },
+    empty: {
+      title: "Aucun document pour l'instant",
+      description:
+        "Ajoutez vos fiches de consignes et vos procédures : toute l'équipe les retrouvera ici.",
+      readOnly: "Les documents ajoutés par l'équipe apparaîtront ici.",
     },
   },
   contents: {

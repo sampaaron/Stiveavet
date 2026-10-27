@@ -1,6 +1,6 @@
 import type { AppDictionary } from "../types";
 
-/** Pages added by the menu redesign (ADR 0044): assistants, shortcuts, integrations, contents. */
+/** Pages added by the menu redesign (ADR 0044): assistants, shortcuts, integrations, documents, contents. */
 export const hub: AppDictionary["hub"] = {
   assistants: {
     title: "AI assistants",
@@ -109,6 +109,65 @@ export const hub: AppDictionary["hub"] = {
       simulated: "Pre-written replies: no text leaves Stivea Vet.",
       connected: (provider: string) => `Connected: ${provider}.`,
       providers: { scaleway: "Scaleway (Paris)", mistral: "Mistral AI" },
+    },
+  },
+  documents: {
+    title: "Documents",
+    description:
+      "The practice library: instruction sheets for owners, internal procedures, administrative documents.",
+    notice:
+      "No patient records here: these documents are visible to everyone on the team who can see protocols.",
+    categories: {
+      owner_sheet: "Sheet for owners",
+      procedure: "Internal procedure",
+      admin: "Administrative",
+      other: "Other",
+    },
+    count: (n: number) =>
+      n === 0 ? "No documents" : n === 1 ? "1 document" : `${n} documents`,
+    added: (when: string, by: string | null) =>
+      by ? `Added ${when} by ${by}` : `Added ${when}`,
+    open: "Open",
+    download: "Download",
+    openLabel: (title: string) => `Open ${title}`,
+    downloadLabel: (title: string) => `Download ${title}`,
+    missing: "Sample file missing from local storage.",
+    expired:
+      "This link has expired: for your security, it only lasts a few minutes. Open the document again below.",
+    upload: {
+      title: "Add a document",
+      description:
+        "PDF, JPEG, PNG or WebP, 5 MB at most. Photos lose their metadata (location, device).",
+      titleLabel: "Title",
+      titlePlaceholder: "Aftercare following neutering",
+      categoryLabel: "Category",
+      fileLabel: "File",
+      submit: "Add the document",
+    },
+    remove: {
+      trigger: "Delete",
+      triggerLabel: (title: string) => `Delete ${title}`,
+      title: (title: string) => `Delete “${title}”?`,
+      description:
+        "The file is erased from storage. The activity log keeps a record of the deletion.",
+      confirm: "Delete the document",
+    },
+    done: {
+      added: "Document added.",
+      removed: "Document deleted.",
+    },
+    validation: {
+      title: "Give a title of 120 characters at most.",
+      category: "Choose a category.",
+      file: "Choose a file.",
+      tooLarge: "This file is over 5 MB.",
+      type: "File rejected: send a PDF or a JPEG, PNG or WebP image of 5 MB at most.",
+    },
+    empty: {
+      title: "No documents yet",
+      description:
+        "Add your instruction sheets and procedures: the whole team will find them here.",
+      readOnly: "Documents added by the team will appear here.",
     },
   },
   contents: {

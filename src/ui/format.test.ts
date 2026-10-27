@@ -5,6 +5,7 @@ import {
   formatDayTitle,
   formatDuration,
   formatEuros,
+  formatFileSize,
   initials,
   formatMinutes,
   formatRelativeDayTime,
@@ -96,5 +97,14 @@ describe("initiales", () => {
     expect(initials("Dr Claire Fontaine")).toBe("CF");
     expect(initials("léa  (ASV)")).toBe("L");
     expect(initials("Inès")).toBe("I");
+  });
+});
+
+describe("formatFileSize", () => {
+  it("écrit la taille en ko ou en Mo, selon la langue", () => {
+    expect(formatFileSize(240 * 1024, "fr")).toBe("240 ko");
+    expect(formatFileSize(1.25 * 1024 * 1024, "fr")).toBe("1,3 Mo");
+    expect(formatFileSize(1.25 * 1024 * 1024, "en")).toBe("1.3 MB");
+    expect(formatFileSize(10, "en")).toBe("1 KB");
   });
 });

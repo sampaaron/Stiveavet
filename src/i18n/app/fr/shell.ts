@@ -28,6 +28,7 @@ export const shell = {
     followupSection: "Suivi",
     assistants: "Assistants IA",
     shortcuts: "Raccourcis",
+    documents: "Documents",
     contents: "Contenus",
     settings: "Réglages",
     integrations: "Intégrations",

@@ -8,6 +8,7 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
+  FolderOpen,
   House,
   LayoutDashboard,
   LifeBuoy,
@@ -120,6 +121,12 @@ export const appNavigation: NavSection[] = [
         href: "/app/protocoles",
         label: "protocols",
         icon: ClipboardList,
+        anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
+      },
+      {
+        href: "/app/documents",
+        label: "documents",
+        icon: FolderOpen,
         anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
       },
       {

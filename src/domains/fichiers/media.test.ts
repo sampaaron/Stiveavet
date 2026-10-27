@@ -12,7 +12,13 @@ import {
 import { checkNumaReply } from "@/domains/conversations/guard";
 import { parisWallMinutes } from "@/domains/heure-paris";
 
-import { durationLabel, sniffAudio, sniffImage, wavDurationMs } from "./media";
+import {
+  durationLabel,
+  sniffAudio,
+  sniffImage,
+  sniffPdf,
+  wavDurationMs,
+} from "./media";
 
 const PNG = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0,
@@ -41,6 +47,15 @@ describe("type des fichiers, lu dans le contenu", () => {
     );
     expect(sniffAudio(buildSimulatedVoiceNote("Bonjour"))).toBe("audio/wav");
     expect(sniffAudio(PNG)).toBeNull();
+  });
+
+  it("reconnaît un PDF à son en-tête seulement", () => {
+    const encode = (text: string) => new TextEncoder().encode(text);
+    expect(sniffPdf(encode("%PDF-1.7\n"))).toBe("application/pdf");
+    expect(sniffPdf(encode("%PDF-2.0\n"))).toBe("application/pdf");
+    expect(sniffPdf(encode("<html>%PDF-1.7"))).toBeNull();
+    expect(sniffPdf(encode("%PDF-x"))).toBeNull();
+    expect(sniffPdf(PNG)).toBeNull();
   });
 });
 

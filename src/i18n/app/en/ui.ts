@@ -26,5 +26,9 @@ export const ui: AppDictionary["ui"] = {
     prompt: "Drop the image here",
     browse: "or click to choose a file",
     replace: "Click to choose another image",
+    document: {
+      prompt: "Drop the file here",
+      replace: "Click to choose another file",
+    },
   },
 };

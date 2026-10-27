@@ -4,8 +4,9 @@ import { concatBytes } from "@/domains/commun/utilitaires";
 
 /**
  * Fichiers acceptés (architecture §7, ADR 0019) : le type est lu dans les premiers octets
- * du fichier, jamais repris du nom ou de ce que déclare l'expéditeur. Pas de SVG ni de PDF
- * ici : une image ou un son seulement, qui ne peut pas exécuter de script une fois servi.
+ * du fichier, jamais repris du nom ou de ce que déclare l'expéditeur. Pas de SVG : une image
+ * ou un son seulement, qui ne peut pas exécuter de script une fois servi. Le PDF n'est admis
+ * que pour les documents du cabinet (ADR 0045), et toujours servi en téléchargement.
  */
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const MAX_VOICE_BYTES = 16 * 1024 * 1024;
@@ -27,6 +28,15 @@ export function sniffImage(bytes: Uint8Array): ImageType | null {
   if (startsWith(bytes, ascii("RIFF")) && startsWith(bytes, ascii("WEBP"), 8))
     return "image/webp";
   return null;
+}
+
+/** En-tête « %PDF-1. » ou « %PDF-2. » dès le premier octet. */
+export function sniffPdf(bytes: Uint8Array): "application/pdf" | null {
+  return startsWith(bytes, ascii("%PDF-")) &&
+    (bytes[5] === 0x31 || bytes[5] === 0x32) &&
+    bytes[6] === 0x2e
+    ? "application/pdf"
+    : null;
 }
 
 export function sniffAudio(bytes: Uint8Array): AudioType | null {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { LINK_TTL_SECONDS, signReadLink, verifyReadLink } from "./liens";
+import {
+  DOCUMENT_LINK_TTL_SECONDS,
+  LINK_TTL_SECONDS,
+  signReadLink,
+  verifyReadLink,
+} from "./liens";
 
 const secret = "clé-de-test-".repeat(4);
 const attachmentId = "6f1c1b7e-2d1a-4c8e-9a54-0c5d3b1f9e01";
@@ -17,7 +22,12 @@ function parts(url: string) {
 }
 
 describe("liens de lecture signés", () => {
-  const link = signReadLink({ secret, attachmentId, membershipId: vet, now });
+  const link = signReadLink({
+    secret,
+    fileId: attachmentId,
+    membershipId: vet,
+    now,
+  });
 
   it("valables deux minutes pour ce fichier et ce membre seulement", () => {
     expect(link.url.startsWith(`/app/fichiers/${attachmentId}?`)).toBe(true);
@@ -27,7 +37,7 @@ describe("liens de lecture signés", () => {
     );
     const ok = {
       secret,
-      attachmentId,
+      fileId: attachmentId,
       membershipId: vet,
       now,
       ...parts(link.url),
@@ -39,7 +49,7 @@ describe("liens de lecture signés", () => {
     expect(
       verifyReadLink({
         ...ok,
-        attachmentId: "11111111-2222-4333-8444-555555555555",
+        fileId: "11111111-2222-4333-8444-555555555555",
       }),
     ).toBe(false);
     // Autre clé : refusé.
@@ -47,7 +57,12 @@ describe("liens de lecture signés", () => {
   });
 
   it("périmé, prolongé ou altéré : refusé", () => {
-    const ok = { secret, attachmentId, membershipId: vet, ...parts(link.url) };
+    const ok = {
+      secret,
+      fileId: attachmentId,
+      membershipId: vet,
+      ...parts(link.url),
+    };
     expect(
       verifyReadLink({
         ...ok,
@@ -65,5 +80,40 @@ describe("liens de lecture signés", () => {
     expect(verifyReadLink({ ...ok, now, signature: tampered })).toBe(false);
     expect(verifyReadLink({ ...ok, now, signature: "" })).toBe(false);
     expect(verifyReadLink({ ...ok, now, expires: "demain" })).toBe(false);
+  });
+
+  it("un lien de document ne vaut pas pour une photo, ni l'inverse", () => {
+    const document = signReadLink({
+      secret,
+      fileId: attachmentId,
+      membershipId: vet,
+      scope: "document",
+      now,
+    });
+    expect(document.url.startsWith(`/app/documents/${attachmentId}?`)).toBe(
+      true,
+    );
+    expect(document.expiresAt.getTime() - now.getTime()).toBe(
+      DOCUMENT_LINK_TTL_SECONDS * 1000,
+    );
+    const asDocument = {
+      secret,
+      fileId: attachmentId,
+      membershipId: vet,
+      now,
+      ...parts(document.url),
+    };
+    expect(verifyReadLink({ ...asDocument, scope: "document" })).toBe(true);
+    expect(verifyReadLink(asDocument)).toBe(false);
+    expect(
+      verifyReadLink({
+        secret,
+        fileId: attachmentId,
+        membershipId: vet,
+        now,
+        scope: "document",
+        ...parts(link.url),
+      }),
+    ).toBe(false);
   });
 });
