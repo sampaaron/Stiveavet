@@ -15,17 +15,17 @@ Aaron a comparé l'espace cabinet au tableau de bord de Limova. Il a validé une
 
 1. **Quatre rubriques dans la barre latérale** (`src/ui/navigation.ts`). Chaque rubrique a ses onglets, affichés en tête de page par `SectionTabs` :
 
-   | Rubrique   | Onglets                                                                    |
-   | ---------- | -------------------------------------------------------------------------- |
-   | Accueil    | Vue d'ensemble, Stive, Assistants IA, Raccourcis                           |
-   | Suivi      | Suivis, Animaux, Alertes, Agenda                                           |
-   | Protocoles | Protocoles, Contenus                                                       |
+   | Rubrique   | Onglets                                                                                    |
+   | ---------- | ------------------------------------------------------------------------------------------ |
+   | Accueil    | Vue d'ensemble, Stive, Assistants IA, Raccourcis                                           |
+   | Suivi      | Suivis, Animaux, Alertes, Agenda                                                           |
+   | Protocoles | Protocoles, Contenus                                                                       |
    | Cabinet    | Équipe et droits, Facturation, Réglages, Intégrations, Automatisations, Journal d'activité |
-
    - Démarrage guidé et Centre d'aide restent en bas du menu ; la carte d'identité mène à Mon compte.
    - Une rubrique mène à son premier onglet permis.
    - Un onglet n'apparaît qu'avec la permission de son écran ; le serveur refuse toujours l'accès (404) sans elle.
    - « Protocoles » n'existe que si son premier onglet est permis : son nom tromperait sinon.
+
 2. **Nouvelles pages, sans nouvelle donnée.**
    - **Assistants IA** : Numa et Stive, ce que chacun fait et ne fait jamais, et le décompte des demandes à Stive de la personne.
    - **Raccourcis** : des demandes toutes prêtes. Chacune passe par l'action « Demander à Stive », avec les mêmes droits et le même décompte qu'une demande écrite. Rien ne part vers un propriétaire sans clic.
