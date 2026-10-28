@@ -1,8 +1,49 @@
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const account = {
-  title: "Sécurité du compte",
+  title: "Mon compte",
   description:
-    "Votre mot de passe, vos sessions ouvertes et vos appareils de confiance. Ces réglages ne concernent que vous.",
+    "Vos informations, votre activité et la sécurité de votre compte. Vous seul voyez cette page.",
+  profile: {
+    title: "Vos informations",
+    email: "E-mail de connexion",
+    organization: "Cabinet",
+    role: "Rôle",
+    alertPhone: "Numéro des alertes urgentes",
+    noAlertPhone: "Aucun numéro renseigné",
+    language: "Langue de l'espace",
+    languages: { fr: "Français", en: "English" },
+    memberSince: "Membre depuis le",
+    plan: "Formule du cabinet",
+    changeHint:
+      "Pour changer votre nom, votre e-mail ou votre rôle, adressez-vous à l'administrateur du cabinet.",
+  },
+  activity: {
+    title: "Votre activité",
+    description: "Les suivis dont vous êtes responsable, hors suivis test.",
+    statuses: {
+      active: "En cours",
+      paused: "En pause",
+      human_takeover: "Repris par l'équipe",
+      draft: "Brouillons",
+      ended: "Terminés",
+    },
+    stive: "Demandes à Stive ce mois-ci",
+    stiveUsage: (used: number, limit: number) => `${used} sur ${limit}`,
+    stiveOff: "Stive n'est pas inclus dans votre accès.",
+  },
+  rights: {
+    title: "Vos droits",
+    description:
+      "Ce que votre compte permet dans le cabinet, selon votre rôle et la formule.",
+  },
+  privacy: {
+    title: "Ce qui reste privé",
+    points: [
+      "Vos échanges avec Stive ne sont visibles que par vous et sont effacés après 30 jours.",
+      "Le journal d'activité garde vos actions sur les dossiers, jamais le contenu médical.",
+      "Votre mot de passe n'est jamais stocké en clair, et personne au cabinet ne peut le lire.",
+    ],
+  },
   password: {
     title: "Mot de passe",
     description:
