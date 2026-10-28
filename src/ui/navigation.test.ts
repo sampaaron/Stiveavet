@@ -72,6 +72,15 @@ describe("visibleNavigation", () => {
     ]);
   });
 
+  it("range les documents du cabinet sous Protocoles, avec les mêmes droits", () => {
+    const protocols = appNavigation.find(
+      (section) => section.label === "protocols",
+    );
+    const [first, documents] = protocols?.tabs ?? [];
+    expect(documents?.href).toBe("/app/documents");
+    expect(documents?.anyOf).toEqual(first?.anyOf);
+  });
+
   it("retire « Protocoles » sans l'accès aux protocoles, même avec Stive", () => {
     const labels = visibleNavigation(new Set(["stive.use"])).map(
       (section) => section.label,

@@ -416,7 +416,7 @@ export function mediaService(deps: {
           row.id,
           signReadLink({
             secret: linkSecret,
-            attachmentId: row.id,
+            fileId: row.id,
             membershipId: actor.membershipId,
             now,
           }),
@@ -497,7 +497,7 @@ export function mediaService(deps: {
         throw new DomainError("not_found");
       const valid = verifyReadLink({
         secret: linkSecret,
-        attachmentId,
+        fileId: attachmentId,
         membershipId: actor.membershipId,
         expires: link.expires,
         signature: link.signature,

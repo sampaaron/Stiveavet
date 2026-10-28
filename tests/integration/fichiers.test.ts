@@ -482,7 +482,7 @@ describe("droits sur les fichiers", () => {
     const leo = await actor(ids.vet);
     const old = signReadLink({
       secret: SECRET,
-      attachmentId: photoId,
+      fileId: photoId,
       membershipId: ids.vet,
       now: new Date(Date.now() - 10 * 60_000),
     });

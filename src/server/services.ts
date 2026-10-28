@@ -14,6 +14,8 @@ import type { AppointmentsService } from "@/domains/agenda/demandes";
 import { conversationsService } from "@/domains/conversations/service";
 import type { ConversationsService } from "@/domains/conversations/service";
 import { demoService } from "@/domains/demo/service";
+import { documentsService } from "@/domains/documents/service";
+import type { DocumentsService } from "@/domains/documents/service";
 import type { DemoService } from "@/domains/demo/service";
 import { teamService } from "@/domains/equipe/service";
 import { mediaService } from "@/domains/fichiers/service";
@@ -66,6 +68,7 @@ let launch: LaunchService | undefined;
 let conversations: ConversationsService | undefined;
 let alerts: AlertsService | undefined;
 let media: MediaService | undefined;
+let documents: DocumentsService | undefined;
 let agenda: AgendaService | undefined;
 let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
@@ -158,6 +161,15 @@ export const services = {
       linkSecret: fileLinkSecret(),
     });
     return media;
+  },
+  /** Documents du cabinet : même stockage privé et mêmes liens signés (ADR 0045). */
+  documents(): DocumentsService {
+    documents ??= documentsService({
+      db: appDatabase(),
+      storage: lazyObjectStorage,
+      linkSecret: fileLinkSecret(),
+    });
+    return documents;
   },
   /** Captures d'agenda et créneaux libres, lecture simulée (ADR 0019). */
   agenda(): AgendaService {

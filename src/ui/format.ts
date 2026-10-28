@@ -153,6 +153,19 @@ export function formatEuros(cents: number, locale: Locale): string {
   }).format(cents / 100);
 }
 
+/** Taille d'un fichier, au dixième près au-delà d'un Mo : « 240 ko », « 1,2 Mo », « 1.2 MB ». */
+export function formatFileSize(bytes: number, locale: Locale): string {
+  const mega = bytes >= 1024 * 1024;
+  const value = mega ? bytes / (1024 * 1024) : Math.max(1, bytes / 1024);
+  const unit = mega
+    ? { fr: "Mo", en: "MB" }[locale]
+    : { fr: "ko", en: "KB" }[locale];
+  const number = new Intl.NumberFormat(INTL[locale], {
+    maximumFractionDigits: mega ? 1 : 0,
+  }).format(value);
+  return `${number} ${unit}`;
+}
+
 /** Initiales d'un nom pour un avatar : « Dr Claire Fontaine » donne « CF ». */
 export function initials(name: string): string {
   return name

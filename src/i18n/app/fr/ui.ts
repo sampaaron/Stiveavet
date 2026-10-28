@@ -27,5 +27,9 @@ export const ui = {
     prompt: "Glissez l'image ici",
     browse: "ou cliquez pour choisir un fichier",
     replace: "Cliquez pour choisir une autre image",
+    document: {
+      prompt: "Glissez le fichier ici",
+      replace: "Cliquez pour choisir un autre fichier",
+    },
   },
 };

@@ -46,6 +46,8 @@ export const errors = {
       "Le propriétaire n'a pas donné son accord (ou l'a retiré) : aucun message ne peut lui être envoyé.",
     invalid_file:
       "Fichier refusé : envoyez une image JPEG, PNG ou WebP de 5 Mo au plus (ou un message vocal).",
+    document_limit:
+      "La bibliothèque du cabinet est pleine (200 documents). Supprimez un document devenu inutile avant d'en ajouter un.",
     capture_unreadable:
       "Aucun créneau libre n'a pu être lu sur cette capture. Elle a été supprimée ; réessayez avec une capture plus nette.",
     whatsapp_signup_failed:

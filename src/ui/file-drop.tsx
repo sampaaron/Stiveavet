@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageUp } from "lucide-react";
+import { FileUp, ImageUp } from "lucide-react";
 import { useState } from "react";
 
 import { useAppText } from "@/i18n/app/client";
@@ -8,7 +8,7 @@ import { useAppText } from "@/i18n/app/client";
 import { cn } from "./cn";
 
 /**
- * Zone de dépôt d'une image, dessinée comme le reste de l'interface. Le vrai champ fichier
+ * Zone de dépôt d'une image (ou d'un document, `variant="document"`), dessinée comme le reste de l'interface. Le vrai champ fichier
  * couvre toute la zone : il reçoit le clic, le glisser-déposer et le clavier, et garde son
  * libellé (`id` relié au `<label>` de l'appelant).
  */
@@ -18,14 +18,19 @@ export function FileDrop({
   accept,
   describedBy,
   className,
+  variant = "image",
 }: {
   id: string;
   name: string;
   accept: string;
   describedBy?: string;
   className?: string;
+  variant?: "image" | "document";
 }) {
   const t = useAppText().ui.fileDrop;
+  const prompt = variant === "document" ? t.document.prompt : t.prompt;
+  const replace = variant === "document" ? t.document.replace : t.replace;
+  const Icon = variant === "document" ? FileUp : ImageUp;
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   return (
@@ -42,17 +47,17 @@ export function FileDrop({
         aria-hidden="true"
         className="grid size-10 shrink-0 place-items-center rounded-full bg-canvas-subtle text-[var(--section-accent,var(--color-brand))]"
       >
-        <ImageUp className="size-5" />
+        <Icon className="size-5" />
       </span>
       <span className="min-w-0 text-sm">
         {fileName ? (
           <>
             <span className="block truncate font-semibold">{fileName}</span>
-            <span className="text-ink-muted">{t.replace}</span>
+            <span className="text-ink-muted">{replace}</span>
           </>
         ) : (
           <>
-            <span className="block font-semibold">{t.prompt}</span>
+            <span className="block font-semibold">{prompt}</span>
             <span className="text-ink-muted">{t.browse}</span>
           </>
         )}

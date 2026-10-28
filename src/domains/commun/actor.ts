@@ -38,6 +38,7 @@ export class DomainError extends Error {
       | "past_step"
       | "consent_missing"
       | "invalid_file"
+      | "document_limit"
       | "capture_unreadable"
       | "whatsapp_signup_failed"
       | "whatsapp_number_taken"

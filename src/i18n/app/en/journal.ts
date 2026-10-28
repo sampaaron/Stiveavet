@@ -76,6 +76,10 @@ export const journal: AppDictionary["journal"] = {
       `${actor} simulated an owner message (local)`,
     "simulator.owner_media": (actor: string) =>
       `${actor} simulated a photo or voice note from an owner (local)`,
+    "document.added": (actor: string) => `${actor} added a practice document`,
+    "document.opened": (actor: string) => `${actor} opened a practice document`,
+    "document.removed": (actor: string) =>
+      `${actor} deleted a practice document`,
     "attachment.opened": (actor: string) =>
       `${actor} opened a photo or voice note from a follow-up`,
     "agenda.capture_read": (actor: string) =>

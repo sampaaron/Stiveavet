@@ -19,7 +19,7 @@ Aaron a comparé l'espace cabinet au tableau de bord de Limova. Il a validé une
    | ---------- | ------------------------------------------------------------------------------------------ |
    | Accueil    | Vue d'ensemble, Stive, Assistants IA, Raccourcis                                           |
    | Suivi      | Suivis, Animaux, Alertes, Agenda                                                           |
-   | Protocoles | Protocoles, Contenus                                                                       |
+   | Protocoles | Protocoles, Documents (ADR 0045), Contenus                                                 |
    | Cabinet    | Équipe et droits, Facturation, Réglages, Intégrations, Automatisations, Journal d'activité |
    - Démarrage guidé et Centre d'aide restent en bas du menu ; la carte d'identité mène à Mon compte.
    - Une rubrique mène à son premier onglet permis.
@@ -35,6 +35,6 @@ Aaron a comparé l'espace cabinet au tableau de bord de Limova. Il a validé une
 3. **Style.** Le point de Stive passe sur la nuit verte de la maquette, avec la barre « Demandez à Stive » et un bouton « Ouvrir Stive ». Les rubriques du menu sont plus grandes, avec une pastille menthe pour la rubrique ouverte. Les onglets reprennent les pastilles de l'ADR 0033.
 4. **Centre d'aide.** `/app/aide` renvoie vers le centre d'aide du site public, dans la langue de l'espace cabinet. Avant, ce lien du menu menait à une page absente.
 
-## Reporté
+## Suite
 
-**Documents.** La bibliothèque de fichiers du cabinet, que Stive pourrait lire, demande un stockage et des droits propres : une table, des liens signés, le journal d'audit. Elle fera l'objet d'une prochaine étape, avec sa migration.
+**Documents.** La bibliothèque de fichiers du cabinet a demandé un stockage et des droits propres : elle est décrite dans l'ADR 0045, avec sa migration.

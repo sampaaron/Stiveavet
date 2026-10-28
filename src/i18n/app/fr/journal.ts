@@ -82,6 +82,12 @@ export const journal = {
       `${actor} a simulé un message de propriétaire (local)`,
     "simulator.owner_media": (actor: string) =>
       `${actor} a simulé une photo ou un message vocal de propriétaire (local)`,
+    "document.added": (actor: string) =>
+      `${actor} a ajouté un document du cabinet`,
+    "document.opened": (actor: string) =>
+      `${actor} a ouvert un document du cabinet`,
+    "document.removed": (actor: string) =>
+      `${actor} a supprimé un document du cabinet`,
     "attachment.opened": (actor: string) =>
       `${actor} a ouvert une photo ou un message vocal d'un suivi`,
     "agenda.capture_read": (actor: string) =>

@@ -86,6 +86,9 @@ function Modal({
 
 type ConfirmDialogProps = {
   triggerLabel: string;
+  /** Nom accessible du bouton quand plusieurs se ressemblent (« Supprimer » d'une liste). */
+  triggerAriaLabel?: string;
+  triggerSize?: "sm";
   title: string;
   description: string;
   confirmLabel: string;
@@ -98,6 +101,8 @@ type ConfirmDialogProps = {
 /** Demande une confirmation explicite avant toute action ayant un effet réel. */
 export function ConfirmDialog({
   triggerLabel,
+  triggerAriaLabel,
+  triggerSize,
   title,
   description,
   confirmLabel,
@@ -109,7 +114,12 @@ export function ConfirmDialog({
   const t = useAppText();
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button
+        variant="secondary"
+        size={triggerSize}
+        aria-label={triggerAriaLabel}
+        onClick={() => setOpen(true)}
+      >
         {triggerLabel}
       </Button>
       <Modal
