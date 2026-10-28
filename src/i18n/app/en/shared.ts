@@ -12,7 +12,7 @@ export const shared: SharedDictionary = {
   },
   assistants: {
     numaRole: "Talks with owners on WhatsApp",
-    stiveRole: "Helps the practice team in Stivea",
+    stiveRole: "The vet's assistant: it prepares, you decide",
     numaAi: "AI assistant",
     stiveAi: "AI assistant",
     avatarAlt: (name, aiLabel) => `${name}, ${aiLabel}`,

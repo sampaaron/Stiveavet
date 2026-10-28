@@ -222,6 +222,9 @@ export const stive = {
   /** Carte du tableau de bord. */
   dashboard: {
     title: "Le point de Stive",
+    promise: "Je prépare, vous décidez : je ne pose jamais de diagnostic.",
+    askPlaceholder:
+      "Demandez à Stive : un résumé de dossier, vos créneaux libres, un brouillon de message…",
     calm: "Rien à confirmer pour l'instant.",
     drafts: (count: number) =>
       `${nombre(count, "fiche de lancement", "fiches de lancement")} à finir`,

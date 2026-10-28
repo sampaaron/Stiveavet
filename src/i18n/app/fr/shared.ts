@@ -15,7 +15,7 @@ export const shared = {
   },
   assistants: {
     numaRole: "Échange avec les propriétaires sur WhatsApp",
-    stiveRole: "Aide l'équipe du cabinet dans Stivea",
+    stiveRole: "L'assistant du vétérinaire : il prépare, vous décidez",
     numaAi: "Assistante IA",
     stiveAi: "Assistant IA",
     avatarAlt: (name: string, aiLabel: string) =>

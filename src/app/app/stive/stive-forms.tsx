@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Eraser, Send, X } from "lucide-react";
+import { Check, Eraser, Send, Sparkles, X } from "lucide-react";
 import { useActionState, useId } from "react";
 
 import { useAppText } from "@/i18n/app/client";
@@ -81,6 +81,52 @@ export function AskStive({
       </form>
       <ActionMessage state={state} />
     </div>
+  );
+}
+
+/**
+ * Barre « Demander à Stive » du tableau de bord : la réponse s'ouvre dans l'écran de Stive,
+ * par la même action que la conversation.
+ */
+export function AskStiveBar({ placeholder }: { placeholder: string }) {
+  const [state, action, pending] = useActionState(
+    askStiveAction,
+    initialActionState,
+  );
+  const id = useId();
+  const text = useAppText().stive.ask;
+  return (
+    <form action={action} className="mt-5 grid gap-2">
+      <label htmlFor={id} className="sr-only">
+        {text.label}
+      </label>
+      <div className="relative">
+        <Sparkles
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-5 z-10 size-5 -translate-y-1/2 text-accent"
+        />
+        <input
+          id={id}
+          name="question"
+          type="text"
+          required
+          autoComplete="off"
+          maxLength={MAX_QUESTION}
+          placeholder={placeholder}
+          className="h-14 w-full rounded-full border border-line/80 bg-surface/90 pr-16 pl-13 text-[15px] text-ink shadow-[0_1px_2px_rgb(11_18_32/0.05),0_10px_30px_-12px_rgb(11_18_32/0.18)] backdrop-blur placeholder:text-ink-muted focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        />
+        <button
+          type="submit"
+          disabled={pending}
+          aria-busy={pending}
+          className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-accent text-white shadow-[0_6px_16px_-6px_rgb(91_79_224/0.8)] transition-transform hover:scale-105 disabled:opacity-60"
+        >
+          <Send aria-hidden="true" className="size-5" />
+          <span className="sr-only">{text.submit}</span>
+        </button>
+      </div>
+      <ActionMessage state={state} />
+    </form>
   );
 }
 

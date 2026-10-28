@@ -26,6 +26,14 @@ describe("appNavigation", () => {
 
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
+
+  it("place Stive, l'assistant du vétérinaire, juste après « Aujourd'hui »", () => {
+    const [first] = appNavigation;
+    expect(first?.items.slice(0, 2).map((item) => item.href)).toEqual([
+      "/app",
+      "/app/stive",
+    ]);
+  });
 });
 
 describe("visibleNavigation", () => {
