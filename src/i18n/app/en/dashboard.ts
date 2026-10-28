@@ -91,6 +91,21 @@ export const dashboard: AppDictionary["dashboard"] = {
     chartRow: (day: string, inbound: number, outbound: number) =>
       `${day}: ${inbound} received, ${outbound} sent`,
   },
+  operated: {
+    title: "Operated today",
+    description:
+      "Read from dr.veto. Preparing the sheet takes the procedure, the suggested protocol, the first message time and the check-up.",
+    at: (time: string) => `Operated at ${time}`,
+    by: (vet: string) => `by ${vet}`,
+    prepare: "Prepare the sheet",
+    prepareAll: (count: number) => `Prepare all (${count})`,
+    draft: "Sheet ready to launch",
+    open: "Follow-up in progress",
+    done: (count: number) =>
+      count
+        ? `${count} sheet${count > 1 ? "s" : ""} prepared: review ${count > 1 ? "them" : "it"} in “Ready to launch”.`
+        : "No sheet prepared: these animals are already followed.",
+  },
   ready: {
     title: "Ready to launch",
     description:
@@ -118,6 +133,10 @@ export const dashboard: AppDictionary["dashboard"] = {
     review: "Review the sheet",
     complete: "Complete the sheet",
     forAnimal: (animal: string) => `: ${animal}`,
+    recordOptIn: "Record the owner's agreement",
+    recordOptInHint:
+      "Collected at reception: the owner agrees to be contacted on WhatsApp.",
+    optInRecorded: "WhatsApp agreement recorded.",
     launchAll: (count: number) => `Launch all (${count})`,
     launchAllTitle: (count: number) =>
       `Launch ${count} follow-up${count > 1 ? "s" : ""}?`,
@@ -173,6 +192,10 @@ export const dashboard: AppDictionary["dashboard"] = {
     emptyDescription: "All follow-ups are progressing normally.",
   },
   others: {
+    quiet: (count: number) =>
+      `${count} follow-up${count > 1 ? "s" : ""}: nothing to report`,
+    quietHint:
+      "No warning sign from the protocol. Open the list only if needed.",
     title: "Other active follow-ups",
     empty: "No other active follow-ups",
   },

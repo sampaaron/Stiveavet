@@ -104,6 +104,22 @@ export const dashboard = {
     chartRow: (day: string, inbound: number, outbound: number) =>
       `${day} : ${inbound} reçu${inbound > 1 ? "s" : ""}, ${outbound} envoyé${outbound > 1 ? "s" : ""}`,
   },
+  /** Opérés du jour (ADR 0047), lus dans dr.veto : une fiche par animal, en un clic. */
+  operated: {
+    title: "Opérés du jour",
+    description:
+      "Lus dans dr.veto. Préparer la fiche reprend l'intervention, le protocole proposé, l'heure du premier message et le contrôle.",
+    at: (time: string) => `Opéré à ${time}`,
+    by: (vet: string) => `par ${vet}`,
+    prepare: "Préparer la fiche",
+    prepareAll: (count: number) => `Tout préparer (${count})`,
+    draft: "Fiche prête à lancer",
+    open: "Suivi en cours",
+    done: (count: number) =>
+      count
+        ? `${nombre(count, "fiche préparée", "fiches préparées")} : relisez-les dans « Prêts à lancer ».`
+        : "Aucune fiche préparée : ces animaux sont déjà suivis.",
+  },
   /**
    * File « Prêts à lancer » (ADR 0046) : fiches préparées par l'équipe, que seul le vétérinaire
    * responsable lance, en un clic, après les avoir relues.
@@ -135,6 +151,10 @@ export const dashboard = {
     review: "Relire la fiche",
     complete: "Compléter la fiche",
     forAnimal: (animal: string) => ` : ${animal}`,
+    recordOptIn: "Noter l'accord du propriétaire",
+    recordOptInHint:
+      "Recueilli à l'accueil : le propriétaire accepte d'être contacté sur WhatsApp.",
+    optInRecorded: "Accord WhatsApp noté.",
     launchAll: (count: number) => `Tout lancer (${count})`,
     launchAllTitle: (count: number) =>
       `Lancer ${nombre(count, "suivi", "suivis")} ?`,
@@ -198,6 +218,10 @@ export const dashboard = {
     emptyDescription: "Tous les suivis évoluent normalement.",
   },
   others: {
+    quiet: (count: number) =>
+      `${nombre(count, "suivi", "suivis")} : rien à signaler`,
+    quietHint:
+      "Aucun signe d'alerte du protocole. Ouvrez la liste seulement si besoin.",
     title: "Autres suivis actifs",
     empty: "Aucun autre suivi actif",
   },

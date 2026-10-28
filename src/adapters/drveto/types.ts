@@ -40,11 +40,26 @@ export type DrVetoRecord = {
     weightGrams: number | null;
   };
   owners: DrVetoOwner[];
-  procedure: { label: string; at: Date };
+  /** Praticien qui a opéré, tel que nommé dans dr.veto (ADR 0047) ; null s'il n'est pas dit. */
+  procedure: { label: string; at: Date; practitionerName: string | null };
   controlAppointmentAt: Date | null;
   allergies: string[];
   antecedents: string[];
   treatments: DrVetoTreatment[];
+};
+
+/**
+ * Animal opéré dans la journée (ADR 0047) : de quoi le reconnaître et préparer sa fiche, sans
+ * donnée clinique détaillée.
+ */
+export type DrVetoOperation = {
+  /** Identifiant de l'animal dans dr.veto. */
+  ref: string;
+  name: string;
+  species: "dog" | "cat";
+  procedure: string;
+  at: Date;
+  practitionerName: string | null;
 };
 
 /**
@@ -71,4 +86,6 @@ export type DrVetoConnector = {
   importRecord(ref: string): Promise<DrVetoRecord | null>;
   /** Agenda complet du cabinet pour le jour (heure de Paris) qui contient `day`. */
   agendaOfDay(day: Date): Promise<DrVetoAgendaEntry[]>;
+  /** Animaux opérés le jour (heure de Paris) qui contient `day`, du plus récent au plus ancien. */
+  operationsOfDay(day: Date): Promise<DrVetoOperation[]>;
 };

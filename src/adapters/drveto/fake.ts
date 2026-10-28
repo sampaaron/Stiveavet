@@ -18,7 +18,8 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 type FakeAnimal = Omit<DrVetoRecord, "procedure" | "controlAppointmentAt"> & {
-  procedure: { label: string; hoursAgo: number };
+  /** Seuls les animaux dont le praticien est connu figurent parmi les opérés du jour. */
+  procedure: { label: string; hoursAgo: number; practitioner?: string };
   controlInDays: number | null;
 };
 
@@ -59,7 +60,11 @@ const ANIMALS: readonly FakeAnimal[] = [
       { fullName: "Antoine Girard", phone: "+33639980102", language: "fr" },
       { fullName: "Chloé Girard", phone: "+33639980103", language: "fr" },
     ],
-    procedure: { label: "Détartrage sous anesthésie", hoursAgo: 3 },
+    procedure: {
+      label: "Détartrage sous anesthésie",
+      hoursAgo: 3,
+      practitioner: "Dr Claire Fontaine",
+    },
     controlInDays: 7,
     allergies: ["Pénicillines (exemple fictif)"],
     antecedents: ["Souffle cardiaque léger, suivi annuel"],
@@ -86,7 +91,11 @@ const ANIMALS: readonly FakeAnimal[] = [
     owners: [
       { fullName: "Julie Moreau", phone: "+33639980104", language: "fr" },
     ],
-    procedure: { label: "Ovariectomie", hoursAgo: 1 },
+    procedure: {
+      label: "Ovariectomie",
+      hoursAgo: 1,
+      practitioner: "Dr Claire Fontaine",
+    },
     controlInDays: 10,
     allergies: [],
     antecedents: [],
@@ -149,7 +158,11 @@ const ANIMALS: readonly FakeAnimal[] = [
       { fullName: "Hélène Roche", phone: "+33639980107", language: "fr" },
       { fullName: "Bastien Roche", phone: "+33639980108", language: "fr" },
     ],
-    procedure: { label: "Ovariectomie", hoursAgo: 2 },
+    procedure: {
+      label: "Ovariectomie",
+      hoursAgo: 2,
+      practitioner: "Dr Claire Fontaine",
+    },
     controlInDays: 10,
     allergies: [],
     antecedents: [],
@@ -394,7 +407,11 @@ const ANIMALS: readonly FakeAnimal[] = [
     owners: [
       { fullName: "Sarah Dumas", phone: "+33639980123", language: "fr" },
     ],
-    procedure: { label: "Ovariectomie", hoursAgo: 2 },
+    procedure: {
+      label: "Ovariectomie",
+      hoursAgo: 2,
+      practitioner: "Dr Claire Fontaine",
+    },
     controlInDays: 10,
     allergies: [],
     antecedents: [],
@@ -417,7 +434,11 @@ const ANIMALS: readonly FakeAnimal[] = [
     owners: [
       { fullName: "Hugo Lambert", phone: "+33639980124", language: "fr" },
     ],
-    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    procedure: {
+      label: "Ovariectomie",
+      hoursAgo: 3,
+      practitioner: "Dr Claire Fontaine",
+    },
     controlInDays: 10,
     allergies: [],
     antecedents: [],
@@ -427,6 +448,49 @@ const ANIMALS: readonly FakeAnimal[] = [
         instructions: "1 comprimé le matin pendant 3 jours, au cours du repas",
       },
     ],
+  },
+  // Opérés par le Dr Hugo Marchal : leur fiche attend son lancement (ADR 0047).
+  {
+    ref: "DV-20760",
+    animal: {
+      name: "Câline",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2025-05-22",
+      weightGrams: 2900,
+    },
+    owners: [{ fullName: "Léna Faure", phone: "+33639980125", language: "fr" }],
+    procedure: {
+      label: "Ovariectomie",
+      hoursAgo: 1,
+      practitioner: "Dr Hugo Marchal",
+    },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20767",
+    animal: {
+      name: "Pépite",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2025-01-30",
+      weightGrams: 3400,
+    },
+    owners: [
+      { fullName: "Marc Rolland", phone: "+33639980126", language: "fr" },
+    ],
+    procedure: {
+      label: "Ovariectomie",
+      hoursAgo: 2,
+      practitioner: "Dr Hugo Marchal",
+    },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
   },
 ];
 
@@ -451,7 +515,11 @@ function toRecord(entry: FakeAnimal, now: Date): DrVetoRecord {
     ref: entry.ref,
     animal: { ...entry.animal },
     owners: entry.owners.map((owner) => ({ ...owner })),
-    procedure: { label: entry.procedure.label, at },
+    procedure: {
+      label: entry.procedure.label,
+      at,
+      practitionerName: entry.procedure.practitioner ?? null,
+    },
     controlAppointmentAt: control,
     allergies: [...entry.allergies],
     antecedents: [...entry.antecedents],
@@ -541,6 +609,29 @@ export function createFakeDrVeto(
     async importRecord(ref) {
       const entry = ANIMALS.find((candidate) => candidate.ref === ref);
       return entry ? toRecord(entry, clock()) : null;
+    },
+    async operationsOfDay(day) {
+      const now = clock();
+      const target = Math.floor(parisWallMinutes(day) / 1440);
+      return ANIMALS.flatMap((entry) => {
+        const record = toRecord(entry, now);
+        const { practitionerName, at, label } = record.procedure;
+        if (
+          !practitionerName ||
+          Math.floor(parisWallMinutes(at) / 1440) !== target
+        )
+          return [];
+        return [
+          {
+            ref: record.ref,
+            name: record.animal.name,
+            species: record.animal.species,
+            procedure: label,
+            at,
+            practitionerName,
+          },
+        ];
+      }).sort((a, b) => b.at.getTime() - a.at.getTime());
     },
     async agendaOfDay(day) {
       const index = Math.floor(parisWallMinutes(day) / 1440);

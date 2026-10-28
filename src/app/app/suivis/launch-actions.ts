@@ -247,3 +247,40 @@ export async function launchReadyAction(
   revalidatePath("/app/suivis");
   redirect(`/app?lances=${result.launched}&echecs=${result.failed}`);
 }
+
+/**
+ * « Préparer la fiche » et « Tout préparer » depuis « Opérés du jour » (ADR 0047) : les fiches
+ * rejoignent « Prêts à lancer », sur la même page.
+ */
+export async function prepareOperatedAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const refs = form.getAll("ref").map((value) => String(value));
+  if (refs.length === 0 || refs.length > 50) return invalidRequest();
+  const context = await memberContext();
+  let prepared = 0;
+  const failure = await guarded(async () => {
+    prepared = await services.launch().prepareMany(context, refs);
+  });
+  if (failure) return failure;
+  revalidatePath("/app");
+  revalidatePath("/app/suivis");
+  redirect(`/app?preparees=${prepared}#prets-a-lancer`);
+}
+
+/** Accord WhatsApp recueilli à l'accueil, noté depuis « Prêts à lancer » (ADR 0047). */
+export async function recordOptInAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const followupId = z.uuid().safeParse(text(form, "followupId"));
+  if (!followupId.success) return invalidRequest();
+  const context = await memberContext();
+  const failure = await guarded(() =>
+    services.launch().recordOptIn(context, followupId.data),
+  );
+  if (failure) return failure;
+  revalidatePath("/app");
+  redirect("/app?accord=1#prets-a-lancer");
+}

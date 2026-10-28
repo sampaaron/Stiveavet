@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
+import { foldText } from "@/domains/commun/utilitaires";
 import { DomainError, assertPermission } from "@/domains/commun/actor";
 import type { Actor } from "@/domains/commun/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
@@ -187,9 +188,13 @@ async function applySheetHeader(
         .where(
           and(
             eq(followupContacts.followupId, followupId),
-            // Accord déjà noté : sa date et son auteur restent ceux d'origine.
+            // Accord donné : pour les contacts qui écriront seulement (le second n'en fait
+            // partie que s'il est inclus). Déjà noté : sa date et son auteur restent.
             data.whatsappOptIn
-              ? isNull(followupContacts.whatsappOptinAt)
+              ? and(
+                  eq(followupContacts.active, true),
+                  isNull(followupContacts.whatsappOptinAt),
+                )
               : sql`true`,
           ),
         );
@@ -344,6 +349,28 @@ async function replaceFutureSteps(
   return kept.length + data.steps.length;
 }
 
+/**
+ * Vétérinaire actif du cabinet qui a opéré, d'après le nom donné par dr.veto (ADR 0047) :
+ * seulement si un seul vétérinaire porte ce nom, accents et majuscules mis à part.
+ */
+function practitionerOf(
+  vets: { membershipId: string; name: string }[],
+  practitionerName: string | null,
+): string | null {
+  if (!practitionerName) return null;
+  const wanted = foldText(practitionerName).trim();
+  const matches = vets.filter((vet) => foldText(vet.name).trim() === wanted);
+  return matches.length === 1 ? (matches[0]?.membershipId ?? null) : null;
+}
+
+/** Un brouillon est créé non privé : qui voit la liste du cabinet garde l'accès à celui d'un confrère. */
+function seesColleagueDrafts(actor: Actor): boolean {
+  return (
+    actor.permissions.has("followups.read_all") ||
+    actor.permissions.has("followups.read_summary")
+  );
+}
+
 /** Traitements importés de dr.veto que le vétérinaire n'a pas encore validés. */
 function pendingImports(tx: TenantTransaction, followupId: string) {
   return tx
@@ -430,6 +457,32 @@ export type ReadyDraft = {
   /** Traitements importés de dr.veto, pas encore validés. */
   treatments: { id: string; name: string; instructions: string }[];
 };
+
+/** Opérés du jour montrés sur la vue d'ensemble, au plus. */
+export const MAX_OPERATIONS = 20;
+
+/**
+ * Animal opéré dans la journée, lu dans dr.veto (ADR 0047), avec l'état de son suivi dans
+ * Stivea : rien encore, brouillon préparé ou suivi en cours.
+ */
+export type OperatedAnimal = {
+  ref: string;
+  name: string;
+  species: "dog" | "cat";
+  procedure: string;
+  at: Date;
+  practitionerName: string | null;
+  followup: {
+    id: string;
+    status: "draft" | "active" | "paused" | "human_takeover";
+  } | null;
+};
+
+/** Préparation de plusieurs fiches depuis « Opérés du jour ». */
+export const prepareManyInput = z
+  .array(z.string().regex(/^[A-Za-z0-9-]{3,64}$/))
+  .min(1)
+  .max(MAX_OPERATIONS);
 
 /** Lancement depuis la file : chaque suivi avec les traitements que le vétérinaire a relus. */
 export const queueLaunchInput = z
@@ -588,12 +641,138 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     return followupId;
   }
 
-  /** Vétérinaire responsable proposé : l'acteur s'il l'est, sinon le premier actif. */
-  async function defaultResponsible(tx: TenantTransaction, actor: Actor) {
+  /**
+   * Vétérinaire responsable proposé : celui qui a opéré, si dr.veto le nomme et qu'un seul
+   * vétérinaire actif du cabinet porte ce nom (ADR 0047) ; sinon l'acteur s'il est
+   * vétérinaire, sinon le premier actif.
+   */
+  async function defaultResponsible(
+    tx: TenantTransaction,
+    actor: Actor,
+    practitionerName: string | null = null,
+  ) {
+    const vets = await activeVets(tx);
+    const surgeon = practitionerOf(vets, practitionerName);
+    // Qui ne voit que ses suivis perdrait l'accès à la fiche d'un confrère : il en reste
+    // responsable et peut la réattribuer depuis la fiche.
+    if (
+      surgeon &&
+      (surgeon === actor.membershipId || seesColleagueDrafts(actor))
+    )
+      return surgeon;
     if (VET_ROLES.has(actor.role)) return actor.membershipId;
-    const [first] = await activeVets(tx);
+    const [first] = vets;
     if (!first) throw new DomainError("invalid_target");
     return first.membershipId;
+  }
+
+  /** Brouillon depuis dr.veto, dans la transaction de l'appelant. */
+  async function prepareIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    ref: string,
+  ): Promise<string> {
+    if (!(await isConnected(tx, "drveto")))
+      throw new DomainError("integration_missing");
+    const record = await drveto.importRecord(ref);
+    if (!record) throw new DomainError("invalid_target");
+    const organizationId = actor.organizationId;
+
+    const responsible = await defaultResponsible(
+      tx,
+      actor,
+      record.procedure.practitionerName,
+    );
+
+    const [known] = await tx
+      .select({ id: animals.id })
+      .from(animals)
+      .where(eq(animals.externalRef, record.ref));
+    let animalId = known?.id;
+    if (animalId) {
+      const [open] = await tx
+        .select({ id: followups.id })
+        .from(followups)
+        .where(
+          and(eq(followups.animalId, animalId), ne(followups.status, "ended")),
+        );
+      if (open) throw new DomainError("already_followed");
+      await tx
+        .update(animals)
+        .set({
+          name: record.animal.name,
+          breed: record.animal.breed,
+          birthDate: record.animal.birthDate,
+          weightGrams: record.animal.weightGrams,
+          archivedAt: null,
+        })
+        .where(eq(animals.id, animalId));
+    } else {
+      const [created] = await tx
+        .insert(animals)
+        .values({
+          organizationId,
+          name: record.animal.name,
+          species: record.animal.species,
+          breed: record.animal.breed,
+          birthDate: record.animal.birthDate,
+          weightGrams: record.animal.weightGrams,
+          externalRef: record.ref,
+        })
+        .returning({ id: animals.id });
+      if (!created) throw new Error("Animal non créé");
+      animalId = created.id;
+    }
+
+    const choices = (await protocolChoices(tx, actor)).filter((choice) =>
+      fitsSpecies(choice, record.animal.species),
+    );
+    const versionId = suggestProtocol(
+      record.procedure.label,
+      record.animal.species,
+      choices,
+    );
+    const contacts = [];
+    for (const owner of record.owners.slice(0, 2))
+      contacts.push({
+        ...(await upsertOwner(tx, organizationId, animalId, owner)),
+        language: owner.language,
+      });
+    const followupId = await insertDraft(tx, actor, {
+      animalId,
+      responsible,
+      procedure: record.procedure.label,
+      procedureAt: record.procedure.at,
+      controlAppointmentAt: record.controlAppointmentAt,
+      versionId,
+      contacts,
+    });
+    await tx.insert(followupImports).values({
+      followupId,
+      organizationId,
+      source: "drveto_simulated",
+      externalRef: record.ref,
+      allergies: record.allergies,
+      antecedents: record.antecedents,
+      importedByMembershipId: actor.membershipId,
+    });
+    const treatments = record.treatments.slice(0, MAX_TREATMENTS);
+    if (treatments.length)
+      await tx.insert(followupTreatments).values(
+        treatments.map((treatment) => ({
+          organizationId,
+          followupId,
+          source: "drveto" as const,
+          name: treatment.name.slice(0, 120),
+          instructions: treatment.instructions.slice(0, 300),
+        })),
+      );
+    await auditFollowup(tx, actor, "followup.prepared", followupId, {
+      source: "drveto_simulated",
+      treatments: treatments.length,
+      protocolSuggested: versionId !== null,
+    });
+    return followupId;
   }
 
   /** Programme d'un suivi déjà chargé, dans la transaction de l'appelant (ADR 0040). */
@@ -648,107 +827,110 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
       assertCanPrepare(actor);
       if (!drVetoRef.safeParse(ref).success)
         throw new DomainError("invalid_target");
+      return run(actor, (tx) => prepareIn(tx, actor, ref));
+    },
+
+    /**
+     * « Opérés du jour » (ADR 0047) : animaux opérés aujourd'hui selon dr.veto, avec l'état de
+     * leur suivi. Null si dr.veto n'est pas relié au cabinet.
+     */
+    async operatedToday(
+      actor: Actor,
+      now = new Date(),
+    ): Promise<OperatedAnimal[] | null> {
+      assertCanPrepare(actor);
       return run(actor, async (tx) => {
-        if (!(await isConnected(tx, "drveto")))
-          throw new DomainError("integration_missing");
-        const record = await drveto.importRecord(ref);
-        if (!record) throw new DomainError("invalid_target");
-        const organizationId = actor.organizationId;
-
-        const responsible = await defaultResponsible(tx, actor);
-
-        const [known] = await tx
-          .select({ id: animals.id })
-          .from(animals)
-          .where(eq(animals.externalRef, record.ref));
-        let animalId = known?.id;
-        if (animalId) {
-          const [open] = await tx
-            .select({ id: followups.id })
-            .from(followups)
-            .where(
-              and(
-                eq(followups.animalId, animalId),
-                ne(followups.status, "ended"),
+        if (!(await isConnected(tx, "drveto"))) return null;
+        const vets = await activeVets(tx);
+        // Qui ne voit que ses suivis : ses opérés, et ceux d'un praticien hors de l'équipe.
+        const operations = (await drveto.operationsOfDay(now))
+          .filter((operation) => {
+            if (seesColleagueDrafts(actor)) return true;
+            const surgeon = practitionerOf(vets, operation.practitionerName);
+            return !surgeon || surgeon === actor.membershipId;
+          })
+          .slice(0, MAX_OPERATIONS);
+        if (!operations.length) return [];
+        const open = await tx
+          .select({
+            id: followups.id,
+            status: followups.status,
+            ref: animals.externalRef,
+          })
+          .from(followups)
+          .innerJoin(animals, eq(animals.id, followups.animalId))
+          .where(
+            and(
+              inArray(
+                animals.externalRef,
+                operations.map((operation) => operation.ref),
               ),
-            );
-          if (open) throw new DomainError("already_followed");
-          await tx
-            .update(animals)
-            .set({
-              name: record.animal.name,
-              breed: record.animal.breed,
-              birthDate: record.animal.birthDate,
-              weightGrams: record.animal.weightGrams,
-              archivedAt: null,
-            })
-            .where(eq(animals.id, animalId));
-        } else {
-          const [created] = await tx
-            .insert(animals)
-            .values({
-              organizationId,
-              name: record.animal.name,
-              species: record.animal.species,
-              breed: record.animal.breed,
-              birthDate: record.animal.birthDate,
-              weightGrams: record.animal.weightGrams,
-              externalRef: record.ref,
-            })
-            .returning({ id: animals.id });
-          if (!created) throw new Error("Animal non créé");
-          animalId = created.id;
-        }
-
-        const choices = (await protocolChoices(tx, actor)).filter((choice) =>
-          fitsSpecies(choice, record.animal.species),
-        );
-        const versionId = suggestProtocol(
-          record.procedure.label,
-          record.animal.species,
-          choices,
-        );
-        const contacts = [];
-        for (const owner of record.owners.slice(0, 2))
-          contacts.push({
-            ...(await upsertOwner(tx, organizationId, animalId, owner)),
-            language: owner.language,
-          });
-        const followupId = await insertDraft(tx, actor, {
-          animalId,
-          responsible,
-          procedure: record.procedure.label,
-          procedureAt: record.procedure.at,
-          controlAppointmentAt: record.controlAppointmentAt,
-          versionId,
-          contacts,
-        });
-        await tx.insert(followupImports).values({
-          followupId,
-          organizationId,
-          source: "drveto_simulated",
-          externalRef: record.ref,
-          allergies: record.allergies,
-          antecedents: record.antecedents,
-          importedByMembershipId: actor.membershipId,
-        });
-        const treatments = record.treatments.slice(0, MAX_TREATMENTS);
-        if (treatments.length)
-          await tx.insert(followupTreatments).values(
-            treatments.map((treatment) => ({
-              organizationId,
-              followupId,
-              source: "drveto" as const,
-              name: treatment.name.slice(0, 120),
-              instructions: treatment.instructions.slice(0, 300),
-            })),
+              ne(followups.status, "ended"),
+              eq(followups.isTest, false),
+            ),
           );
-        await auditFollowup(tx, actor, "followup.prepared", followupId, {
-          source: "drveto_simulated",
-          treatments: treatments.length,
-          protocolSuggested: versionId !== null,
+        const byRef = new Map(open.map((row) => [row.ref, row]));
+        return operations.map((operation) => {
+          const followup = byRef.get(operation.ref);
+          return {
+            ...operation,
+            followup:
+              followup && followup.status !== "ended"
+                ? { id: followup.id, status: followup.status }
+                : null,
+          };
         });
-        return followupId;
+      });
+    },
+
+    /**
+     * « Tout préparer » : une fiche par animal opéré, chacune dans sa transaction. Un animal
+     * déjà suivi, ou absent de dr.veto, est passé. Renvoie le nombre de fiches créées.
+     */
+    async prepareMany(actor: Actor, refs: unknown): Promise<number> {
+      assertCanPrepare(actor);
+      const parsed = prepareManyInput.safeParse(refs);
+      if (!parsed.success) throw new DomainError("invalid_target");
+      let prepared = 0;
+      for (const ref of new Set(parsed.data))
+        try {
+          await run(actor, (tx) => prepareIn(tx, actor, ref));
+          prepared += 1;
+        } catch (error) {
+          if (!(error instanceof DomainError)) throw error;
+        }
+      return prepared;
+    },
+
+    /**
+     * Accord WhatsApp recueilli à l'accueil, noté depuis « Prêts à lancer » (ADR 0047) : pour
+     * les contacts qui écriront, par qui prépare la fiche, journalisé comme depuis la fiche.
+     */
+    async recordOptIn(actor: Actor, followupId: string, now = new Date()) {
+      assertCanPrepare(actor);
+      await run(actor, async (tx) => {
+        const followup = await loadFollowup(tx, actor, followupId, true);
+        if (!canPrepareFollowup(actor, followup.access))
+          throw new DomainError("forbidden");
+        if (followup.status !== "draft" || followup.isTest)
+          throw new DomainError("invalid_transition");
+        await tx
+          .update(followupContacts)
+          .set({
+            whatsappOptinAt: now,
+            whatsappOptinByMembershipId: actor.membershipId,
+          })
+          .where(
+            and(
+              eq(followupContacts.followupId, followupId),
+              eq(followupContacts.active, true),
+              isNull(followupContacts.whatsappOptinAt),
+            ),
+          );
+        await auditFollowup(tx, actor, "followup.whatsapp_optin", followupId, {
+          given: true,
+          via: "queue",
+        });
       });
     },
 
