@@ -17,7 +17,7 @@ L'espace cabinet n'existait qu'en clair. Les vétérinaires le consultent aussi 
    - Un cookie (`sv_mode`, `__Host-` en HTTPS) le porte jusqu'au rendu serveur. La page arrive donc déjà dans le bon mode, sans éclair blanc. Il est recalé sur le compte à chaque connexion.
    - C'est une simple préférence : aucun accès n'en dépend, rien n'est journalisé.
 3. **Les couleurs passent par les jetons.**
-   - `data-mode` sur `<html>` et une variante Tailwind `dark:` redéfinissent les jetons : nuit verte du site, textes clairs, teintes de gravité éclaircies.
+   - `data-mode` sur `<html>` et une variante Tailwind `dark:` redéfinissent les jetons : le noir remplace le blanc comme couleur de fond (choix d'Aaron), textes clairs, teintes du cabinet et de gravité éclaircies.
    - Les fonds pleins (bouton, pastille d'urgence) portent un texte `on-strong`, blanc en clair et nuit en sombre.
    - Chaque rubrique garde sa teinte, dans une variante éclaircie (`--section-accent-night`).
    - Chaque paire texte et fond dépasse 4,5:1. Un test de bout en bout passe 17 écrans en sombre à axe.

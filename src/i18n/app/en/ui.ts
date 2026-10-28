@@ -12,7 +12,7 @@ export const ui: AppDictionary["ui"] = {
     options: { light: "Light", dark: "Dark", system: "Automatic" },
     hints: {
       light: "Light background, as before.",
-      dark: "Green night background, easier in the evening and in surgery.",
+      dark: "Black background, easier in the evening and in surgery.",
       system: "Follows your computer or phone setting.",
     },
   },

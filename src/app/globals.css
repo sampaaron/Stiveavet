@@ -63,8 +63,8 @@
 }
 
 /*
- * Jetons du mode sombre (ADR 0052) : la nuit verte du site, des textes clairs et des teintes
- * éclaircies. Les fonds pleins (bouton, urgence) portent alors un texte nuit : chaque paire
+ * Jetons du mode sombre (ADR 0052) : le noir en couleur de fond à la place du blanc, des
+ * textes clairs et les teintes du cabinet éclaircies. Les fonds pleins (bouton, urgence) portent alors un texte nuit : chaque paire
  * reste au-dessus de 4,5:1.
  */
 :root {
@@ -72,22 +72,23 @@
 
   @variant dark {
     color-scheme: dark;
-    --color-chrome: #050c09;
-    --color-canvas: #0a1511;
-    --color-canvas-subtle: #10201a;
-    --color-surface: #12241d;
-    --color-ink: #eef6f2;
-    --color-ink-muted: #a7bcb2;
-    --color-line: #24402f;
+    --color-chrome: #000000;
+    --color-canvas: #000000;
+    --color-canvas-subtle: #0f0f0f;
+    --color-surface: #141414;
+    --color-ink: #f5f5f5;
+    --color-ink-muted: #a3a3a3;
+    --color-line: #2e2e2e;
     --color-brand: #3fcf98;
     --color-brand-strong: #6fe0b4;
-    --color-brand-soft: #123b2a;
+    --color-brand-soft: #0f2e21;
     --color-brand-ink: #8ce8c3;
-    --color-on-strong: #06110c;
+    --color-on-strong: #0a0a0a;
+    --color-night-soft: #1c1c1c;
     --color-watch: #f6c879;
-    --color-watch-soft: #3a2c12;
+    --color-watch-soft: #2e2410;
     --color-urgent: #ff9a85;
-    --color-urgent-soft: #3d1b15;
+    --color-urgent-soft: #321713;
     --color-accent: #b4abff;
     --shadow-card:
       0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -18px rgb(0 0 0 / 0.8);
@@ -111,6 +112,7 @@
 .theme-site {
   /* Le site garde ses teintes, quel que soit le mode choisi dans l'espace cabinet. */
   --color-chrome: #0b1512;
+  --color-night-soft: #10231b;
   --color-brand: #087a54;
   --color-brand-strong: #066044;
   --color-on-strong: #ffffff;

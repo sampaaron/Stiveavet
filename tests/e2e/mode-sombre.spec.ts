@@ -57,7 +57,7 @@ test.describe("mode sombre", () => {
     await chooseMode(page, "/app/reglages", "Sombre");
     await expect(page).toHaveURL(/\/app\/reglages#affichage$/);
     await expect(page.locator("html")).toHaveAttribute("data-mode", "dark");
-    expect(await background(page)).toBe("rgb(10, 21, 17)");
+    expect(await background(page)).toBe("rgb(0, 0, 0)");
 
     for (const path of PAGES) {
       await page.goto(path);
@@ -74,7 +74,7 @@ test.describe("mode sombre", () => {
     await page.emulateMedia({ colorScheme: "light" });
     expect(await background(page)).toBe("rgb(246, 248, 247)");
     await page.emulateMedia({ colorScheme: "dark" });
-    expect(await background(page)).toBe("rgb(10, 21, 17)");
+    expect(await background(page)).toBe("rgb(0, 0, 0)");
     await expectAccessible(page);
 
     // Même cookie, sans session : l'écran de connexion arrive déjà en sombre.

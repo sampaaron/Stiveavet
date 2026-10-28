@@ -11,7 +11,7 @@ export const ui = {
     options: { light: "Clair", dark: "Sombre", system: "Automatique" },
     hints: {
       light: "Fond clair, comme aujourd'hui.",
-      dark: "Fond nuit verte, plus doux le soir et au bloc.",
+      dark: "Fond noir, plus doux le soir et au bloc.",
       system: "Suit le réglage de l'ordinateur ou du téléphone.",
     },
   },
