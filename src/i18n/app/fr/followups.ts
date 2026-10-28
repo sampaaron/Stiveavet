@@ -172,6 +172,7 @@ export const followups = {
       count > 1
         ? "Accord WhatsApp des propriétaires déjà noté au cabinet."
         : "Accord WhatsApp du propriétaire déjà noté au cabinet.",
+    optInQr: "Montrer le QR code d'accord au propriétaire",
     keep: "Garder",
     remove: "Retirer",
     keepTreatmentLabel: (name: string) => `Garder le traitement ${name}`,
@@ -195,6 +196,42 @@ export const followups = {
     saveChanges: "Enregistrer les modifications",
     launchedBy: (name: string) =>
       `Le suivi sera lancé par ${name}, vétérinaire responsable.`,
+  },
+  /** Accord WhatsApp par QR code à l'accueil (ADR 0051) : écran montré au propriétaire. */
+  optInQr: {
+    title: "QR code d'accord",
+    back: (name: string) => `Fiche de lancement de ${name}`,
+    heading: (name: string) => `Accord WhatsApp pour le suivi de ${name}`,
+    intro:
+      "À montrer au propriétaire, à l'accueil. Il scanne le QR code avec l'appareil photo de son téléphone : WhatsApp s'ouvre avec un message prêt, qu'il n'a plus qu'à envoyer.",
+    consentTitle: "Ce que vous acceptez",
+    consent: (practice: string, animal: string) =>
+      `En envoyant ce message, vous acceptez que ${practice} vous écrive sur WhatsApp pour le suivi de ${animal}. Numa, l'assistante IA du cabinet, vous posera des questions sur son rétablissement et l'équipe vétérinaire lit vos réponses. Numa ne remplace pas le vétérinaire. Vous pouvez tout arrêter à tout moment en écrivant STOP.`,
+    twoOwners:
+      "Chaque propriétaire scanne son propre QR code, depuis son téléphone.",
+    roles: { primary: "Propriétaire", secondary: "Second propriétaire" },
+    fromPhone: (phone: string) => `À envoyer depuis le ${phone}`,
+    qrAlt: (name: string) => `QR code d'accord WhatsApp pour ${name}`,
+    code: (code: string) => `Code ${code}`,
+    validUntil: (time: string) => `Valable jusqu'à ${time}`,
+    preparing: "Préparation du QR code…",
+    waiting: "En attente du message",
+    expired: "Ce QR code a expiré.",
+    renew: "Nouveau QR code",
+    received: "Accord reçu",
+    allReceived: (count: number) =>
+      count > 1
+        ? "Accord des deux propriétaires reçu : le suivi peut être lancé."
+        : "Accord reçu : le suivi peut être lancé.",
+    toSheet: "Ouvrir la fiche de lancement",
+    toDashboard: "Revenir à la vue d'ensemble",
+    simulatedTitle: "WhatsApp est simulé",
+    simulatedBody:
+      "Ce QR code ne contient que le texte du message : il n'ouvre aucune conversation. Le bouton imite l'envoi depuis le téléphone du propriétaire.",
+    simulate: "Simuler l'envoi depuis le téléphone",
+    simulateFor: (name: string) => ` de ${name}`,
+    notReceived:
+      "Le message n'a pas été pris en compte : affichez un nouveau QR code.",
   },
   /** Refus des actions de lancement ; les limites viennent des règles de la fiche. */
   validation: {

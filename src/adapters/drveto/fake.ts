@@ -492,6 +492,42 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  // Accord par QR code à l'accueil (ADR 0051) : un animal par format d'écran des tests.
+  {
+    ref: "DV-20774",
+    animal: {
+      name: "Bambou",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2024-08-14",
+      weightGrams: 3600,
+    },
+    owners: [
+      { fullName: "Paul Leroy", phone: "+33639980127", language: "fr" },
+      { fullName: "Anaïs Leroy", phone: "+33639980128", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 2 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20781",
+    animal: {
+      name: "Paprika",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2025-03-02",
+      weightGrams: 3100,
+    },
+    owners: [{ fullName: "Zoé Martin", phone: "+33639980129", language: "fr" }],
+    procedure: { label: "Ovariectomie", hoursAgo: 2 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

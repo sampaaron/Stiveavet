@@ -34,6 +34,8 @@ import { settingsService } from "@/domains/reglages/service";
 import { stiveService } from "@/domains/stive/service";
 import type { StiveService } from "@/domains/stive/service";
 import type { SettingsService } from "@/domains/reglages/service";
+import { optInService } from "@/domains/suivis/accord-qr";
+import type { OptInService } from "@/domains/suivis/accord-qr";
 import { launchService } from "@/domains/suivis/lancement";
 import type { LaunchService } from "@/domains/suivis/lancement";
 import { followupsService } from "@/domains/suivis/service";
@@ -67,6 +69,7 @@ let billing: BillingService | undefined;
 let demo: DemoService | undefined;
 let jobs: JobsService | undefined;
 let launch: LaunchService | undefined;
+let optIn: OptInService | undefined;
 let conversations: ConversationsService | undefined;
 let alerts: AlertsService | undefined;
 let media: MediaService | undefined;
@@ -145,6 +148,14 @@ export const services = {
   launch(): LaunchService {
     launch ??= launchService({ db: appDatabase(), drveto: fakeDrVeto });
     return launch;
+  },
+  /** Accord WhatsApp par QR code à l'accueil (ADR 0051) ; lien réel si WhatsApp l'est. */
+  optIn(): OptInService {
+    optIn ??= optInService({
+      db: appDatabase(),
+      live: configuredWhatsApp().mode === "cloud_api",
+    });
+    return optIn;
   },
   /** Conversation WhatsApp d'un suivi : Numa, accord, reprise en main (ADR 0016). */
   conversations(): ConversationsService {

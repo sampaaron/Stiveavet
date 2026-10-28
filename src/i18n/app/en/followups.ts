@@ -160,6 +160,7 @@ export const followups: AppDictionary["followups"] = {
       count > 1
         ? "The owners' WhatsApp agreement is already recorded at the practice."
         : "The owner's WhatsApp agreement is already recorded at the practice.",
+    optInQr: "Show the agreement QR code to the owner",
     keep: "Keep",
     remove: "Remove",
     keepTreatmentLabel: (name: string) => `Keep the treatment ${name}`,
@@ -182,6 +183,39 @@ export const followups: AppDictionary["followups"] = {
     saveChanges: "Save changes",
     launchedBy: (name: string) =>
       `The follow-up will be launched by ${name}, responsible vet.`,
+  },
+  optInQr: {
+    title: "Agreement QR code",
+    back: (name: string) => `${name}'s launch sheet`,
+    heading: (name: string) => `WhatsApp agreement for ${name}'s follow-up`,
+    intro:
+      "Show it to the owner at reception. They scan the QR code with their phone camera: WhatsApp opens with a ready message they only have to send.",
+    consentTitle: "What you agree to",
+    consent: (practice: string, animal: string) =>
+      `By sending this message, you agree that ${practice} may write to you on WhatsApp about ${animal}'s follow-up. Numa, the practice's AI assistant, will ask you about the recovery and the veterinary team reads your answers. Numa does not replace the vet. You can stop at any time by writing STOP.`,
+    twoOwners: "Each owner scans their own QR code, from their own phone.",
+    roles: { primary: "Owner", secondary: "Second owner" },
+    fromPhone: (phone: string) => `To send from ${phone}`,
+    qrAlt: (name: string) => `WhatsApp agreement QR code for ${name}`,
+    code: (code: string) => `Code ${code}`,
+    validUntil: (time: string) => `Valid until ${time}`,
+    preparing: "Preparing the QR code…",
+    waiting: "Waiting for the message",
+    expired: "This QR code has expired.",
+    renew: "New QR code",
+    received: "Agreement received",
+    allReceived: (count: number) =>
+      count > 1
+        ? "Both owners agreed: the follow-up can be launched."
+        : "Agreement received: the follow-up can be launched.",
+    toSheet: "Open the launch sheet",
+    toDashboard: "Back to the overview",
+    simulatedTitle: "WhatsApp is simulated",
+    simulatedBody:
+      "This QR code only holds the message text: it opens no conversation. The button imitates sending it from the owner's phone.",
+    simulate: "Simulate sending from the phone",
+    simulateFor: (name: string) => ` of ${name}`,
+    notReceived: "The message was not taken into account: show a new QR code.",
   },
   validation: {
     invalidControl: "Invalid check-up date.",
