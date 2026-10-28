@@ -172,6 +172,12 @@ export const followupContacts = pgTable("followup_contacts", {
   /** Migration 0017 : accord recueilli au cabinet pour être contacté sur WhatsApp. */
   whatsappOptinAt: timestamp("whatsapp_optin_at", { withTimezone: true }),
   whatsappOptinByMembershipId: uuid("whatsapp_optin_by_membership_id"),
+  /** Migration 0034 : code d'accord du QR code de l'accueil (empreinte seule). */
+  optinCodeHash: text("optin_code_hash"),
+  optinCodeExpiresAt: timestamp("optin_code_expires_at", {
+    withTimezone: true,
+  }),
+  optinCodeByMembershipId: uuid("optin_code_by_membership_id"),
   createdAt,
   updatedAt,
 });

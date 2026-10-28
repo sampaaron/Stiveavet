@@ -7,6 +7,7 @@ import { classifyGraphError } from "@/adapters/whatsapp/cloud-api";
 import { receiveInTx, recordInbound } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/commun/actor";
 import { refuseOwnerMedia } from "@/domains/fichiers/service";
+import { acceptOptInCode, optInCodeIn } from "@/domains/suivis/accord-qr";
 import { acknowledgeFromWhatsApp } from "@/domains/urgences/service";
 import {
   followupContacts,
@@ -395,6 +396,8 @@ export type WebhookResult = {
   statuses: number;
   /** « Bien reçu » des vétérinaires sous une alerte, pris en compte. */
   acknowledgements: number;
+  /** Accords donnés par le QR code de l'accueil (ADR 0051). */
+  optIns: number;
   ignored: number;
 };
 
@@ -410,6 +413,7 @@ export async function handleWebhook(
     messages: 0,
     statuses: 0,
     acknowledgements: 0,
+    optIns: 0,
     ignored: 0,
   };
   for (const entry of payload.entry)
@@ -466,6 +470,16 @@ export async function handleWebhook(
           }
           const media = inboundMedia(message.data);
           const body = inboundText(message.data);
+          // Accord du QR code : noté ou non, le message n'est pas gardé (rien à suivre encore).
+          const code = !media && body ? optInCodeIn(body) : null;
+          if (code) {
+            const accepted = await tx.transaction((inner) =>
+              acceptOptInCode(inner, { code, from: message.data.from }, now),
+            );
+            if (accepted) result.optIns += 1;
+            else result.ignored += 1;
+            continue;
+          }
           const target =
             body || media ? await routeInbound(tx, message.data) : null;
           if (!target) {

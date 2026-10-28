@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Plus, QrCode, ShieldCheck, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useId, useState } from "react";
 
 import type { LaunchSheet } from "@/domains/suivis/lancement";
@@ -210,21 +211,30 @@ export function SheetForm({
               {text.optInGiven(second && secondActive ? 2 : 1)}
             </p>
           ) : (
-            <label className="mt-4 flex items-start gap-3 rounded-[var(--radius-control)] border border-line p-3 text-sm">
-              <input
-                type="checkbox"
-                name="whatsappOptIn"
-                className="mt-0.5 size-4 accent-[var(--color-brand)]"
-                checked={optIn}
-                onChange={(event) => setOptIn(event.target.checked)}
-              />
-              <span>
-                <span className="font-semibold">
-                  {text.optInLabel(second && secondActive ? 2 : 1)}
+            <div className="mt-4 grid gap-2">
+              <label className="flex items-start gap-3 rounded-[var(--radius-control)] border border-line p-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="whatsappOptIn"
+                  className="mt-0.5 size-4 accent-[var(--color-brand)]"
+                  checked={optIn}
+                  onChange={(event) => setOptIn(event.target.checked)}
+                />
+                <span>
+                  <span className="font-semibold">
+                    {text.optInLabel(second && secondActive ? 2 : 1)}
+                  </span>
+                  <span className="block text-ink-muted">{text.optInHint}</span>
                 </span>
-                <span className="block text-ink-muted">{text.optInHint}</span>
-              </span>
-            </label>
+              </label>
+              <Link
+                href={`/app/suivis/${followup.id}/accord`}
+                className="inline-flex items-center gap-1.5 justify-self-start text-sm font-semibold text-brand-ink underline-offset-2 hover:underline"
+              >
+                <QrCode aria-hidden="true" className="size-4" />
+                {text.optInQr}
+              </Link>
+            </div>
           )}
         </SectionCard>
       ) : null}

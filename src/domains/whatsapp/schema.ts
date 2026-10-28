@@ -10,6 +10,8 @@ export const whatsappAccounts = pgTable("whatsapp_accounts", {
   organizationId: uuid("organization_id").primaryKey(),
   wabaId: text("waba_id").notNull(),
   phoneNumberId: text("phone_number_id").notNull(),
+  /** Migration 0034 : numéro public (E.164), pour le QR code d'accord de l'accueil. */
+  displayPhone: text("display_phone"),
   accessTokenSealed: text("access_token_sealed").notNull(),
   connectedByMembershipId: uuid("connected_by_membership_id").notNull(),
   connectedAt: at("connected_at").notNull().defaultNow(),

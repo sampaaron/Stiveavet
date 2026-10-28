@@ -133,6 +133,9 @@ export const dashboard: AppDictionary["dashboard"] = {
     review: "Review the sheet",
     complete: "Complete the sheet",
     forAnimal: (animal: string) => `: ${animal}`,
+    showOptInQr: "Agreement QR code",
+    showOptInQrHint:
+      "The owner scans it and sends the ready message from their phone: the agreement records itself.",
     recordOptIn: "Record the owner's agreement",
     recordOptInHint:
       "Collected at reception: the owner agrees to be contacted on WhatsApp.",

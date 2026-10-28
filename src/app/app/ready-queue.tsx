@@ -1,6 +1,12 @@
 "use client";
 
-import { CircleAlert, MessageCircleCheck, Pill, Rocket } from "lucide-react";
+import {
+  CircleAlert,
+  MessageCircleCheck,
+  Pill,
+  QrCode,
+  Rocket,
+} from "lucide-react";
 import { useActionState, useRef } from "react";
 
 import type { ReadyDraft } from "@/domains/suivis/lancement";
@@ -210,7 +216,20 @@ export function ReadyQueue({
               <div className="flex flex-wrap items-start gap-2 sm:justify-end">
                 {ready && draft.canLaunch ? <LaunchOne draft={draft} /> : null}
                 {draft.blocker === "optin_missing" ? (
-                  <RecordOptIn draft={draft} />
+                  <>
+                    <ButtonLink
+                      href={`/app/suivis/${draft.id}/accord`}
+                      size="sm"
+                      title={text.showOptInQrHint}
+                      icon={<QrCode aria-hidden="true" className="size-4" />}
+                    >
+                      {text.showOptInQr}
+                      <span className="sr-only">
+                        {text.forAnimal(draft.animalName)}
+                      </span>
+                    </ButtonLink>
+                    <RecordOptIn draft={draft} />
+                  </>
                 ) : null}
                 <ButtonLink href={sheet} variant="secondary" size="sm">
                   {ready ? text.review : text.complete}

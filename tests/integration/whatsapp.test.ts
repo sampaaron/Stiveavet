@@ -374,8 +374,8 @@ describe("connexion du numéro par l'inscription intégrée de Meta", () => {
       pin: "246810",
     });
     const { rows } = await admin.query(
-      `SELECT waba_id, phone_number_id, access_token_sealed FROM whatsapp_accounts
-       WHERE organization_id = $1`,
+      `SELECT waba_id, phone_number_id, access_token_sealed, display_phone
+       FROM whatsapp_accounts WHERE organization_id = $1`,
       [org],
     );
     const account = rows[0] as
@@ -388,6 +388,8 @@ describe("connexion du numéro par l'inscription intégrée de Meta", () => {
     expect(account).toMatchObject({
       waba_id: WABA_ID,
       phone_number_id: PHONE_NUMBER_ID,
+      // Numéro public, pour le QR code d'accord de l'accueil (ADR 0051).
+      display_phone: "+33123456789",
     });
     // Jamais en clair en base, et lisible seulement pour ce cabinet.
     expect(account?.access_token_sealed).not.toContain(ACCESS_TOKEN);
@@ -484,12 +486,14 @@ describe("envois et webhooks", () => {
       messages: 1,
       statuses: 0,
       acknowledgements: 0,
+      optIns: 0,
       ignored: 0,
     });
     expect(await deliverWebhook(body)).toEqual({
       messages: 0,
       statuses: 0,
       acknowledgements: 0,
+      optIns: 0,
       ignored: 1,
     });
     const inbound = (await messagesOf(plume)).filter(
@@ -538,6 +542,7 @@ describe("envois et webhooks", () => {
       messages: 0,
       statuses: 0,
       acknowledgements: 0,
+      optIns: 0,
       ignored: 1,
     });
 
@@ -728,6 +733,7 @@ describe("envois et webhooks", () => {
       messages: 0,
       statuses: 0,
       acknowledgements: 0,
+      optIns: 0,
       ignored: 1,
     };
     const inboundBefore = (await messagesOf(plume)).length;
@@ -739,6 +745,7 @@ describe("envois et webhooks", () => {
       messages: 0,
       statuses: 0,
       acknowledgements: 1,
+      optIns: 0,
       ignored: 0,
     });
     // Touché une seconde fois : déjà reçue, plus rien.
@@ -841,6 +848,7 @@ describe("photos et vocaux reçus par WhatsApp", () => {
       messages: 1,
       statuses: 0,
       acknowledgements: 0,
+      optIns: 0,
       ignored: 0,
     });
     // Rejoué : ni second message ni second téléchargement.

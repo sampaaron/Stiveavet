@@ -71,6 +71,8 @@ export const journal = {
       `${actor} a validé des traitements importés`,
     "followup.whatsapp_optin": (actor: string) =>
       `${actor} a noté l'accord du propriétaire pour WhatsApp`,
+    "followup.whatsapp_optin_qr": (actor: string) =>
+      `Le propriétaire a donné son accord pour WhatsApp par le QR code affiché par ${actor}`,
     "followup.launched": (actor: string) => `${actor} a lancé un suivi`,
     "followup.paused": (actor: string) => `${actor} a mis un suivi en pause`,
     "followup.resumed": (actor: string) => `${actor} a repris un suivi`,

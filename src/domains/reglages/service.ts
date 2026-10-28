@@ -21,7 +21,7 @@ import { currentPlan } from "@/domains/facturation/limits";
 import { planDefinition } from "@/domains/facturation/rules";
 import { canReadProtocol } from "@/domains/protocoles/policies";
 import { tokenContext } from "@/domains/whatsapp/connexion";
-import { maskPhone } from "@/domains/whatsapp/numero";
+import { maskPhone, toE164 } from "@/domains/whatsapp/numero";
 import type { WhatsAppSetup } from "@/domains/whatsapp/connexion";
 import {
   animalOwners,
@@ -695,6 +695,8 @@ export function settingsService(deps: {
         const account = {
           wabaId: input.wabaId,
           phoneNumberId: input.phoneNumberId,
+          // Numéro public du cabinet, pour le lien du QR code d'accord (ADR 0051).
+          displayPhone: toE164(result.displayPhone),
           accessTokenSealed: sealed,
           connectedByMembershipId: actor.membershipId,
           connectedAt: new Date(),

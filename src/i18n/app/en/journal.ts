@@ -63,6 +63,8 @@ export const journal: AppDictionary["journal"] = {
       `${actor} validated imported treatments`,
     "followup.whatsapp_optin": (actor: string) =>
       `${actor} recorded the owner's WhatsApp agreement`,
+    "followup.whatsapp_optin_qr": (actor: string) =>
+      `The owner gave their WhatsApp agreement with the QR code shown by ${actor}`,
     "followup.launched": (actor: string) => `${actor} launched a follow-up`,
     "followup.paused": (actor: string) => `${actor} paused a follow-up`,
     "followup.resumed": (actor: string) => `${actor} resumed a follow-up`,
