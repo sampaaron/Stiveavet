@@ -10,6 +10,7 @@ import {
 import type { Locale } from "@/i18n/locales";
 import { isLocale } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
+import { withSafeDbErrors } from "@/server/db/errors";
 import type { Database } from "@/server/db/tenant";
 
 import { demoEmail, isDemoStep } from "./emails";
@@ -24,7 +25,6 @@ export type DemoAccess = { locale: Locale; cabinetName: string };
 type DueEmail = {
   lead_id: string;
   email: string;
-  cabinet_name: string;
   locale: string;
   step: number;
 };
@@ -42,13 +42,15 @@ export function demoService(deps: {
   db: Database;
   email: EmailSender;
   appUrl: string;
+  /** Envoi après la réponse (`after()` de Next) : sa durée ne révèle rien de l'adresse. */
+  defer?: (task: () => Promise<void>) => Promise<void>;
 }) {
-  const { db, email, appUrl } = deps;
+  const { db, email, appUrl, defer = (task) => task() } = deps;
   const url = (path: string) => new URL(path, appUrl).toString();
 
   /** Réserve, envoie puis marque l'étape ; un échec d'envoi libère la réservation. */
   async function send(
-    lead: { id: string; email: string; cabinetName: string; locale: Locale },
+    lead: { id: string; email: string; locale: Locale },
     step: DemoStep,
     accessUrl?: string,
   ): Promise<boolean> {
@@ -62,7 +64,6 @@ export function demoService(deps: {
       await email.send(
         demoEmail(lead.email, step, {
           locale: lead.locale,
-          cabinetName: lead.cabinetName,
           appUrl,
           accessUrl,
           unsubscribeUrl: url(
@@ -85,11 +86,12 @@ export function demoService(deps: {
     return true;
   }
 
-  return {
+  return withSafeDbErrors({
     /**
-     * Enregistre la demande et ouvre la démo. Le premier e-mail part aussitôt ; une nouvelle
-     * demande avec la même adresse renouvelle l'accès sans renvoyer d'e-mail. La réponse est
-     * la même que l'adresse soit connue ou non.
+     * Enregistre la demande et ouvre la démo dans ce navigateur. Le premier e-mail part après
+     * la réponse, avec un lien qui n'est remis qu'à l'adresse : la suite de la séquence attend
+     * un clic sur ce lien (ADR 0036). Une nouvelle demande avec la même adresse renouvelle
+     * l'accès sans renvoyer d'e-mail. La réponse est la même que l'adresse soit connue ou non.
      */
     async capture(
       input: DemoRequest,
@@ -107,22 +109,21 @@ export function demoService(deps: {
       }
 
       const accessToken = createToken();
+      const linkToken = createToken();
       const [lead] = await rows<{ lead_id: string; created: boolean }>(
         db,
-        sql`SELECT * FROM marketing.capture_demo_lead(${input.email}, ${input.cabinetName}, ${input.vetCount}::smallint, ${input.locale}, ${tokenHash(accessToken)})`,
+        sql`SELECT * FROM marketing.capture_demo_lead(${input.email}, ${input.cabinetName}, ${input.vetCount}::smallint, ${input.locale}, ${tokenHash(accessToken)}, ${tokenHash(linkToken)})`,
       );
       if (!lead) throw new Error("Demande de démo non enregistrée");
       if (lead.created)
-        await send(
-          {
-            id: lead.lead_id,
-            email: input.email,
-            cabinetName: input.cabinetName,
-            locale: input.locale,
-          },
-          1,
-          url(`/demo/acces/${accessToken}`),
-        );
+        await defer(async () => {
+          // Un échec d'envoi libère l'étape : le prochain passage la renvoie.
+          await send(
+            { id: lead.lead_id, email: input.email, locale: input.locale },
+            1,
+            url(`/demo/acces/${linkToken}`),
+          );
+        });
       return { status: "captured", accessToken };
     },
 
@@ -132,6 +133,17 @@ export function demoService(deps: {
       const [row] = await rows<{ locale: string; cabinet_name: string }>(
         db,
         sql`SELECT * FROM marketing.demo_access(${tokenHash(token)})`,
+      );
+      if (!row || !isLocale(row.locale)) return null;
+      return { locale: row.locale, cabinetName: row.cabinet_name };
+    },
+
+    /** Lien du premier e-mail : confirme l'adresse et ouvre la démo, sinon null. */
+    async openLink(token: string | undefined): Promise<DemoAccess | null> {
+      if (!isWellFormedToken(token)) return null;
+      const [row] = await rows<{ locale: string; cabinet_name: string }>(
+        db,
+        sql`SELECT * FROM marketing.open_demo_link(${tokenHash(token)})`,
       );
       if (!row || !isLocale(row.locale)) return null;
       return { locale: row.locale, cabinetName: row.cabinet_name };
@@ -163,12 +175,7 @@ export function demoService(deps: {
       for (const row of due) {
         if (!isLocale(row.locale) || !isDemoStep(row.step)) continue;
         const ok = await send(
-          {
-            id: row.lead_id,
-            email: row.email,
-            cabinetName: row.cabinet_name,
-            locale: row.locale,
-          },
+          { id: row.lead_id, email: row.email, locale: row.locale },
           row.step,
         );
         if (ok) sent += 1;
@@ -180,7 +187,7 @@ export function demoService(deps: {
       );
       return { sent, failed, purged: purge?.purged ?? 0 };
     },
-  };
+  });
 }
 
 export type DemoService = ReturnType<typeof demoService>;

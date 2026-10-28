@@ -19,14 +19,20 @@ export const AUTH_POLICY = {
 
 /** Limites de tentatives : [nombre maximal, fenêtre en minutes]. */
 export const RATE_LIMITS = {
-  /** Seuls les échecs comptent : une personne qui se connecte souvent n'est jamais bloquée. */
-  loginFailuresPerAccount: [5, 15],
+  /**
+   * Seuls les échecs comptent : une personne qui se connecte souvent n'est jamais bloquée.
+   * Par compte et par lieu (appareil de confiance ou adresse IP), puis par compte au total.
+   */
+  loginFailuresPerAccountAndPlace: [5, 15],
+  loginFailuresPerAccount: [25, 15],
   loginPerIp: [30, 15],
   unlockFailuresPerAccount: [5, 15],
   /** Codes e-mail envoyés : 5 essais chacun, soit 30 essais par heure au plus. */
   securityCodesPerAccount: [6, 60],
   resetPerAccount: [3, 60],
   resetPerIp: [10, 60],
+  /** Nouveaux mots de passe envoyés depuis un lien, valable ou non. */
+  resetAttemptsPerIp: [20, 60],
   signupPerIp: [5, 60],
 } as const satisfies Record<string, readonly [number, number]>;
 

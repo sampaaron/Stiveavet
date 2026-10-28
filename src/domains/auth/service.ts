@@ -162,22 +162,30 @@ export function authService({
       if (!(await allowed("loginPerIp", origin.ip))) return rateLimited();
 
       const credentials = await repo.credentialsByEmail(address);
-      // Un appareil de confiance a son propre compteur d'échecs : des essais venus d'ailleurs
-      // ne bloquent pas le vétérinaire sur son poste habituel.
-      const trusted =
+      const device =
         credentials && isWellFormedToken(input.deviceToken)
-          ? await repo.isTrustedDevice(
-              tokenHash(input.deviceToken),
-              credentials.userId,
-            )
+          ? tokenHash(input.deviceToken)
+          : null;
+      const trusted =
+        credentials && device
+          ? await repo.isTrustedDevice(device, credentials.userId)
           : false;
-      const failures = await reserveFailure(
-        "loginFailuresPerAccount",
-        trusted && input.deviceToken
-          ? `${address}:${tokenHash(input.deviceToken).toString("hex")}`
-          : address,
-      );
-      if (!failures.ok) return rateLimited(credentials?.userId);
+      // Échecs comptés par compte et par lieu (appareil de confiance, sinon adresse IP) : des
+      // essais venus d'ailleurs ne bloquent pas la personne là où elle se connecte. Hors appareil
+      // de confiance, un plafond par compte, toutes adresses confondues, freine les essais
+      // répartis sur plusieurs adresses (ADR 0036).
+      const place = trusted && device ? device.toString("hex") : origin.ip;
+      const failures = [
+        await reserveFailure(
+          "loginFailuresPerAccountAndPlace",
+          place ? `${address}:${place}` : address,
+        ),
+        ...(trusted
+          ? []
+          : [await reserveFailure("loginFailuresPerAccount", address)]),
+      ];
+      if (failures.some((failure) => !failure.ok))
+        return rateLimited(credentials?.userId);
 
       const passwordOk = await verifyPassword(
         credentials?.passwordHash ?? null,
@@ -197,7 +205,7 @@ export function authService({
         return { status: "invalid" };
       }
 
-      await failures.release();
+      await Promise.all(failures.map((failure) => failure.release()));
 
       const needsCode = memberships.some((m) => VET_ROLES.has(m.role));
       if (needsCode && !trusted) {
@@ -404,13 +412,19 @@ export function authService({
       | { status: "done" }
       | { status: "expired" }
       | { status: "invalid_password"; problems: PasswordProblem[] }
+      | { status: "rate_limited" }
     > {
+      if (!(await allowed("resetAttemptsPerIp", origin.ip)))
+        return { status: "rate_limited" };
       if (!isWellFormedToken(input.token)) return { status: "expired" };
+      const hash = tokenHash(input.token);
+      // Le hachage du mot de passe est coûteux : il n'a lieu que pour un lien encore valable.
+      if (!(await repo.passwordResetValid(hash))) return { status: "expired" };
       const problems = passwordProblems(input.password);
       if (problems.length) return { status: "invalid_password", problems };
 
       const result = await repo.resetPassword(
-        tokenHash(input.token),
+        hash,
         await hashPassword(input.password),
       );
       if (!result) return { status: "expired" };

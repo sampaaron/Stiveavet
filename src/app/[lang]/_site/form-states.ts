@@ -4,6 +4,7 @@ export type DemoErrorCode =
   | "too_long"
   | "cabinet_short"
   | "cabinet_long"
+  | "cabinet_chars"
   | "vets"
   | "rate_limited";
 

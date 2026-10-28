@@ -41,13 +41,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    {
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
-  ],
+  // Toutes les pages, préchargements compris : aucune réponse HTML ne part sans sa CSP, et
+  // la langue n'est jamais reprise d'un en-tête envoyé par le navigateur.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

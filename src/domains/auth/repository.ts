@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 
+import { withSafeDbErrors } from "@/server/db/errors";
 import type { Database } from "@/server/db/tenant";
 
 import type { loginEventKind } from "./schema";
@@ -30,7 +31,7 @@ async function rows<T>(db: Database, query: ReturnType<typeof sql>) {
 }
 
 export function authRepository(db: Database) {
-  return {
+  return withSafeDbErrors({
     async credentialsByEmail(email: string) {
       const [row] = await rows<{ user_id: string; password_hash: string }>(
         db,
@@ -212,7 +213,7 @@ export function authRepository(db: Database) {
         sql`SELECT auth.record_login_event(${event.kind}::login_event_kind, ${event.userId ?? null}, ${event.organizationId ?? null}, ${event.ipHash ?? null}, ${event.userAgent ?? null})`,
       );
     },
-  };
+  });
 }
 
 export type AuthRepository = ReturnType<typeof authRepository>;

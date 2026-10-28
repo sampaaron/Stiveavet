@@ -53,6 +53,14 @@ function tokenFrom(text: string, pattern: RegExp): string {
   return match[1];
 }
 
+const linkIn = (text = "") => tokenFrom(text, /\/demo\/acces\/([\w-]{43})/);
+
+/** Clic sur le lien du premier e-mail reçu par cette adresse : la séquence peut continuer. */
+async function confirm(email: string) {
+  const mail = outbox.sent.find((sent) => sent.to === email);
+  expect(await service().openLink(linkIn(mail?.text))).not.toBeNull();
+}
+
 beforeEach(async () => {
   outbox = new MemoryEmailSender();
   await admin.query("DELETE FROM marketing.demo_leads");
@@ -76,7 +84,16 @@ describe("demande de démo", () => {
     expect(outbox.sent).toHaveLength(1);
     const [mail] = outbox.sent;
     expect(mail?.subject).toBe("Votre démo Stivea Vet est prête");
-    expect(mail?.text).toContain(`${APP_URL}/demo/acces/${result.accessToken}`);
+    expect(mail?.text).not.toContain("Cabinet des Essais");
+    // Le lien de l'e-mail n'est pas le jeton remis au navigateur qui a fait la demande.
+    const link = linkIn(mail?.text);
+    expect(mail?.text).toContain(`${APP_URL}/demo/acces/${link}`);
+    expect(link).not.toBe(result.accessToken);
+    expect(await service().openLink(result.accessToken)).toBeNull();
+    expect(await service().openLink(link)).toEqual({
+      locale: "fr",
+      cabinetName: "Cabinet des Essais",
+    });
     expect(mail?.text).toMatch(/\/fr\/desinscription\?jeton=[\w-]{43}/);
     expect(mail?.headers?.["List-Unsubscribe"]).toMatch(
       /^<http:\/\/localhost:3000\/api\/desinscription\?jeton=[\w-]{43}>$/,
@@ -113,6 +130,8 @@ describe("demande de démo", () => {
       locale: "fr",
       cabinetName: "Nouveau nom",
     });
+    // Le lien reçu par la vraie adresse reste valable.
+    expect(await service().access(linkIn(outbox.sent[0]?.text))).not.toBeNull();
   });
 
   it("refuse un jeton inconnu, mal formé ou expiré", async () => {
@@ -166,9 +185,19 @@ describe("demande de démo", () => {
 });
 
 describe("séquence de cinq e-mails", () => {
+  it("n'envoie que le premier e-mail tant que le lien n'a pas été ouvert", async () => {
+    await service().capture(request("tiers@exemple.test"), null);
+    await ageLead("tiers@exemple.test", 3);
+    expect((await service().dispatch()).sent).toBe(0);
+    await confirm("tiers@exemple.test");
+    expect((await service().dispatch()).sent).toBe(1);
+    expect(outbox.sent).toHaveLength(2);
+  });
+
   it("envoie cinq e-mails sur deux semaines, chacun une seule fois", async () => {
     await service().capture(request("sequence@exemple.test"), null);
     expect(outbox.sent).toHaveLength(1);
+    await confirm("sequence@exemple.test");
 
     let elapsed = 0;
     for (const day of DEMO_SEQUENCE_DAYS.slice(1)) {
@@ -200,6 +229,7 @@ describe("séquence de cinq e-mails", () => {
 
   it("après une longue interruption, n'envoie qu'un e-mail par passage et par jour", async () => {
     await service().capture(request("retard@exemple.test"), null);
+    await confirm("retard@exemple.test");
     await ageLead("retard@exemple.test", 13);
     expect((await service().dispatch()).sent).toBe(1);
     expect((await service().dispatch()).sent).toBe(0);
@@ -261,6 +291,7 @@ describe("séquence de cinq e-mails", () => {
 
   it("deux envois simultanés ne doublent jamais un e-mail", async () => {
     await service().capture(request("course@exemple.test"), null);
+    await confirm("course@exemple.test");
     await ageLead("course@exemple.test", 2);
     const results = await Promise.all([
       service().dispatch(),

@@ -195,6 +195,26 @@ describe("Stive : ce qu'il lit", () => {
     ).toMatchObject({ kind: "appointments" });
   });
 
+  it("un droit retiré s'applique aussitôt à l'historique : l'agenda disparaît", async () => {
+    expectKind(
+      await stive.ask(lea, { question: "Mon point du jour" }),
+      "briefing",
+    );
+    const withoutAgenda: Actor = {
+      ...lea,
+      permissions: new Set(
+        [...lea.permissions].filter(
+          (permission) => permission !== "agenda.read",
+        ),
+      ),
+    };
+    const { entries } = await stive.conversation(withoutAgenda);
+    const last = entries.filter((entry) => entry.author === "stive").at(-1);
+    expect(last).toMatchObject({
+      answer: { kind: "briefing", agenda: null, pendingAppointments: null },
+    });
+  });
+
   it("un dossier rendu privé disparaît de l'historique de ceux qui n'y ont plus accès", async () => {
     const filou = idOf("Filou");
     const summary = expectKind(
