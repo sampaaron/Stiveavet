@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ClipboardPen,
   CalendarDays,
+  ChevronDown,
   CircleAlert,
   Eye,
   FolderOpen,
@@ -64,6 +65,7 @@ import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
 import { ActivityPanel, NextActions } from "./activity-panel";
+import { OperatedToday } from "./operated-today";
 import { ReadyQueue } from "./ready-queue";
 import { AskStiveBar } from "./stive/stive-forms";
 import { triageReasonText } from "./triage-reason";
@@ -577,14 +579,36 @@ function ClinicalLists({
           </ButtonLink>
         }
       >
-        <ul className="-mx-3">
-          {others.map((followup) => (
-            <li key={followup.id}>
-              <FollowupCard followup={toCard(t, locale, followup, now)} />
-            </li>
-          ))}
-        </ul>
-        {others.length === 0 ? <EmptyState title={text.others.empty} /> : null}
+        {others.length === 0 ? (
+          <EmptyState title={text.others.empty} />
+        ) : (
+          // Rien à signaler selon les règles d'alerte du protocole (ADR 0047) : la liste reste
+          // repliée, le vétérinaire n'ouvre que ce qui demande un regard.
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-start gap-3 rounded-[var(--radius-control)] px-1 py-1 [&::-webkit-details-marker]:hidden">
+              <StatusBadge status="normal" />
+              <span className="min-w-0">
+                <span className="block font-semibold">
+                  {text.others.quiet(others.length)}
+                </span>
+                <span className="block text-sm text-ink-muted">
+                  {text.others.quietHint}
+                </span>
+              </span>
+              <ChevronDown
+                aria-hidden="true"
+                className="ml-auto size-4 shrink-0 text-ink-muted transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <ul className="-mx-3 mt-3">
+              {others.map((followup) => (
+                <li key={followup.id}>
+                  <FollowupCard followup={toCard(t, locale, followup, now)} />
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </SectionCard>
     </>
   );
@@ -699,22 +723,33 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
     services.stats().activity(context, now),
   ]);
   // File « Prêts à lancer » (ADR 0046) : pour qui prépare les fiches avec l'accès clinique.
-  const [ready, { lances, echecs }] = await Promise.all([
-    can("followups.launch") && can("clinical.read")
-      ? services.launch().readyQueue(context)
-      : Promise.resolve([]),
-    searchParams,
-  ]);
-  const launchedNow = Number(lances);
-  const failedNow = Number(echecs);
-  const launchNotice =
-    Number.isSafeInteger(launchedNow) &&
-    Number.isSafeInteger(failedNow) &&
-    launchedNow >= 0 &&
-    failedNow >= 0 &&
-    launchedNow + failedNow > 0
-      ? text.ready.done(launchedNow, failedNow)
+  // « Opérés du jour » (ADR 0047) : lus dans dr.veto, pour la même personne.
+  const prepares = can("followups.launch") && can("clinical.read");
+  const [ready, operated, { lances, echecs, preparees, accord }] =
+    await Promise.all([
+      prepares ? services.launch().readyQueue(context) : Promise.resolve([]),
+      prepares
+        ? services.launch().operatedToday(context, now)
+        : Promise.resolve(null),
+      searchParams,
+    ]);
+  const count = (value: unknown) => {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 50
+      ? parsed
       : null;
+  };
+  const launchedNow = count(lances);
+  const failedNow = count(echecs);
+  const preparedNow = count(preparees);
+  const launchNotice =
+    launchedNow !== null && failedNow !== null && launchedNow + failedNow > 0
+      ? text.ready.done(launchedNow, failedNow)
+      : preparedNow !== null && typeof preparees === "string"
+        ? text.operated.done(preparedNow)
+        : accord === "1"
+          ? text.ready.optInRecorded
+          : null;
   // Le point de Stive reprend la vue déjà lue : ni demande comptée, ni échange enregistré.
   const briefing = can("stive.use")
     ? await services.stive().briefing(context, now, today)
@@ -832,6 +867,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
+            {operated?.length ? <OperatedToday animals={operated} /> : null}
             {ready.length > 0 ? <ReadyQueue drafts={ready} now={now} /> : null}
             {clinical ? (
               <ClinicalLists

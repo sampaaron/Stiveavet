@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, Pill, Rocket } from "lucide-react";
+import { CircleAlert, MessageCircleCheck, Pill, Rocket } from "lucide-react";
 import { useActionState, useRef } from "react";
 
 import type { ReadyDraft } from "@/domains/suivis/lancement";
@@ -13,7 +13,7 @@ import { formatRelativeDayTime } from "@/ui/format";
 
 import { ActionMessage } from "./action-message";
 import { initialActionState } from "./action-state";
-import { launchReadyAction } from "./suivis/launch-actions";
+import { launchReadyAction, recordOptInAction } from "./suivis/launch-actions";
 
 /** Ce que le serveur relit : chaque suivi avec les traitements affichés sur sa carte. */
 function items(drafts: ReadyDraft[]) {
@@ -45,6 +45,32 @@ function LaunchOne({ draft }: { draft: ReadyDraft }) {
         {draft.treatments.length
           ? text.launchWithTreatments(draft.treatments.length)
           : text.launch}
+        <span className="sr-only">{text.forAnimal(draft.animalName)}</span>
+      </Button>
+      <ActionMessage state={state} />
+    </form>
+  );
+}
+
+/** Accord WhatsApp recueilli à l'accueil (ADR 0047) : par qui prépare la fiche, en un clic. */
+function RecordOptIn({ draft }: { draft: ReadyDraft }) {
+  const [state, action, pending] = useActionState(
+    recordOptInAction,
+    initialActionState,
+  );
+  const text = useAppText().dashboard.ready;
+  return (
+    <form action={action} className="grid justify-items-start gap-2">
+      <input type="hidden" name="followupId" value={draft.id} />
+      <Button
+        type="submit"
+        size="sm"
+        disabled={pending}
+        aria-busy={pending}
+        title={text.recordOptInHint}
+        icon={<MessageCircleCheck aria-hidden="true" className="size-4" />}
+      >
+        {text.recordOptIn}
         <span className="sr-only">{text.forAnimal(draft.animalName)}</span>
       </Button>
       <ActionMessage state={state} />
@@ -92,6 +118,7 @@ export function ReadyQueue({
   );
   return (
     <SectionCard
+      id="prets-a-lancer"
       title={text.title}
       description={text.description}
       action={launchable.length > 1 ? <LaunchAll drafts={launchable} /> : null}
@@ -182,6 +209,9 @@ export function ReadyQueue({
               </div>
               <div className="flex flex-wrap items-start gap-2 sm:justify-end">
                 {ready && draft.canLaunch ? <LaunchOne draft={draft} /> : null}
+                {draft.blocker === "optin_missing" ? (
+                  <RecordOptIn draft={draft} />
+                ) : null}
                 <ButtonLink href={sheet} variant="secondary" size="sm">
                   {ready ? text.review : text.complete}
                   <span className="sr-only">
