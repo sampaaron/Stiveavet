@@ -130,7 +130,7 @@ export function AskStiveBar({ placeholder }: { placeholder: string }) {
           type="submit"
           disabled={pending}
           aria-busy={pending}
-          className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-accent text-white shadow-[0_6px_16px_-6px_rgb(91_79_224/0.8)] transition-transform hover:scale-105 disabled:opacity-60"
+          className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-accent text-on-strong shadow-[0_6px_16px_-6px_rgb(91_79_224/0.8)] transition-transform hover:scale-105 disabled:opacity-60"
         >
           <Send aria-hidden="true" className="size-5" />
           <span className="sr-only">{text.submit}</span>

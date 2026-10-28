@@ -28,12 +28,22 @@ import {
 } from "@/server/auth/cookies";
 import { requestOrigin } from "@/server/auth/origin";
 import { appDatabase } from "@/server/db/client";
+import { syncColorModeCookie } from "@/server/color-mode";
 import { syncUiLocaleCookie } from "@/server/ui-locale";
 
 import { fields, text } from "@/app/app/form-data";
 
 import type { FormState } from "./form-state";
 import { fieldErrors, passwordErrors } from "./messages";
+
+/** À la connexion, la langue et le mode d'affichage suivent le compte (ADR 0022, 0052). */
+async function syncPreferences(sessionToken: string): Promise<void> {
+  const session = await auth().resolveSession(sessionToken);
+  await Promise.all([
+    syncUiLocaleCookie(session),
+    syncColorModeCookie(session),
+  ]);
+}
 
 export async function loginAction(
   _previous: FormState,
@@ -59,9 +69,7 @@ export async function loginAction(
       return redirect("/connexion/code");
     case "signed_in":
       await setSessionCookie(result.sessionToken, result.sessionExpiresAt);
-      await syncUiLocaleCookie(
-        await auth().resolveSession(result.sessionToken),
-      );
+      await syncPreferences(result.sessionToken);
       return redirect("/app");
   }
 }
@@ -92,7 +100,7 @@ export async function verifyCodeAction(
   await clearAuthCookie("challenge");
   await setSessionCookie(result.sessionToken, result.sessionExpiresAt);
   if (result.deviceToken) await setDeviceCookie(result.deviceToken);
-  await syncUiLocaleCookie(await auth().resolveSession(result.sessionToken));
+  await syncPreferences(result.sessionToken);
   // Après l'inscription, le cabinet arrive directement dans l'installation guidée (cahier §14).
   redirect(form.get("origine") === "inscription" ? "/app/demarrage" : "/app");
 }

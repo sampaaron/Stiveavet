@@ -28,7 +28,7 @@ const tones: Record<
   urgent: {
     icon: CircleAlert,
     className: "border-urgent/25 bg-urgent-soft/70",
-    iconClassName: "bg-urgent text-white",
+    iconClassName: "bg-urgent text-on-strong",
   },
 };
 

@@ -1,6 +1,21 @@
 @import "tailwindcss";
 
 /*
+ * Mode sombre de l'espace cabinet (ADR 0052) : choisi par la personne (`data-mode` sur <html>),
+ * « dark » toujours, « system » quand l'appareil est en sombre.
+ */
+@custom-variant dark {
+  &:where([data-mode="dark"], [data-mode="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-mode="system"], [data-mode="system"] *) {
+      @slot;
+    }
+  }
+}
+
+/*
  * Jetons de design Stivea Vet, issus de la référence visuelle.
  * Le vert est l'accent principal ; ambre et rouge sont réservés aux niveaux de gravité.
  */
@@ -21,6 +36,8 @@
   --color-brand-strong: #066044;
   --color-brand-soft: #dcf5ea;
   --color-brand-ink: #07603f;
+  /* Texte sur un fond plein de couleur (bouton, pastille) : blanc en clair, nuit en sombre. */
+  --color-on-strong: #ffffff;
 
   --color-watch: #87561d;
   --color-watch-soft: #f8eedd;
@@ -46,10 +63,59 @@
 }
 
 /*
+ * Jetons du mode sombre (ADR 0052) : le noir en couleur de fond à la place du blanc, des
+ * textes clairs et les teintes du cabinet éclaircies. Les fonds pleins (bouton, urgence) portent alors un texte nuit : chaque paire
+ * reste au-dessus de 4,5:1.
+ */
+:root {
+  color-scheme: light;
+
+  @variant dark {
+    color-scheme: dark;
+    --color-chrome: #000000;
+    --color-canvas: #000000;
+    --color-canvas-subtle: #0f0f0f;
+    --color-surface: #141414;
+    --color-ink: #f5f5f5;
+    --color-ink-muted: #a3a3a3;
+    --color-line: #2e2e2e;
+    --color-brand: #3fcf98;
+    --color-brand-strong: #6fe0b4;
+    --color-brand-soft: #0f2e21;
+    --color-brand-ink: #8ce8c3;
+    --color-on-strong: #0a0a0a;
+    --color-night-soft: #1c1c1c;
+    --color-watch: #f6c879;
+    --color-watch-soft: #2e2410;
+    --color-urgent: #ff9a85;
+    --color-urgent-soft: #321713;
+    --color-accent: #b4abff;
+    --shadow-card:
+      0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -18px rgb(0 0 0 / 0.8);
+    --shadow-pill: 0 1px 2px rgb(0 0 0 / 0.4);
+  }
+}
+
+/* Teinte de la rubrique (ADR 0033), éclaircie en mode sombre. */
+.section-tint {
+  --section-accent: var(--section-accent-day);
+
+  @variant dark {
+    --section-accent: var(--section-accent-night);
+  }
+}
+
+/*
  * Site public en thème sombre (ADR 0043), dans l'esprit de Limova : nuit verte, textes
  * clairs, cartes en verre fumé. Les contrastes restent au-dessus de 4,5:1 sur la nuit.
  */
 .theme-site {
+  /* Le site garde ses teintes, quel que soit le mode choisi dans l'espace cabinet. */
+  --color-chrome: #0b1512;
+  --color-night-soft: #10231b;
+  --color-brand: #087a54;
+  --color-brand-strong: #066044;
+  --color-on-strong: #ffffff;
   --color-canvas: #07110d;
   --color-canvas-subtle: #0d1c15;
   --color-surface: #0f2019;
@@ -70,6 +136,7 @@
 
 /* Aperçus du logiciel dans le site sombre : ils gardent les couleurs claires de l'application. */
 .theme-site .theme-light {
+  color-scheme: light;
   --color-canvas: #f6f8f7;
   --color-canvas-subtle: #edf2ef;
   --color-surface: #ffffff;
@@ -147,6 +214,10 @@
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 1rem;
+
+    @variant dark {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a7bcb2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
   }
 
   input[type="time"]::-webkit-calendar-picker-indicator {
@@ -285,6 +356,10 @@
 /* Motif de la rubrique : traits fins, fondus vers la gauche et vers le bas. */
 @utility section-motif {
   opacity: 0.22;
+  /* Teintes éclaircies sur la nuit : le motif reste discret. */
+  @variant dark {
+    opacity: 0.12;
+  }
   mask-image:
     linear-gradient(to left, black 25%, transparent 85%),
     linear-gradient(to bottom, black 30%, transparent 95%);

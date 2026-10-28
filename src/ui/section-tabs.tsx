@@ -40,7 +40,7 @@ export function SectionTabs({
           tab.badge === "alerts" && pendingAlerts > 0 ? (
             <>
               {t.nav[tab.label]}
-              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-urgent px-1.5 text-[11px] font-bold text-white tabular-nums">
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-urgent px-1.5 text-[11px] font-bold text-on-strong tabular-nums">
                 <span className="sr-only">
                   {t.alertsPending(pendingAlerts)}
                 </span>

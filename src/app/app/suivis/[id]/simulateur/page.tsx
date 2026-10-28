@@ -129,7 +129,7 @@ export default async function OwnerSimulatorPage({
               <span
                 key={item.role}
                 aria-current="true"
-                className="rounded-full bg-brand px-3 py-1 font-semibold text-white"
+                className="rounded-full bg-brand px-3 py-1 font-semibold text-on-strong"
               >
                 {item.firstName}
               </span>
@@ -160,7 +160,7 @@ export default async function OwnerSimulatorPage({
           aria-label={text.phoneLabel(ownerFirstName)}
           className="flex min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-line bg-surface shadow-[var(--shadow-card)]"
         >
-          <div className="border-b border-line bg-brand px-4 py-3 text-white">
+          <div className="border-b border-line bg-brand px-4 py-3 text-on-strong">
             <p className="font-semibold">{text.practice}</p>
             <p className="text-xs opacity-90">{text.business}</p>
           </div>

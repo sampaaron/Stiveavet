@@ -390,7 +390,7 @@ function TodayBriefing({
           />
           <button
             type="submit"
-            className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-strong text-white shadow-[0_6px_16px_-6px_rgb(8_122_84/0.8)] transition-transform hover:scale-105"
+            className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-strong text-on-strong shadow-[0_6px_16px_-6px_rgb(8_122_84/0.8)] transition-transform hover:scale-105"
           >
             <ArrowRight aria-hidden="true" className="size-5" />
             <span className="sr-only">{text.briefing.searchSubmit}</span>

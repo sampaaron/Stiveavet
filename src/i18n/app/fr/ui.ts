@@ -3,6 +3,18 @@ import { shared } from "./shared";
 /** Composants partagés (src/ui) : badges, conversation, compteurs. */
 export const ui = {
   ...shared,
+  colorMode: {
+    title: "Affichage",
+    description:
+      "Ce choix ne change que votre écran : chaque membre de l'équipe choisit le sien.",
+    legend: "Mode",
+    options: { light: "Clair", dark: "Sombre", system: "Automatique" },
+    hints: {
+      light: "Fond clair, comme aujourd'hui.",
+      dark: "Fond noir, plus doux le soir et au bloc.",
+      system: "Suit le réglage de l'ordinateur ou du téléphone.",
+    },
+  },
   capacity: {
     label: "Suivis actifs",
     valueText: (used: number, included: number) =>

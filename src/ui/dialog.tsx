@@ -52,7 +52,7 @@ function Modal({
         // Un clic sur le fond (hors du contenu) ferme la fenêtre.
         if (event.target === event.currentTarget) onClose();
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-[var(--radius-card)] border border-line bg-surface p-0 text-ink shadow-[var(--shadow-card)] backdrop:bg-ink/30"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-[var(--radius-card)] border border-line bg-surface p-0 text-ink shadow-[var(--shadow-card)] backdrop:bg-ink/30 dark:backdrop:bg-black/60"
     >
       <div className="p-6">
         <div className="flex items-start justify-between gap-4">

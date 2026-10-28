@@ -8,12 +8,15 @@ import {
 } from "@/domains/reglages/content";
 import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
+import { currentColorMode } from "@/server/color-mode";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
 import { SectionCard } from "@/ui/card";
 import { PageSections } from "@/ui/page-sections";
 import { formatDateTime, formatMinutes, toDateTimeInput } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
+
+import { ColorModeCard } from "../color-mode-form";
 
 import {
   AlertSettingsForm,
@@ -34,8 +37,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SettingsPage() {
   const context = await requirePermission("organization.settings");
-  const settings = await services.settings().get(context);
-  const { t, locale } = await appText();
+  const [settings, { t, locale }, colorMode] = await Promise.all([
+    services.settings().get(context),
+    appText(),
+    currentColorMode(),
+  ]);
   const text = t.settings;
 
   const windows = new Map(
@@ -58,6 +64,7 @@ export default async function SettingsPage() {
         label={t.shell.onThisPage}
         sections={(
           [
+            ["affichage", t.ui.colorMode.title],
             ["horaires", text.messageWindows.title],
             ["rendez-vous", text.appointments.title],
             ["consignes", text.instructions.title],
@@ -76,6 +83,8 @@ export default async function SettingsPage() {
             {text.unconfigured.body}
           </AlertBanner>
         ) : null}
+
+        <ColorModeCard t={t} current={colorMode} back="/app/reglages" />
 
         <SectionCard
           id="horaires"

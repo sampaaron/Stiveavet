@@ -14,7 +14,7 @@ export function Card({
     <div
       className={cn(
         !bare &&
-          "rounded-[var(--radius-card)] border border-line/80 bg-surface/92 shadow-[var(--shadow-card),inset_0_1px_0_rgb(255_255_255/0.9)] backdrop-blur-xl",
+          "rounded-[var(--radius-card)] border border-line/80 bg-surface/92 shadow-[var(--shadow-card),inset_0_1px_0_rgb(255_255_255/0.9)] backdrop-blur-xl dark:shadow-[var(--shadow-card),inset_0_1px_0_rgb(255_255_255/0.04)]",
         className,
       )}
       {...props}

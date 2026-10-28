@@ -46,7 +46,7 @@ export function SidebarNav({
   const current = currentSection(sections, pathname);
 
   return (
-    <aside className="text-white sidebar-glow lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+    <aside className="text-white sidebar-glow lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:dark:border-r lg:dark:border-white/8">
       <div className="flex items-center justify-between gap-2 px-4 py-3 lg:px-5 lg:pt-5 lg:pb-4">
         {brand}
         <div className="flex items-center gap-1 lg:hidden">
@@ -127,7 +127,7 @@ export function SidebarNav({
                       {t.nav[section.label]}
                     </span>
                     {count > 0 ? (
-                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-urgent px-1.5 text-[11px] font-bold text-white tabular-nums">
+                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-urgent px-1.5 text-[11px] font-bold text-on-strong tabular-nums">
                         <span className="sr-only">
                           {t.alertsPending(count)}
                         </span>
@@ -196,7 +196,7 @@ export function AlertsBell({
       {count > 0 ? (
         <span
           aria-hidden="true"
-          className="absolute top-1.5 right-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-urgent px-1 text-[10px] font-bold text-white tabular-nums ring-2 ring-surface"
+          className="absolute top-1.5 right-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-urgent px-1 text-[10px] font-bold text-on-strong tabular-nums ring-2 ring-surface"
         >
           {count}
         </span>

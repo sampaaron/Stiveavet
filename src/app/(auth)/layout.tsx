@@ -25,7 +25,9 @@ export default async function AuthLayout({
       title={t.shell.backToSite}
       className="flex items-center gap-3 rounded-[12px]"
     >
-      <LogoMark className={cn("h-10 w-auto", !onDark && "text-night")} />
+      <LogoMark
+        className={cn("h-10 w-auto", !onDark && "text-night dark:text-white")}
+      />
       <span className="text-lg font-bold tracking-tight">
         <span className="sr-only">{t.shell.backToSite} : </span>
         stivea <span className={onDark ? "text-mint" : "text-brand"}>vet</span>
@@ -75,7 +77,7 @@ export default async function AuthLayout({
       </aside>
       <main className="relative flex min-h-screen flex-col items-center justify-center gap-6 bg-[radial-gradient(60rem_30rem_at_100%_0%,color-mix(in_oklab,#8ce8c3_25%,transparent),transparent_70%)] px-4 py-10">
         <div className="lg:hidden">{brand(false)}</div>
-        <div className="w-full max-w-md rounded-[28px] border border-white/80 bg-surface/90 p-6 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_30px_60px_-30px_rgb(8_60_40/0.35)] backdrop-blur-xl sm:p-9">
+        <div className="w-full max-w-md rounded-[28px] border border-white/80 bg-surface/90 p-6 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_30px_60px_-30px_rgb(8_60_40/0.35)] backdrop-blur-xl sm:p-9 dark:border-line">
           {children}
         </div>
         {/* Bascule de langue discrète, sous la carte (ADR 0022). */}
