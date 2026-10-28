@@ -344,6 +344,43 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  // Stive : rendez-vous confirmé et brouillon (e2e du lot 29, un par projet).
+  {
+    ref: "DV-20725",
+    animal: {
+      name: "Tofu",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2024-06-18",
+      weightGrams: 3500,
+    },
+    owners: [
+      { fullName: "Élodie Garnier", phone: "+33639980121", language: "fr" },
+    ],
+    procedure: { label: "Castration", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
+  {
+    ref: "DV-20732",
+    animal: {
+      name: "Grisou",
+      species: "cat",
+      breed: "Chartreux",
+      birthDate: "2023-12-01",
+      weightGrams: 4600,
+    },
+    owners: [
+      { fullName: "Julien Perrin", phone: "+33639980122", language: "fr" },
+    ],
+    procedure: { label: "Castration", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

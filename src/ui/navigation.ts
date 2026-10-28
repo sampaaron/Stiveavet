@@ -10,6 +10,7 @@ import {
   MessagesSquare,
   PawPrint,
   Settings2,
+  Sparkles,
   Sun,
   Users,
 } from "lucide-react";
@@ -81,6 +82,14 @@ export const appNavigation: NavSection[] = [
         icon: Settings2,
         anyOf: ["organization.settings"],
         assistant: "numa",
+      },
+      {
+        href: "/app/stive",
+        label: "stive",
+        icon: Sparkles,
+        // Sans Stive dans la formule, l'administrateur y voit la présentation de l'offre.
+        anyOf: ["stive.use", "billing.manage"],
+        assistant: "stive",
       },
     ],
   },

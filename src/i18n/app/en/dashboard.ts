@@ -139,8 +139,6 @@ export const dashboard: AppDictionary["dashboard"] = {
   quickActions: "Quick actions",
   numa: (animals: number) =>
     `Follows ${animals} ${animals === 1 ? "animal" : "animals"} for the practice. She never makes a diagnosis and escalates whenever in doubt.`,
-  stive:
-    "Your daily briefing will be ready here. Any real action will wait for your confirmation.",
   notFound: {
     title: "This screen is not available yet",
     description:

@@ -18,6 +18,7 @@ import type { Database } from "@/server/db/tenant";
  * avec son horloge et ne garde que des statistiques anonymisées.
  * La tâche d'effacement ne porte pas le suivi en colonne (elle serait effacée avec lui) :
  * seulement son identifiant dans la charge utile.
+ * Le même balayage efface les échanges avec Stive de plus de 30 jours (ADR 0034).
  */
 
 export const SWEEP_KIND = "retention.sweep";
@@ -71,6 +72,19 @@ export function retentionHandlers(deps: {
         ),
       )
       .limit(SWEEP_BATCH);
+    // Échanges avec Stive : effacés 30 jours après leur création (migration 0024).
+    const stive = await tx.execute<{ removed: number }>(
+      sql`SELECT app.purge_stive_messages() AS removed`,
+    );
+    const removed = Number(stive.rows[0]?.removed ?? 0);
+    if (removed > 0)
+      await recordAudit(
+        tx,
+        { organizationId: job.organizationId, membershipId: null },
+        "stive.messages_purged",
+        { type: "organization", id: job.organizationId },
+        { messages: removed },
+      );
     for (const { id } of idle) {
       const result = await tx.execute<{ deleted: boolean }>(
         sql`SELECT app.delete_unused_animal(${id}, ${IDLE_ANIMAL_RETENTION}::interval) AS deleted`,

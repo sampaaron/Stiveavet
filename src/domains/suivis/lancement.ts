@@ -84,6 +84,7 @@ export {
   loadFollowup,
   copyProtocolPlan,
   reminderTreatments,
+  TRANSITIONS,
 } from "./chargement";
 export type {
   StatusChange,

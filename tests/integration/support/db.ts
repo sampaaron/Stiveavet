@@ -58,6 +58,9 @@ export const TENANT_TABLES = [
   "appointment_requests",
   "whatsapp_accounts",
   "webhook_events",
+  "stive_messages",
+  "stive_proposals",
+  "stive_usage",
 ] as const;
 
 export function pools() {
