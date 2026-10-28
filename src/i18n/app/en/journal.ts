@@ -114,6 +114,8 @@ export const journal: AppDictionary["journal"] = {
     "alert.resolved": (actor: string) => `${actor} closed an alert`,
     "alert.reassigned": (actor: string) =>
       `${actor} assigned an alert to another vet`,
+    "alert.forwarded": (actor: string) =>
+      `${actor} passed an alert to watch on to the vet`,
     "job.retried": (actor: string) => `${actor} retried a failed task`,
     "job.cancelled": (actor: string) => `${actor} abandoned a failed task`,
     "followup.test_created": (actor: string) =>

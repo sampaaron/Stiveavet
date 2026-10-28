@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createOrganization } from "../../db/seed/cabinets-fictifs";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
+import { MemoryEmailSender } from "@/adapters/email/memory";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { fakePaymentMandate } from "@/adapters/payments/fake";
 import { conversationsService } from "@/domains/conversations/service";
@@ -14,6 +15,10 @@ import { protocolsService } from "@/domains/protocoles/service";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
+import {
+  alertRecapHandlers,
+  planAlertRecaps,
+} from "@/domains/urgences/recapitulatif";
 import {
   alertHandlers,
   alertsService,
@@ -738,5 +743,239 @@ describe("droits, isolation et garde-fous de la base", () => {
       level: "urgent",
       status: "open",
     });
+  });
+});
+
+describe("l'assistante prend d'abord les alertes « à surveiller » (ADR 0049)", () => {
+  let moka: string;
+
+  beforeAll(async () => {
+    moka = await launchWithConsent("DV-20612");
+  });
+
+  /** Vue d'une alerte pour un membre, dans la liste des alertes en cours. */
+  async function viewOf(membershipId: string, alertId: string) {
+    const views = await alertsApi.open(await actor(membershipId));
+    return views.find((view) => view.id === alertId);
+  }
+
+  async function watchAlert(body: string) {
+    const received = await conversations.receiveOwnerMessage(org, moka, body);
+    expect(received.triage).toBe("watch");
+    return (await alertOfMessage(received.messageId)).id;
+  }
+
+  it("sans le droit donné par l'administrateur, rien ne change", async () => {
+    const alertId = await watchAlert("Elle a un peu vomi ce matin");
+    expect(await viewOf(ids.vet, alertId)).toMatchObject({
+      heldByTeam: false,
+      canForward: false,
+    });
+    expect(await viewOf(ids.assistant, alertId)).toMatchObject({
+      canAcknowledge: false,
+      canForward: false,
+    });
+    const lina = await actor(ids.assistant);
+    expect(await domainError(alertsApi.acknowledge(lina, alertId))).toBe(
+      "forbidden",
+    );
+    expect(await domainError(alertsApi.forward(lina, alertId))).toBe(
+      "not_found",
+    );
+    await alertsApi.resolve(await actor(ids.vet), alertId);
+  });
+
+  it("avec le droit : « Je m'en occupe », puis transmettre au vétérinaire, une seule fois", async () => {
+    await admin.query(
+      "INSERT INTO membership_permissions (organization_id, membership_id, permission) VALUES ($1, $2, 'alerts.watch')",
+      [org, ids.assistant],
+    );
+    const alertId = await watchAlert("Elle a encore vomi");
+    expect(await viewOf(ids.vet, alertId)).toMatchObject({
+      heldByTeam: true,
+      canForward: false,
+    });
+    expect(await viewOf(ids.assistant, alertId)).toMatchObject({
+      heldByTeam: true,
+      canAcknowledge: true,
+      canForward: true,
+      assignees: [],
+    });
+    const lina = await actor(ids.assistant);
+    await alertsApi.acknowledge(lina, alertId);
+    expect(await viewOf(ids.vet, alertId)).toMatchObject({
+      status: "acknowledged",
+      acknowledgedBy: "Lina Asv",
+      heldByTeam: true,
+    });
+
+    await alertsApi.forward(lina, alertId);
+    expect((await alertById(alertId)).status).toBe("open");
+    expect(await viewOf(ids.vet, alertId)).toMatchObject({
+      status: "open",
+      heldByTeam: false,
+      forwardedBy: "Lina Asv",
+    });
+    expect(await viewOf(ids.assistant, alertId)).toMatchObject({
+      canForward: false,
+    });
+    expect(await domainError(alertsApi.forward(lina, alertId))).toBe(
+      "invalid_transition",
+    );
+    // Confier reste une décision de vétérinaire ; un vétérinaire ne « transmet » pas.
+    expect(
+      await domainError(alertsApi.reassign(lina, alertId, ids.admin)),
+    ).toBe("forbidden");
+    expect(
+      await domainError(alertsApi.forward(await actor(ids.admin), alertId)),
+    ).toBe("forbidden");
+
+    const leo = await actor(ids.vet);
+    await alertsApi.acknowledge(leo, alertId);
+    expect(await viewOf(ids.vet, alertId)).toMatchObject({
+      acknowledgedBy: "Dr Léo Vet",
+    });
+    await alertsApi.resolve(leo, alertId);
+    const { rows } = await admin.query(
+      `SELECT actor_membership_id, metadata FROM audit_events
+       WHERE organization_id = $1 AND action = 'alert.forwarded'`,
+      [org],
+    );
+    expect(rows).toEqual([
+      { actor_membership_id: ids.assistant, metadata: { alertId } },
+    ]);
+  });
+
+  it("une urgence ne passe jamais par l'assistante", async () => {
+    const received = await conversations.receiveOwnerMessage(
+      org,
+      moka,
+      "Les points sont lâchés",
+    );
+    expect(received.triage).toBe("urgent");
+    const alertId = (await alertOfMessage(received.messageId)).id;
+    expect(await viewOf(ids.vet, alertId)).toMatchObject({
+      heldByTeam: false,
+    });
+    expect(await viewOf(ids.assistant, alertId)).toMatchObject({
+      canAcknowledge: false,
+      canForward: false,
+    });
+    const lina = await actor(ids.assistant);
+    for (const decision of [
+      alertsApi.acknowledge(lina, alertId),
+      alertsApi.resolve(lina, alertId),
+      alertsApi.forward(lina, alertId),
+    ])
+      expect(await domainError(decision)).toBe("forbidden");
+    // La base refuse aussi de transmettre une urgence.
+    await expect(
+      admin.query(
+        "UPDATE alerts SET forwarded_at = now(), forwarded_by_membership_id = $2 WHERE id = $1",
+        [alertId, ids.assistant],
+      ),
+    ).rejects.toThrow(/alerts_forwarded_watch/);
+    await alertsApi.resolve(await actor(ids.vet), alertId);
+  });
+
+  it("la base fige une transmission et n'en accepte pas sur une alerte close", async () => {
+    const alertId = await watchAlert("Elle a vomi après le repas");
+    await alertsApi.forward(await actor(ids.assistant), alertId);
+    await expect(
+      admin.query(
+        "UPDATE alerts SET forwarded_at = now() - interval '1 minute' WHERE id = $1",
+        [alertId],
+      ),
+    ).rejects.toThrow(/transmission d'alerte figée/);
+    const closed = await watchAlert("Elle a vomi une dernière fois");
+    await alertsApi.resolve(await actor(ids.assistant), closed);
+    await expect(
+      admin.query(
+        "UPDATE alerts SET forwarded_at = now(), forwarded_by_membership_id = $2 WHERE id = $1",
+        [closed, ids.assistant],
+      ),
+    ).rejects.toThrow(/transmission d'alerte refusée/);
+    await alertsApi.resolve(await actor(ids.vet), alertId);
+  });
+
+  it("récapitulatif de 12 h : des nombres et un lien, à chaque vétérinaire concerné", async () => {
+    const held = await watchAlert("Elle a vomi ce midi");
+    const urgent = await conversations.receiveOwnerMessage(
+      org,
+      moka,
+      "Elle saigne beaucoup",
+    );
+    const email = new MemoryEmailSender();
+    const noon = new Date();
+    const handlers = alertRecapHandlers({
+      email,
+      appUrl: "http://localhost:3000",
+      clock: () => noon,
+    });
+    const run = (kind: string, payload: Record<string, string>) => {
+      const handler = handlers[kind];
+      if (!handler) throw new Error("exécutant manquant");
+      return withTenant(appDb, { organizationId: org }, (tx) =>
+        handler({
+          tx,
+          job: {
+            id: randomUUID(),
+            organizationId: org,
+            kind,
+            attempt: 1,
+            followupId: null,
+            payload,
+            idempotencyKey: `test:${randomUUID()}`,
+          },
+        }),
+      );
+    };
+    await run("alert.recap", { slot: "midday" });
+    const { rows } = await admin.query(
+      `SELECT payload FROM scheduled_jobs
+       WHERE organization_id = $1 AND kind = 'alert.recap_mail'`,
+      [org],
+    );
+    const payloads = rows.map(
+      (row: { payload: Record<string, string> }) => row.payload,
+    );
+    // Un e-mail par vétérinaire actif, jamais à l'assistante.
+    expect(payloads.map((payload) => payload.membershipId).sort()).toEqual(
+      [ids.admin, ids.vet, ids.vet2].sort(),
+    );
+    for (const payload of payloads) await run("alert.recap_mail", payload);
+
+    const leoEmail = `uv-${tag}@essai.test`;
+    const recap = email.lastTo(leoEmail);
+    expect(recap?.subject).toBe(
+      "Stivea Vet : le point de 12 h sur les alertes",
+    );
+    expect(recap?.text).toContain(
+      "1 alerte « à surveiller » prise en charge par l'équipe",
+    );
+    expect(recap?.text).toMatch(/urgences? en cours/);
+    expect(recap?.text).toMatch(/closes? par l'équipe depuis hier 18 h/);
+    expect(recap?.text).toContain("http://localhost:3000/app/alertes");
+    // Ni animal, ni message, ni numéro.
+    const { rows: names } = await admin.query(
+      "SELECT a.name FROM followups f JOIN animals a ON a.id = f.animal_id WHERE f.id = $1",
+      [moka],
+    );
+    const animal = (names[0] as { name: string } | undefined)?.name ?? "";
+    for (const message of email.sent) {
+      expect(message.text).not.toContain(animal);
+      expect(message.text).not.toMatch(/vomi|saigne|\+33/);
+    }
+    // Zoé ne lit que ses dossiers : rien à lui signaler, aucun e-mail.
+    expect(email.lastTo(`uz-${tag}@essai.test`)).toBeUndefined();
+
+    const lou = await actor(ids.admin);
+    await alertsApi.resolve(lou, held);
+    await alertsApi.resolve(lou, (await alertOfMessage(urgent.messageId)).id);
+  });
+
+  it("le planificateur n'inscrit le récapitulatif qu'une fois par créneau", async () => {
+    await planAlertRecaps(appDb);
+    expect(await planAlertRecaps(appDb)).toBe(0);
   });
 });

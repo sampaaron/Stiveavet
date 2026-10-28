@@ -18,6 +18,8 @@ export const dossier = {
     "alerte-recue": "Réception confirmée : l'escalade est annulée.",
     "alerte-close": "Alerte close.",
     "alerte-confiee": "Alerte confiée : le vétérinaire choisi est prévenu.",
+    "alerte-transmise":
+      "Alerte transmise : le vétérinaire la retrouve dans « À traiter ».",
   },
   header: {
     responsible: "Responsable :",

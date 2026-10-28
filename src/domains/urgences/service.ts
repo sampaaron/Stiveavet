@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
   and,
@@ -34,6 +34,7 @@ import type { DeadJobHandler, JobHandler } from "@/domains/taches/worker";
 import type { WhatsAppProvider } from "@/domains/whatsapp/connexion";
 import { renderTemplate } from "@/domains/whatsapp/modeles";
 import { alertPhoneInput, maskPhone } from "@/domains/whatsapp/numero";
+import { fingerprint } from "@/server/crypto/fingerprint";
 import {
   acknowledgements,
   alerts,
@@ -80,6 +81,8 @@ import type { TriageLevel } from "./triage";
  *   « Urgent » : alerte WhatsApp (simulée) immédiate, puis escalade aux autres vétérinaires
  *   à l'heure réglée (3 à 5 h) sans accusé de réception, jamais avant.
  * - Les consignes d'urgence partent au propriétaire tout de suite, sans attendre l'escalade.
+ * - Si l'administrateur l'a permis (droit `alerts.watch`), l'assistante prend d'abord en
+ *   charge les alertes « à surveiller » ; jamais une urgence (ADR 0049).
  * Le journal et les tâches ne portent que des identifiants et des codes.
  */
 
@@ -98,11 +101,24 @@ export type AlertView = {
   createdAt: Date;
   escalateAt: Date | null;
   escalatedAt: Date | null;
+  /** Dernier accusé de réception (ou « Je m'en occupe » de l'assistante). */
   acknowledgedBy: string | null;
   acknowledgedAt: Date | null;
   resolvedBy: string | null;
   resolvedAt: Date | null;
+  /** « Transmettre au vétérinaire » par l'assistante (alerte « à surveiller »). */
+  forwardedBy: string | null;
+  forwardedAt: Date | null;
+  /**
+   * Alerte « à surveiller » d'abord confiée à l'équipe : une assistante autorisée lit le
+   * dossier, et ni elle ni un vétérinaire ne l'a encore rendue ou prise. Le vétérinaire la
+   * retrouve dans la page Alertes et dans le récapitulatif, pas dans « À traiter ».
+   */
+  heldByTeam: boolean;
+  /** Accuser réception (ou « Je m'en occupe ») et clore : vétérinaire, ou assistante autorisée. */
   canAcknowledge: boolean;
+  /** « Transmettre au vétérinaire » : assistante autorisée, une fois par alerte. */
+  canForward: boolean;
   /** Vétérinaires à qui confier l'alerte (accès clinique au dossier), destinataire compris. */
   assignees: { id: string; name: string }[];
   targetMembershipId: string;
@@ -122,6 +138,221 @@ const ALERT_DELIVERY_JOB = "alert.deliver";
  * en simulation, rien ne sort. Avec WhatsApp réel, l'alerte exige son numéro.
  */
 const SIMULATED_ALERT_PHONE = "+33600000000";
+
+/** Accusé de réception d'une alerte, au nom de l'acteur ; l'escalade prévue est abandonnée. */
+async function acknowledgeInTx(
+  tx: TenantTransaction,
+  actor: Actor,
+  alert: typeof alerts.$inferSelect,
+) {
+  await tx
+    .insert(acknowledgements)
+    .values({
+      organizationId: actor.organizationId,
+      alertId: alert.id,
+      membershipId: actor.membershipId,
+    })
+    .onConflictDoNothing();
+  await tx
+    .update(scheduledJobs)
+    .set({ status: "cancelled", finishedAt: new Date() })
+    .where(
+      and(
+        eq(scheduledJobs.kind, "alert.escalate"),
+        eq(scheduledJobs.status, "pending"),
+        sql`${scheduledJobs.payload} ->> 'alertId' = ${alert.id}`,
+      ),
+    );
+}
+
+/** Membres actifs du cabinet et leurs droits (vétérinaires et assistantes). */
+async function activeTeam(tx: TenantTransaction) {
+  const rows = await tx
+    .select({
+      id: memberships.id,
+      userId: memberships.userId,
+      role: memberships.role,
+      name: users.displayName,
+      email: users.email,
+      permission: membershipPermissions.permission,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(
+      membershipPermissions,
+      eq(membershipPermissions.membershipId, memberships.id),
+    )
+    .where(and(isNull(memberships.deactivatedAt), isNull(users.disabledAt)))
+    .orderBy(asc(users.displayName));
+  const team = new Map<
+    string,
+    {
+      id: string;
+      userId: string;
+      role: (typeof rows)[number]["role"];
+      name: string;
+      email: string;
+      permissions: Set<PermissionKey>;
+    }
+  >();
+  for (const row of rows) {
+    const member = team.get(row.id) ?? {
+      id: row.id,
+      userId: row.userId,
+      role: row.role,
+      name: row.name,
+      email: row.email,
+      permissions: new Set<PermissionKey>(),
+    };
+    if (row.permission && isPermissionKey(row.permission))
+      member.permissions.add(row.permission);
+    team.set(row.id, member);
+  }
+  return [...team.values()];
+}
+
+export type TeamMember = Awaited<ReturnType<typeof activeTeam>>[number];
+
+/** Assistante qui peut prendre en charge une alerte « à surveiller » de ce dossier. */
+function watchHandlers(
+  team: readonly TeamMember[],
+  facts: Parameters<typeof followupAccess>[1],
+): TeamMember[] {
+  return team.filter(
+    (member) =>
+      !VET_ROLES.has(member.role) &&
+      member.permissions.has("alerts.watch") &&
+      followupAccess(
+        { membershipId: member.id, permissions: member.permissions },
+        facts,
+      ) === "clinical",
+  );
+}
+
+/**
+ * Alerte « à surveiller » encore entre les mains de l'équipe (voir `AlertView.heldByTeam`).
+ * Une urgence n'est jamais confiée à l'assistante.
+ */
+function isHeldByTeam(
+  alert: {
+    level: AlertLevel;
+    status: AlertStatus;
+    forwardedAt: Date | null;
+  },
+  acknowledgedByVet: boolean,
+  handlers: number,
+): boolean {
+  return (
+    alert.level === "watch" &&
+    alert.status !== "resolved" &&
+    alert.forwardedAt === null &&
+    !acknowledgedByVet &&
+    handlers > 0
+  );
+}
+
+/** Données utiles au récapitulatif : alertes et équipe, sans contenu clinique. */
+export const alertTeam = { activeTeam, watchHandlers, isHeldByTeam };
+
+/**
+ * Bouton « Bien reçu » de l'alerte WhatsApp (ADR 0049) : la réponse rapide renvoie ce jeton,
+ * lié à une seule livraison et signé avec la clé des empreintes ; impossible à deviner.
+ */
+const ACK_PAYLOAD = /^ack:([0-9a-f-]{36}):([0-9a-f]{32})$/;
+
+export function alertAckPayload(deliveryId: string): string {
+  return `ack:${deliveryId}:${fingerprint(`alert-ack:${deliveryId}`).slice(0, 32)}`;
+}
+
+/** Livraison désignée par un jeton valide ; null sinon. */
+export function alertAckDelivery(payload: string): string | null {
+  const match = ACK_PAYLOAD.exec(payload);
+  if (!match?.[1] || !match[2] || !uuid.safeParse(match[1]).success)
+    return null;
+  const expected = Buffer.from(alertAckPayload(match[1]));
+  const received = Buffer.from(payload);
+  return expected.length === received.length &&
+    timingSafeEqual(expected, received)
+    ? match[1]
+    : null;
+}
+
+/** Un « Bien reçu » ne vaut que pour une alerte envoyée il y a moins de 24 heures. */
+const ACK_VALIDITY_MS = 24 * 3_600_000;
+
+/**
+ * « Bien reçu » touché sous l'alerte WhatsApp : accuse réception au nom du vétérinaire qui
+ * l'a reçue, comme dans Stivea Vet. Le message doit venir du numéro d'alerte de ce
+ * vétérinaire, avec le jeton de cette livraison, et le vétérinaire doit lire le dossier en
+ * clinique. Tout le reste est ignoré sans rien dire (le prestataire ne voit qu'un 200).
+ */
+export async function acknowledgeFromWhatsApp(
+  tx: TenantTransaction,
+  input: { payload: string; from: string | undefined },
+  now = new Date(),
+): Promise<boolean> {
+  const deliveryId = alertAckDelivery(input.payload);
+  if (!deliveryId || !input.from) return false;
+  const [row] = await tx
+    .select({
+      alertId: alerts.id,
+      status: notificationDeliveries.status,
+      sentAt: notificationDeliveries.sentAt,
+      membershipId: memberships.id,
+    })
+    .from(notificationDeliveries)
+    .innerJoin(alerts, eq(alerts.id, notificationDeliveries.alertId))
+    .innerJoin(
+      memberships,
+      eq(memberships.id, notificationDeliveries.recipientMembershipId),
+    )
+    .where(
+      and(
+        eq(notificationDeliveries.id, deliveryId),
+        eq(notificationDeliveries.channel, "whatsapp"),
+        eq(memberships.alertPhone, `+${input.from}`),
+      ),
+    );
+  if (
+    !row?.sentAt ||
+    !["sent", "delivered"].includes(row.status) ||
+    now.getTime() - row.sentAt.getTime() > ACK_VALIDITY_MS
+  )
+    return false;
+  const member = (await activeTeam(tx)).find(
+    (entry) => entry.id === row.membershipId,
+  );
+  if (!member || !VET_ROLES.has(member.role)) return false;
+  const [alert] = await tx
+    .select()
+    .from(alerts)
+    .where(eq(alerts.id, row.alertId))
+    .for("update");
+  // Déjà reçue ou close : le bouton ne fait plus rien.
+  if (!alert || (alert.status !== "open" && alert.status !== "escalated"))
+    return false;
+  const actor: Actor = {
+    organizationId: alert.organizationId,
+    userId: member.userId,
+    membershipId: member.id,
+    role: member.role,
+    permissions: member.permissions,
+  };
+  const followup = await loadFollowup(tx, actor, alert.followupId);
+  if (followup.access !== "clinical") return false;
+  await acknowledgeInTx(tx, actor, alert);
+  await tx
+    .update(alerts)
+    .set({ status: "acknowledged" })
+    .where(eq(alerts.id, alert.id));
+  await auditFollowup(tx, actor, "alert.acknowledged", alert.followupId, {
+    alertId: alert.id,
+    level: alert.level,
+    escalated: alert.status === "escalated",
+    via: "whatsapp",
+  });
+  return true;
+}
 
 /** Vétérinaire prévenu en premier : responsable aux heures du cabinet, sinon la garde. */
 async function recipientFor(
@@ -357,7 +588,8 @@ export async function emergencyGuidance(
  * Tâches `alert.notify`, `alert.escalate` et `alert.deliver`. Chaque alerte WhatsApp à un
  * vétérinaire est une livraison, envoyée par sa propre tâche (un seul appel au prestataire
  * par tentative, ADR 0024) : le modèle `alerte_urgente` ou `alerte_escalade`, sans aucun
- * détail médical, au numéro professionnel réglé dans son profil.
+ * détail médical, au numéro professionnel réglé dans son profil, avec le bouton « Bien reçu »
+ * propre à cette livraison (ADR 0049).
  */
 /** Motif d'échec d'une livraison d'alerte selon le code de la tâche abandonnée. */
 const DELIVERY_FAILURES: Partial<Record<JobErrorCode, string>> = {
@@ -495,6 +727,8 @@ export function alertHandlers(deps: {
           key: alert.key,
           language: delivery.locale,
           params: alert.params,
+          // « Bien reçu » : accusé de réception sans ouvrir Stivea Vet (ADR 0049).
+          quickReply: alertAckPayload(delivery.id),
         },
         reference: delivery.id,
       }));
@@ -630,77 +864,25 @@ export function alertsService(db: Database) {
     if (!alert) throw new DomainError("not_found");
     const followup = await loadFollowup(tx, actor, alert.followupId);
     if (followup.access !== "clinical") throw new DomainError("not_found");
-    if (!VET_ROLES.has(actor.role)) throw new DomainError("forbidden");
+    // L'assistante autorisée agit sur une alerte « à surveiller », jamais sur une urgence.
+    if (
+      !VET_ROLES.has(actor.role) &&
+      !(alert.level === "watch" && actor.permissions.has("alerts.watch"))
+    )
+      throw new DomainError("forbidden");
     return alert;
-  }
-
-  async function acknowledgeInTx(
-    tx: TenantTransaction,
-    actor: Actor,
-    alert: typeof alerts.$inferSelect,
-  ) {
-    await tx
-      .insert(acknowledgements)
-      .values({
-        organizationId: actor.organizationId,
-        alertId: alert.id,
-        membershipId: actor.membershipId,
-      })
-      .onConflictDoNothing();
-    // L'escalade prévue est abandonnée.
-    await tx
-      .update(scheduledJobs)
-      .set({ status: "cancelled", finishedAt: new Date() })
-      .where(
-        and(
-          eq(scheduledJobs.kind, "alert.escalate"),
-          eq(scheduledJobs.status, "pending"),
-          sql`${scheduledJobs.payload} ->> 'alertId' = ${alert.id}`,
-        ),
-      );
   }
 
   /** Vétérinaires actifs du cabinet et leurs droits, pour choisir à qui confier une alerte. */
   async function activeVets(tx: TenantTransaction) {
-    const rows = await tx
-      .select({
-        id: memberships.id,
-        name: users.displayName,
-        permission: membershipPermissions.permission,
-      })
-      .from(memberships)
-      .innerJoin(users, eq(users.id, memberships.userId))
-      .leftJoin(
-        membershipPermissions,
-        eq(membershipPermissions.membershipId, memberships.id),
-      )
-      .where(
-        and(
-          inArray(memberships.role, [...VET_ROLES]),
-          isNull(memberships.deactivatedAt),
-        ),
-      )
-      .orderBy(asc(users.displayName));
-    const vets = new Map<
-      string,
-      { id: string; name: string; permissions: Set<PermissionKey> }
-    >();
-    for (const row of rows) {
-      const vet = vets.get(row.id) ?? {
-        id: row.id,
-        name: row.name,
-        permissions: new Set<PermissionKey>(),
-      };
-      if (row.permission && isPermissionKey(row.permission))
-        vet.permissions.add(row.permission);
-      vets.set(row.id, vet);
-    }
-    return [...vets.values()];
+    return (await activeTeam(tx)).filter((member) =>
+      VET_ROLES.has(member.role),
+    );
   }
 
   /** Seul un vétérinaire qui lit le dossier en clinique peut recevoir l'alerte. */
   function assigneesOf(
-    vets: Awaited<ReturnType<typeof activeVets>>,
+    vets: readonly TeamMember[],
     facts: Parameters<typeof followupAccess>[1],
   ) {
     return vets
@@ -744,6 +926,8 @@ export function alertsService(db: Database) {
         escalatedAt: alerts.escalatedAt,
         resolvedAt: alerts.resolvedAt,
         resolvedByMembershipId: alerts.resolvedByMembershipId,
+        forwardedAt: alerts.forwardedAt,
+        forwardedByMembershipId: alerts.forwardedByMembershipId,
         targetMembershipId: alerts.targetMembershipId,
         responsibleMembershipId: followups.responsibleMembershipId,
         isPrivate: followups.isPrivate,
@@ -797,6 +981,7 @@ export function alertsService(db: Database) {
       .select({
         alertId: acknowledgements.alertId,
         name: users.displayName,
+        role: memberships.role,
         at: acknowledgements.acknowledgedAt,
       })
       .from(acknowledgements)
@@ -810,11 +995,15 @@ export function alertsService(db: Database) {
       )
       .orderBy(asc(acknowledgements.acknowledgedAt));
     const isVet = VET_ROLES.has(actor.role);
-    const vets = await activeVets(tx);
+    const handlesWatch = !isVet && actor.permissions.has("alerts.watch");
+    const team = await activeTeam(tx);
+    const vets = team.filter((member) => VET_ROLES.has(member.role));
     const resolverIds = [
       ...new Set(
         rows.flatMap((row) =>
-          row.resolvedByMembershipId ? [row.resolvedByMembershipId] : [],
+          [row.resolvedByMembershipId, row.forwardedByMembershipId].filter(
+            (id): id is string => id !== null,
+          ),
         ),
       ),
     ];
@@ -838,8 +1027,16 @@ export function alertsService(db: Database) {
     return rows
       .filter((row) => followupAccess(actor, factsOf(row)) === "clinical")
       .map((row) => {
-        const ack = acks.find((entry) => entry.alertId === row.id);
+        const own = acks.filter((entry) => entry.alertId === row.id);
+        const ack = own.at(-1);
         const open = row.status !== "resolved";
+        const facts = factsOf(row);
+        const heldByTeam = isHeldByTeam(
+          row,
+          own.some((entry) => VET_ROLES.has(entry.role)),
+          watchHandlers(team, facts).length,
+        );
+        const canAct = isVet || (handlesWatch && row.level === "watch");
         return {
           id: row.id,
           followupId: row.followupId,
@@ -857,8 +1054,18 @@ export function alertsService(db: Database) {
             ? (resolvers.get(row.resolvedByMembershipId) ?? null)
             : null,
           resolvedAt: row.resolvedAt,
-          canAcknowledge: isVet && open,
-          assignees: isVet && open ? assigneesOf(vets, factsOf(row)) : [],
+          forwardedBy: row.forwardedByMembershipId
+            ? (resolvers.get(row.forwardedByMembershipId) ?? null)
+            : null,
+          forwardedAt: row.forwardedAt,
+          heldByTeam,
+          canAcknowledge: canAct && open,
+          canForward:
+            handlesWatch &&
+            open &&
+            row.level === "watch" &&
+            row.forwardedAt === null,
+          assignees: isVet && open ? assigneesOf(vets, facts) : [],
           targetMembershipId: row.targetMembershipId,
         };
       });
@@ -957,7 +1164,10 @@ export function alertsService(db: Database) {
 
     ofFollowupIn,
 
-    /** « Accuser réception » : arrête l'escalade d'une urgence. Décision de vétérinaire. */
+    /**
+     * « Accuser réception » : arrête l'escalade d'une urgence. Décision de vétérinaire ; sur
+     * une alerte « à surveiller », l'assistante autorisée la prend en charge (« Je m'en occupe »).
+     */
     async acknowledge(actor: Actor, alertId: string) {
       assertPermission(actor, "clinical.read");
       return run(actor, async (tx) => {
@@ -984,6 +1194,7 @@ export function alertsService(db: Database) {
      */
     async reassign(actor: Actor, alertId: string, membershipId: string) {
       assertPermission(actor, "clinical.read");
+      if (!VET_ROLES.has(actor.role)) throw new DomainError("forbidden");
       if (!uuid.safeParse(membershipId).success)
         throw new DomainError("invalid_target");
       return run(actor, async (tx) => {
@@ -1011,6 +1222,33 @@ export function alertsService(db: Database) {
           alertId: alert.id,
           from: alert.targetMembershipId,
           to: membershipId,
+        });
+        return alert.followupId;
+      });
+    },
+
+    /**
+     * « Transmettre au vétérinaire » : l'assistante rend une alerte « à surveiller » au
+     * vétérinaire prévenu, qui la retrouve dans « À traiter » sans accusé de réception.
+     */
+    async forward(actor: Actor, alertId: string, now = new Date()) {
+      assertPermission(actor, "clinical.read");
+      assertPermission(actor, "alerts.watch");
+      if (VET_ROLES.has(actor.role)) throw new DomainError("forbidden");
+      return run(actor, async (tx) => {
+        const alert = await lockAlert(tx, actor, alertId);
+        if (alert.status === "resolved" || alert.forwardedAt)
+          throw new DomainError("invalid_transition");
+        await tx
+          .update(alerts)
+          .set({
+            status: "open",
+            forwardedAt: now,
+            forwardedByMembershipId: actor.membershipId,
+          })
+          .where(eq(alerts.id, alert.id));
+        await auditFollowup(tx, actor, "alert.forwarded", alert.followupId, {
+          alertId: alert.id,
         });
         return alert.followupId;
       });

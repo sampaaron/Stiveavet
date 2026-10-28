@@ -23,6 +23,7 @@ Les droits sont des permissions précises, attribuées à chaque membre. « oui 
 | Consulter l'agenda (`agenda.read`)                                                            | oui                        | oui          | oui                   |
 | Envoyer une capture d'agenda (créneaux libres) (`agenda.capture`)                             | oui                        | oui          | sur décision          |
 | Utiliser Stive, l'assistant IA interne (`stive.use`)                                          | oui                        | oui          | sur décision          |
+| Prendre en charge les alertes « à surveiller » (`alerts.watch`)                               | oui                        | non          | sur décision          |
 
 ## Accès à un dossier (droits par défaut)
 

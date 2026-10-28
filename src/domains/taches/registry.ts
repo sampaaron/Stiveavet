@@ -15,6 +15,10 @@ import {
   retentionHandlers,
 } from "@/domains/suivis/conservation";
 import { followupEndHandlers } from "@/domains/suivis/rappels";
+import {
+  alertRecapHandlers,
+  planAlertRecaps,
+} from "@/domains/urgences/recapitulatif";
 import { alertHandlers } from "@/domains/urgences/service";
 import type { WhatsAppProvider } from "@/domains/whatsapp/connexion";
 import { sendHandlers } from "@/domains/whatsapp/envoi";
@@ -36,7 +40,8 @@ import type {
  * stockage objet local ; conservation des données au lot 17 (ADR 0020) ; offre d'engagement
  * annuel au lot 20 (ADR 0023) ; envois WhatsApp, simulés ou par l'API de Meta selon la
  * configuration, au lot 21 (ADR 0024) ; photos et vocaux reçus par WhatsApp au lot 22 (ADR 0025) ;
- * échéances et prélèvements quotidiens, hors des pages (ADR 0040).
+ * échéances et prélèvements quotidiens, hors des pages (ADR 0040) ; récapitulatif des alertes
+ * à 12 h et à 18 h (ADR 0049).
  */
 export function jobRegistry(deps: {
   whatsapp: WhatsAppProvider;
@@ -63,6 +68,7 @@ export function jobRegistry(deps: {
       ...alerts.handlers,
       ...downloads.handlers,
       ...failureEmailHandlers({ email, appUrl: deps.appUrl }),
+      ...alertRecapHandlers({ email, appUrl: deps.appUrl }),
       ...followupEndHandlers(),
       ...mediaHandlers({ storage: lazyObjectStorage, ai: deps.ai }),
       ...retentionHandlers({ storage: lazyObjectStorage }),
@@ -79,6 +85,7 @@ export function jobRegistry(deps: {
 export const JOB_PLANNERS: readonly JobPlanner[] = [
   planRetentionSweeps,
   planBillingSyncs,
+  planAlertRecaps,
 ];
 
 export const OUTBOX_ROUTES: Readonly<Record<string, OutboxRoute>> = {};

@@ -2,11 +2,13 @@
 export const alerts = {
   title: "Alertes",
   description:
-    "Messages de propriétaires classés urgents ou à surveiller par les règles du triage. Numa ne pose aucun diagnostic : chaque alerte attend la décision d'un vétérinaire.",
+    "Messages de propriétaires classés urgents ou à surveiller par les règles du triage. Numa ne pose aucun diagnostic : chaque alerte attend une décision de l'équipe, et une urgence, toujours celle d'un vétérinaire.",
   done: {
     recue: "Réception confirmée : l'escalade est annulée.",
     close: "Alerte close.",
     confiee: "Alerte confiée : le vétérinaire choisi est prévenu.",
+    transmise:
+      "Alerte transmise : le vétérinaire la retrouve dans « À traiter ».",
   },
   views: {
     label: "Afficher",
@@ -51,6 +53,12 @@ export const alerts = {
     open: (target: string) => `Prévenu : ${target}.`,
     escalated: (time: string | null) =>
       `Sans accusé de réception, toute l'équipe vétérinaire a été alertée${time ? ` à ${time}` : ""}.`,
+    acknowledgedWatch: (by: string | null, time: string | null) =>
+      `Prise en charge par ${by ?? "l'équipe"}${time ? ` à ${time}` : ""}.`,
+    withTeam: (target: string) =>
+      `Prise en charge d'abord par l'équipe ; ${target} la voit dans le récapitulatif de 12 h et de 18 h.`,
+    forwarded: (by: string | null, target: string, time: string) =>
+      `Transmise à ${target} par ${by ?? "l'équipe"} à ${time}.`,
     acknowledged: (by: string | null, time: string | null) =>
       `Réception confirmée par ${by ?? "un vétérinaire"}${time ? ` à ${time}` : ""}. L'escalade est annulée.`,
     resolved: (by: string | null, date: string | null) =>
@@ -59,6 +67,8 @@ export const alerts = {
   buttons: {
     acknowledge: "Accuser réception",
     resolve: "Clore l'alerte",
+    takeCharge: "Je m'en occupe",
+    forward: "Transmettre au vétérinaire",
   },
   reassign: {
     label: "Confier à",

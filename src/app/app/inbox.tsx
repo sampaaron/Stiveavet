@@ -34,19 +34,27 @@ function alertRank(alert: AlertView): number {
   return pending ? 2 : 4;
 }
 
+/**
+ * Lignes de la boîte. Pour un vétérinaire, une alerte « à surveiller » que l'équipe a d'abord
+ * en main (ADR 0049) n'y figure pas, ni la réponse attendue sur ce dossier : il la retrouve
+ * dans la page Alertes et dans le récapitulatif de 12 h et de 18 h.
+ */
 export function inboxItems(input: {
   alerts: AlertView[];
   followups: DashboardFollowup[];
   failures: FailedJobView[];
+  forVet: boolean;
 }): Item[] {
   const alerted = new Set(input.alerts.map((alert) => alert.followupId));
   return [
-    ...input.alerts.map((alert) => ({
-      kind: "alert" as const,
-      at: alert.createdAt,
-      rank: alertRank(alert),
-      alert,
-    })),
+    ...input.alerts
+      .filter((alert) => !(input.forVet && alert.heldByTeam))
+      .map((alert) => ({
+        kind: "alert" as const,
+        at: alert.createdAt,
+        rank: alertRank(alert),
+        alert,
+      })),
     ...input.followups
       .filter((followup) => followup.awaitingReply && !alerted.has(followup.id))
       .map((followup) => ({
@@ -74,12 +82,15 @@ export function Inbox({
   now,
   items,
   can,
+  withTeam = 0,
 }: {
   t: AppDictionary;
   locale: Locale;
   now: Date;
   items: Item[];
   can: { reply: boolean; agenda: boolean };
+  /** Alertes « à surveiller » que l'équipe a d'abord en main (vétérinaire seulement). */
+  withTeam?: number;
 }) {
   const text = t.dashboard.inbox;
   const shown = items.slice(0, MAX_ITEMS);
@@ -226,6 +237,17 @@ export function Inbox({
             className="font-semibold text-brand-ink underline-offset-2 hover:underline"
           >
             {text.more(items.length - shown.length)}
+          </Link>
+        </p>
+      ) : null}
+      {withTeam > 0 ? (
+        <p className="mt-4 text-sm text-ink-muted">
+          {text.withTeam(withTeam)}{" "}
+          <Link
+            href="/app/alertes"
+            className="font-semibold text-brand-ink underline-offset-2 hover:underline"
+          >
+            {text.withTeamLink}
           </Link>
         </p>
       ) : null}

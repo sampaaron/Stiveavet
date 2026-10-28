@@ -6,6 +6,7 @@ import {
   TEMPLATES,
   fillTemplate,
   isTemplateKey,
+  templateQuickReply,
 } from "@/domains/whatsapp/modeles";
 import type { TemplateKey, TemplateLanguage } from "@/domains/whatsapp/modeles";
 
@@ -30,6 +31,8 @@ export type ImitatedSend = {
       params: string[];
       /** Texte que le propriétaire lit, rendu à partir du catalogue approuvé. */
       body: string;
+      /** Charge du bouton de réponse rapide envoyée avec le modèle. */
+      quickReply: string | null;
     }
 );
 
@@ -52,8 +55,8 @@ const templateMessage = textMessage.omit({ type: true, text: true }).extend({
   template: z.object({
     name: z.string(),
     language: z.object({ code: z.enum(["fr", "en"]) }),
-    components: z
-      .array(
+    components: z.union([
+      z.tuple([
         z.object({
           type: z.literal("body"),
           parameters: z.array(
@@ -64,8 +67,31 @@ const templateMessage = textMessage.omit({ type: true, text: true }).extend({
             }),
           ),
         }),
-      )
-      .length(1),
+      ]),
+      z.tuple([
+        z.object({
+          type: z.literal("body"),
+          parameters: z.array(
+            z.object({
+              type: z.literal("text"),
+              parameter_name: z.string(),
+              text: z.string(),
+            }),
+          ),
+        }),
+        z.object({
+          type: z.literal("button"),
+          sub_type: z.literal("quick_reply"),
+          index: z.literal("0"),
+          parameters: z.tuple([
+            z.object({
+              type: z.literal("payload"),
+              payload: z.string().min(1).max(256),
+            }),
+          ]),
+        }),
+      ]),
+    ]),
   }),
 });
 
@@ -258,7 +284,14 @@ export function metaImitation(options: {
       const { name, language, components } = request.template;
       if (!isTemplateKey(name)) return graphError(404, 132001);
       const expected = TEMPLATES[name].params as readonly string[];
-      const values = components[0]?.parameters ?? [];
+      const values = components[0].parameters;
+      const button = components[1]?.parameters[0].payload ?? null;
+      // Un bouton n'existe que dans le modèle approuvé qui le déclare.
+      if (
+        (templateQuickReply(name, language.code) !== null) !==
+        (button !== null)
+      )
+        return graphError(400, 132000);
       const byName = new Map(values.map((p) => [p.parameter_name, p.text]));
       if (
         values.length !== expected.length ||
@@ -275,6 +308,7 @@ export function metaImitation(options: {
         language: language.code,
         params,
         body: fillTemplate(name, language.code, params),
+        quickReply: button,
       });
     }
     return Response.json({

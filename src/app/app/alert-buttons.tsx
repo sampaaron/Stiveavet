@@ -12,16 +12,22 @@ import { alertAction } from "./alertes/actions";
 /** Écran d'où vient la décision, où l'on revient ensuite. */
 export type AlertOrigin = "alertes" | "dossier" | "accueil";
 
-/** « Accuser réception » et « Clore l'alerte » : décisions de vétérinaire. */
+/**
+ * « Accuser réception » et « Clore l'alerte » : décisions de vétérinaire. L'assistante
+ * autorisée (alerte « à surveiller ») lit « Je m'en occupe » et peut transmettre au vétérinaire.
+ */
 export function AlertButtons({
   alertId,
   from,
   canAcknowledge,
+  canForward = false,
 }: {
   alertId: string;
   from: AlertOrigin;
   /** Urgence ou alerte encore sans accusé de réception. */
   canAcknowledge: boolean;
+  /** Assistante autorisée, alerte pas encore transmise. */
+  canForward?: boolean;
 }) {
   const t = useAppText();
   const [state, action, pending] = useActionState(
@@ -42,7 +48,9 @@ export function AlertButtons({
             disabled={pending}
             aria-busy={pending}
           >
-            {t.alerts.buttons.acknowledge}
+            {canForward
+              ? t.alerts.buttons.takeCharge
+              : t.alerts.buttons.acknowledge}
           </Button>
         ) : null}
         <Button
@@ -56,6 +64,19 @@ export function AlertButtons({
         >
           {t.alerts.buttons.resolve}
         </Button>
+        {canForward ? (
+          <Button
+            type="submit"
+            name="intent"
+            value="forward"
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            aria-busy={pending}
+          >
+            {t.alerts.buttons.forward}
+          </Button>
+        ) : null}
       </div>
       <ActionMessage state={state} />
     </form>

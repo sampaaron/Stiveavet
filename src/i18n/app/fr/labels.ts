@@ -27,6 +27,7 @@ export const labels = {
     "agenda.read": "Consulter l'agenda",
     "agenda.capture": "Envoyer une capture d'agenda (créneaux libres)",
     "stive.use": "Utiliser Stive, l'assistant IA interne",
+    "alerts.watch": "Prendre en charge les alertes « à surveiller »",
   },
   followupStatus: {
     draft: "Brouillon",

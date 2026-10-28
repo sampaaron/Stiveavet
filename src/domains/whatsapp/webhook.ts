@@ -7,6 +7,7 @@ import { classifyGraphError } from "@/adapters/whatsapp/cloud-api";
 import { receiveInTx, recordInbound } from "@/domains/conversations/service";
 import { DomainError } from "@/domains/commun/actor";
 import { refuseOwnerMedia } from "@/domains/fichiers/service";
+import { acknowledgeFromWhatsApp } from "@/domains/urgences/service";
 import {
   followupContacts,
   followups,
@@ -29,7 +30,9 @@ import { queueMediaDownload } from "./medias";
  * - le cabinet se déduit du numéro Meta destinataire, jamais d'une donnée du message ;
  * - chaque message et chaque accusé n'est traité qu'une fois (`webhook_events`) ;
  * - un accusé ne fait qu'avancer l'état d'un message (envoyé, reçu, lu), sauf l'échec, qui
- *   remet la tâche d'envoi en échec et prévient le vétérinaire (§15).
+ *   remet la tâche d'envoi en échec et prévient le vétérinaire (§15) ;
+ * - « Bien reçu » touché par un vétérinaire sous une alerte accuse réception (ADR 0049) ; ce
+ *   n'est jamais un message de propriétaire.
  * Rien du contenu, du numéro ou du jeton n'est journalisé.
  */
 
@@ -89,7 +92,9 @@ const inbound = z.object({
   type: z.string().max(40),
   context: z.object({ id: wamid }).partial().optional(),
   text: z.object({ body: z.string() }).optional(),
-  button: z.object({ text: z.string() }).optional(),
+  button: z
+    .object({ text: z.string(), payload: z.string().max(256).optional() })
+    .optional(),
   interactive: z
     .object({
       button_reply: z.object({ title: z.string() }).optional(),
@@ -388,8 +393,12 @@ async function applyStatus(
 export type WebhookResult = {
   messages: number;
   statuses: number;
+  /** « Bien reçu » des vétérinaires sous une alerte, pris en compte. */
+  acknowledgements: number;
   ignored: number;
 };
+
+const ACK_PREFIX = "ack:";
 
 /** Traite un corps déjà authentifié par sa signature. */
 export async function handleWebhook(
@@ -397,7 +406,12 @@ export async function handleWebhook(
   payload: z.infer<typeof webhookPayload>,
   now: Date = new Date(),
 ): Promise<WebhookResult> {
-  const result: WebhookResult = { messages: 0, statuses: 0, ignored: 0 };
+  const result: WebhookResult = {
+    messages: 0,
+    statuses: 0,
+    acknowledgements: 0,
+    ignored: 0,
+  };
   for (const entry of payload.entry)
     for (const raw of entry.changes) {
       const parsed = change.safeParse(raw);
@@ -432,6 +446,22 @@ export async function handleWebhook(
             ))
           ) {
             result.ignored += 1;
+            continue;
+          }
+          const payload = message.data.button?.payload;
+          if (
+            message.data.type === "button" &&
+            payload?.startsWith(ACK_PREFIX)
+          ) {
+            const acknowledged = await tx.transaction((inner) =>
+              acknowledgeFromWhatsApp(
+                inner,
+                { payload, from: message.data.from },
+                now,
+              ),
+            );
+            if (acknowledged) result.acknowledgements += 1;
+            else result.ignored += 1;
             continue;
           }
           const media = inboundMedia(message.data);

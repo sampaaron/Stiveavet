@@ -17,6 +17,7 @@ export const dossier: AppDictionary["dossier"] = {
     "alerte-recue": "Receipt confirmed: the escalation is cancelled.",
     "alerte-close": "Alert closed.",
     "alerte-confiee": "Alert reassigned: the chosen vet has been notified.",
+    "alerte-transmise": "Alert passed on: the vet will find it under “To do”.",
   },
   header: {
     responsible: "Responsible vet:",

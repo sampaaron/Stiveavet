@@ -12,7 +12,7 @@ import { AlertButtons, ReassignForm } from "./alert-buttons";
 import type { AlertOrigin } from "./alert-buttons";
 import { triageReasonText } from "./triage-reason";
 
-/** État de l'alerte : qui est prévenu, l'escalade, l'accusé de réception. */
+/** État de l'alerte : qui est prévenu, l'escalade, l'accusé de réception, l'équipe. */
 function statusLine(
   t: AppDictionary,
   locale: Locale,
@@ -23,6 +23,13 @@ function statusLine(
     value ? formatTime(value, locale) : null;
   switch (alert.status) {
     case "open":
+      if (alert.forwardedAt)
+        return text.forwarded(
+          alert.forwardedBy,
+          alert.targetName,
+          formatTime(alert.forwardedAt, locale),
+        );
+      if (alert.heldByTeam) return text.withTeam(alert.targetName);
       return alert.level === "urgent" && alert.escalateAt
         ? text.openEscalating(
             alert.targetName,
@@ -32,6 +39,11 @@ function statusLine(
     case "escalated":
       return text.escalated(time(alert.escalatedAt));
     case "acknowledged":
+      if (alert.level === "watch")
+        return text.acknowledgedWatch(
+          alert.acknowledgedBy ?? null,
+          time(alert.acknowledgedAt),
+        );
       return text.acknowledged(
         alert.acknowledgedBy ?? null,
         time(alert.acknowledgedAt),
@@ -44,7 +56,10 @@ function statusLine(
   }
 }
 
-/** Une alerte du triage : niveau, raison (accès clinique), état et actions de vétérinaire. */
+/**
+ * Une alerte du triage : niveau, raison (accès clinique), état et actions. L'assistante
+ * autorisée agit sur une alerte « à surveiller » : « Je m'en occupe », clore ou transmettre.
+ */
 export async function AlertCard({
   alert,
   from,
@@ -76,6 +91,7 @@ export async function AlertCard({
             alertId={alert.id}
             from={from}
             canAcknowledge={pending}
+            canForward={alert.canForward}
           />
         ) : undefined
       }

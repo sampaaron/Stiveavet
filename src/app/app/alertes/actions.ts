@@ -15,13 +15,14 @@ import { domainFailure } from "../domain-messages";
 import { text } from "../form-data";
 
 /**
- * Accusé de réception et clôture d'une alerte (ADR 0017). Le service vérifie l'accès
- * clinique au dossier et le rôle de vétérinaire ; chaque décision est journalisée.
+ * Accusé de réception et clôture d'une alerte (ADR 0017), transmission au vétérinaire par
+ * l'assistante (ADR 0049). Le service vérifie l'accès clinique au dossier et le rôle (une
+ * urgence reste une décision de vétérinaire) ; chaque décision est journalisée.
  */
 
 const input = z.object({
   alertId: z.uuid(),
-  intent: z.enum(["acknowledge", "resolve", "reassign"]),
+  intent: z.enum(["acknowledge", "resolve", "reassign", "forward"]),
   // Destinataire choisi pour « Confier » ; le service vérifie son accès clinique au dossier.
   membershipId: z.uuid().optional(),
   // Retour vers la liste des alertes ou le dossier, jamais vers une adresse libre.
@@ -72,14 +73,19 @@ export async function alertAction(
         ? await service.acknowledge(context, alertId)
         : intent === "resolve"
           ? await service.resolve(context, alertId)
-          : await service.reassign(context, alertId, membershipId ?? "");
+          : intent === "forward"
+            ? await service.forward(context, alertId)
+            : await service.reassign(context, alertId, membershipId ?? "");
   } catch (error) {
     if (error instanceof DomainError) return domainFailure(error);
     throw error;
   }
-  const done = { acknowledge: "recue", resolve: "close", reassign: "confiee" }[
-    intent
-  ];
+  const done = {
+    acknowledge: "recue",
+    resolve: "close",
+    reassign: "confiee",
+    forward: "transmise",
+  }[intent];
   revalidatePath("/app", "layout");
   redirect(
     from === "dossier"

@@ -228,12 +228,17 @@ export const dashboard = {
     awaitingSince: (when: string, paused: boolean) =>
       `Dernier message du propriétaire ${when}. ${paused ? "Numa est en pause" : "L'équipe a repris la main"} : la réponse vient de vous.`,
     task: (label: string) => `Tâche en échec · ${label}`,
+    withTeam: (count: number) =>
+      `${nombre(count, "alerte « à surveiller » est prise", "alertes « à surveiller » sont prises")} en charge par l'équipe. Vous les retrouvez dans le récapitulatif de 12 h et de 18 h.`,
+    withTeamLink: "Voir les alertes",
     more: (count: number) =>
       `${nombre(count, "autre élément", "autres éléments")} : voir toutes les alertes`,
     done: {
       "alerte-recue": "Réception confirmée : l'escalade est annulée.",
       "alerte-close": "Alerte close.",
       "alerte-confiee": "Alerte confiée : le vétérinaire choisi est prévenu.",
+      "alerte-transmise":
+        "Alerte transmise : le vétérinaire la retrouve dans « À traiter ».",
       "tache-relance": "Tâche relancée.",
       "tache-abandon": "Tâche abandonnée.",
     },

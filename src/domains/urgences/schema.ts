@@ -60,6 +60,9 @@ export const alerts = pgTable("alerts", {
   escalatedAt: at("escalated_at"),
   resolvedAt: at("resolved_at"),
   resolvedByMembershipId: uuid("resolved_by_membership_id"),
+  /** Migration 0032 : alerte « à surveiller » rendue au vétérinaire par l'assistante. */
+  forwardedAt: at("forwarded_at"),
+  forwardedByMembershipId: uuid("forwarded_by_membership_id"),
   createdAt: at("created_at").notNull().defaultNow(),
 });
 

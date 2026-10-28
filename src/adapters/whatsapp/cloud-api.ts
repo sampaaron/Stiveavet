@@ -142,6 +142,16 @@ function messageBody(to: string, content: OutboundContent, reference: string) {
           type: "body",
           parameters: metaParameters(content.key, content.params),
         },
+        ...(content.quickReply
+          ? [
+              {
+                type: "button",
+                sub_type: "quick_reply",
+                index: "0",
+                parameters: [{ type: "payload", payload: content.quickReply }],
+              },
+            ]
+          : []),
       ],
     },
   };

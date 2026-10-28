@@ -17,6 +17,7 @@ import { isPermissionKey } from "@/domains/equipe/permissions";
 import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
+import { alertsService } from "@/domains/urgences/service";
 import { liveProvider, tokenContext } from "@/domains/whatsapp/connexion";
 import type { WhatsAppSetup } from "@/domains/whatsapp/connexion";
 import { mediaHandlers } from "@/domains/fichiers/service";
@@ -479,10 +480,16 @@ describe("envois et webhooks", () => {
   it("un webhook signé enregistre la réponse ; rejoué, il ne crée rien ; falsifié, il est refusé", async () => {
     const wamid = `wamid.IN${randomUUID()}`;
     const { body, result } = await ownerWrites("Oui", wamid);
-    expect(result).toEqual({ messages: 1, statuses: 0, ignored: 0 });
+    expect(result).toEqual({
+      messages: 1,
+      statuses: 0,
+      acknowledgements: 0,
+      ignored: 0,
+    });
     expect(await deliverWebhook(body)).toEqual({
       messages: 0,
       statuses: 0,
+      acknowledgements: 0,
       ignored: 1,
     });
     const inbound = (await messagesOf(plume)).filter(
@@ -530,6 +537,7 @@ describe("envois et webhooks", () => {
     expect(await deliverWebhook(stranger)).toEqual({
       messages: 0,
       statuses: 0,
+      acknowledgements: 0,
       ignored: 1,
     });
 
@@ -684,6 +692,78 @@ describe("envois et webhooks", () => {
     );
     expect(rows).toEqual([{ status: "dead", attempts: 1 }]);
   });
+
+  it("« Bien reçu » sous l'alerte accuse réception au nom du vétérinaire, depuis son numéro seulement", async () => {
+    const VET_PHONE = "+33639980202";
+    await alertsService(appDb).setAlertPhone(await actor(ids.vet), VET_PHONE);
+    const before = meta.sent.length;
+    await ownerWrites("Les points sont lâchés, on voit la plaie");
+    await drain(plume);
+    const alert = meta.sent
+      .slice(before)
+      .find(
+        (entry) =>
+          entry.type === "template" && entry.template === "alerte_urgente",
+      );
+    if (alert?.type !== "template" || !alert.quickReply)
+      throw new Error("alerte sans bouton");
+    expect(alert.to).toBe(VET_PHONE);
+    const payload = alert.quickReply;
+    expect(payload).toMatch(/^ack:[0-9a-f-]{36}:[0-9a-f]{32}$/);
+    const press = (from: string, button = payload) =>
+      deliverWebhook(
+        webhookBody({
+          messages: [
+            {
+              from: from.slice(1),
+              id: `wamid.IN${randomUUID()}`,
+              timestamp: seconds(),
+              type: "button",
+              button: { text: "Bien reçu", payload: button },
+            },
+          ],
+        }),
+      );
+    const ignored = {
+      messages: 0,
+      statuses: 0,
+      acknowledgements: 0,
+      ignored: 1,
+    };
+    const inboundBefore = (await messagesOf(plume)).length;
+    // Un autre numéro, ou un jeton retouché : rien, et jamais un message de propriétaire.
+    expect(await press(OWNER_PHONE)).toEqual(ignored);
+    const forged = `${payload.slice(0, -1)}${payload.endsWith("0") ? "1" : "0"}`;
+    expect(await press(VET_PHONE, forged)).toEqual(ignored);
+    expect(await press(VET_PHONE)).toEqual({
+      messages: 0,
+      statuses: 0,
+      acknowledgements: 1,
+      ignored: 0,
+    });
+    // Touché une seconde fois : déjà reçue, plus rien.
+    expect(await press(VET_PHONE)).toEqual(ignored);
+    expect((await messagesOf(plume)).length).toBe(inboundBefore);
+
+    const { rows } = await admin.query(
+      `SELECT a.status, j.status AS escalation FROM alerts a
+       JOIN scheduled_jobs j ON j.kind = 'alert.escalate' AND j.payload ->> 'alertId' = a.id::text
+       WHERE a.followup_id = $1 AND a.level = 'urgent'`,
+      [plume],
+    );
+    expect(rows).toEqual([{ status: "acknowledged", escalation: "cancelled" }]);
+    const { rows: audit } = await admin.query(
+      `SELECT actor_membership_id, metadata FROM audit_events
+       WHERE organization_id = $1 AND action = 'alert.acknowledged'`,
+      [org],
+    );
+    expect(audit).toEqual([
+      {
+        actor_membership_id: ids.vet,
+        metadata: expect.objectContaining({ via: "whatsapp" }),
+      },
+    ]);
+  });
 });
 
 const PNG = fictionalPng(16, 16);
@@ -757,7 +837,12 @@ describe("photos et vocaux reçus par WhatsApp", () => {
       id: mediaId,
       mime_type: "image/png",
     });
-    expect(result).toEqual({ messages: 1, statuses: 0, ignored: 0 });
+    expect(result).toEqual({
+      messages: 1,
+      statuses: 0,
+      acknowledgements: 0,
+      ignored: 0,
+    });
     // Rejoué : ni second message ni second téléchargement.
     await deliverWebhook(body);
     const message = await lastInbound();

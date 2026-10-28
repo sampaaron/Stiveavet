@@ -199,12 +199,17 @@ export const dashboard: AppDictionary["dashboard"] = {
     awaitingSince: (when, paused) =>
       `Owner's last message ${when}. ${paused ? "Numa is paused" : "The team has taken over"}: the reply comes from you.`,
     task: (label) => `Failed task · ${label}`,
+    withTeam: (count) =>
+      `${count} ${count > 1 ? "alerts" : "alert"} to watch ${count > 1 ? "are" : "is"} being handled by the team. You will find ${count > 1 ? "them" : "it"} in the noon and 6 pm recap.`,
+    withTeamLink: "See alerts",
     more: (count) =>
       `${count} more item${count > 1 ? "s" : ""}: see all alerts`,
     done: {
       "alerte-recue": "Acknowledged: escalation cancelled.",
       "alerte-close": "Alert closed.",
       "alerte-confiee": "Alert handed over: the chosen vet has been notified.",
+      "alerte-transmise":
+        "Alert passed on: the vet will find it under “To do”.",
       "tache-relance": "Task retried.",
       "tache-abandon": "Task cancelled.",
     },

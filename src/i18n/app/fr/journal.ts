@@ -123,6 +123,8 @@ export const journal = {
     "alert.resolved": (actor: string) => `${actor} a clos une alerte`,
     "alert.reassigned": (actor: string) =>
       `${actor} a confié une alerte à un autre vétérinaire`,
+    "alert.forwarded": (actor: string) =>
+      `${actor} a transmis une alerte « à surveiller » au vétérinaire`,
     "job.retried": (actor: string) => `${actor} a relancé une tâche en échec`,
     "job.cancelled": (actor: string) =>
       `${actor} a abandonné une tâche en échec`,

@@ -15,6 +15,8 @@ export type OutboundContent =
       language: TemplateLanguage;
       /** Valeurs dans l'ordre du catalogue. */
       params: readonly string[];
+      /** Charge du bouton de réponse rapide, pour un modèle qui en a un (ADR 0049). */
+      quickReply?: string;
     };
 
 export type Recipient =

@@ -26,6 +26,7 @@ export const PERMISSIONS = {
   "agenda.read": "Consulter l'agenda",
   "agenda.capture": "Envoyer une capture d'agenda (créneaux libres)",
   "stive.use": "Utiliser Stive, l'assistant IA interne",
+  "alerts.watch": "Prendre en charge les alertes « à surveiller »",
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
@@ -64,6 +65,7 @@ export const ROLE_PERMISSIONS: Record<MemberRole, RoleGrants> = {
       "clinical.read",
       "followups.launch",
       "stive.use",
+      "alerts.watch",
     ],
   },
 };
