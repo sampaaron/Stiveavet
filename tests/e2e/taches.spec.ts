@@ -36,7 +36,7 @@ test("l'administratrice voit les tâches en échec, sans contenu clinique", asyn
 }) => {
   await page.goto("/app/taches");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Tâches en échec" }),
+    page.getByRole("heading", { level: 1, name: "Automatisations" }),
   ).toBeVisible();
   // Rappel bloqué du jeu fictif (suivi en pause d'Oscar).
   await expect(page.getByText("Rappel au propriétaire")).toBeVisible();
@@ -68,7 +68,7 @@ test("une assistante n'a pas accès aux tâches en échec", async ({
   const page = await context.newPage();
   await login(page, LEA, PHRASE);
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("link", { name: "Tâches en échec" })).toHaveCount(
+  await expect(page.getByRole("link", { name: "Automatisations" })).toHaveCount(
     0,
   );
   const response = await page.goto("/app/taches");

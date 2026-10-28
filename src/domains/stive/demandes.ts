@@ -188,6 +188,19 @@ function statusChange(folded: string): StatusChange | null {
   return null;
 }
 
+/**
+ * Suivi désigné par un texte libre (prénom d'un animal), sinon le dossier d'où vient la
+ * demande : même règle que la reconnaissance, pour les outils de Stive (ADR 0042).
+ */
+export function findTarget(text: string, context: RecognitionContext): Target {
+  return target(foldText(text).replace(/\s+/g, " ").trim(), context);
+}
+
+/** Vétérinaire désigné par un texte libre (« Claire », « moi », « toute l'équipe »). */
+export function findVet(text: string, context: RecognitionContext): VetChoice {
+  return vetChoice(foldText(text).replace(/\s+/g, " ").trim(), context);
+}
+
 /** Demande reconnue, de la plus précise à la plus générale. */
 export function recognize(
   question: string,

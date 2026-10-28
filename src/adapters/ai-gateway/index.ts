@@ -93,3 +93,8 @@ export function configuredAiGateway(): AiGateway {
   configured ??= aiGatewayFor(aiConfig(process.env));
   return configured;
 }
+
+/** Fournisseur IA configuré, pour l'écran des intégrations : jamais la clé ni l'adresse. */
+export function configuredAiMode(): AiConfig["mode"] {
+  return aiConfig(process.env).mode;
+}

@@ -70,15 +70,30 @@ test.describe("tableau de bord « Aujourd'hui »", () => {
     await expect(moka).toContainText("Stivea");
   });
 
-  test("marque « Aujourd'hui » comme page courante", async ({ page }) => {
+  test("marque « Accueil » et son onglet « Vue d'ensemble » comme courants", async ({
+    page,
+  }) => {
     await page.goto("/app");
+    const tabs = page.getByRole("navigation", {
+      name: "Onglets de la rubrique Accueil",
+    });
+    await expect(
+      tabs.getByRole("link", { name: "Vue d'ensemble" }),
+    ).toHaveAttribute("aria-current", "page");
+    await tabs.getByRole("link", { name: "Assistants IA" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Assistants IA" }),
+    ).toBeVisible();
+
     const nav = page.getByRole("navigation", { name: "Navigation principale" });
     if (!(await nav.isVisible()))
       await page.getByRole("button", { name: "Ouvrir le menu" }).click();
-
-    await expect(
-      nav.getByRole("link", { name: "Aujourd'hui" }),
-    ).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "Accueil" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    await nav.getByRole("link", { name: "Cabinet" }).click();
+    await expect(page).toHaveURL(/\/app\/equipe$/);
   });
 
   test("reste accessible et sans débordement horizontal", async ({ page }) => {

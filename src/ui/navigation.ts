@@ -2,17 +2,23 @@ import {
   Activity,
   BellRing,
   BookOpen,
-  CircleAlert,
+  Bot,
+  Building2,
   CalendarDays,
   ClipboardList,
   CreditCard,
+  FileText,
+  House,
+  LayoutDashboard,
   LifeBuoy,
   MessagesSquare,
   PawPrint,
+  PlugZap,
   Settings2,
   Sparkles,
-  Sun,
   Users,
+  Workflow,
+  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,33 +38,57 @@ export type NavItem = {
   /** Pastille du nombre d'alertes sans accusé de réception. */
   badge?: "alerts";
 };
-export type NavSection = { label?: NavLabel; items: NavItem[] };
+
+/** Entrée du menu : une rubrique et ses onglets, affichés en tête de page (ADR 0044). */
+export type NavSection = {
+  label: NavLabel;
+  icon: LucideIcon;
+  tabs: NavItem[];
+  /** La rubrique n'existe que si son premier onglet est permis (sinon son nom tromperait). */
+  anchored?: boolean;
+};
+
+/** Lecture des suivis, sous l'une de ses trois formes. */
+const READ_FOLLOWUPS = [
+  "followups.read_all",
+  "followups.read_own",
+  "followups.read_summary",
+] as const;
+
+/** Stive : son usage, ou la présentation de l'offre pour qui gère l'abonnement. */
+const STIVE = ["stive.use", "billing.manage"] as const;
 
 /**
- * Navigation de l'espace cabinet. Une entrée n'apparaît que si la personne a le droit
- * d'ouvrir l'écran ; le serveur refuse de toute façon l'accès (404) sans la permission.
+ * Navigation de l'espace cabinet : quatre rubriques, chacune avec ses onglets. Un onglet
+ * n'apparaît que si la personne a le droit d'ouvrir l'écran ; le serveur refuse de toute
+ * façon l'accès (404) sans la permission.
  */
 export const appNavigation: NavSection[] = [
   {
-    items: [
-      { href: "/app", label: "today", icon: Sun },
+    label: "home",
+    icon: House,
+    tabs: [
+      { href: "/app", label: "overview", icon: LayoutDashboard },
       {
         href: "/app/stive",
         label: "stive",
         icon: Sparkles,
-        // Sans Stive dans la formule, l'administrateur y voit la présentation de l'offre.
-        anyOf: ["stive.use", "billing.manage"],
+        anyOf: STIVE,
         assistant: "stive",
       },
+      { href: "/app/assistants", label: "assistants", icon: Bot },
+      { href: "/app/raccourcis", label: "shortcuts", icon: Zap, anyOf: STIVE },
+    ],
+  },
+  {
+    label: "followupSection",
+    icon: MessagesSquare,
+    tabs: [
       {
         href: "/app/suivis",
         label: "followups",
         icon: MessagesSquare,
-        anyOf: [
-          "followups.read_all",
-          "followups.read_own",
-          "followups.read_summary",
-        ],
+        anyOf: READ_FOLLOWUPS,
       },
       {
         href: "/app/animaux",
@@ -82,20 +112,28 @@ export const appNavigation: NavSection[] = [
     ],
   },
   {
-    label: "practice",
-    items: [
-      {
-        href: "/app/reglages",
-        label: "settings",
-        icon: Settings2,
-        anyOf: ["organization.settings"],
-      },
+    label: "protocols",
+    icon: ClipboardList,
+    anchored: true,
+    tabs: [
       {
         href: "/app/protocoles",
         label: "protocols",
         icon: ClipboardList,
         anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
       },
+      {
+        href: "/app/contenus",
+        label: "contents",
+        icon: FileText,
+        anyOf: ["stive.use"],
+      },
+    ],
+  },
+  {
+    label: "practice",
+    icon: Building2,
+    tabs: [
       {
         href: "/app/equipe",
         label: "team",
@@ -109,9 +147,21 @@ export const appNavigation: NavSection[] = [
         anyOf: ["billing.manage"],
       },
       {
+        href: "/app/reglages",
+        label: "settings",
+        icon: Settings2,
+        anyOf: ["organization.settings"],
+      },
+      {
+        href: "/app/integrations",
+        label: "integrations",
+        icon: PlugZap,
+        anyOf: ["organization.settings"],
+      },
+      {
         href: "/app/taches",
         label: "tasks",
-        icon: CircleAlert,
+        icon: Workflow,
         anyOf: ["organization.settings"],
       },
       {
@@ -122,35 +172,57 @@ export const appNavigation: NavSection[] = [
       },
     ],
   },
-  {
-    items: [
-      { href: "/app/aide", label: "help", icon: LifeBuoy },
-      {
-        href: "/app/demarrage",
-        label: "onboarding",
-        icon: BookOpen,
-        anyOf: ["organization.settings"],
-      },
-    ],
-  },
 ];
 
-/** Sections et entrées visibles avec ces permissions ; une section vide disparaît. */
+/** Bas du menu, sous les rubriques. */
+export const footerNavigation: NavItem[] = [
+  {
+    href: "/app/demarrage",
+    label: "onboarding",
+    icon: BookOpen,
+    anyOf: ["organization.settings"],
+  },
+  { href: "/app/aide", label: "help", icon: LifeBuoy },
+];
+
+function allowed(item: NavItem, permissions: ReadonlySet<string>): boolean {
+  return !item.anyOf || item.anyOf.some((key) => permissions.has(key));
+}
+
+/** Rubriques et onglets visibles avec ces permissions ; une rubrique vide disparaît. */
 export function visibleNavigation(
   permissions: ReadonlySet<string>,
 ): NavSection[] {
   return appNavigation
+    .filter(
+      (section) =>
+        !section.anchored ||
+        (section.tabs[0] !== undefined &&
+          allowed(section.tabs[0], permissions)),
+    )
     .map((section) => ({
       ...section,
-      items: section.items.filter(
-        (item) => !item.anyOf || item.anyOf.some((key) => permissions.has(key)),
-      ),
+      tabs: section.tabs.filter((tab) => allowed(tab, permissions)),
     }))
-    .filter((section) => section.items.length > 0);
+    .filter((section) => section.tabs.length > 0);
 }
 
-/** Une entrée est active sur sa page et ses sous-pages ; « Aujourd'hui » seulement sur /app. */
+export function visibleFooter(permissions: ReadonlySet<string>): NavItem[] {
+  return footerNavigation.filter((item) => allowed(item, permissions));
+}
+
+/** Un onglet est actif sur sa page et ses sous-pages ; « Vue d'ensemble » seulement sur /app. */
 export function isNavItemActive(href: string, pathname: string): boolean {
   if (href === "/app") return pathname === "/app";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Rubrique de la page ouverte, parmi celles visibles ; aucune pour le compte ou l'aide. */
+export function currentSection(
+  sections: readonly NavSection[],
+  pathname: string,
+): NavSection | undefined {
+  return sections.find((section) =>
+    section.tabs.some((tab) => isNavItemActive(tab.href, pathname)),
+  );
 }

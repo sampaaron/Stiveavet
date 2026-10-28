@@ -104,4 +104,53 @@ export type AiGateway = {
   ): Promise<{ observations: string[] }>;
   readAgendaCapture(input: AgendaCaptureInput): Promise<{ slots: FreeSlot[] }>;
   summarizeFollowup(input: SynthesisInput): Promise<SynthesisDraft>;
+  /** Un tour de la conversation de Stive : une réponse, ou des outils à exécuter. */
+  stiveChat(input: StiveChatInput): Promise<StiveChatStep>;
 };
+
+/**
+ * Conversation avec Stive (ADR 0042) : un tour de modèle avec appel d'outils, au format
+ * « chat completions » compatible OpenAI et Mistral. La boucle (exécution des outils avec les
+ * droits de la personne, limites, garde-fous) reste côté Stivea Vet ; la passerelle ne fait
+ * qu'un appel. Les résultats d'outils sont déjà réduits au strict nécessaire par l'appelant.
+ */
+export type StiveToolCall = {
+  /** Identifiant donné par le modèle, renvoyé tel quel avec le résultat. */
+  id: string;
+  name: string;
+  /** Arguments en JSON, à relire par Zod avant tout usage. */
+  arguments: string;
+};
+
+export type StiveChatMessage =
+  | { role: "user"; content: string }
+  /** Réponse du modèle ; `toolCalls` : outils qu'il a demandés à ce tour. */
+  | { role: "assistant"; content: string; toolCalls?: StiveToolCall[] }
+  | { role: "tool"; callId: string; name: string; content: string };
+
+export type StiveToolDefinition = {
+  name: string;
+  description: string;
+  /** Schéma JSON des arguments (sous-ensemble accepté par les fournisseurs visés). */
+  parameters: Record<string, unknown>;
+};
+
+export type StiveChatInput = {
+  /** Langue de l'interface, à défaut de celle du dernier message. */
+  language: "fr" | "en";
+  /** Contexte du tour, sans aucune donnée de propriétaire. */
+  context: {
+    /** Jour de Paris, « AAAA-MM-JJ ». */
+    today: string;
+    role: "vet" | "assistant";
+    /** Référence du dossier d'où vient la demande (« S3 »), s'il y en a un. */
+    openFollowup: string | null;
+  };
+  messages: StiveChatMessage[];
+  tools: StiveToolDefinition[];
+  /** false : le modèle doit répondre en texte (dernier tour permis). */
+  allowTools: boolean;
+};
+
+export type StiveChatStep =
+  { kind: "answer"; text: string } | { kind: "tools"; calls: StiveToolCall[] };

@@ -213,4 +213,81 @@ test("le point du jour de Stive, en un clic", async ({ page }) => {
   await expect(
     thread(page).getByText("Je ne sais pas encore faire ça.").last(),
   ).toBeVisible();
+  // Et il dit pourquoi : la conversation libre demande l'IA branchée.
+  await expect(
+    thread(page)
+      .getByText(/la conversation libre sur le métier demande l'IA branchée/)
+      .last(),
+  ).toBeVisible();
+});
+
+test("un raccourci ouvre la réponse de Stive ; ses brouillons sont dans Contenus", async ({
+  page,
+}) => {
+  await page.goto("/app/raccourcis");
+  await page
+    .getByRole("button", { name: "Demander à Stive : Mon point du jour" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/stive#derniere-reponse$/);
+  await expect(
+    thread(page).getByRole("heading", { name: "Votre point du jour" }).last(),
+  ).toBeVisible();
+
+  await page.goto("/app/contenus");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Contenus" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Vos brouillons ne sont visibles que par vous/),
+  ).toBeVisible();
+  await expectAccessible(page);
+});
+
+/** Conversation en mode simulé (ADR 0042) : Stive échange simplement, sans rien inventer. */
+async function ask(page: Page, question: string) {
+  await page.getByLabel("Votre demande à Stive").fill(question);
+  await page.getByRole("button", { name: "Demander", exact: true }).click();
+  await expect(page).toHaveURL(/#derniere-reponse$/);
+}
+
+test("conversation simple en mode simulé, honnête sur l'IA à brancher", async ({
+  page,
+}) => {
+  await page.goto("/app/stive");
+  await expect(
+    page.getByRole("note").filter({ hasText: "Mode simulé" }),
+  ).toContainText("AI_PROVIDER");
+  await expect(
+    page.getByText("Discuter librement du métier : demande l'IA branchée"),
+  ).toBeVisible();
+
+  await ask(page, "Bonjour Stive !");
+  await expect(
+    thread(page)
+      .getByText("Bonjour ! Je suis Stive, l'assistant IA de l'équipe.", {
+        exact: false,
+      })
+      .last(),
+  ).toBeVisible();
+
+  await ask(page, "Qui es-tu ?");
+  await expect(
+    thread(page)
+      .getByText(/Je suis Stive, une IA, l'assistant de l'équipe du cabinet/)
+      .last(),
+  ).toBeVisible();
+
+  await ask(
+    page,
+    "Comment annoncer une complication à un propriétaire inquiet ?",
+  );
+  await expect(
+    thread(page)
+      .getByRole("listitem")
+      .filter({ hasText: "la conversation libre sur le métier demande l'IA" })
+      .last(),
+  ).toBeVisible();
+  // Chaque échange reste présenté comme venant d'une IA.
+  await expect(thread(page).getByText("Assistant IA").last()).toBeVisible();
+  await expectAccessible(page);
 });

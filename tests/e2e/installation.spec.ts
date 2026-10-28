@@ -155,7 +155,18 @@ test.describe("réglages des Tilleuls (Claire)", () => {
     await expect(
       page.getByLabel(/Analyse assistée des photos/),
     ).not.toBeChecked();
+    await expectAccessible(page);
+  });
+
+  test("les connexions sont regroupées dans Intégrations", async ({ page }) => {
+    await page.goto("/app/integrations");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Intégrations" }),
+    ).toBeVisible();
     await expect(page.getByText("•• •• •• •• 42 (simulé)")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: /Assistants IA/ }),
+    ).toBeVisible();
     await expectAccessible(page);
   });
 });
@@ -173,9 +184,7 @@ test.describe("assistant (Léa)", () => {
     }
     await page.goto("/app");
     await openAccountMenu(page);
-    await expect(
-      page.getByRole("link", { name: "Numa, urgences et garde" }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Réglages" })).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Démarrage guidé" }),
     ).toHaveCount(0);

@@ -1,8 +1,12 @@
+import { randomBytes } from "node:crypto";
+
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SEED } from "../../db/seed/cabinets-fictifs";
+import { apiAiGateway } from "@/adapters/ai-gateway/api-compatible";
 import { fakeAiGateway } from "@/adapters/ai-gateway/fake";
+import { aiImitation } from "@/adapters/ai-gateway/imitation";
 import { createFakeDrVeto } from "@/adapters/drveto/fake";
 import { createMemoryStorage } from "@/adapters/object-storage/memory";
 import { agendaService } from "@/domains/agenda/captures";
@@ -12,6 +16,7 @@ import { DomainError } from "@/domains/commun/actor";
 import type { Actor } from "@/domains/commun/actor";
 import { ROLE_PERMISSIONS } from "@/domains/equipe/permissions";
 import type { PermissionKey } from "@/domains/equipe/permissions";
+import { followupRefs } from "@/domains/stive/outils";
 import { parisMonth, stiveService } from "@/domains/stive/service";
 import type { StiveAnswer } from "@/domains/stive/reponses";
 import { launchService } from "@/domains/suivis/lancement";
@@ -45,7 +50,7 @@ const drveto = createFakeDrVeto();
 const suivis = followupsService(appDb);
 const launch = launchService({ db: appDb, drveto });
 const appointments = appointmentsService(appDb);
-const stive = stiveService({
+const deps = {
   db: appDb,
   followups: suivis,
   today: todayService({ db: appDb, followups: suivis, drveto }),
@@ -59,7 +64,43 @@ const stive = stiveService({
   conversations: conversationsService(appDb),
   launch,
   alerts: alertsService(appDb),
+};
+/** Stive simulé : règles écrites seulement (ADR 0034). */
+const stive = stiveService({ ...deps, ai: fakeAiGateway });
+
+/**
+ * Stive branché sur la passerelle réelle, contre l'imitation locale du fournisseur (ADR
+ * 0042) : aucun appel réseau, aucune clé dans le dépôt. Chaque requête est gardée pour
+ * vérifier ce qui part chez le prestataire.
+ */
+const KEY = randomBytes(24).toString("hex");
+const model = aiImitation({ apiKey: KEY });
+const stiveIa = stiveService({
+  ...deps,
+  ai: apiAiGateway({
+    fetch: model.fetch,
+    baseUrl: "https://api.scaleway.ai/v1",
+    apiKey: KEY,
+    models: { text: "texte", vision: "vision", transcription: "voix" },
+  }),
 });
+
+/** Requêtes de conversation envoyées au fournisseur depuis `start`. */
+function chatRequests(start: number) {
+  return model.requests
+    .slice(start)
+    .flatMap((request) => (request.kind === "stive_chat" ? [request] : []));
+}
+
+/** Résultats d'outils envoyés au fournisseur depuis `start`. */
+function toolResults(start: number): string {
+  return chatRequests(start)
+    .flatMap((request) =>
+      request.messages.filter((message) => message.role === "tool"),
+    )
+    .map((message) => message.content)
+    .join("\n");
+}
 
 const idOf = (name: string) => {
   const found = fixtureFollowups.find((entry) => entry.animal.name === name);
@@ -501,5 +542,349 @@ describe("Stive : confidentialité et conservation", () => {
       [hugo.membershipId],
     );
     expect(rows[0]).toEqual({ n: 0 });
+  });
+});
+
+describe("Stive sans IA branchée : honnête (ADR 0042)", () => {
+  it("salue, se présente comme une IA, et dit que la conversation libre demande l'IA", async () => {
+    expect(await stive.ask(hugo, { question: "Bonjour Stive !" })).toEqual({
+      kind: "smalltalk",
+      topic: "greeting",
+    });
+    expect(await stive.ask(hugo, { question: "Qui es-tu ?" })).toEqual({
+      kind: "smalltalk",
+      topic: "identity",
+    });
+    expect(
+      await stive.ask(hugo, {
+        question: "Comment annoncer une complication à un propriétaire ?",
+      }),
+    ).toEqual({ kind: "unknown", mode: "simulated" });
+    expect((await stive.conversation(hugo)).mode).toBe("simulated");
+  });
+});
+
+describe("Stive conversationnel, IA branchée (ADR 0042)", () => {
+  async function sushiId(): Promise<string> {
+    const { rows } = await admin.query(
+      "SELECT f.id FROM followups f JOIN animals a ON a.id = f.animal_id WHERE a.name = 'Sushi'",
+    );
+    const row = rows[0] as { id: string } | undefined;
+    if (!row) throw new Error("Sushi introuvable");
+    return row.id;
+  }
+
+  it("converse librement sur le métier, avec l'historique, une demande par message", async () => {
+    await stiveIa.clear(hugo);
+    const before = (await stiveIa.conversation(hugo)).usage.used;
+    const start = model.requests.length;
+    model.answerNext(
+      {
+        text: "Commencez par ce que vous avez constaté, puis laissez-lui le temps de poser ses questions. La décision vous revient.",
+      },
+      { text: "Proposez-lui un appel de suivi, à une heure qui l'arrange." },
+    );
+    expect(
+      await stiveIa.ask(hugo, {
+        question:
+          "Comment annoncer une complication à un propriétaire inquiet ?",
+      }),
+    ).toMatchObject({
+      kind: "reply",
+      text: expect.stringContaining("Commencez par ce que vous avez constaté"),
+      withheld: null,
+    });
+    await stiveIa.ask(hugo, { question: "Et s'il est en colère ?" });
+
+    const conversation = await stiveIa.conversation(hugo);
+    expect(conversation.mode).toBe("ai");
+    expect(conversation.usage.used).toBe(before + 2);
+    expect(
+      conversation.entries.map((entry) =>
+        entry.author === "member" ? entry.question : entry.answer?.kind,
+      ),
+    ).toEqual([
+      "Comment annoncer une complication à un propriétaire inquiet ?",
+      "reply",
+      "Et s'il est en colère ?",
+      "reply",
+    ]);
+    const [, second] = chatRequests(start);
+    expect(second?.messages).toEqual([
+      {
+        role: "user",
+        content:
+          "Comment annoncer une complication à un propriétaire inquiet ?",
+      },
+      {
+        role: "assistant",
+        content:
+          "Commencez par ce que vous avez constaté, puis laissez-lui le temps de poser ses questions. La décision vous revient.",
+      },
+      { role: "user", content: "Et s'il est en colère ?" },
+    ]);
+    expect(second?.system).toContain('"role":"vétérinaire"');
+  });
+
+  it("lit un dossier par ses outils, avec les droits de la personne : carte, journal, rien du propriétaire", async () => {
+    const caramel = idOf("Caramel");
+    const viewed = await auditCount("followup.viewed", caramel);
+    const used = (await stiveIa.conversation(claire)).usage.used;
+    // Référence que Stive donnera à Caramel pendant ce tour (ordre de la liste des suivis).
+    const reference = followupRefs(await suivis.list(claire)).refOf(caramel);
+    const start = model.requests.length;
+    model.answerNext(
+      {
+        toolCalls: [
+          { name: "chercher_suivis", arguments: { animal: "Caramel" } },
+        ],
+      },
+      {
+        toolCalls: [{ name: "lire_dossier", arguments: { suivi: reference } }],
+      },
+      {
+        text: "Caramel est suivie de près ; une alerte attend votre accusé de réception.",
+      },
+    );
+    const reply = await stiveIa.ask(claire, {
+      question: "Où en est Caramel ?",
+    });
+    expect(toolResults(start)).toContain(
+      `"ref":"${reference}","animal":"Caramel"`,
+    );
+    expect(reply).toMatchObject({ kind: "reply", withheld: null });
+    const { entries, usage } = await stiveIa.conversation(claire);
+    // Un seul message de la personne : une seule demande, quels que soient les outils.
+    expect(usage.used).toBe(used + 1);
+    expect(
+      entries
+        .slice(-2)
+        .map((entry) => (entry.author === "stive" ? entry.answer?.kind : null)),
+    ).toEqual(["reply", "summary"]);
+    expect(await auditCount("followup.viewed", caramel)).toBe(viewed + 1);
+    const sent = JSON.stringify(model.requests.slice(start));
+    expect(sent).toContain("Caramel");
+    for (const secret of [
+      "Julien",
+      "Morel",
+      "06 39",
+      caramel,
+      claire.membershipId,
+    ])
+      expect(sent).not.toContain(secret);
+  });
+
+  it("le résumé d'un dossier est une carte, et la consultation est tracée", async () => {
+    const caramel = idOf("Caramel");
+    const viewed = await auditCount("followup.viewed", caramel);
+    const start = model.requests.length;
+    model.answerNext(
+      {
+        toolCalls: [{ name: "lire_dossier", arguments: { animal: "Caramel" } }],
+      },
+      { text: "Voici le résumé de Caramel." },
+    );
+    await stiveIa.ask(claire, { question: "Résume-moi Caramel" });
+    const { entries } = await stiveIa.conversation(claire);
+    const [reply, card] = entries.slice(-2);
+    expect(reply).toMatchObject({
+      author: "stive",
+      answer: {
+        kind: "reply",
+        sources: {
+          followups: [{ id: caramel, access: "clinical" }],
+          agenda: false,
+        },
+      },
+    });
+    expect(card).toMatchObject({
+      author: "stive",
+      answer: { kind: "summary", followup: { id: caramel } },
+    });
+    expect(await auditCount("followup.viewed", caramel)).toBe(viewed + 1);
+    const results = toolResults(start);
+    expect(results).toContain("synthese_non_fiable");
+    expect(results).toContain("Ovariectomie");
+    expect(results).not.toContain("Julien");
+  });
+
+  it("aucun dossier hors accès : autre vétérinaire, assistante sans accès clinique, dossier privé, autre cabinet", async () => {
+    const caramel = idOf("Caramel");
+    const filou = idOf("Filou");
+    const sushi = await sushiId();
+    const caramelViews = await auditCount("followup.viewed", caramel);
+    const filouViews = await auditCount("followup.viewed", filou);
+
+    // Hugo ne suit pas Caramel : le dossier n'existe pas pour lui.
+    let start = model.requests.length;
+    model.answerNext(
+      {
+        toolCalls: [{ name: "lire_dossier", arguments: { animal: "Caramel" } }],
+      },
+      { text: "Je ne trouve pas ce dossier dans votre périmètre." },
+    );
+    await stiveIa.ask(hugo, { question: "Résume Caramel" });
+    expect(toolResults(start)).not.toContain("Caramel");
+    expect(toolResults(start)).not.toContain("Ovariectomie");
+    expect((await stiveIa.conversation(hugo)).entries.at(-1)).toMatchObject({
+      answer: { kind: "reply" },
+    });
+
+    // Léa, sans accès clinique : un refus, jamais une synthèse.
+    start = model.requests.length;
+    model.answerNext(
+      { toolCalls: [{ name: "lire_dossier", arguments: { animal: "Moka" } }] },
+      { text: "Je ne peux pas vous montrer ce dossier." },
+    );
+    await stiveIa.ask(lea, { question: "Comment va Moka ?" });
+    expect(toolResults(start)).toContain("refus");
+    expect(toolResults(start)).not.toContain("synthese");
+
+    // Filou rendu privé par Hugo : invisible pour Claire, même nommé.
+    await suivis.setPrivate(hugo, filou, true);
+    try {
+      start = model.requests.length;
+      model.answerNext(
+        {
+          toolCalls: [
+            { name: "chercher_suivis", arguments: { animal: "Filou" } },
+            { name: "lire_dossier", arguments: { animal: "Filou" } },
+          ],
+        },
+        { text: "Je ne trouve pas de suivi à ce nom." },
+      );
+      await stiveIa.ask(claire, { question: "Et Filou ?" });
+      expect(toolResults(start)).not.toContain("Filou");
+      expect(toolResults(start)).toContain('"total":0');
+    } finally {
+      await suivis.setPrivate(hugo, filou, false);
+    }
+
+    // Autre cabinet : ni par son nom, ni par son identifiant passé en contexte.
+    start = model.requests.length;
+    model.answerNext(
+      {
+        toolCalls: [
+          { name: "lire_dossier", arguments: { animal: "Sushi" } },
+          { name: "lire_dossier", arguments: { suivi: "S99" } },
+        ],
+      },
+      { text: "Je ne trouve pas ce dossier." },
+    );
+    await stiveIa.ask(claire, { question: "Et Sushi ?", followupId: sushi });
+    expect(toolResults(start)).not.toContain("Sushi");
+    expect(chatRequests(start)[0]?.system).toContain('"dossier_ouvert":null');
+    // Aucune consultation tracée pour ces refus.
+    expect(await auditCount("followup.viewed", caramel)).toBe(caramelViews);
+    expect(await auditCount("followup.viewed", filou)).toBe(filouViews);
+  });
+
+  it("une réponse sur un dossier devenu privé disparaît, et ne repart pas chez le prestataire", async () => {
+    const filou = idOf("Filou");
+    model.answerNext(
+      { toolCalls: [{ name: "lire_dossier", arguments: { animal: "Filou" } }] },
+      { text: "Filou se remet bien d'après les échanges." },
+    );
+    await stiveIa.ask(claire, { question: "Où en est Filou ?" });
+    await suivis.setPrivate(hugo, filou, true);
+    try {
+      const { entries } = await stiveIa.conversation(claire);
+      expect(
+        entries
+          .slice(-2)
+          .map((entry) => entry.author === "stive" && entry.answer),
+      ).toEqual([null, null]);
+      const start = model.requests.length;
+      model.answerNext({ text: "Bien sûr." });
+      await stiveIa.ask(claire, { question: "Merci, autre chose ?" });
+      const [request] = chatRequests(start);
+      const history = JSON.stringify(request?.messages);
+      expect(history).toContain("Réponse masquée");
+      expect(history).not.toContain("Filou se remet bien");
+    } finally {
+      await suivis.setPrivate(hugo, filou, false);
+    }
+  });
+
+  it("une action reste une carte « À confirmer » : rien ne change avant le clic", async () => {
+    const ruby = idOf("Ruby");
+    model.answerNext(
+      {
+        toolCalls: [
+          {
+            name: "proposer_changement_suivi",
+            arguments: { animal: "Ruby", changement: "pause" },
+          },
+        ],
+      },
+      { text: "J'ai préparé la mise en pause : confirmez-la sur la carte." },
+    );
+    await stiveIa.ask(claire, { question: "Mets Ruby en pause s'il te plaît" });
+    const { entries } = await stiveIa.conversation(claire);
+    const card = entries.at(-1);
+    if (card?.author !== "stive" || card.answer?.kind !== "status")
+      throw new Error("carte attendue");
+    const { rows } = await admin.query(
+      "SELECT status FROM followups WHERE id = $1",
+      [ruby],
+    );
+    expect(rows[0]).toEqual({ status: "active" });
+    try {
+      expect(
+        await stiveIa.decide(claire, card.answer.proposalId, "confirm"),
+      ).toBe("paused");
+    } finally {
+      await launch.changeStatus(claire, ruby, "resume");
+    }
+  });
+
+  it("un dosage est remplacé par le renvoi au référentiel, sans rien garder du texte", async () => {
+    model.answerNext({
+      text: "Pour un chat, comptez 0,05 mg/kg de méloxicam une fois par jour.",
+    });
+    expect(
+      await stiveIa.ask(hugo, {
+        question: "Quelle dose de méloxicam pour un chat ?",
+      }),
+    ).toMatchObject({ kind: "reply", text: null, withheld: "dosage" });
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM stive_messages WHERE answer::text LIKE '%mg/kg%'",
+    );
+    expect(rows[0]).toEqual({ n: 0 });
+  });
+
+  it("IA injoignable : les règles écrites prennent le relais, sans rien inventer", async () => {
+    model.answerNext({ status: 503 }, { status: 503 });
+    expect(
+      (await stiveIa.ask(claire, { question: "Mon point du jour" })).kind,
+    ).toBe("briefing");
+    expect(
+      await stiveIa.ask(claire, {
+        question: "Comment gérer un client agressif au téléphone ?",
+      }),
+    ).toEqual({ kind: "unknown", mode: "ai_unavailable" });
+  });
+
+  it("à la limite du mois, aucun appel au prestataire", async () => {
+    const month = parisMonth(new Date());
+    await admin.query(
+      `INSERT INTO stive_usage (organization_id, membership_id, month, requests)
+       VALUES ($1, $2, $3, 600)
+       ON CONFLICT (membership_id, month) DO UPDATE SET requests = 600`,
+      [hugo.organizationId, hugo.membershipId, month],
+    );
+    try {
+      const start = model.requests.length;
+      expect(
+        await stiveIa.ask(hugo, {
+          question: "Comment organiser mes rappels ?",
+        }),
+      ).toMatchObject({ kind: "limit", limit: 600 });
+      expect(model.requests.length).toBe(start);
+    } finally {
+      await admin.query("DELETE FROM stive_usage WHERE membership_id = $1", [
+        hugo.membershipId,
+      ]);
+    }
   });
 });

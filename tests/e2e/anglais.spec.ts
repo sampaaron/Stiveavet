@@ -30,7 +30,8 @@ function frenchOnly(french: unknown, english: unknown, found: string[] = []) {
 /**
  * Coïncidences avec les données, qui restent en français (ADR 0022) : nom d'un protocole de
  * la bibliothèque, message de Numa et trace « Accord donné par… » du dossier fictif de
- * Caramel, libellé du mandat simulé, nom du cabinet créé par `signUp`.
+ * Caramel, libellé du mandat simulé, nom du cabinet créé par `signUp`, étapes des protocoles
+ * de la bibliothèque (même début que deux raccourcis de Stive).
  */
 const DATA = new Set([
   "Suivi de traitement",
@@ -38,6 +39,8 @@ const DATA = new Set([
   "Accord donné",
   "Mandat de prélèvement",
   "Cabinet vétérinaire",
+  "Prendre des nouvelles",
+  "Demander une photo",
 ]);
 const FRENCH = frenchOnly(fr, en).filter((text) => !DATA.has(text));
 
@@ -70,7 +73,11 @@ const SCREENS: [path: string, heading: string | RegExp][] = [
   ["/app/equipe", "Team and permissions"],
   ["/app/facturation", "Billing"],
   ["/app/journal", "Activity log"],
-  ["/app/taches", "Failed tasks"],
+  ["/app/taches", "Automations"],
+  ["/app/assistants", "AI assistants"],
+  ["/app/raccourcis", "Shortcuts"],
+  ["/app/integrations", "Integrations"],
+  ["/app/contenus", "Contents"],
   ["/app/demarrage", "Guided setup"],
 ];
 

@@ -1,8 +1,39 @@
 /** Textes de cette partie de l'espace cabinet (voir ADR 0022). */
 export const tasks = {
-  title: "Tâches en échec",
+  title: "Automatisations",
   description:
-    "Envois, rappels et alertes que Stivea Vet n'a pas pu mener à bien après plusieurs tentatives espacées. Relancez-les une fois la cause réglée, ou abandonnez-les.",
+    "Ce que Stivea Vet fait tout seul, selon vos protocoles et vos réglages, et les envois qui n'ont pas abouti. Aucune automatisation ne prend de décision médicale.",
+  automations: {
+    title: "Ce qui tourne tout seul",
+    items: [
+      {
+        title: "Rappels de la fiche de suivi",
+        text: "Chaque étape prévue part à son heure, avec l'accord du propriétaire et dans vos horaires d'envoi.",
+      },
+      {
+        title: "Réponses de Numa",
+        text: "Numa répond aux propriétaires et recueille leurs nouvelles, selon le protocole du suivi.",
+      },
+      {
+        title: "Alertes à l'équipe",
+        text: "Une réponse inquiétante prévient le vétérinaire, puis les autres si personne ne la voit dans le délai réglé.",
+      },
+      {
+        title: "Vocaux et photos",
+        text: "Les vocaux sont transcrits ; les photos sont décrites si vous l'avez activé. L'équipe lit et décide.",
+      },
+      {
+        title: "Fin des suivis",
+        text: "Le suivi automatisé se termine à la date prévue par son protocole.",
+      },
+      {
+        title: "Effacement des données",
+        text: "Fichiers et suivis arrivés à échéance sont effacés, selon les durées de conservation.",
+      },
+    ],
+    settings: "Régler les horaires et les alertes",
+  },
+  failedTitle: "Tâches en échec",
   done: {
     retried: "Tâche relancée : le worker la reprend dans un instant.",
     cancelled: "Tâche abandonnée : elle ne sera plus tentée.",
