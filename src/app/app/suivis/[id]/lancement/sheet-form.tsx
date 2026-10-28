@@ -1,7 +1,6 @@
 "use client";
 
-import { Plus, QrCode, ShieldCheck, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useActionState, useId, useState } from "react";
 
 import type { LaunchSheet } from "@/domains/suivis/lancement";
@@ -18,6 +17,7 @@ import { initialActionState } from "../../../action-state";
 import { AlertsEditor, StepsEditor, keyed } from "../../../plan-editors";
 import type { EditableAlert, EditableStep } from "../../../plan-editors";
 import { saveSheetAction } from "../../launch-actions";
+import { OptInQrCallout } from "../../opt-in-qr-callout";
 
 const HOUR = 3_600_000;
 
@@ -211,7 +211,14 @@ export function SheetForm({
               {text.optInGiven(second && secondActive ? 2 : 1)}
             </p>
           ) : (
-            <div className="mt-4 grid gap-2">
+            <div className="mt-4 grid gap-3">
+              <OptInQrCallout
+                stacked
+                followupId={followup.id}
+                title={text.optInQrTitle}
+                body={text.optInQrBody}
+                action={text.optInQr}
+              />
               <label className="flex items-start gap-3 rounded-[var(--radius-control)] border border-line p-3 text-sm">
                 <input
                   type="checkbox"
@@ -227,13 +234,6 @@ export function SheetForm({
                   <span className="block text-ink-muted">{text.optInHint}</span>
                 </span>
               </label>
-              <Link
-                href={`/app/suivis/${followup.id}/accord`}
-                className="inline-flex items-center gap-1.5 justify-self-start text-sm font-semibold text-brand-ink underline-offset-2 hover:underline"
-              >
-                <QrCode aria-hidden="true" className="size-4" />
-                {text.optInQr}
-              </Link>
             </div>
           )}
         </SectionCard>

@@ -1,7 +1,7 @@
 "use client";
 
 import { startRegistration } from "@simplewebauthn/browser";
-import { KeyRound } from "lucide-react";
+import { KeyRound, QrCode } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 
@@ -137,11 +137,25 @@ export function AddPasskeyForm() {
     event.preventDefault();
     const target = event.currentTarget;
     const form = new FormData(target);
+    // « Avec mon téléphone » : le navigateur affiche tout de suite le QR code à scanner.
+    const phone =
+      event.nativeEvent instanceof SubmitEvent &&
+      event.nativeEvent.submitter?.getAttribute("value") === "phone";
     startTransition(async () => {
       const started = await startPasskeyAction(form);
       if (!started.options) return setState(started);
+      const options = started.options;
       const response = await startRegistration({
-        optionsJSON: started.options,
+        optionsJSON: phone
+          ? {
+              ...options,
+              hints: ["hybrid"],
+              authenticatorSelection: {
+                ...options.authenticatorSelection,
+                authenticatorAttachment: "cross-platform",
+              },
+            }
+          : options,
       }).catch((error: unknown) =>
         error instanceof Error && error.name === "InvalidStateError"
           ? text.already
@@ -184,16 +198,30 @@ export function AddPasskeyForm() {
           {state.notice}
         </p>
       ) : null}
-      <div>
+      <div className="flex flex-wrap gap-3">
         <Button
           type="submit"
+          name="mode"
+          value="device"
           disabled={pending}
           aria-busy={pending}
           icon={<KeyRound aria-hidden="true" className="size-4" />}
         >
           {text.submit}
         </Button>
+        <Button
+          type="submit"
+          name="mode"
+          value="phone"
+          variant="secondary"
+          disabled={pending}
+          aria-busy={pending}
+          icon={<QrCode aria-hidden="true" className="size-4" />}
+        >
+          {text.submitPhone}
+        </Button>
       </div>
+      <p className="text-sm text-ink-muted">{text.phoneHint}</p>
     </form>
   );
 }

@@ -101,6 +101,45 @@ export default async function AccountPage() {
           </div>
         </Card>
 
+        <SectionCard
+          id="cles-d-acces"
+          title={text.passkeys.title}
+          description={text.passkeys.description}
+        >
+          {passkeys.length === 0 ? (
+            <p className="mb-4 text-sm text-ink-muted">{text.passkeys.none}</p>
+          ) : (
+            <ul className="mb-5 grid gap-3">
+              {passkeys.map((passkey) => (
+                <li
+                  key={passkey.id}
+                  className="flex flex-wrap items-start justify-between gap-3 text-sm"
+                >
+                  <span>
+                    <span className="block font-semibold">{passkey.label}</span>
+                    <span className="block text-ink-muted">
+                      {text.passkeys.addedOn(
+                        formatDate(passkey.createdAt, locale),
+                      )}{" "}
+                      ·{" "}
+                      {passkey.lastUsedAt
+                        ? text.passkeys.lastUsed(
+                            formatDateTime(passkey.lastUsedAt, locale),
+                          )
+                        : text.passkeys.neverUsed}
+                    </span>
+                  </span>
+                  <RemovePasskeyForm id={passkey.id} label={passkey.label} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <AddPasskeyForm />
+          <p className="mt-4 text-sm text-ink-muted">
+            {text.passkeys.loginNote}
+          </p>
+        </SectionCard>
+
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard
             title={text.activity.title}
@@ -173,45 +212,6 @@ export default async function AccountPage() {
           description={text.password.description}
         >
           <PasswordForm />
-        </SectionCard>
-
-        <SectionCard
-          id="cles-d-acces"
-          title={text.passkeys.title}
-          description={text.passkeys.description}
-        >
-          {passkeys.length === 0 ? (
-            <p className="mb-4 text-sm text-ink-muted">{text.passkeys.none}</p>
-          ) : (
-            <ul className="mb-5 grid gap-3">
-              {passkeys.map((passkey) => (
-                <li
-                  key={passkey.id}
-                  className="flex flex-wrap items-start justify-between gap-3 text-sm"
-                >
-                  <span>
-                    <span className="block font-semibold">{passkey.label}</span>
-                    <span className="block text-ink-muted">
-                      {text.passkeys.addedOn(
-                        formatDate(passkey.createdAt, locale),
-                      )}{" "}
-                      ·{" "}
-                      {passkey.lastUsedAt
-                        ? text.passkeys.lastUsed(
-                            formatDateTime(passkey.lastUsedAt, locale),
-                          )
-                        : text.passkeys.neverUsed}
-                    </span>
-                  </span>
-                  <RemovePasskeyForm id={passkey.id} label={passkey.label} />
-                </li>
-              ))}
-            </ul>
-          )}
-          <AddPasskeyForm />
-          <p className="mt-4 text-sm text-ink-muted">
-            {text.passkeys.loginNote}
-          </p>
         </SectionCard>
 
         <SectionCard

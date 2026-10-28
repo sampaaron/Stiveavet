@@ -160,7 +160,10 @@ export const followups: AppDictionary["followups"] = {
       count > 1
         ? "The owners' WhatsApp agreement is already recorded at the practice."
         : "The owner's WhatsApp agreement is already recorded at the practice.",
-    optInQr: "Show the agreement QR code to the owner",
+    optInQrTitle: "The easiest way: the QR code",
+    optInQrBody:
+      "Show it to the owner: they scan it with their phone, send the ready message, and their agreement records itself. Nothing left to tick.",
+    optInQr: "Show the QR code to the owner",
     keep: "Keep",
     remove: "Remove",
     keepTreatmentLabel: (name: string) => `Keep the treatment ${name}`,

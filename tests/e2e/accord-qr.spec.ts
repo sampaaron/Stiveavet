@@ -52,7 +52,7 @@ test("le propriétaire donne son accord WhatsApp en scannant le QR code de l'acc
     // Depuis la fiche de lancement, à côté de la case.
     await page
       .getByRole("link", {
-        name: "Montrer le QR code d'accord au propriétaire",
+        name: "Afficher le QR code au propriétaire",
       })
       .click();
   } else {
@@ -60,7 +60,7 @@ test("le propriétaire donne son accord WhatsApp en scannant le QR code de l'acc
     await page.goto("/app");
     await page
       .getByRole("list", { name: "Prêts à lancer" })
-      .getByRole("link", { name: `QR code d'accord : ${name}` })
+      .getByRole("link", { name: `Afficher le QR code : ${name}` })
       .click();
   }
 
