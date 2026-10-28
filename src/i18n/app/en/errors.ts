@@ -47,6 +47,8 @@ export const errors: AppDictionary["errors"] = {
       "The owner has not given consent (or has withdrawn it): no message can be sent to them.",
     invalid_file:
       "File rejected: send a JPEG, PNG or WebP image of 5 MB at most (or a voice note).",
+    sheet_changed:
+      "The imported treatments changed after this page was shown. Review them again before launching the follow-up.",
     document_limit:
       "The practice library is full (200 documents). Delete a document you no longer need before adding another.",
     capture_unreadable:

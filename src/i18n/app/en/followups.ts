@@ -152,6 +152,14 @@ export const followups: AppDictionary["followups"] = {
     validatedBy: (name: string) => `Approved by ${name}`,
     toValidate: "Imported from dr.veto, awaiting approval",
     validateTreatment: (name: string) => `I approve this treatment: ${name}`,
+    validateAllImported: (count: number) =>
+      count > 1
+        ? `Approve the ${count} imported treatments`
+        : "Approve the imported treatment",
+    optInGiven: (count: number) =>
+      count > 1
+        ? "The owners' WhatsApp agreement is already recorded at the practice."
+        : "The owner's WhatsApp agreement is already recorded at the practice.",
     keep: "Keep",
     remove: "Remove",
     keepTreatmentLabel: (name: string) => `Keep the treatment ${name}`,

@@ -374,6 +374,7 @@ describe("activité du cabinet (totaux du tableau de bord)", () => {
       tilleuls.response.launched,
     );
     expect(tilleuls.daily).toHaveLength(14);
+    expect(tilleuls.checkIns).toBeGreaterThan(0);
     expect(
       tilleuls.daily.reduce((sum, day) => sum + day.inbound, 0),
     ).toBeLessThanOrEqual(tilleuls.ownerMessages);
@@ -390,6 +391,7 @@ describe("activité du cabinet (totaux du tableau de bord)", () => {
     for (const query of [
       "SELECT * FROM app.activity_messages(now() - interval '30 days')",
       "SELECT app.activity_answered(now() - interval '30 days')",
+      "SELECT app.activity_check_ins(now() - interval '30 days')",
     ])
       expect(
         await asApp(app, null, (client) => errorCode(client.query(query))),

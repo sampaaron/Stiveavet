@@ -104,6 +104,64 @@ export const dashboard = {
     chartRow: (day: string, inbound: number, outbound: number) =>
       `${day} : ${inbound} reçu${inbound > 1 ? "s" : ""}, ${outbound} envoyé${outbound > 1 ? "s" : ""}`,
   },
+  /**
+   * File « Prêts à lancer » (ADR 0046) : fiches préparées par l'équipe, que seul le vétérinaire
+   * responsable lance, en un clic, après les avoir relues.
+   */
+  ready: {
+    title: "Prêts à lancer",
+    description:
+      "Fiches préparées par l'équipe. Relisez chaque carte : seul le vétérinaire responsable lance le suivi.",
+    protocol: (name: string) => `Protocole « ${name} »`,
+    noProtocol: "Aucun protocole choisi",
+    firstMessage: (at: string) => `Premier message : ${at}`,
+    firstMessageNow: "Premier message dès le lancement",
+    control: (at: string) => `Contrôle : ${at}`,
+    treatments: (count: number) =>
+      count > 1
+        ? `${count} traitements importés de dr.veto, validés en lançant :`
+        : "1 traitement importé de dr.veto, validé en lançant :",
+    blockers: {
+      launch_incomplete: "Fiche à compléter",
+      integration_missing: "WhatsApp à relier au cabinet",
+      optin_missing: "Accord WhatsApp du propriétaire à noter",
+    },
+    waiting: (vet: string) => `Prête, attend ${vet}`,
+    launch: "Lancer",
+    launchWithTreatments: (count: number) =>
+      count > 1
+        ? `Valider les ${count} traitements et lancer`
+        : "Valider le traitement et lancer",
+    review: "Relire la fiche",
+    complete: "Compléter la fiche",
+    forAnimal: (animal: string) => ` : ${animal}`,
+    launchAll: (count: number) => `Tout lancer (${count})`,
+    launchAllTitle: (count: number) =>
+      `Lancer ${nombre(count, "suivi", "suivis")} ?`,
+    launchAllDescription:
+      "Les traitements importés affichés sur chaque carte seront validés en votre nom. Numa enverra ensuite chaque premier message à l'heure prévue.",
+    launchAllConfirm: "Tout lancer",
+    done: (launched: number, failed: number) =>
+      [
+        launched
+          ? `${nombre(launched, "suivi lancé", "suivis lancés")} : Numa enverra chaque premier message à l'heure prévue.`
+          : null,
+        failed
+          ? failed > 1
+            ? `${failed} fiches ont changé ou ne sont plus prêtes : ouvrez-les pour les relire.`
+            : "1 fiche a changé ou n'est plus prête : ouvrez-la pour la relire."
+          : null,
+      ]
+        .filter((part) => part !== null)
+        .join(" "),
+  },
+  /** Temps gagné (ADR 0046) : une estimation, dont le calcul est affiché. */
+  timeSaved: {
+    line: (duration: string, checkIns: number) =>
+      `Environ ${duration} gagnées sur 30 jours : ${nombre(checkIns, "prise de nouvelles faite", "prises de nouvelles faites")} par Numa à la place d'un appel.`,
+    how: (callMinutes: number, launchMinutes: number) =>
+      `Estimation : ${callMinutes} min par appel évité, moins ${launchMinutes} min par suivi lancé.`,
+  },
   next: {
     title: "Prochaines actions",
     drafts: (count: number) =>

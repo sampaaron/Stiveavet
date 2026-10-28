@@ -226,3 +226,24 @@ export async function changeStatusAction(
   revalidatePath("/app/suivis");
   redirect(`/app/suivis/${followupId}?fait=${STATUS_DONE[change]}`);
 }
+
+/**
+ * « Lancer » et « Tout lancer » depuis la file « Prêts à lancer » (ADR 0046) : le service
+ * revalide chaque suivi, ses traitements relus et le droit de lancer.
+ */
+export async function launchReadyAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const items = text(form, "items");
+  if (items.length > MAX_PAYLOAD) return invalidRequest();
+  const context = await memberContext();
+  let result = { launched: 0, failed: 0 };
+  const failure = await guarded(async () => {
+    result = await services.launch().launchFromQueue(context, parseJson(items));
+  });
+  if (failure) return failure;
+  revalidatePath("/app");
+  revalidatePath("/app/suivis");
+  redirect(`/app?lances=${result.launched}&echecs=${result.failed}`);
+}

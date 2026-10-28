@@ -46,6 +46,8 @@ export const errors = {
       "Le propriétaire n'a pas donné son accord (ou l'a retiré) : aucun message ne peut lui être envoyé.",
     invalid_file:
       "Fichier refusé : envoyez une image JPEG, PNG ou WebP de 5 Mo au plus (ou un message vocal).",
+    sheet_changed:
+      "Les traitements importés ont changé depuis l'affichage. Relisez-les avant de lancer le suivi.",
     document_limit:
       "La bibliothèque du cabinet est pleine (200 documents). Supprimez un document devenu inutile avant d'en ajouter un.",
     capture_unreadable:
