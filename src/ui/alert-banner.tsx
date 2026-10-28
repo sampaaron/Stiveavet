@@ -39,6 +39,11 @@ type AlertBannerProps = {
   action?: ReactNode;
   /** Bandeau fin d'une ligne, pour les rappels communs à tout l'espace cabinet. */
   compact?: boolean;
+  /**
+   * Annoncé aux lecteurs d'écran (par défaut). Faux pour une ligne d'une liste que la page
+   * annonce déjà ailleurs, comme la boîte « À traiter ».
+   */
+  live?: boolean;
 };
 
 /** Bandeau d'information. Le ton urgent est annoncé immédiatement aux lecteurs d'écran. */
@@ -48,11 +53,12 @@ export function AlertBanner({
   children,
   action,
   compact = false,
+  live = true,
 }: AlertBannerProps) {
   const { icon: Icon, className, iconClassName } = tones[tone];
   return (
     <div
-      role={tone === "urgent" ? "alert" : "status"}
+      role={live ? (tone === "urgent" ? "alert" : "status") : undefined}
       className={cn(
         "flex rounded-[var(--radius-card)] border",
         compact

@@ -17,6 +17,7 @@ import { formatDate, formatTime } from "@/ui/format";
 import { EmptyState } from "@/ui/states";
 
 import { OwnerComposer, ResumeNumaButton } from "./conversation-controls";
+import type { ReadyReply } from "./conversation-controls";
 
 type Text = AppDictionary["dossier"]["conversation"];
 
@@ -177,6 +178,7 @@ export function LiveConversation({
   view,
   links,
   draft,
+  ready,
   simulatorHref,
 }: {
   t: AppDictionary;
@@ -186,6 +188,8 @@ export function LiveConversation({
   links: Record<string, SignedLink>;
   /** Brouillon préparé par Stive, posé dans la zone de saisie (ADR 0034). */
   draft: string | null;
+  /** Réponses prêtes du cabinet et de Stive (ADR 0048). */
+  ready: ReadyReply[];
   /** Lien vers le simulateur du propriétaire, en local seulement. */
   simulatorHref: string | null;
 }) {
@@ -253,6 +257,7 @@ export function LiveConversation({
           animalName={view.animalName}
           pausesNuma={view.status === "active"}
           draft={draft}
+          ready={ready}
         />
       ) : (
         <p className="border-t border-line p-4 text-sm text-ink-muted sm:p-5">

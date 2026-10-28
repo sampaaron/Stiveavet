@@ -85,6 +85,19 @@ export const dossier = {
       aVet: "un vétérinaire",
       resolved: "close",
     },
+    /** « Copier pour dr.veto » (ADR 0048) : presse-papiers seulement. */
+    copy: {
+      button: "Copier pour dr.veto",
+      forAnimal: (animal: string) => ` : synthèse de ${animal}`,
+      copied:
+        "Synthèse copiée : collez-la dans le dossier dr.veto, puis relisez-la.",
+      failed:
+        "Copie impossible dans ce navigateur : sélectionnez le texte de la synthèse pour le copier.",
+      heading: (animal: string, procedure: string, day: number) =>
+        `Stivea Vet · Suivi de ${animal} (${procedure}, J${day})`,
+      footer: (date: string) =>
+        `Synthèse préparée par l'IA de Stivea Vet le ${date}, à relire : ni diagnostic ni conduite à tenir.`,
+    },
   },
   contacts: {
     title: "Propriétaires et accord",
@@ -265,6 +278,18 @@ export const dossier = {
       staysPaused: "Numa reste en pause.",
       placeholder: (animal: string) => `Votre message au sujet de ${animal}`,
       send: "Envoyer",
+      /** Réponses prêtes (ADR 0048) : posées dans la zone, jamais envoyées sans clic. */
+      ready: {
+        title: "Réponses prêtes",
+        byStive: "(préparée par Stive, assistant IA)",
+        placed: (label: string) =>
+          `« ${label} » posé dans la zone : relisez, corrigez puis envoyez.`,
+        stive: {
+          news: "Prendre des nouvelles",
+          photo: "Demander une photo",
+          call: "Demander d'appeler le cabinet",
+        },
+      },
     },
     resumeNuma: "Reprendre Numa",
   },

@@ -307,5 +307,21 @@ export function synthesisService(deps: { db: Database; ai: AiGateway }) {
       });
       return view(content, generatedAt);
     },
+
+    /**
+     * « Copier pour dr.veto » (ADR 0048) : la copie se fait dans le presse-papiers de la
+     * personne, jamais par écriture automatique dans dr.veto ; le journal garde qui a copié.
+     */
+    async recordCopy(actor: Actor, followupId: string): Promise<void> {
+      assertPermission(actor, "clinical.read");
+      await run(actor, async (tx) => {
+        const followup = await loadFollowup(tx, actor, followupId);
+        if (followup.access !== "clinical" || followup.status === "draft")
+          throw new DomainError("not_found");
+        await auditFollowup(tx, actor, "synthesis.copied", followupId, {
+          target: "drveto",
+        });
+      });
+    },
   };
 }

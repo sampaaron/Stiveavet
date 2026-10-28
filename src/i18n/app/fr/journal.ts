@@ -88,6 +88,14 @@ export const journal = {
       `${actor} a ouvert un document du cabinet`,
     "document.removed": (actor: string) =>
       `${actor} a supprimé un document du cabinet`,
+    "reply_template.created": (actor: string) =>
+      `${actor} a ajouté un modèle de réponse`,
+    "reply_template.updated": (actor: string) =>
+      `${actor} a modifié un modèle de réponse`,
+    "reply_template.removed": (actor: string) =>
+      `${actor} a supprimé un modèle de réponse`,
+    "synthesis.copied": (actor: string) =>
+      `${actor} a copié la synthèse d'un dossier pour dr.veto`,
     "attachment.opened": (actor: string) =>
       `${actor} a ouvert une photo ou un message vocal d'un suivi`,
     "agenda.capture_read": (actor: string) =>

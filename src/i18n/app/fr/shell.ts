@@ -29,6 +29,7 @@ export const shell = {
     assistants: "Assistants IA",
     shortcuts: "Raccourcis",
     documents: "Documents",
+    replies: "Réponses prêtes",
     contents: "Contenus",
     settings: "Réglages",
     integrations: "Intégrations",

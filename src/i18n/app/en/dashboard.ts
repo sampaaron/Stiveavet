@@ -184,12 +184,37 @@ export const dashboard: AppDictionary["dashboard"] = {
     appointments: "Stivea appointments",
     appointmentsHint: "Today, confirmed by the practice",
   },
-  priorities: {
-    title: "Priorities",
+  controlsChip: (count) =>
+    `${count} check-up${count > 1 ? "s" : ""} today: summaries ready`,
+  inbox: {
+    title: (count) => (count ? `To do (${count})` : "To do"),
+    label: "To do",
     description:
-      "Emergencies and cases to watch, from most serious to most recent.",
-    emptyTitle: "No priorities",
-    emptyDescription: "All follow-ups are progressing normally.",
+      "Alerts, owners waiting for the team and failed tasks, from most to least urgent. Each line suggests what to do.",
+    emptyTitle: "Nothing to do",
+    emptyDescription: "No alerts, no replies awaited, no failed tasks.",
+    reply: "Reply",
+    appointment: "See the calendar",
+    awaiting: (animal) => `${animal} · the owner is waiting for the team`,
+    awaitingSince: (when, paused) =>
+      `Owner's last message ${when}. ${paused ? "Numa is paused" : "The team has taken over"}: the reply comes from you.`,
+    task: (label) => `Failed task · ${label}`,
+    more: (count) =>
+      `${count} more item${count > 1 ? "s" : ""}: see all alerts`,
+    done: {
+      "alerte-recue": "Acknowledged: escalation cancelled.",
+      "alerte-close": "Alert closed.",
+      "alerte-confiee": "Alert handed over: the chosen vet has been notified.",
+      "tache-relance": "Task retried.",
+      "tache-abandon": "Task cancelled.",
+    },
+  },
+  controls: {
+    title: "Today's check-ups",
+    description:
+      "Each animal's summary is ready before the consultation. “Copy for dr.veto” puts it on your clipboard: nothing is written to dr.veto automatically.",
+    at: (time, day) => `Check-up at ${time} · day ${day}`,
+    read: "Read the summary",
   },
   others: {
     quiet: (count: number) =>

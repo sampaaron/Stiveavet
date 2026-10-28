@@ -170,6 +170,54 @@ export const hub = {
       readOnly: "Les documents ajoutés par l'équipe apparaîtront ici.",
     },
   },
+  /** Modèles de réponse du cabinet (ADR 0048). */
+  replies: {
+    title: "Réponses prêtes",
+    description:
+      "Les modèles de réponse du cabinet. Dans un dossier, un clic pose le texte dans la zone de saisie : vous le relisez, le corrigez puis l'envoyez vous-même.",
+    notice:
+      "Écrivez des phrases d'organisation, sans avis médical. Les noms sont remplacés dans le dossier : {animal}, {proprietaire}, {veterinaire}, {cabinet}.",
+    count: (n: number) =>
+      n === 0 ? "Aucun modèle" : `${n} modèle${n > 1 ? "s" : ""}`,
+    languages: { fr: "Français", en: "Anglais" },
+    empty: {
+      title: "Aucun modèle pour l'instant",
+      description: "Ajoutez la première réponse que l'équipe écrit souvent.",
+      readOnly:
+        "L'administrateur du cabinet peut ajouter les réponses que l'équipe écrit souvent.",
+    },
+    updated: (when: string, by: string | null) =>
+      by ? `Modifié ${when} · ajouté par ${by}` : `Modifié ${when}`,
+    form: {
+      addTitle: "Ajouter un modèle",
+      titleLabel: "Nom du modèle",
+      titlePlaceholder: "Par exemple : Message bien reçu",
+      bodyLabel: "Texte",
+      bodyHint:
+        "1 000 caractères au plus. Champs remplacés dans le dossier : {animal}, {proprietaire}, {veterinaire}, {cabinet}.",
+      languageLabel: "Langue du propriétaire",
+      add: "Ajouter le modèle",
+      edit: "Modifier",
+      save: "Enregistrer",
+    },
+    remove: {
+      trigger: "Supprimer",
+      triggerLabel: (title: string) => `Supprimer ${title}`,
+      title: (title: string) => `Supprimer « ${title} » ?`,
+      description:
+        "Le modèle disparaît des dossiers. Les messages déjà envoyés ne changent pas.",
+      confirm: "Supprimer le modèle",
+    },
+    validation: {
+      title: "Donnez un nom au modèle (60 caractères au plus).",
+      body: "Écrivez le texte du modèle (1 000 caractères au plus).",
+    },
+    done: {
+      added: "Modèle ajouté.",
+      saved: "Modèle enregistré.",
+      removed: "Modèle supprimé.",
+    },
+  },
   contents: {
     title: "Contenus",
     description:

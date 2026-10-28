@@ -14,3 +14,4 @@ export * from "@/domains/notifications/schema";
 export * from "@/domains/whatsapp/schema";
 export * from "@/domains/stive/schema";
 export * from "@/domains/documents/schema";
+export * from "@/domains/reponses/schema";

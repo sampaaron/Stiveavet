@@ -28,6 +28,7 @@ import { ROLE_PERMISSIONS } from "../../src/domains/equipe/permissions";
 import { PROTOCOL_LIBRARY } from "../../src/domains/protocoles/library";
 import { protocolsService } from "../../src/domains/protocoles/service";
 import { settingsService } from "../../src/domains/reglages/service";
+import { replyTemplatesService } from "../../src/domains/reponses/service";
 import { addMonths } from "../../src/domains/facturation/rules";
 import {
   billingService,
@@ -292,6 +293,34 @@ async function seedProtocols(db: Database, claire: Actor, hugo: Actor) {
  * Réglages des Tilleuls : installation menée par Claire, sauf le suivi test (étape laissée
  * ouverte). Connexions simulées, garde de Hugo puis d'Inès.
  */
+/** Réponses prêtes du cabinet (ADR 0048) : des phrases d'organisation, sans avis médical. */
+async function seedReplyTemplates(db: Database, claire: Actor) {
+  const service = replyTemplatesService(db);
+  for (const template of [
+    {
+      title: "Message bien reçu",
+      body: "Bonjour {proprietaire}, c'est {veterinaire}. Merci pour votre message au sujet de {animal} : je le lis et je reviens vers vous dans la journée.",
+      language: "fr" as const,
+    },
+    {
+      title: "Venir au cabinet",
+      body: "Bonjour {proprietaire}, je préfère voir {animal} au cabinet. Appelez-nous pour convenir d'un horaire aujourd'hui ; si c'est urgent, venez directement. {veterinaire}, {cabinet}.",
+      language: "fr" as const,
+    },
+    {
+      title: "Rappel du contrôle",
+      body: "Bonjour {proprietaire}, nous attendons {animal} pour son contrôle. Pensez à apporter son carnet de santé. À bientôt, {cabinet}.",
+      language: "fr" as const,
+    },
+    {
+      title: "Message received",
+      body: "Hello {proprietaire}, this is {veterinaire}. Thank you for your message about {animal}: I am reading it and will get back to you today.",
+      language: "en" as const,
+    },
+  ])
+    await service.create(claire, template);
+}
+
 async function seedSettings(
   db: Database,
   claire: Actor,
@@ -429,6 +458,7 @@ export async function seedFictionalCabinets(db: Database) {
     await seedActor(db, SEED.tilleuls, hugoId),
   );
   await seedSettings(db, claire, [hugoId, inesId]);
+  await seedReplyTemplates(db, claire);
   // Clinique au 5e mois : essai terminé, choix de l'engagement annuel encore à faire.
   await seedSubscription(db, claire, "premium", {
     monthsAgo: 4,

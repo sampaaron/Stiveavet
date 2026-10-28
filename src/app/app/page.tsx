@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ClipboardPen,
   CalendarDays,
+  ClipboardCheck,
   ChevronDown,
   CircleAlert,
   Eye,
@@ -22,6 +23,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { PermissionKey } from "@/domains/equipe/permissions";
+import { parisDayIndex } from "@/domains/heure-paris";
 import type { StiveBriefing } from "@/domains/stive/service";
 import { daysSince } from "@/domains/suivis/calendrier";
 import type { ActivityStats } from "@/domains/suivis/statistiques";
@@ -65,8 +67,11 @@ import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
 import { ActivityPanel, NextActions } from "./activity-panel";
+import { Inbox, inboxItems } from "./inbox";
 import { OperatedToday } from "./operated-today";
 import { ReadyQueue } from "./ready-queue";
+import { MAX_CONTROLS, TodayControls } from "./today-controls";
+import type { TodayControl } from "./today-controls";
 import { AskStiveBar } from "./stive/stive-forms";
 import { triageReasonText } from "./triage-reason";
 
@@ -533,43 +538,21 @@ function TodayStats({
   );
 }
 
-/** Suivis prioritaires (urgents puis à surveiller), puis les autres. */
-function ClinicalLists({
+/** Suivis en cours sans alerte, repliés : les alertes sont dans « À traiter ». */
+function QuietFollowups({
   t,
   locale,
   now,
-  priorities,
   others,
 }: {
   t: AppDictionary;
   locale: Locale;
   now: Date;
-  priorities: DashboardFollowup[];
   others: DashboardFollowup[];
 }) {
   const text = t.dashboard;
   return (
     <>
-      <SectionCard
-        title={text.priorities.title}
-        description={text.priorities.description}
-      >
-        {priorities.length > 0 ? (
-          <ul className="-mx-3">
-            {priorities.map((followup) => (
-              <li key={followup.id}>
-                <FollowupCard followup={toCard(t, locale, followup, now)} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            title={text.priorities.emptyTitle}
-            description={text.priorities.emptyDescription}
-          />
-        )}
-      </SectionCard>
-
       <SectionCard
         title={text.others.title}
         action={
@@ -725,14 +708,19 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
   // File « Prêts à lancer » (ADR 0046) : pour qui prépare les fiches avec l'accès clinique.
   // « Opérés du jour » (ADR 0047) : lus dans dr.veto, pour la même personne.
   const prepares = can("followups.launch") && can("clinical.read");
-  const [ready, operated, { lances, echecs, preparees, accord }] =
-    await Promise.all([
-      prepares ? services.launch().readyQueue(context) : Promise.resolve([]),
-      prepares
-        ? services.launch().operatedToday(context, now)
-        : Promise.resolve(null),
-      searchParams,
-    ]);
+  // « À traiter » (ADR 0048) : alertes lisibles en clinique, tâches en échec pour l'administrateur.
+  const [ready, operated, openAlerts, failures, params] = await Promise.all([
+    prepares ? services.launch().readyQueue(context) : Promise.resolve([]),
+    prepares
+      ? services.launch().operatedToday(context, now)
+      : Promise.resolve(null),
+    services.alerts().open(context),
+    can("organization.settings")
+      ? services.jobs().failures(context)
+      : Promise.resolve([]),
+    searchParams,
+  ]);
+  const { lances, echecs, preparees, accord, fait } = params;
   const count = (value: unknown) => {
     const parsed = Number(value);
     return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 50
@@ -749,7 +737,9 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
         ? text.operated.done(preparedNow)
         : accord === "1"
           ? text.ready.optInRecorded
-          : null;
+          : typeof fait === "string" && Object.hasOwn(text.inbox.done, fait)
+            ? text.inbox.done[fait as keyof typeof text.inbox.done]
+            : null;
   // Le point de Stive reprend la vue déjà lue : ni demande comptée, ni échange enregistré.
   const briefing = can("stive.use")
     ? await services.stive().briefing(context, now, today)
@@ -796,7 +786,39 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
     can("followups.read_all") ||
     can("followups.read_own") ||
     can("followups.read_summary");
-  const chips = quickActions(t, can, today, urgent);
+  // Contrôles du jour (ADR 0048) : date de contrôle de la fiche, ou rendez-vous de contrôle.
+  const day = parisDayIndex(now);
+  const controlAt = new Map<string, Date>();
+  for (const item of today.agenda ?? [])
+    if (item.kind === "controle" && item.followupId)
+      controlAt.set(item.followupId, item.startsAt);
+  const controls: TodayControl[] = visible
+    .flatMap((followup) => {
+      const at =
+        controlAt.get(followup.id) ??
+        (followup.controlAppointmentAt &&
+        parisDayIndex(followup.controlAppointmentAt) === day
+          ? followup.controlAppointmentAt
+          : null);
+      return at ? [{ followup, at }] : [];
+    })
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .slice(0, MAX_CONTROLS);
+  const inbox = clinical
+    ? inboxItems({ alerts: openAlerts, followups: visible, failures })
+    : [];
+  const chips = [
+    ...(controls.length
+      ? [
+          {
+            href: "#controles-du-jour",
+            label: text.controlsChip(controls.length),
+            icon: ClipboardCheck,
+          },
+        ]
+      : []),
+    ...quickActions(t, can, today, urgent),
+  ];
 
   return (
     <>
@@ -867,16 +889,31 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
-            {operated?.length ? <OperatedToday animals={operated} /> : null}
-            {ready.length > 0 ? <ReadyQueue drafts={ready} now={now} /> : null}
             {clinical ? (
-              <ClinicalLists
+              <Inbox
                 t={t}
                 locale={locale}
                 now={now}
-                priorities={[...urgent, ...watch]}
-                others={others}
+                items={inbox}
+                can={{
+                  reply: can("owner_messages.reply"),
+                  agenda: can("agenda.read"),
+                }}
               />
+            ) : null}
+            {controls.length ? (
+              <TodayControls
+                t={t}
+                locale={locale}
+                context={context}
+                controls={controls}
+                now={now}
+              />
+            ) : null}
+            {operated?.length ? <OperatedToday animals={operated} /> : null}
+            {ready.length > 0 ? <ReadyQueue drafts={ready} now={now} /> : null}
+            {clinical ? (
+              <QuietFollowups t={t} locale={locale} now={now} others={others} />
             ) : (
               <OrganizationList t={t} views={views} />
             )}

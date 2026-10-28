@@ -51,6 +51,8 @@ export const errors: AppDictionary["errors"] = {
       "The imported treatments changed after this page was shown. Review them again before launching the follow-up.",
     document_limit:
       "The practice library is full (200 documents). Delete a document you no longer need before adding another.",
+    template_limit:
+      "The practice already has 30 reply templates. Delete one you no longer need before adding another.",
     capture_unreadable:
       "No free slot could be read from this screenshot. It has been deleted; try again with a sharper screenshot.",
     whatsapp_signup_failed:

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { AlertView } from "@/domains/urgences/service";
 import { appText } from "@/i18n/app/server";
@@ -8,6 +9,7 @@ import { AlertBanner } from "@/ui/alert-banner";
 import { formatDateTime, formatTime } from "@/ui/format";
 
 import { AlertButtons, ReassignForm } from "./alert-buttons";
+import type { AlertOrigin } from "./alert-buttons";
 import { triageReasonText } from "./triage-reason";
 
 /** État de l'alerte : qui est prévenu, l'escalade, l'accusé de réception. */
@@ -46,9 +48,12 @@ function statusLine(
 export async function AlertCard({
   alert,
   from,
+  extra,
 }: {
   alert: AlertView;
-  from: "alertes" | "dossier";
+  from: AlertOrigin;
+  /** Actions proposées en plus (boîte « À traiter ») : répondre, voir l'agenda. */
+  extra?: ReactNode;
 }) {
   const { t, locale } = await appText();
   const text = t.alerts.card;
@@ -63,7 +68,8 @@ export async function AlertCard({
   return (
     <AlertBanner
       tone={pending ? (urgent ? "urgent" : "watch") : "success"}
-      title={from === "alertes" ? `${alert.animalName} · ${title}` : title}
+      live={from !== "accueil"}
+      title={from === "dossier" ? title : `${alert.animalName} · ${title}`}
       action={
         alert.canAcknowledge ? (
           <AlertButtons
@@ -90,7 +96,7 @@ export async function AlertCard({
           current={alert.targetMembershipId}
         />
       ) : null}
-      {from === "alertes" ? (
+      {from !== "dossier" ? (
         <Link
           href={`/app/suivis/${alert.followupId}#conversation`}
           className="mt-1 inline-block font-semibold text-brand-ink underline-offset-2 hover:underline"
@@ -101,6 +107,9 @@ export async function AlertCard({
             ({formatDateTime(alert.createdAt, locale)})
           </span>
         </Link>
+      ) : null}
+      {extra ? (
+        <span className="mt-2 flex flex-wrap gap-2">{extra}</span>
       ) : null}
     </AlertBanner>
   );

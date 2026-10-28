@@ -10,7 +10,16 @@ import { initialActionState } from "../action-state";
 import { cancelJobAction, retryJobAction } from "./actions";
 
 /** Relancer ou abandonner une tâche en échec. */
-export function JobActions({ id, label }: { id: string; label: string }) {
+export function JobActions({
+  id,
+  label,
+  from = "taches",
+}: {
+  id: string;
+  label: string;
+  /** Écran où revenir : la page des tâches ou la boîte « À traiter ». */
+  from?: "taches" | "accueil";
+}) {
   const [retryState, retry, retrying] = useActionState(
     retryJobAction,
     initialActionState,
@@ -26,6 +35,7 @@ export function JobActions({ id, label }: { id: string; label: string }) {
       <div className="flex flex-wrap gap-2">
         <form action={retry}>
           <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="from" value={from} />
           <Button
             type="submit"
             variant="secondary"
@@ -39,6 +49,7 @@ export function JobActions({ id, label }: { id: string; label: string }) {
         </form>
         <form action={cancel}>
           <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="from" value={from} />
           <Button
             type="submit"
             variant="quiet"

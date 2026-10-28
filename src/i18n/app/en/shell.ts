@@ -29,6 +29,7 @@ export const shell: AppDictionary["shell"] = {
     assistants: "AI assistants",
     shortcuts: "Shortcuts",
     documents: "Documents",
+    replies: "Ready replies",
     contents: "Contents",
     settings: "Settings",
     integrations: "Integrations",

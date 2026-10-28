@@ -9,6 +9,9 @@ import { ActionMessage, selectClasses } from "./action-message";
 import { initialActionState } from "./action-state";
 import { alertAction } from "./alertes/actions";
 
+/** Écran d'où vient la décision, où l'on revient ensuite. */
+export type AlertOrigin = "alertes" | "dossier" | "accueil";
+
 /** « Accuser réception » et « Clore l'alerte » : décisions de vétérinaire. */
 export function AlertButtons({
   alertId,
@@ -16,7 +19,7 @@ export function AlertButtons({
   canAcknowledge,
 }: {
   alertId: string;
-  from: "alertes" | "dossier";
+  from: AlertOrigin;
   /** Urgence ou alerte encore sans accusé de réception. */
   canAcknowledge: boolean;
 }) {
@@ -67,7 +70,7 @@ export function ReassignForm({
   current,
 }: {
   alertId: string;
-  from: "alertes" | "dossier";
+  from: AlertOrigin;
   options: { value: string; label: string }[];
   current: string;
 }) {

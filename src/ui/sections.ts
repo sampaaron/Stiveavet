@@ -29,6 +29,7 @@ const prefixes: readonly [string, Section][] = [
   ["/app/raccourcis", "assistants"],
   ["/app/contenus", "protocols"],
   ["/app/documents", "protocols"],
+  ["/app/reponses", "protocols"],
   ["/app/integrations", "tasks"],
   ["/app/protocoles", "protocols"],
   ["/app/equipe", "team"],

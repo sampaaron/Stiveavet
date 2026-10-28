@@ -81,6 +81,13 @@ export type DashboardFollowup = {
   consent: "requested" | "given" | "withdrawn" | null;
   lastActivityAt: Date | null;
   summary: DashboardSummary;
+  /** Date du contrôle prévue sur la fiche (synthèse prête ce jour-là, ADR 0048). */
+  controlAppointmentAt: Date | null;
+  /**
+   * Numa en pause ou relayée par l'équipe, et le dernier message vient du propriétaire :
+   * c'est à l'équipe de répondre (boîte « À traiter », ADR 0048).
+   */
+  awaitingReply: boolean;
 };
 
 export type DashboardAgendaItem = {
@@ -313,6 +320,18 @@ function summaryOf(
   return { kind: "quiet" };
 }
 
+/** Numa ne répond plus d'elle-même et le propriétaire a écrit en dernier. */
+function awaitingReply(
+  view: FollowupClinical,
+  facts: Awaited<ReturnType<typeof clinicalFacts>>,
+): boolean {
+  if (view.status !== "paused" && view.status !== "human_takeover")
+    return false;
+  const owner = facts.lastOwner.get(view.id);
+  const last = facts.lastMessage.get(view.id);
+  return Boolean(owner && last && owner.at.getTime() >= last.getTime());
+}
+
 const TRIAGE_ORDER = { urgent: 0, watch: 1, normal: 2 } as const;
 
 export type TodayService = ReturnType<typeof todayService>;
@@ -374,6 +393,8 @@ export function todayService(deps: {
               lastActivityAt:
                 facts.lastMessage.get(view.id) ?? view.startedAt ?? null,
               summary: summaryOf(view, facts),
+              controlAppointmentAt: view.controlAppointmentAt,
+              awaitingReply: awaitingReply(view, facts),
             }))
             .sort(
               (a, b) =>

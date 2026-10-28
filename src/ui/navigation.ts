@@ -12,6 +12,7 @@ import {
   House,
   LayoutDashboard,
   LifeBuoy,
+  MessageSquareQuote,
   MessagesSquare,
   PawPrint,
   PlugZap,
@@ -128,6 +129,12 @@ export const appNavigation: NavSection[] = [
         label: "documents",
         icon: FolderOpen,
         anyOf: ["protocols.manage", "protocols.create_own", "followups.launch"],
+      },
+      {
+        href: "/app/reponses",
+        label: "replies",
+        icon: MessageSquareQuote,
+        anyOf: ["owner_messages.reply", "organization.settings"],
       },
       {
         href: "/app/contenus",
