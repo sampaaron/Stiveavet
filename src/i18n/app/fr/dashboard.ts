@@ -151,9 +151,10 @@ export const dashboard = {
     review: "Relire la fiche",
     complete: "Compléter la fiche",
     forAnimal: (animal: string) => ` : ${animal}`,
-    showOptInQr: "QR code d'accord",
+    optInQrTitle: "Accord WhatsApp du propriétaire à recueillir",
+    showOptInQr: "Afficher le QR code",
     showOptInQrHint:
-      "Le propriétaire scanne et envoie le message prêt depuis son téléphone : son accord est noté seul.",
+      "Montrez-lui le QR code : il le scanne avec son téléphone, envoie le message prêt, et l'accord est noté tout seul.",
     recordOptIn: "Noter l'accord du propriétaire",
     recordOptInHint:
       "Recueilli à l'accueil : le propriétaire accepte d'être contacté sur WhatsApp.",

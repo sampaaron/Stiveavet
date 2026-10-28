@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  CircleAlert,
-  MessageCircleCheck,
-  Pill,
-  QrCode,
-  Rocket,
-} from "lucide-react";
+import { CircleAlert, MessageCircleCheck, Pill, Rocket } from "lucide-react";
 import { useActionState, useRef } from "react";
 
 import type { ReadyDraft } from "@/domains/suivis/lancement";
@@ -18,6 +12,7 @@ import { ConfirmDialog } from "@/ui/dialog";
 import { formatRelativeDayTime } from "@/ui/format";
 
 import { ActionMessage } from "./action-message";
+import { OptInQrCallout } from "./suivis/opt-in-qr-callout";
 import { initialActionState } from "./action-state";
 import { launchReadyAction, recordOptInAction } from "./suivis/launch-actions";
 
@@ -70,6 +65,7 @@ function RecordOptIn({ draft }: { draft: ReadyDraft }) {
       <input type="hidden" name="followupId" value={draft.id} />
       <Button
         type="submit"
+        variant="secondary"
         size="sm"
         disabled={pending}
         aria-busy={pending}
@@ -216,20 +212,7 @@ export function ReadyQueue({
               <div className="flex flex-wrap items-start gap-2 sm:justify-end">
                 {ready && draft.canLaunch ? <LaunchOne draft={draft} /> : null}
                 {draft.blocker === "optin_missing" ? (
-                  <>
-                    <ButtonLink
-                      href={`/app/suivis/${draft.id}/accord`}
-                      size="sm"
-                      title={text.showOptInQrHint}
-                      icon={<QrCode aria-hidden="true" className="size-4" />}
-                    >
-                      {text.showOptInQr}
-                      <span className="sr-only">
-                        {text.forAnimal(draft.animalName)}
-                      </span>
-                    </ButtonLink>
-                    <RecordOptIn draft={draft} />
-                  </>
+                  <RecordOptIn draft={draft} />
                 ) : null}
                 <ButtonLink href={sheet} variant="secondary" size="sm">
                   {ready ? text.review : text.complete}
@@ -238,6 +221,16 @@ export function ReadyQueue({
                   </span>
                 </ButtonLink>
               </div>
+              {draft.blocker === "optin_missing" ? (
+                <OptInQrCallout
+                  className="sm:col-span-2"
+                  followupId={draft.id}
+                  title={text.optInQrTitle}
+                  body={text.showOptInQrHint}
+                  action={text.showOptInQr}
+                  actionSuffix={text.forAnimal(draft.animalName)}
+                />
+              ) : null}
             </li>
           );
         })}

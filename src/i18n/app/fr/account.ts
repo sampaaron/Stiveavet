@@ -99,6 +99,9 @@ export const account = {
       "Pour la reconnaître, par exemple « Ordinateur de la consultation ».",
     password: "Votre mot de passe",
     submit: "Ajouter une clé d'accès",
+    submitPhone: "Ajouter avec mon téléphone (QR code)",
+    phoneHint:
+      "Avec votre téléphone, un QR code s'affiche : scannez-le avec l'appareil photo, puis confirmez avec votre empreinte ou votre visage. Le Bluetooth doit être allumé sur l'ordinateur et sur le téléphone.",
     added: "Clé d'accès ajoutée. Un e-mail de confirmation vous a été envoyé.",
     cancelled: "Ajout annulé sur l'appareil : rien n'a été enregistré.",
     already: "Cet appareil a déjà une clé d'accès pour votre compte.",

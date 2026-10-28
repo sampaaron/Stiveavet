@@ -99,6 +99,9 @@ export const account: AppDictionary["account"] = {
     labelHint: "To recognise it, for example “Consultation room computer”.",
     password: "Your password",
     submit: "Add a passkey",
+    submitPhone: "Add with my phone (QR code)",
+    phoneHint:
+      "With your phone, a QR code appears: scan it with the camera, then confirm with your fingerprint or face. Bluetooth must be on, on both the computer and the phone.",
     added: "Passkey added. A confirmation email has been sent to you.",
     cancelled: "Cancelled on the device: nothing was saved.",
     already: "This device already has a passkey for your account.",

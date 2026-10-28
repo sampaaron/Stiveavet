@@ -172,7 +172,10 @@ export const followups = {
       count > 1
         ? "Accord WhatsApp des propriétaires déjà noté au cabinet."
         : "Accord WhatsApp du propriétaire déjà noté au cabinet.",
-    optInQr: "Montrer le QR code d'accord au propriétaire",
+    optInQrTitle: "Le plus simple : le QR code",
+    optInQrBody:
+      "Montrez-le au propriétaire : il le scanne avec son téléphone, envoie le message prêt, et son accord est noté tout seul. Plus rien à cocher.",
+    optInQr: "Afficher le QR code au propriétaire",
     keep: "Garder",
     remove: "Retirer",
     keepTreatmentLabel: (name: string) => `Garder le traitement ${name}`,
