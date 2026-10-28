@@ -7,7 +7,7 @@ import { z } from "zod";
  * les erreurs : seulement leur classe et un code technique.
  */
 
-export const STRIPE_API_URL = "https://api.stripe.com/v1";
+const STRIPE_API_URL = "https://api.stripe.com/v1";
 /** Version de l'API, figée ; revue à l'ouverture du compte (partie B) et à chaque mise à jour. */
 export const STRIPE_API_VERSION = "2025-09-30.clover";
 
@@ -61,7 +61,7 @@ const errorBody = z.object({
 
 /** Corps « application/x-www-form-urlencoded » de Stripe, objets imbriqués en `a[b]`. */
 type FormValue = string | number | boolean | string[] | Record<string, string>;
-export function formBody(fields: Record<string, FormValue | undefined>) {
+function formBody(fields: Record<string, FormValue | undefined>) {
   const body = new URLSearchParams();
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined) continue;

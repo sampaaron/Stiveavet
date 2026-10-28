@@ -14,6 +14,7 @@ import { services } from "@/server/services";
 
 import type { ActionState } from "../action-state";
 import { domainFailure, invalidRequest } from "../domain-messages";
+import { parseJson, text } from "../form-data";
 
 /**
  * Lancement d'un suivi (ADR 0015). Chaque action refait toute la garde : session, membre actif,
@@ -21,19 +22,6 @@ import { domainFailure, invalidRequest } from "../domain-messages";
  */
 
 const MAX_PAYLOAD = 100_000;
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
-
-function parseJson(payload: string): unknown {
-  try {
-    return JSON.parse(payload) as unknown;
-  } catch {
-    return null;
-  }
-}
 
 async function guarded(
   run: () => Promise<void>,

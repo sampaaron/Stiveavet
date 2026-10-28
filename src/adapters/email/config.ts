@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseConfig } from "@/server/config";
+
 import { scalewayEmailSender } from "./scaleway";
 import { SmtpEmailSender } from "./smtp";
 import type { EmailSender } from "./types";
@@ -58,14 +60,7 @@ export type EmailConfig =
 export function emailConfig(
   source: Record<string, string | undefined>,
 ): EmailConfig {
-  const result = configSchema.safeParse(source);
-  if (!result.success) {
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  const env = result.data;
+  const env = parseConfig(configSchema, source);
   if (env.EMAIL_PROVIDER === "smtp")
     return {
       mode: "smtp",

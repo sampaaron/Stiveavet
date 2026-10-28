@@ -48,4 +48,9 @@ export const ui: AppDictionary["ui"] = {
     },
     pending: "To confirm",
   },
+  fileDrop: {
+    prompt: "Drop the image here",
+    browse: "or click to choose a file",
+    replace: "Click to choose another image",
+  },
 };

@@ -8,7 +8,6 @@ export const common = {
   edit: "Modifier",
   remove: "Retirer",
   back: "Retour",
-  loading: "Chargement…",
   saved: "Enregistré.",
   yes: "Oui",
   no: "Non",

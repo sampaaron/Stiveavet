@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseConfig } from "@/server/config";
+
 import { scalewayQueue } from "./scaleway-queues";
 
 /**
@@ -42,14 +44,7 @@ export function wakeChannel(
   source: Record<string, string | undefined>,
   fetcher: typeof fetch = globalThis.fetch,
 ): WakeChannel {
-  const result = configSchema.safeParse(source);
-  if (!result.success) {
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  const env = result.data;
+  const env = parseConfig(configSchema, source);
   if (env.QUEUE_PROVIDER === "none")
     return { notify: () => Promise.resolve(), wait: sleep };
   const queue = scalewayQueue({

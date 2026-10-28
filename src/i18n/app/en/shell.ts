@@ -17,7 +17,6 @@ export const shell: AppDictionary["shell"] = {
   alertsNone: "Alerts: none pending",
   alertsPending: (count: number) => `Alerts: ${count} not acknowledged`,
   onThisPage: "On this page",
-  workspace: "Practice workspace",
   nav: {
     today: "Today",
     followups: "Follow-ups",

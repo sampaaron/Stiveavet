@@ -5,6 +5,7 @@ import type { DrVetoConnector } from "@/adapters/drveto/types";
 import { DomainError, assertPermission } from "@/domains/equipe/actor";
 import type { Actor } from "@/domains/equipe/actor";
 import { VET_ROLES } from "@/domains/equipe/permissions";
+import { activeVets } from "@/domains/equipe/veterinaires";
 import { recordUsage } from "@/domains/facturation/service";
 import { MAX_STEPS } from "@/domains/protocoles/content";
 import { emit } from "@/domains/taches/queue";
@@ -63,7 +64,6 @@ import type {
   StatusChange,
 } from "./chargement";
 import {
-  activeVets,
   copyProtocolPlan,
   currentAlerts,
   currentSteps,

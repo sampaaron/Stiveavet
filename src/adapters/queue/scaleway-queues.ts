@@ -9,9 +9,9 @@ import type { Credentials } from "@/adapters/scaleway/sigv4";
  * PostgreSQL reste la seule source de vérité des tâches (ADR 0014).
  */
 
-export const SCALEWAY_QUEUES_URL = "https://sqs.mnq.fr-par.scaleway.com";
+const SCALEWAY_QUEUES_URL = "https://sqs.mnq.fr-par.scaleway.com";
 
-export class QueueError extends Error {
+class QueueError extends Error {
   constructor(readonly status: number) {
     super(`queue:${status}`);
   }

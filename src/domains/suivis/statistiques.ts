@@ -10,8 +10,8 @@ import type { Database } from "@/server/db/tenant";
  * suivis test de l'installation ne comptent pas.
  */
 
-export const ACTIVITY_DAYS = 30;
-export const CHART_DAYS = 14;
+const ACTIVITY_DAYS = 30;
+const CHART_DAYS = 14;
 
 export type ActivityStats = {
   ongoing: number;

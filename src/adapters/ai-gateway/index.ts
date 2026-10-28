@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseConfig } from "@/server/config";
+
 import { apiAiGateway } from "./api-compatible";
 import { fakeAiGateway } from "./fake";
 import type { AiGateway } from "./types";
@@ -61,14 +63,7 @@ export type AiConfig =
     };
 
 export function aiConfig(source: Record<string, string | undefined>): AiConfig {
-  const result = configSchema.safeParse(source);
-  if (!result.success) {
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  const env = result.data;
+  const env = parseConfig(configSchema, source);
   if (env.AI_PROVIDER === "simulated") return { mode: "simulated" };
   return {
     mode: env.AI_PROVIDER,

@@ -57,7 +57,7 @@
     @apply outline-2 outline-offset-2 outline-brand;
   }
 
-  /* Listes déroulantes et fichiers dessinés comme le reste de l'interface (audit design, point 4). */
+  /* Listes déroulantes et heures dessinées comme le reste de l'interface (audit design, point 4) ; les fichiers passent par `FileDrop`. */
   select:not([multiple]) {
     /* Peut rétrécir sous la largeur de sa plus longue option (écrans de 320 px). */
     max-width: 100%;
@@ -67,14 +67,6 @@
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 1rem;
-  }
-
-  input[type="file"]::file-selector-button {
-    @apply mr-3 cursor-pointer rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition-colors;
-  }
-
-  input[type="file"]::file-selector-button:hover {
-    @apply bg-canvas-subtle;
   }
 
   input[type="time"]::-webkit-calendar-picker-indicator {

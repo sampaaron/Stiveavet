@@ -49,6 +49,7 @@ import {
   isPermissionKey,
 } from "./permissions";
 import type { PermissionKey } from "./permissions";
+import { activeVets } from "./veterinaires";
 
 const INVITATION_DAYS = 7;
 
@@ -620,18 +621,7 @@ export function teamService(deps: {
     async reassignmentTargets(actor: Actor, excludingMembershipId: string) {
       assertPermission(actor, "team.manage");
       return run(actor, (tx) =>
-        tx
-          .select({ membershipId: memberships.id, name: users.displayName })
-          .from(memberships)
-          .innerJoin(users, eq(users.id, memberships.userId))
-          .where(
-            and(
-              isNull(memberships.deactivatedAt),
-              inArray(memberships.role, ["admin_vet", "vet"]),
-              ne(memberships.id, excludingMembershipId),
-            ),
-          )
-          .orderBy(asc(users.displayName)),
+        activeVets(tx, { excluding: excludingMembershipId }),
       );
     },
   };

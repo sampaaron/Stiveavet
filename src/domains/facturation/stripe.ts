@@ -7,6 +7,7 @@ import { fakePaymentMandate } from "@/adapters/payments/fake";
 import type { PaymentMandateProvider } from "@/adapters/payments/types";
 import { StripeError, stripeApi } from "@/adapters/stripe/api";
 import type { StripeApi } from "@/adapters/stripe/api";
+import { parseConfig } from "@/server/config";
 import { billingAccounts } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
 
@@ -58,14 +59,7 @@ export type BillingConfig =
 export function billingConfig(
   source: Record<string, string | undefined>,
 ): BillingConfig {
-  const result = configSchema.safeParse(source);
-  if (!result.success) {
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  const env = result.data;
+  const env = parseConfig(configSchema, source);
   if (env.BILLING_PROVIDER === "simulated") return { mode: "simulated" };
   return {
     mode: "stripe",

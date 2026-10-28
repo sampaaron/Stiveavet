@@ -2,6 +2,8 @@ import { isAbsolute } from "node:path";
 
 import { z } from "zod";
 
+import { parseConfig } from "@/server/config";
+
 import { createLocalStorage, defaultStorageRoot } from "./local";
 import { scalewayStorage } from "./scaleway";
 import type { ObjectStorage } from "./types";
@@ -49,14 +51,7 @@ export function storageFor(
   source: Record<string, string | undefined>,
   fetcher: typeof fetch = globalThis.fetch,
 ): ObjectStorage {
-  const result = configSchema.safeParse(source);
-  if (!result.success) {
-    const names = [
-      ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
-    ];
-    throw new Error(`Configuration invalide : ${names.join(", ")}`);
-  }
-  const env = result.data;
+  const env = parseConfig(configSchema, source);
   if (env.STORAGE_PROVIDER === "local")
     return createLocalStorage(env.OBJECT_STORAGE_DIR ?? defaultStorageRoot());
   return scalewayStorage({

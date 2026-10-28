@@ -56,29 +56,43 @@ export function SectionTitle({
   );
 }
 
-/** En-tête des pages intérieures : titre éditorial sur la nuit du héros, avec ses halos. */
+/**
+ * En-tête des pages intérieures : titre éditorial sur la nuit du héros, avec ses halos, et
+ * à droite, sur grand écran, le visuel propre à la page (audit design, point 2).
+ */
 export function PageIntro({
   title,
   lead,
   children,
+  aside,
 }: {
   title: string;
   lead?: string;
   children?: ReactNode;
+  aside?: ReactNode;
 }) {
   return (
     <div className="relative overflow-hidden bg-night px-4 py-14 text-white sm:py-20">
       <div aria-hidden="true" className="absolute inset-0 site-halos" />
-      <div className="relative mx-auto max-w-6xl">
-        <h1 className="max-w-3xl font-display text-[2rem] leading-tight font-semibold tracking-tight sm:text-5xl">
-          {title}
-        </h1>
-        {lead ? (
-          <p className="mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
-            {lead}
-          </p>
-        ) : null}
-        {children}
+      <div
+        className={cn(
+          "relative mx-auto max-w-6xl",
+          aside !== undefined &&
+            "grid grid-cols-1 items-center gap-10 lg:grid-cols-[minmax(0,1fr)_24rem]",
+        )}
+      >
+        <div className="min-w-0">
+          <h1 className="max-w-3xl font-display text-[2rem] leading-tight font-semibold tracking-tight sm:text-5xl">
+            {title}
+          </h1>
+          {lead ? (
+            <p className="mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
+              {lead}
+            </p>
+          ) : null}
+          {children}
+        </div>
+        {aside !== undefined ? <div className="min-w-0">{aside}</div> : null}
       </div>
     </div>
   );
@@ -203,22 +217,40 @@ export function Faq({
   return (
     <div>
       <SectionTitle id={id} title={title} />
-      <div className="mt-8 divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface">
-        {items.map((item) => (
-          <details key={item.q} className="group px-5 py-4">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
-              {item.q}
-              <span
-                aria-hidden="true"
-                className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted transition-transform group-open:rotate-45"
-              >
-                +
-              </span>
-            </summary>
-            <p className="mt-3 text-ink-muted">{item.a}</p>
-          </details>
-        ))}
-      </div>
+      <FaqList items={items} className="mt-8" />
+    </div>
+  );
+}
+
+/** Questions dépliables, sans script : `<details>` natif, utilisable au clavier. */
+export function FaqList({
+  items,
+  className,
+}: {
+  items: readonly { q: string; a: string }[];
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface",
+        className,
+      )}
+    >
+      {items.map((item) => (
+        <details key={item.q} className="group px-5 py-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
+            {item.q}
+            <span
+              aria-hidden="true"
+              className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted transition-transform group-open:rotate-45"
+            >
+              +
+            </span>
+          </summary>
+          <p className="mt-3 text-ink-muted">{item.a}</p>
+        </details>
+      ))}
     </div>
   );
 }

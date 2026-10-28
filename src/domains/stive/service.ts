@@ -63,7 +63,7 @@ import type { StiveAnswer } from "./reponses";
  * La reconnaissance des demandes est simulée par des règles écrites (`demandes.ts`).
  */
 
-export const STIVE_RETENTION_DAYS = 30;
+const STIVE_RETENTION_DAYS = 30;
 const MAX_MESSAGES = 60;
 const MAX_CANDIDATES = 8;
 const DAY_MS = 86_400_000;

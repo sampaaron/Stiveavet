@@ -80,7 +80,6 @@ export const dashboard = {
     launchedHint: (ongoing: number) =>
       `${nombre(ongoing, "suivi", "suivis")} en cours`,
     ended: "Suivis terminés",
-    endedHint: "Contrôle atteint ou arrêt",
     messages: "Messages reçus",
     messagesHint: (outbound: number) =>
       `${nombre(outbound, "envoyé", "envoyés")} par Numa et l'équipe`,
@@ -154,7 +153,6 @@ export const dashboard = {
     appointment: (kind: string, animal: string) => `${kind} · ${animal}`,
     otherAppointment: "Rendez-vous",
   },
-  quickActions: "Actions rapides",
   numa: (animals: number) =>
     `Suit ${animals} ${animals > 1 ? "animaux" : "animal"} pour la clinique. Elle ne pose jamais de diagnostic et escalade en cas de doute.`,
   notFound: {

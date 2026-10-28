@@ -96,7 +96,7 @@ function escape(value: string): string {
 }
 
 /** Le mot (ou groupe de mots) apparaît-il entier dans le texte replié ? */
-export function hasWord(folded: string, word: string): boolean {
+function hasWord(folded: string, word: string): boolean {
   const target = foldText(word).trim();
   if (target.length < 2) return false;
   return new RegExp(
