@@ -8,6 +8,7 @@ import {
   fillTemplate,
   metaParameters,
   renderTemplate,
+  templateQuickReply,
   templateSubmissions,
 } from "./modeles";
 import type { TemplateKey } from "./modeles";
@@ -30,7 +31,8 @@ describe("catalogue des modèles WhatsApp", () => {
   it("respecte les règles de Meta : pas de paramètre isolé, au début ni à la fin ; 1 024 caractères au plus", () => {
     for (const submission of templateSubmissions()) {
       const [body] = submission.components;
-      const text = body?.text ?? "";
+      if (body?.type !== "body") throw new Error("corps attendu en premier");
+      const text = body.text;
       expect(text, submission.name).not.toMatch(/^\{\{/);
       expect(text, submission.name).not.toMatch(/\}\}[.!?]?$/);
       for (const line of text.split("\n"))
@@ -39,7 +41,7 @@ describe("catalogue des modèles WhatsApp", () => {
           submission.name,
         ).toBe(true);
       expect(submission.name).toMatch(/^[a-z0-9_]{1,512}$/);
-      const examples = body?.example.body_text_named_params ?? [];
+      const examples = body.example.body_text_named_params;
       const rendered = fillTemplate(
         submission.name,
         submission.language,
@@ -71,6 +73,19 @@ describe("catalogue des modèles WhatsApp", () => {
     expect(fillTemplate("suivi_cloture", "fr", rendered.params)).toBe(
       rendered.body,
     );
+  });
+
+  it("seules les alertes aux vétérinaires portent le bouton « Bien reçu », soumis à Meta", () => {
+    const withButton = keys.filter((key) => templateQuickReply(key, "fr"));
+    expect(withButton.sort()).toEqual(["alerte_escalade", "alerte_urgente"]);
+    expect(templateQuickReply("alerte_urgente", "en")).toBe("Got it");
+    const submission = templateSubmissions().find(
+      (entry) => entry.name === "alerte_urgente" && entry.language === "fr",
+    );
+    expect(submission?.components[1]).toEqual({
+      type: "buttons",
+      buttons: [{ type: "quick_reply", text: "Bien reçu" }],
+    });
   });
 
   it("une valeur tient sur une ligne ; une valeur vide est refusée", () => {

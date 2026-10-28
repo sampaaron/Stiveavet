@@ -28,6 +28,7 @@ export const labels: AppDictionary["labels"] = {
     "agenda.read": "View the calendar",
     "agenda.capture": "Send a calendar screenshot (free slots)",
     "stive.use": "Use Stive, the internal AI assistant",
+    "alerts.watch": "Handle alerts to watch",
   },
   followupStatus: {
     draft: "Draft",

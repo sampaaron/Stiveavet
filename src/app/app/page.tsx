@@ -22,6 +22,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { VET_ROLES } from "@/domains/equipe/permissions";
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import { parisDayIndex } from "@/domains/heure-paris";
 import type { StiveBriefing } from "@/domains/stive/service";
@@ -804,9 +805,13 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
     })
     .sort((a, b) => a.at.getTime() - b.at.getTime())
     .slice(0, MAX_CONTROLS);
+  const forVet = VET_ROLES.has(context.role);
   const inbox = clinical
-    ? inboxItems({ alerts: openAlerts, followups: visible, failures })
+    ? inboxItems({ alerts: openAlerts, followups: visible, failures, forVet })
     : [];
+  const withTeam = forVet
+    ? openAlerts.filter((alert) => alert.heldByTeam).length
+    : 0;
   const chips = [
     ...(controls.length
       ? [
@@ -895,6 +900,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/app">) {
                 locale={locale}
                 now={now}
                 items={inbox}
+                withTeam={withTeam}
                 can={{
                   reply: can("owner_messages.reply"),
                   agenda: can("agenda.read"),

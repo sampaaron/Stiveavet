@@ -38,8 +38,8 @@ export default async function AlertsPage({
   const { t } = await appText();
   const text = t.alerts;
   const done =
-    fait === "recue" || fait === "close" || fait === "confiee"
-      ? text.done[fait]
+    typeof fait === "string" && Object.hasOwn(text.done, fait)
+      ? text.done[fait as keyof typeof text.done]
       : undefined;
   const urgent = alerts.filter((alert) => alert.level === "urgent");
   const watch = alerts.filter((alert) => alert.level === "watch");

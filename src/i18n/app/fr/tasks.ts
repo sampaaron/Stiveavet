@@ -69,6 +69,8 @@ export const tasks = {
     "whatsapp.media": "Photo ou vocal reçu par WhatsApp",
     "alert.deliver": "Alerte WhatsApp à un vétérinaire",
     "notify.whatsapp_failed": "E-mail d'échec d'un envoi WhatsApp",
+    "alert.recap": "Récapitulatif des alertes (12 h et 18 h)",
+    "alert.recap_mail": "E-mail de récapitulatif des alertes à un vétérinaire",
   },
   unknownKind: "Tâche technique",
   /** Motifs techniques d'échec, par code (jamais le message brut d'une exception). */

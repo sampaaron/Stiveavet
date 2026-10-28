@@ -70,6 +70,8 @@ export const tasks: AppDictionary["tasks"] = {
     "whatsapp.media": "Photo or voice note received on WhatsApp",
     "alert.deliver": "WhatsApp alert to a vet",
     "notify.whatsapp_failed": "E-mail about a failed WhatsApp message",
+    "alert.recap": "Alert recap (noon and 6 pm)",
+    "alert.recap_mail": "Alert recap e-mail to a vet",
   },
   unknownKind: "Technical task",
   errors: {

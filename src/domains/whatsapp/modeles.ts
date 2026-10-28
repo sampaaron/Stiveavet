@@ -22,6 +22,11 @@ type Template<P extends string> = {
   /** Exemples exigés par Meta à la soumission (données fictives), par langue. */
   examples: Readonly<Record<TemplateLanguage, Readonly<Record<P, string>>>>;
   text: Readonly<Record<TemplateLanguage, string>>;
+  /**
+   * Bouton de réponse rapide (ADR 0049), par langue : touché, il renvoie la charge donnée à
+   * l'envoi (`OutboundContent.quickReply`), jamais un texte libre.
+   */
+  quickReply?: Readonly<Record<TemplateLanguage, string>>;
 };
 
 const EXAMPLES = {
@@ -52,6 +57,7 @@ function template<P extends ParamName>(
   purpose: string,
   params: readonly P[],
   text: Record<TemplateLanguage, string>,
+  quickReply?: Record<TemplateLanguage, string>,
 ): Template<P> {
   const examplesIn = (language: TemplateLanguage) => {
     const values = {} as Record<P, string>;
@@ -63,8 +69,12 @@ function template<P extends ParamName>(
     params,
     examples: { fr: examplesIn("fr"), en: examplesIn("en") },
     text,
+    ...(quickReply ? { quickReply } : {}),
   };
 }
+
+/** Accusé de réception d'une alerte depuis WhatsApp : même bouton sous les deux modèles. */
+const ACK_BUTTON = { fr: "Bien reçu", en: "Got it" };
 
 const CONSENT_FR =
   "Je ne pose pas de diagnostic et je ne modifie aucun traitement : toute décision médicale reste au vétérinaire, qui lit nos échanges.";
@@ -164,17 +174,19 @@ export const TEMPLATES = {
     "Alerte au vétérinaire responsable ou de garde : un propriétaire a signalé une possible urgence. Aucun détail médical.",
     ["practice"],
     {
-      fr: "Stivea Vet : un propriétaire suivi par {{practice}} a signalé une possible urgence. Ouvrez Stivea Vet pour la prendre en charge. Aucun détail médical n'est envoyé sur WhatsApp.",
-      en: "Stivea Vet: an owner followed by {{practice}} reported a possible emergency. Open Stivea Vet to handle it. No medical details are sent on WhatsApp.",
+      fr: "Stivea Vet : un propriétaire suivi par {{practice}} a signalé une possible urgence. Touchez « Bien reçu » pour arrêter l'escalade, puis ouvrez Stivea Vet pour la prendre en charge. Aucun détail médical n'est envoyé sur WhatsApp.",
+      en: "Stivea Vet: an owner followed by {{practice}} reported a possible emergency. Tap “Got it” to stop the escalation, then open Stivea Vet to handle it. No medical details are sent on WhatsApp.",
     },
+    ACK_BUTTON,
   ),
   alerte_escalade: template(
     "Escalade aux autres vétérinaires : une urgence n'a pas encore été prise en charge. Aucun détail médical.",
     ["practice"],
     {
-      fr: "Stivea Vet : une urgence signalée à {{practice}} n'a pas encore été prise en charge. Ouvrez Stivea Vet pour la traiter. Aucun détail médical n'est envoyé sur WhatsApp.",
-      en: "Stivea Vet: an emergency reported to {{practice}} has not been handled yet. Open Stivea Vet to deal with it. No medical details are sent on WhatsApp.",
+      fr: "Stivea Vet : une urgence signalée à {{practice}} n'a pas encore été prise en charge. Touchez « Bien reçu » si vous vous en chargez, puis ouvrez Stivea Vet pour la traiter. Aucun détail médical n'est envoyé sur WhatsApp.",
+      en: "Stivea Vet: an emergency reported to {{practice}} has not been handled yet. Tap “Got it” if you are taking it, then open Stivea Vet to deal with it. No medical details are sent on WhatsApp.",
     },
+    ACK_BUTTON,
   ),
 } as const;
 
@@ -185,7 +197,7 @@ export type TemplateParams<K extends TemplateKey> = Record<
 >;
 
 /** Version du catalogue : à changer à chaque modification d'un texte (nouvelle approbation). */
-export const TEMPLATE_CATALOG_VERSION = "modeles-v1";
+export const TEMPLATE_CATALOG_VERSION = "modeles-v2";
 
 /** Longueur maximale d'un corps de modèle chez Meta. */
 export const TEMPLATE_BODY_MAX = 1024;
@@ -258,6 +270,15 @@ export function metaParameters(
   }));
 }
 
+/** Libellé du bouton de réponse rapide d'un modèle, s'il en a un. */
+export function templateQuickReply(
+  key: TemplateKey,
+  language: TemplateLanguage,
+): string | null {
+  const definition: Template<string> = TEMPLATES[key];
+  return definition.quickReply?.[language] ?? null;
+}
+
 /** Demandes d'approbation à soumettre à Meta, une par modèle et par langue. */
 export function templateSubmissions() {
   return (Object.keys(TEMPLATES) as TemplateKey[]).flatMap((name) => {
@@ -279,6 +300,19 @@ export function templateSubmissions() {
             })),
           },
         },
+        ...(definition.quickReply
+          ? [
+              {
+                type: "buttons" as const,
+                buttons: [
+                  {
+                    type: "quick_reply" as const,
+                    text: definition.quickReply[language],
+                  },
+                ],
+              },
+            ]
+          : []),
       ],
     }));
   });
