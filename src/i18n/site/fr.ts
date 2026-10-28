@@ -166,11 +166,65 @@ export const fr = {
         },
       ],
     },
+    /** Accueil façon Limova (ADR 0043) : bandeau, question à Numa, film et badges de section. */
+    announcement:
+      "Nouveau : Numa, l'assistante IA qui prend des nouvelles de vos patients",
+    announcementLink: "Voir la démo",
+    launchAnnouncement:
+      "Offre de lancement : −{percent} % pendant {months} mois pour toute inscription jusqu'au {date}",
+    launchAnnouncementLink: "Voir les tarifs",
+    ask: {
+      label: "Exemple de question à Numa (fictive)",
+      prompt: "Comment va Caramel depuis son ovariectomie ?",
+      who: "Posée à Numa · Assistante IA",
+    },
+    film: {
+      label: "Film de présentation de Stivea Vet (1 minute, sous-titré)",
+      soundOn: "Activer le son",
+      soundOff: "Couper le son",
+      play: "Lire le film",
+      pause: "Mettre le film en pause",
+    },
+    badges: {
+      assistants: "Deux assistants IA",
+      whatsapp: "Sur le WhatsApp du cabinet",
+      change: "Au quotidien",
+      integrations: "Intégrations",
+      steps: "Démarrage guidé",
+      faq: "Questions fréquentes",
+    },
+    whatsapp: {
+      title: "Le suivi se fait là où vos clients sont déjà : sur WhatsApp",
+      lead: "Numa écrit depuis le numéro WhatsApp Business du cabinet. Le propriétaire répond simplement ; l'équipe voit tout dans Stivea Vet et reprend la main quand elle veut.",
+    },
+    integrationsBlock: {
+      title: "Stivea Vet s'appuie sur les outils du cabinet",
+      link: "Voir les intégrations",
+    },
+    /** Aperçu fictif de l'espace cabinet, dans le héros. */
+    preview: {
+      label: "Aperçu fictif de l'espace cabinet Stivea Vet",
+      today: "Aujourd'hui",
+      greeting: "Bonjour Claire",
+      briefingTitle: "Le point de Stive",
+      briefing:
+        "Numa accompagne 7 animaux. 1 cas est à surveiller. La décision reste la vôtre.",
+      rows: [
+        {
+          name: "Caramel",
+          status: "watch",
+          line: "Rougeur sur la cicatrice · J+1",
+        },
+        {
+          name: "Moka",
+          status: "normal",
+          line: "A mangé toute sa ration · J+3",
+        },
+        { name: "Pixel", status: "normal", line: "Contrôle prévu jeudi · J+6" },
+      ],
+    },
     alert: {
       level: "À surveiller",
-      title: "Caramel · J+1 · ovariectomie",
-      body: "Rougeur signalée sur la cicatrice, photo reçue.",
-      footer: "Dr Fontaine prévenue sur l'ordinateur du cabinet",
     },
     beforeAfter: {
       title: "Ce qui change pour le cabinet",

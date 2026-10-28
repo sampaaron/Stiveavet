@@ -1,32 +1,76 @@
 import { Check, FileWarning, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { ViewTransition } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import type { Locale } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
 import type { SiteDictionary } from "@/i18n/site";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
+import { SectionBackdrop } from "@/ui/section-backdrop";
+import { sectionAccents } from "@/ui/sections";
+import type { Section as Rubrique } from "@/ui/sections";
 
 import { CtaLink, trialCta } from "./chrome";
 
+/**
+ * Section du site. Avec `theme`, elle prend l'identité d'une rubrique de l'espace cabinet
+ * (teinte et motif, ADR 0043) : le site et le logiciel se répondent.
+ */
 export function Section({
   children,
   className,
   labelledBy,
+  theme,
+  tinted = false,
 }: {
   children: ReactNode;
   className?: string;
   labelledBy?: string;
+  theme?: Rubrique;
+  /** Bande plus claire pour détacher la section ; elle entre et sort en dégradé, sans bord. */
+  tinted?: boolean;
 }) {
   return (
+    // Sans `isolate` ni `overflow-hidden` : le fond de la rubrique passe sous le contenu de
+    // toute la page (contexte d'empilement du site) et se fond dans les sections voisines.
     <section
       aria-labelledby={labelledBy}
-      className={cn("px-4 py-16 sm:py-20", className)}
+      className={cn("relative px-4 py-16 sm:py-24", className)}
+      // Sur la nuit du site, la teinte claire de la rubrique sert d'accent (lisible sur sombre).
+      style={
+        theme
+          ? ({
+              "--section-accent": sectionAccents[theme].glow,
+              "--section-glow": sectionAccents[theme].accent,
+            } as CSSProperties)
+          : undefined
+      }
     >
+      {tinted ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -inset-y-16 -z-20 bg-surface [mask-image:linear-gradient(to_bottom,transparent,black_12rem,black_calc(100%-12rem),transparent)]"
+        />
+      ) : null}
+      {theme ? <SectionBackdrop section={theme} blend /> : null}
       <div className="mx-auto max-w-6xl">{children}</div>
     </section>
+  );
+}
+
+/** Petite étiquette au-dessus d'un titre de section, comme chez Limova. */
+export function Badge({ children }: { children: ReactNode }) {
+  return (
+    <p className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--section-accent,#8ce8c3)]/30 bg-[var(--section-accent,#8ce8c3)]/[0.07] px-3 py-1 text-[11px] font-bold tracking-[0.14em] text-[var(--section-accent,#8ce8c3)] uppercase">
+      <span
+        aria-hidden="true"
+        className="size-1.5 rounded-full bg-[var(--section-accent,#8ce8c3)] shadow-[0_0_8px_var(--section-accent,#8ce8c3)]"
+      />
+      {children}
+    </p>
   );
 }
 
@@ -35,17 +79,25 @@ export function SectionTitle({
   title,
   lead,
   className,
+  center = false,
 }: {
   id: string;
   title: string;
   lead?: string;
   className?: string;
+  /** Titre centré (sections plein écran). */
+  center?: boolean;
 }) {
   return (
-    <div className={cn("max-w-2xl", className)}>
+    <div
+      className={cn(
+        center ? "mx-auto max-w-3xl text-center" : "max-w-2xl",
+        className,
+      )}
+    >
       <h2
         id={id}
-        className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-4xl"
+        className="font-display text-[1.95rem] leading-[1.08] font-extrabold tracking-[-0.03em] text-balance sm:text-[2.85rem]"
       >
         {title}
       </h2>
@@ -72,8 +124,16 @@ export function PageIntro({
   aside?: ReactNode;
 }) {
   return (
-    <div className="relative overflow-hidden bg-night px-4 py-14 text-white sm:py-20">
-      <div aria-hidden="true" className="absolute inset-0 site-halos" />
+    <div className="relative px-4 py-16 text-white sm:py-24">
+      {/* Nuit et halos débordent sous la section suivante et s'y effacent : pas de bord. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -bottom-48 -z-10 bg-night fade-out-bottom [--fade-length:16rem]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -bottom-48 -z-10 fade-out-bottom [--fade-length:16rem] site-halos"
+      />
       <div
         className={cn(
           "relative mx-auto max-w-6xl",
@@ -82,9 +142,15 @@ export function PageIntro({
         )}
       >
         <div className="min-w-0">
-          <h1 className="max-w-3xl font-display text-[2rem] leading-tight font-semibold tracking-tight sm:text-5xl">
-            {title}
-          </h1>
+          <ViewTransition
+            name="site-title"
+            share="site-title-morph"
+            default="none"
+          >
+            <h1 className="max-w-3xl font-display text-[2.2rem] leading-[1.04] font-extrabold tracking-[-0.035em] text-balance sm:text-[3.5rem]">
+              {title}
+            </h1>
+          </ViewTransition>
           {lead ? (
             <p className="mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
               {lead}
@@ -184,14 +250,20 @@ export function CtaBand({
 }) {
   return (
     <Section className="pt-0 sm:pt-0">
-      <div className="relative overflow-hidden rounded-[24px] bg-night px-6 py-12 text-white sm:px-12">
-        <div aria-hidden="true" className="absolute inset-0 site-halos" />
-        <div className="relative max-w-2xl">
-          <h2 className="font-display text-[1.75rem] leading-tight font-semibold sm:text-4xl">
+      <div className="relative isolate overflow-hidden rounded-[36px] border border-white/10 bg-night px-6 py-16 text-center text-white shadow-[0_40px_100px_-40px_rgb(8_122_84/0.7)] sm:px-14 sm:py-24">
+        <div aria-hidden="true" className="absolute inset-0 -z-10 hero-glow" />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-[radial-gradient(rgb(255_255_255/0.06)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] [background-size:22px_22px]"
+        />
+        <div className="relative mx-auto max-w-3xl">
+          <h2 className="font-display text-[2rem] leading-[1.06] font-extrabold tracking-[-0.03em] text-balance sm:text-5xl">
             {title}
           </h2>
-          {body ? <p className="mt-3 text-white/80">{body}</p> : null}
-          <div className="mt-8 flex flex-wrap gap-3">
+          {body ? (
+            <p className="mx-auto mt-4 max-w-xl text-white/75">{body}</p>
+          ) : null}
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
             <CtaLink href={pathFor("trial", locale)}>
               {trialCta(locale, t)}
             </CtaLink>
@@ -209,15 +281,22 @@ export function Faq({
   id,
   title,
   items,
+  center = false,
 }: {
   id: string;
   title: string;
   items: readonly { q: string; a: string }[];
+  center?: boolean;
 }) {
   return (
     <div>
-      <SectionTitle id={id} title={title} />
-      <FaqList items={items} className="mt-8" />
+      <SectionTitle
+        id={id}
+        title={title}
+        center={center}
+        className={center ? "mt-5" : undefined}
+      />
+      <FaqList items={items} className="mt-10" />
     </div>
   );
 }
@@ -233,17 +312,20 @@ export function FaqList({
   return (
     <div
       className={cn(
-        "divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface",
+        "divide-y divide-line overflow-hidden rounded-[24px] border border-line/80 bg-surface/90 shadow-[var(--shadow-card)] backdrop-blur-xl",
         className,
       )}
     >
       {items.map((item) => (
-        <details key={item.q} className="group px-5 py-4">
+        <details
+          key={item.q}
+          className="group px-6 py-5 transition-colors open:bg-canvas/60"
+        >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
             {item.q}
             <span
               aria-hidden="true"
-              className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas-subtle text-ink-muted transition-transform group-open:rotate-45"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--section-accent,var(--color-brand))]/10 text-[var(--section-accent,var(--color-brand-ink))] transition-transform duration-300 group-open:rotate-45"
             >
               +
             </span>

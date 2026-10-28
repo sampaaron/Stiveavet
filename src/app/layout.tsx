@@ -11,7 +11,6 @@ import { uiLocale } from "@/i18n/app/server";
 export const metadata: Metadata = {
   title: { default: "Stivea Vet", template: "%s · Stivea Vet" },
   description: "Le suivi post-consultation des cabinets vétérinaires.",
-  icons: { icon: "/logo-stivea-vet.png" },
   robots: { index: false, follow: false },
 };
 

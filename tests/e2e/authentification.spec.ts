@@ -24,6 +24,25 @@ test("l'espace cabinet exige une connexion ; l'écran est accessible", async ({
   await expectAccessible(page);
 });
 
+test("le logo Stivea Vet ramène à la vitrine, depuis la connexion et le cabinet", async ({
+  page,
+}) => {
+  const backToSite = /^Retour au site Stivea Vet/;
+  await page.goto("/connexion");
+  await page
+    .getByRole("link", { name: backToSite })
+    .filter({ visible: true })
+    .click();
+  await expect(page).toHaveURL(/\/fr$/);
+
+  await login(page, LEA, PHRASE);
+  await expect(page).toHaveURL(/\/app$/);
+  // Sur mobile, la barre latérale est repliée : on vérifie la cible du lien.
+  await expect(
+    page.getByRole("link", { name: backToSite, includeHidden: true }),
+  ).toHaveAttribute("href", "/fr");
+});
+
 test("une erreur de connexion ne dit pas si le compte existe", async ({
   page,
 }) => {
