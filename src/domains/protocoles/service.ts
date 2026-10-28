@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import {
   alertRules,
   followups,
@@ -16,7 +16,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditProtocol as audit } from "@/domains/audit/journal";
+import { auditProtocol } from "@/domains/audit/journal";
 
 import { protocolContentInput } from "./content";
 import type { ProtocolContent } from "./content";
@@ -434,7 +434,7 @@ export function protocolsService(db: Database) {
           }),
           changeNote: SYSTEM_CHANGE_NOTES.creation,
         });
-        await audit(tx, actor, "protocol.created", id, { scope });
+        await auditProtocol(tx, actor, "protocol.created", id, { scope });
         return id;
       });
     },
@@ -463,7 +463,7 @@ export function protocolsService(db: Database) {
           changeNote: note.data,
           validated: canValidateProtocol(actor, protocol),
         });
-        await audit(tx, actor, "protocol.version_created", protocolId, {
+        await auditProtocol(tx, actor, "protocol.version_created", protocolId, {
           versionNumber,
         });
         return versionNumber;
@@ -486,7 +486,7 @@ export function protocolsService(db: Database) {
           validated: false,
           changeNote: SYSTEM_CHANGE_NOTES.copy,
         });
-        await audit(tx, actor, "protocol.duplicated", id, {
+        await auditProtocol(tx, actor, "protocol.duplicated", id, {
           scope,
           fromProtocolId: protocolId,
         });
@@ -520,7 +520,7 @@ export function protocolsService(db: Database) {
             ),
           )
           .returning({ n: protocolVersions.versionNumber });
-        await audit(tx, actor, "protocol.validated", protocolId, {
+        await auditProtocol(tx, actor, "protocol.validated", protocolId, {
           versionNumber: validated[0]?.n ?? null,
         });
       });
@@ -534,7 +534,7 @@ export function protocolsService(db: Database) {
           .update(protocols)
           .set({ archivedAt: archived ? new Date() : null })
           .where(eq(protocols.id, protocolId));
-        await audit(
+        await auditProtocol(
           tx,
           actor,
           archived ? "protocol.archived" : "protocol.restored",
@@ -563,7 +563,9 @@ export function protocolsService(db: Database) {
           validated: false,
           changeNote: SYSTEM_CHANGE_NOTES.library,
         });
-        await audit(tx, actor, "protocol.installed", id, { libraryKey });
+        await auditProtocol(tx, actor, "protocol.installed", id, {
+          libraryKey,
+        });
         return id;
       });
     },

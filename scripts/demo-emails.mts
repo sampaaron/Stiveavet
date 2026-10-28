@@ -6,8 +6,10 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import nodemailer from "nodemailer";
 import { Pool } from "pg";
+import { z } from "zod";
 
 import { demoService } from "../src/domains/demo/service";
+import { parseConfig } from "../src/server/config";
 import * as schema from "../src/server/db/schema";
 
 // Aucun prestataire réel : local uniquement, vers Mailpit (ADR 0004 et 0012).
@@ -17,20 +19,31 @@ if (process.env.APP_ENV !== "local") {
   );
   process.exit(1);
 }
-const url = process.env.DATABASE_URL;
-if (!url) {
-  console.error("DATABASE_URL manquante");
+const demoConfig = z.object({
+  DATABASE_URL: z.url(),
+  SMTP_HOST: z.string().min(1).default("localhost"),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(1025),
+  APP_URL: z.url().default("http://localhost:3000"),
+});
+let env: z.output<typeof demoConfig>;
+try {
+  env = parseConfig(demoConfig, process.env);
+} catch (error) {
+  // Le message ne cite que des noms de variables, jamais leurs valeurs.
+  console.error(
+    error instanceof Error ? error.message : "Configuration invalide",
+  );
   process.exit(1);
 }
 
 const transport = nodemailer.createTransport({
-  host: process.env.SMTP_HOST ?? "localhost",
-  port: Number(process.env.SMTP_PORT ?? 1025),
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
   secure: false,
   ignoreTLS: true,
 });
 
-const pool = new Pool({ connectionString: url });
+const pool = new Pool({ connectionString: env.DATABASE_URL });
 try {
   const result = await demoService({
     db: drizzle(pool, { schema }),
@@ -42,7 +55,7 @@ try {
         });
       },
     },
-    appUrl: process.env.APP_URL ?? "http://localhost:3000",
+    appUrl: env.APP_URL,
   }).dispatch();
   // Uniquement des nombres : jamais d'adresse e-mail dans la sortie.
   console.warn(

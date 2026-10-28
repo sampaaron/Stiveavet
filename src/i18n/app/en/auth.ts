@@ -146,6 +146,8 @@ export const auth: AppDictionary["auth"] = {
     passwords_mismatch: "The two passwords do not match.",
     organization_name_short: "Practice name too short.",
     organization_name_long: "Practice name too long.",
+    organization_name_chars:
+      "Enter a name, without any link or e-mail address.",
     display_name_required: "Enter your name.",
     display_name_long: "Name too long.",
     plan_required: "Choose your plan.",
@@ -160,5 +162,6 @@ export const auth: AppDictionary["auth"] = {
     repetitive: "Too many repeated characters.",
     common: "This password is among the most commonly used.",
     personal: "It must not contain your name or e-mail address.",
+    unchanged: "Choose a password different from your current one.",
   },
 };

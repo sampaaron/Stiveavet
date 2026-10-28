@@ -8,7 +8,7 @@ import {
   vets,
 } from "../../src/fixtures/cabinet-tilleuls";
 import { SEED } from "../../src/fixtures/seed-ids";
-import type { Followup } from "../../src/fixtures/types";
+import type { Followup } from "../../src/ui/types";
 import {
   agendaFreeSlots,
   animalOwners,
@@ -23,7 +23,7 @@ import {
   users,
 } from "../../src/server/db/schema";
 import { hashPassword } from "../../src/domains/auth/password";
-import type { Actor } from "../../src/domains/equipe/actor";
+import type { Actor } from "../../src/domains/commun/actor";
 import { ROLE_PERMISSIONS } from "../../src/domains/equipe/permissions";
 import { PROTOCOL_LIBRARY } from "../../src/domains/protocoles/library";
 import { protocolsService } from "../../src/domains/protocoles/service";
@@ -481,8 +481,10 @@ export async function seedFictionalCabinets(db: Database) {
   }).connect(paul, "payment_mandate", "");
 
   await withTenant(db, { organizationId: SEED.martin }, async (tx) => {
+    const model = tilleulsFollowups[1];
+    if (!model) throw new Error("Suivi fictif introuvable");
     const sushi: Followup = {
-      ...structuredClone(tilleulsFollowups[1]!),
+      ...structuredClone(model),
       id: "e3a9c4d1-8b2f-4e67-a0d5-2c7f1b9e6a38",
       animal: {
         name: "Sushi",

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { concatBytes } from "@/domains/commun/utilitaires";
+
 /**
  * Fichiers acceptés (architecture §7, ADR 0019) : le type est lu dans les premiers octets
  * du fichier, jamais repris du nom ou de ce que déclare l'expéditeur. Pas de SVG ni de PDF
@@ -96,16 +98,6 @@ export function stripImageMetadata(
   return stripWebp(bytes);
 }
 
-function concat(parts: Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
 /** APP1 (EXIF, XMP), APP13 (IPTC) et commentaires retirés ; le reste est recopié. */
 function stripJpeg(bytes: Uint8Array): Uint8Array | null {
   const parts: Uint8Array[] = [bytes.subarray(0, 2)];
@@ -120,7 +112,7 @@ function stripJpeg(bytes: Uint8Array): Uint8Array | null {
     // Début de l'image compressée : tout le reste est recopié tel quel.
     if (marker === 0xda) {
       parts.push(bytes.subarray(offset));
-      return concat(parts);
+      return concatBytes(parts);
     }
     const length = ((bytes[offset + 2] ?? 0) << 8) | (bytes[offset + 3] ?? 0);
     const end = offset + 2 + length;
@@ -145,7 +137,7 @@ function stripPng(bytes: Uint8Array): Uint8Array | null {
     if (end > bytes.length) return null;
     if (!PNG_DROPPED.has(type)) parts.push(bytes.subarray(offset, end));
     offset = end;
-    if (type === "IEND") return concat(parts);
+    if (type === "IEND") return concatBytes(parts);
   }
   return null;
 }
@@ -167,9 +159,9 @@ function stripWebp(bytes: Uint8Array): Uint8Array | null {
       whole[8] = (whole[8] ?? 0) & ~0x0c;
     parts.push(whole);
   }
-  const body = concat(parts);
+  const body = concatBytes(parts);
   const header = new Uint8Array(12);
   header.set(bytes.subarray(0, 12));
   new DataView(header.buffer).setUint32(4, body.length + 4, true);
-  return concat([header, body]);
+  return concatBytes([header, body]);
 }

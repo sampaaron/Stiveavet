@@ -14,8 +14,6 @@ export const common = {
   none: "Aucun",
   optional: "facultatif",
   simulated: "simulé",
-  numaAi: "Assistante IA",
-  stiveAi: "Assistant IA",
   and: "et",
   /** Liste lisible : « Antoine », « Antoine et Chloé », « A, B et C ». */
   list: (items: readonly string[]) =>

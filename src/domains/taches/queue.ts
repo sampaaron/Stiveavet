@@ -86,12 +86,13 @@ export type EmitInput = z.input<typeof emitInput>;
 
 /** Événement métier, publié plus tard par le worker (outbox transactionnelle). */
 export async function emit(tx: TenantTransaction, input: EmitInput) {
-  requestWake();
   const event = emitInput.parse(input);
   const [row] = await tx
     .insert(outboxEvents)
     .values({ ...event, payload: event.payload as JobPayload })
     .returning({ id: outboxEvents.id });
   if (!row) throw new Error("Événement non inscrit");
+  // Comme pour `enqueue` : réveil demandé une fois l'événement inscrit, envoyé à la validation.
+  requestWake();
   return row.id;
 }

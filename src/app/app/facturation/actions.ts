@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import { PLANS } from "@/domains/facturation/rules";
 import { appText } from "@/i18n/app/server";
 import { memberContext } from "@/server/authz";

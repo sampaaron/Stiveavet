@@ -4,10 +4,7 @@ import { nombre } from "@/i18n/pluriel";
 export const dashboard = {
   title: "Aujourd'hui",
   greeting: (firstName: string) => `Bonjour ${firstName}`,
-  /** Sous-titre avec accès clinique : la date, puis les urgences et les cas à surveiller. */
-  headline: (day: string, urgent: number, watch: number) =>
-    `${day} · ${urgent} urgence${urgent > 1 ? "s" : ""} et ${watch} cas à surveiller`,
-  /** Sous-titre court (la date est au-dessus du titre). */
+  /** Sous-titre avec accès clinique (la date est au-dessus du titre). */
   headlineShort: (urgent: number, watch: number) =>
     `${nombre(urgent, "urgence", "urgences")} et ${watch} cas à surveiller`,
   /** Le point de Numa, en tête du tableau de bord : des décomptes, jamais un avis médical. */

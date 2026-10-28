@@ -17,6 +17,9 @@ export type SecretBox = {
 };
 
 const KEY_ID = /^[a-z0-9-]{1,32}$/;
+/** Vecteur de 96 bits et étiquette complète de 128 bits (NIST SP 800-38D). */
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
 
 export class SecretBoxError extends Error {
   constructor() {
@@ -53,8 +56,10 @@ export function secretBox(keys: ReadonlyMap<string, Buffer>): SecretBox {
     seal(plaintext, context) {
       const key = keys.get(current);
       if (!key) throw new SecretBoxError();
-      const iv = randomBytes(12);
-      const cipher = createCipheriv("aes-256-gcm", key, iv);
+      const iv = randomBytes(IV_BYTES);
+      const cipher = createCipheriv("aes-256-gcm", key, iv, {
+        authTagLength: TAG_BYTES,
+      });
       cipher.setAAD(Buffer.from(context, "utf8"));
       const data = Buffer.concat([
         cipher.update(plaintext, "utf8"),
@@ -73,14 +78,17 @@ export function secretBox(keys: ReadonlyMap<string, Buffer>): SecretBox {
       const key = keyId ? keys.get(keyId) : undefined;
       if (version !== "v1" || !key || !iv || !data || !tag || rest.length > 0)
         throw new SecretBoxError();
+      // Longueurs imposées : une étiquette tronquée affaiblirait l'authentification.
+      const ivBytes = Buffer.from(iv, "base64url");
+      const tagBytes = Buffer.from(tag, "base64url");
+      if (ivBytes.length !== IV_BYTES || tagBytes.length !== TAG_BYTES)
+        throw new SecretBoxError();
       try {
-        const decipher = createDecipheriv(
-          "aes-256-gcm",
-          key,
-          Buffer.from(iv, "base64url"),
-        );
+        const decipher = createDecipheriv("aes-256-gcm", key, ivBytes, {
+          authTagLength: TAG_BYTES,
+        });
         decipher.setAAD(Buffer.from(context, "utf8"));
-        decipher.setAuthTag(Buffer.from(tag, "base64url"));
+        decipher.setAuthTag(tagBytes);
         return Buffer.concat([
           decipher.update(Buffer.from(data, "base64url")),
           decipher.final(),

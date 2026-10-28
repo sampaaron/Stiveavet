@@ -1,6 +1,6 @@
 import { hash, verify } from "@node-rs/argon2";
 
-import { COMMON_PASSWORD_ROOTS } from "./common-passwords";
+import { isCommonPassword } from "./common-passwords";
 import { AUTH_POLICY } from "./policy";
 
 // Argon2id, paramètres minimaux recommandés par l'OWASP (19 Mio, 2 passes).
@@ -35,14 +35,6 @@ export async function verifyPassword(
   }
 }
 
-function normalizedRoot(password: string): string {
-  return password
-    .toLowerCase()
-    .normalize("NFC")
-    .replace(/[\d\W_]+$/u, "")
-    .replace(/^[\d\W_]+/u, "");
-}
-
 /**
  * Raison de refus d'un mot de passe : un code stable, avec la valeur utile à son message.
  * L'écran la traduit dans la langue de la personne (ADR 0022).
@@ -52,7 +44,8 @@ export type PasswordProblem =
   | { code: "too_long"; max: number }
   | { code: "repetitive" }
   | { code: "common" }
-  | { code: "personal" };
+  | { code: "personal" }
+  | { code: "unchanged" };
 
 /** Raisons de refus, dans l'ordre où l'écran les affiche sous le champ. */
 export function passwordProblems(
@@ -67,10 +60,9 @@ export function passwordProblems(
     problems.push({ code: "too_long", max: maxLength });
   if (new Set(password).size < 5) problems.push({ code: "repetitive" });
 
+  if (isCommonPassword(password)) problems.push({ code: "common" });
+
   const lowered = password.toLowerCase();
-  const root = normalizedRoot(password);
-  if (COMMON_PASSWORD_ROOTS.has(lowered) || COMMON_PASSWORD_ROOTS.has(root))
-    problems.push({ code: "common" });
 
   const personal = [
     context.email?.split("@")[0],

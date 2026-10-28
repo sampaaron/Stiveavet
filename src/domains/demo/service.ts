@@ -29,11 +29,6 @@ type DueEmail = {
   step: number;
 };
 
-async function rows<T>(db: Database, query: ReturnType<typeof sql>) {
-  const result = await db.execute(query);
-  return result.rows as T[];
-}
-
 /**
  * Démo du site public et séquence d'e-mails. Tout passe par les fonctions du schéma
  * `marketing` (migration 0007) : le rôle applicatif n'a aucun accès direct aux prospects.
@@ -55,10 +50,11 @@ export function demoService(deps: {
     accessUrl?: string,
   ): Promise<boolean> {
     const unsubscribeToken = createToken();
-    const [reserved] = await rows<{ ok: boolean }>(
-      db,
-      sql`SELECT marketing.reserve_demo_email(${lead.id}, ${step}::smallint, ${tokenHash(unsubscribeToken)}) AS ok`,
-    );
+    const [reserved] = (
+      await db.execute<{ ok: boolean }>(
+        sql`SELECT marketing.reserve_demo_email(${lead.id}, ${step}::smallint, ${tokenHash(unsubscribeToken)}) AS ok`,
+      )
+    ).rows;
     if (reserved?.ok !== true) return false;
     try {
       await email.send(
@@ -101,19 +97,21 @@ export function demoService(deps: {
     > {
       if (ip) {
         const [max, windowMinutes] = DEMO_RATE_LIMIT;
-        const [hit] = await rows<{ allowed: boolean }>(
-          db,
-          sql`SELECT auth.hit_rate_limit(${rateLimitBucket("demoPerIp", ip)}, ${`${windowMinutes} minutes`}::interval, ${max}) AS allowed`,
-        );
+        const [hit] = (
+          await db.execute<{ allowed: boolean }>(
+            sql`SELECT auth.hit_rate_limit(${rateLimitBucket("demoPerIp", ip)}, ${`${windowMinutes} minutes`}::interval, ${max}) AS allowed`,
+          )
+        ).rows;
         if (hit?.allowed !== true) return { status: "rate_limited" };
       }
 
       const accessToken = createToken();
       const linkToken = createToken();
-      const [lead] = await rows<{ lead_id: string; created: boolean }>(
-        db,
-        sql`SELECT * FROM marketing.capture_demo_lead(${input.email}, ${input.cabinetName}, ${input.vetCount}::smallint, ${input.locale}, ${tokenHash(accessToken)}, ${tokenHash(linkToken)})`,
-      );
+      const [lead] = (
+        await db.execute<{ lead_id: string; created: boolean }>(
+          sql`SELECT * FROM marketing.capture_demo_lead(${input.email}, ${input.cabinetName}, ${input.vetCount}::smallint, ${input.locale}, ${tokenHash(accessToken)}, ${tokenHash(linkToken)})`,
+        )
+      ).rows;
       if (!lead) throw new Error("Demande de démo non enregistrée");
       if (lead.created)
         await defer(async () => {
@@ -130,10 +128,11 @@ export function demoService(deps: {
     /** Démo ouverte pour ce jeton (14 jours après la dernière demande), sinon null. */
     async access(token: string | undefined): Promise<DemoAccess | null> {
       if (!isWellFormedToken(token)) return null;
-      const [row] = await rows<{ locale: string; cabinet_name: string }>(
-        db,
-        sql`SELECT * FROM marketing.demo_access(${tokenHash(token)})`,
-      );
+      const [row] = (
+        await db.execute<{ locale: string; cabinet_name: string }>(
+          sql`SELECT * FROM marketing.demo_access(${tokenHash(token)})`,
+        )
+      ).rows;
       if (!row || !isLocale(row.locale)) return null;
       return { locale: row.locale, cabinetName: row.cabinet_name };
     },
@@ -141,10 +140,11 @@ export function demoService(deps: {
     /** Lien du premier e-mail : confirme l'adresse et ouvre la démo, sinon null. */
     async openLink(token: string | undefined): Promise<DemoAccess | null> {
       if (!isWellFormedToken(token)) return null;
-      const [row] = await rows<{ locale: string; cabinet_name: string }>(
-        db,
-        sql`SELECT * FROM marketing.open_demo_link(${tokenHash(token)})`,
-      );
+      const [row] = (
+        await db.execute<{ locale: string; cabinet_name: string }>(
+          sql`SELECT * FROM marketing.open_demo_link(${tokenHash(token)})`,
+        )
+      ).rows;
       if (!row || !isLocale(row.locale)) return null;
       return { locale: row.locale, cabinetName: row.cabinet_name };
     },
@@ -152,10 +152,11 @@ export function demoService(deps: {
     /** Désinscription par le lien d'un e-mail ; idempotente. */
     async unsubscribe(token: string | undefined): Promise<boolean> {
       if (!isWellFormedToken(token)) return false;
-      const [row] = await rows<{ ok: boolean }>(
-        db,
-        sql`SELECT marketing.unsubscribe(${tokenHash(token)}) AS ok`,
-      );
+      const [row] = (
+        await db.execute<{ ok: boolean }>(
+          sql`SELECT marketing.unsubscribe(${tokenHash(token)}) AS ok`,
+        )
+      ).rows;
       return row?.ok === true;
     },
 
@@ -166,10 +167,11 @@ export function demoService(deps: {
     async dispatch(
       limit = 50,
     ): Promise<{ sent: number; failed: number; purged: number }> {
-      const due = await rows<DueEmail>(
-        db,
-        sql`SELECT * FROM marketing.due_demo_emails(${limit})`,
-      );
+      const due = (
+        await db.execute<DueEmail>(
+          sql`SELECT * FROM marketing.due_demo_emails(${limit})`,
+        )
+      ).rows;
       let sent = 0;
       let failed = 0;
       for (const row of due) {
@@ -181,10 +183,11 @@ export function demoService(deps: {
         if (ok) sent += 1;
         else failed += 1;
       }
-      const [purge] = await rows<{ purged: number }>(
-        db,
-        sql`SELECT marketing.purge_demo_leads() AS purged`,
-      );
+      const [purge] = (
+        await db.execute<{ purged: number }>(
+          sql`SELECT marketing.purge_demo_leads() AS purged`,
+        )
+      ).rows;
       return { sent, failed, purged: purge?.purged ?? 0 };
     },
   });

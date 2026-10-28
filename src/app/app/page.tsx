@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
   BellRing,
@@ -25,8 +26,9 @@ import type {
   DashboardAgendaItem,
   DashboardFollowup,
   DashboardSummary,
+  TodayView,
 } from "@/domains/suivis/tableau";
-import type { AgendaEvent as AgendaEventData } from "@/fixtures/types";
+import type { AgendaEvent as AgendaEventData } from "@/ui/types";
 import { AgendaEvent } from "@/ui/agenda-event";
 import { AlertBanner } from "@/ui/alert-banner";
 import { AiBadge, AssistantAvatar, AssistantCard } from "@/ui/assistant-card";
@@ -256,6 +258,389 @@ function StiveBriefingCard({
   );
 }
 
+type Chip = { href: string; label: string; icon: LucideIcon };
+
+/** Raccourcis sous le point de Numa, selon les droits et ce qu'il y a à faire. */
+function quickActions(
+  t: AppDictionary,
+  can: (permission: PermissionKey) => boolean,
+  today: TodayView,
+  urgent: DashboardFollowup[],
+): Chip[] {
+  const text = t.dashboard;
+  return [
+    can("followups.launch")
+      ? {
+          href: "/app/animaux/nouveau",
+          label: text.actions.newAnimal,
+          icon: Plus,
+        }
+      : null,
+    can("owner_messages.reply") && today.followups[0]
+      ? {
+          href: `/app/suivis/${urgent[0]?.id ?? today.followups[0].id}`,
+          label: text.actions.writeToOwner,
+          icon: MessageSquareText,
+        }
+      : null,
+    today.views.length > 0
+      ? {
+          href: "/app/suivis",
+          label: text.actions.allFollowups,
+          icon: FolderOpen,
+        }
+      : null,
+    today.agenda
+      ? { href: "/app/agenda", label: text.actions.agenda, icon: CalendarDays }
+      : null,
+  ].filter((chip) => chip !== null);
+}
+
+/** Le point de Numa : décomptes du jour, recherche et raccourcis. */
+function NumaBriefing({
+  t,
+  clinical,
+  today,
+  urgent,
+  watch,
+  canSearch,
+  chips,
+}: {
+  t: AppDictionary;
+  clinical: boolean;
+  today: TodayView;
+  urgent: number;
+  watch: number;
+  canSearch: boolean;
+  chips: Chip[];
+}) {
+  const text = t.dashboard;
+  return (
+    <section
+      aria-labelledby="point-de-numa"
+      className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(8_122_84/0.35)] assistant-glow sm:p-8"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-25 blur-3xl"
+      />
+      <div className="flex items-start gap-4">
+        <AssistantAvatar
+          assistant="numa"
+          size={56}
+          className="size-11 ring-4 ring-brand-soft sm:size-14"
+        />
+        <div className="min-w-0">
+          <h2
+            id="point-de-numa"
+            className="flex flex-wrap items-center gap-2 font-bold"
+          >
+            {text.briefing.title}
+            <AiBadge assistant="numa" />
+          </h2>
+          <p className="mt-2 max-w-3xl font-display text-lg leading-snug tracking-[-0.01em] text-balance sm:text-[1.375rem]">
+            {clinical
+              ? text.briefing.clinical(today.activeFollowups, urgent, watch)
+              : text.briefing.summary(today.activeFollowups)}
+          </p>
+        </div>
+      </div>
+      {canSearch ? (
+        <form action="/app/suivis" role="search" className="relative mt-5">
+          <label htmlFor="recherche-globale" className="sr-only">
+            {t.shell.search.label}
+          </label>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-ink-muted"
+          />
+          <input
+            id="recherche-globale"
+            name="q"
+            type="search"
+            autoComplete="off"
+            maxLength={80}
+            placeholder={text.briefing.searchPlaceholder}
+            className="h-14 w-full rounded-full border border-line/80 bg-surface/90 pr-16 pl-13 text-[15px] text-ink shadow-[0_1px_2px_rgb(11_18_32/0.05),0_10px_30px_-12px_rgb(11_18_32/0.18)] backdrop-blur placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+          />
+          <button
+            type="submit"
+            className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-strong text-white shadow-[0_6px_16px_-6px_rgb(8_122_84/0.8)] transition-transform hover:scale-105"
+          >
+            <ArrowRight aria-hidden="true" className="size-5" />
+            <span className="sr-only">{text.briefing.searchSubmit}</span>
+          </button>
+        </form>
+      ) : null}
+      {chips.length > 0 ? (
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {chips.map(({ href, label, icon: Icon }) => (
+            <li key={href}>
+              <Link
+                href={href}
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line/80 bg-surface/70 px-4 text-sm font-medium text-ink backdrop-blur transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:bg-surface hover:shadow-[0_8px_20px_-10px_rgb(8_122_84/0.5)]"
+              >
+                <Icon aria-hidden="true" className="size-4 text-brand" />
+                {label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+/** Un bandeau par suivi urgent, en tête de page. */
+function UrgentBanners({
+  t,
+  locale,
+  now,
+  urgent,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  now: Date;
+  urgent: DashboardFollowup[];
+}) {
+  const text = t.dashboard;
+  return urgent.map((followup) => {
+    const card = toCard(t, locale, followup, now);
+    return (
+      <AlertBanner
+        key={followup.id}
+        tone="urgent"
+        title={
+          followup.summary.kind === "alert"
+            ? text.urgentReportedAt(
+                followup.animalName,
+                formatTime(followup.summary.at, locale),
+              )
+            : text.urgentOngoing(followup.animalName)
+        }
+        action={
+          <ButtonLink href={`/app/suivis/${followup.id}`} size="sm">
+            {text.actions.openFile}
+          </ButtonLink>
+        }
+      >
+        {card.summaryLine} · {followup.procedure} · {card.dayLabel} ·{" "}
+        {card.vetName}.
+      </AlertBanner>
+    );
+  });
+}
+
+/** Chiffres du jour ; urgences et cas à surveiller seulement avec l'accès clinique. */
+function TodayStats({
+  t,
+  clinical,
+  today,
+  urgent,
+  watch,
+}: {
+  t: AppDictionary;
+  clinical: boolean;
+  today: TodayView;
+  urgent: number;
+  watch: number;
+}) {
+  const text = t.dashboard;
+  return (
+    <StatGrid>
+      {clinical ? (
+        <>
+          <StatTile
+            label={text.stats.urgent}
+            value={urgent}
+            tone="urgent"
+            hint={text.stats.urgentHint}
+            icon={<CircleAlert className="size-4" />}
+          />
+          <StatTile
+            label={text.stats.watch}
+            value={watch}
+            tone="watch"
+            hint={text.stats.watchHint}
+            icon={<Eye className="size-4" />}
+          />
+        </>
+      ) : null}
+      <StatTile
+        label={text.stats.active}
+        value={`${today.activeFollowups} / ${today.includedFollowups}`}
+        tone="brand"
+        icon={<MessagesSquare className="size-4" />}
+      >
+        <CapacityMeter
+          used={today.activeFollowups}
+          included={today.includedFollowups}
+        />
+      </StatTile>
+      <StatTile
+        label={text.stats.appointments}
+        value={today.stiveaAppointments}
+        hint={text.stats.appointmentsHint}
+        icon={<CalendarCheck className="size-4" />}
+      />
+    </StatGrid>
+  );
+}
+
+/** Suivis prioritaires (urgents puis à surveiller), puis les autres. */
+function ClinicalLists({
+  t,
+  locale,
+  now,
+  priorities,
+  others,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  now: Date;
+  priorities: DashboardFollowup[];
+  others: DashboardFollowup[];
+}) {
+  const text = t.dashboard;
+  return (
+    <>
+      <SectionCard
+        title={text.priorities.title}
+        description={text.priorities.description}
+      >
+        {priorities.length > 0 ? (
+          <ul className="-mx-3">
+            {priorities.map((followup) => (
+              <li key={followup.id}>
+                <FollowupCard followup={toCard(t, locale, followup, now)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            title={text.priorities.emptyTitle}
+            description={text.priorities.emptyDescription}
+          />
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title={text.others.title}
+        action={
+          <ButtonLink href="/app/suivis" variant="quiet" size="sm">
+            {text.actions.allFollowups}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </ButtonLink>
+        }
+      >
+        <ul className="-mx-3">
+          {others.map((followup) => (
+            <li key={followup.id}>
+              <FollowupCard followup={toCard(t, locale, followup, now)} />
+            </li>
+          ))}
+        </ul>
+        {others.length === 0 ? <EmptyState title={text.others.empty} /> : null}
+      </SectionCard>
+    </>
+  );
+}
+
+/** Sans accès clinique : la liste des suivis, sans détail. */
+function OrganizationList({
+  t,
+  views,
+}: {
+  t: AppDictionary;
+  views: TodayView["views"];
+}) {
+  const text = t.dashboard;
+  return (
+    <SectionCard
+      title={text.organization.title}
+      description={text.organization.description}
+      action={
+        <ButtonLink href="/app/suivis" variant="quiet" size="sm">
+          {text.actions.allFollowups}
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </ButtonLink>
+      }
+    >
+      {views.length > 0 ? (
+        <ul className="grid gap-3">
+          {views.map((view) => (
+            <li
+              key={view.id}
+              className="flex flex-wrap items-center justify-between gap-2 text-sm"
+            >
+              <span>
+                <span className="font-semibold">{view.animalName}</span>
+                <span className="text-ink-muted">
+                  {" "}
+                  · {view.responsibleName}
+                </span>
+              </span>
+              {view.status === "paused" ? (
+                <StatusBadge status="paused" />
+              ) : (
+                <span className="text-ink-muted">
+                  {t.labels.followupStatus[view.status]}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState title={text.organization.empty} />
+      )}
+    </SectionCard>
+  );
+}
+
+/** Agenda du jour, lu dans le logiciel du cabinet. */
+function TodayAgenda({
+  t,
+  locale,
+  agenda,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  agenda: AgendaEventData[];
+}) {
+  const text = t.dashboard;
+  return (
+    <SectionCard
+      title={text.agenda.title}
+      description={text.agenda.description}
+      action={
+        <ButtonLink href="/app/agenda" variant="quiet" size="sm">
+          {text.actions.agenda}
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </ButtonLink>
+      }
+    >
+      {agenda.length > 0 ? (
+        <ol className="flex flex-col gap-2">
+          {agenda.map((event) => (
+            <li key={event.id}>
+              <AgendaEvent
+                event={event}
+                vetName={shortPersonName(event.vetId)}
+                locale={locale}
+              />
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <EmptyState
+          title={text.agenda.emptyTitle}
+          description={text.agenda.emptyDescription}
+        />
+      )}
+    </SectionCard>
+  );
+}
+
 export default async function TodayPage() {
   const context = await memberContext();
   const can = (permission: PermissionKey) =>
@@ -266,7 +651,7 @@ export default async function TodayPage() {
   const now = new Date();
   // Suivis visibles selon les droits ; le détail clinique seulement avec l'accès clinique.
   const [today, stats] = await Promise.all([
-    services.today().today(context, now),
+    services.today().today(context, now, context),
     services.stats().activity(context, now),
   ]);
   // Le point de Stive reprend la vue déjà lue : ni demande comptée, ni échange enregistré.
@@ -315,32 +700,7 @@ export default async function TodayPage() {
     can("followups.read_all") ||
     can("followups.read_own") ||
     can("followups.read_summary");
-  const chips = [
-    can("followups.launch")
-      ? {
-          href: "/app/animaux/nouveau",
-          label: text.actions.newAnimal,
-          icon: Plus,
-        }
-      : null,
-    can("owner_messages.reply") && visible[0]
-      ? {
-          href: `/app/suivis/${urgent[0]?.id ?? visible[0].id}`,
-          label: text.actions.writeToOwner,
-          icon: MessageSquareText,
-        }
-      : null,
-    views.length > 0
-      ? {
-          href: "/app/suivis",
-          label: text.actions.allFollowups,
-          icon: FolderOpen,
-        }
-      : null,
-    today.agenda
-      ? { href: "/app/agenda", label: text.actions.agenda, icon: CalendarDays }
-      : null,
-  ].filter((chip) => chip !== null);
+  const chips = quickActions(t, can, today, urgent);
 
   return (
     <>
@@ -376,271 +736,44 @@ export default async function TodayPage() {
       />
 
       <div className="grid gap-6">
-        <section
-          aria-labelledby="point-de-numa"
-          className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/70 p-5 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_24px_48px_-24px_rgb(8_122_84/0.35)] assistant-glow sm:p-8"
-        >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[conic-gradient(from_200deg,#8ce8c3,#5b4fe0,#f5c46b,#8ce8c3)] opacity-25 blur-3xl"
-          />
-          <div className="flex items-start gap-4">
-            <AssistantAvatar
-              assistant="numa"
-              size={56}
-              className="size-11 ring-4 ring-brand-soft sm:size-14"
-            />
-            <div className="min-w-0">
-              <h2
-                id="point-de-numa"
-                className="flex flex-wrap items-center gap-2 font-bold"
-              >
-                {text.briefing.title}
-                <AiBadge assistant="numa" />
-              </h2>
-              <p className="mt-2 max-w-3xl font-display text-lg leading-snug tracking-[-0.01em] text-balance sm:text-[1.375rem]">
-                {clinical
-                  ? text.briefing.clinical(
-                      today.activeFollowups,
-                      urgent.length,
-                      watch.length,
-                    )
-                  : text.briefing.summary(today.activeFollowups)}
-              </p>
-            </div>
-          </div>
-          {canSearch ? (
-            <form action="/app/suivis" role="search" className="relative mt-5">
-              <label htmlFor="recherche-globale" className="sr-only">
-                {t.shell.search.label}
-              </label>
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-ink-muted"
-              />
-              <input
-                id="recherche-globale"
-                name="q"
-                type="search"
-                autoComplete="off"
-                maxLength={80}
-                placeholder={text.briefing.searchPlaceholder}
-                className="h-14 w-full rounded-full border border-line/80 bg-surface/90 pr-16 pl-13 text-[15px] text-ink shadow-[0_1px_2px_rgb(11_18_32/0.05),0_10px_30px_-12px_rgb(11_18_32/0.18)] backdrop-blur placeholder:text-ink-muted focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
-              />
-              <button
-                type="submit"
-                className="absolute top-1/2 right-2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-strong text-white shadow-[0_6px_16px_-6px_rgb(8_122_84/0.8)] transition-transform hover:scale-105"
-              >
-                <ArrowRight aria-hidden="true" className="size-5" />
-                <span className="sr-only">{text.briefing.searchSubmit}</span>
-              </button>
-            </form>
-          ) : null}
-          {chips.length > 0 ? (
-            <ul className="mt-4 flex flex-wrap gap-2">
-              {chips.map(({ href, label, icon: Icon }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-line/80 bg-surface/70 px-4 text-sm font-medium text-ink backdrop-blur transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:bg-surface hover:shadow-[0_8px_20px_-10px_rgb(8_122_84/0.5)]"
-                  >
-                    <Icon aria-hidden="true" className="size-4 text-brand" />
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
+        <NumaBriefing
+          t={t}
+          clinical={clinical}
+          today={today}
+          urgent={urgent.length}
+          watch={watch.length}
+          canSearch={canSearch}
+          chips={chips}
+        />
 
-        {urgent.map((followup) => {
-          const card = toCard(t, locale, followup, now);
-          return (
-            <AlertBanner
-              key={followup.id}
-              tone="urgent"
-              title={
-                followup.summary.kind === "alert"
-                  ? text.urgentReportedAt(
-                      followup.animalName,
-                      formatTime(followup.summary.at, locale),
-                    )
-                  : text.urgentOngoing(followup.animalName)
-              }
-              action={
-                <ButtonLink href={`/app/suivis/${followup.id}`} size="sm">
-                  {text.actions.openFile}
-                </ButtonLink>
-              }
-            >
-              {card.summaryLine} · {followup.procedure} · {card.dayLabel} ·{" "}
-              {card.vetName}.
-            </AlertBanner>
-          );
-        })}
+        <UrgentBanners t={t} locale={locale} now={now} urgent={urgent} />
 
-        <StatGrid>
-          {clinical ? (
-            <>
-              <StatTile
-                label={text.stats.urgent}
-                value={urgent.length}
-                tone="urgent"
-                hint={text.stats.urgentHint}
-                icon={<CircleAlert className="size-4" />}
-              />
-              <StatTile
-                label={text.stats.watch}
-                value={watch.length}
-                tone="watch"
-                hint={text.stats.watchHint}
-                icon={<Eye className="size-4" />}
-              />
-            </>
-          ) : null}
-          <StatTile
-            label={text.stats.active}
-            value={`${today.activeFollowups} / ${today.includedFollowups}`}
-            tone="brand"
-            icon={<MessagesSquare className="size-4" />}
-          >
-            <CapacityMeter
-              used={today.activeFollowups}
-              included={today.includedFollowups}
-            />
-          </StatTile>
-          <StatTile
-            label={text.stats.appointments}
-            value={today.stiveaAppointments}
-            hint={text.stats.appointmentsHint}
-            icon={<CalendarCheck className="size-4" />}
-          />
-        </StatGrid>
+        <TodayStats
+          t={t}
+          clinical={clinical}
+          today={today}
+          urgent={urgent.length}
+          watch={watch.length}
+        />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
             {clinical ? (
-              <>
-                <SectionCard
-                  title={text.priorities.title}
-                  description={text.priorities.description}
-                >
-                  {urgent.length + watch.length > 0 ? (
-                    <ul className="-mx-3">
-                      {[...urgent, ...watch].map((followup) => (
-                        <li key={followup.id}>
-                          <FollowupCard
-                            followup={toCard(t, locale, followup, now)}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <EmptyState
-                      title={text.priorities.emptyTitle}
-                      description={text.priorities.emptyDescription}
-                    />
-                  )}
-                </SectionCard>
-
-                <SectionCard
-                  title={text.others.title}
-                  action={
-                    <ButtonLink href="/app/suivis" variant="quiet" size="sm">
-                      {text.actions.allFollowups}
-                      <ArrowRight aria-hidden="true" className="size-4" />
-                    </ButtonLink>
-                  }
-                >
-                  <ul className="-mx-3">
-                    {others.map((followup) => (
-                      <li key={followup.id}>
-                        <FollowupCard
-                          followup={toCard(t, locale, followup, now)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                  {others.length === 0 ? (
-                    <EmptyState title={text.others.empty} />
-                  ) : null}
-                </SectionCard>
-              </>
+              <ClinicalLists
+                t={t}
+                locale={locale}
+                now={now}
+                priorities={[...urgent, ...watch]}
+                others={others}
+              />
             ) : (
-              <SectionCard
-                title={text.organization.title}
-                description={text.organization.description}
-                action={
-                  <ButtonLink href="/app/suivis" variant="quiet" size="sm">
-                    {text.actions.allFollowups}
-                    <ArrowRight aria-hidden="true" className="size-4" />
-                  </ButtonLink>
-                }
-              >
-                {views.length > 0 ? (
-                  <ul className="grid gap-3">
-                    {views.map((view) => (
-                      <li
-                        key={view.id}
-                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                      >
-                        <span>
-                          <span className="font-semibold">
-                            {view.animalName}
-                          </span>
-                          <span className="text-ink-muted">
-                            {" "}
-                            · {view.responsibleName}
-                          </span>
-                        </span>
-                        {view.status === "paused" ? (
-                          <StatusBadge status="paused" />
-                        ) : (
-                          <span className="text-ink-muted">
-                            {t.labels.followupStatus[view.status]}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <EmptyState title={text.organization.empty} />
-                )}
-              </SectionCard>
+              <OrganizationList t={t} views={views} />
             )}
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
             {today.agenda ? (
-              <SectionCard
-                title={text.agenda.title}
-                description={text.agenda.description}
-                action={
-                  <ButtonLink href="/app/agenda" variant="quiet" size="sm">
-                    {text.actions.agenda}
-                    <ArrowRight aria-hidden="true" className="size-4" />
-                  </ButtonLink>
-                }
-              >
-                {agenda.length > 0 ? (
-                  <ol className="flex flex-col gap-2">
-                    {agenda.map((event) => (
-                      <li key={event.id}>
-                        <AgendaEvent
-                          event={event}
-                          vetName={shortPersonName(event.vetId)}
-                          locale={locale}
-                        />
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <EmptyState
-                    title={text.agenda.emptyTitle}
-                    description={text.agenda.emptyDescription}
-                  />
-                )}
-              </SectionCard>
+              <TodayAgenda t={t} locale={locale} agenda={agenda} />
             ) : null}
 
             <NextActions

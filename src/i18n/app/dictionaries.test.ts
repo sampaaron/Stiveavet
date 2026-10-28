@@ -41,8 +41,8 @@ function sample(leaf: string | Text): string {
   }
 }
 
-const french = leaves(fr as unknown as Tree);
-const english = new Map(leaves(en as unknown as Tree));
+const french = leaves(fr);
+const english = new Map(leaves(en));
 
 describe("dictionnaires de l'espace cabinet", () => {
   it("le français et l'anglais ont exactement la même structure", () => {
@@ -65,10 +65,10 @@ describe("dictionnaires de l'espace cabinet", () => {
   });
 
   it("présente toujours Numa et Stive comme des IA", () => {
-    expect(fr.common.numaAi).toBe("Assistante IA");
-    expect(fr.common.stiveAi).toBe("Assistant IA");
-    expect(en.common.numaAi).toBe("AI assistant");
-    expect(en.common.stiveAi).toBe("AI assistant");
+    expect(fr.ui.assistants.numaAi).toBe("Assistante IA");
+    expect(fr.ui.assistants.stiveAi).toBe("Assistant IA");
+    expect(en.ui.assistants.numaAi).toBe("AI assistant");
+    expect(en.ui.assistants.stiveAi).toBe("AI assistant");
     expect(en.ui.chat.numaAuthor).toContain("AI assistant");
   });
 

@@ -12,7 +12,11 @@ import { refuseOwnerMedia, storeOwnerMedia } from "@/domains/fichiers/service";
 import type { MediaRefusal } from "@/domains/fichiers/service";
 import { JobError } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
-import type { DeadJobHandler, JobHandler } from "@/domains/taches/worker";
+import type {
+  AnyJobHandler,
+  DeadJobHandler,
+  StagedJobHandler,
+} from "@/domains/taches/worker";
 import { attachments, messages } from "@/server/db/schema";
 import type { TenantTransaction } from "@/server/db/tenant";
 
@@ -69,8 +73,9 @@ async function pendingTarget(
   tx: TenantTransaction,
   organizationId: string,
   messageId: string,
+  lock = true,
 ) {
-  const [message] = await tx
+  const query = tx
     .select({
       followupId: messages.followupId,
       caption: messages.body,
@@ -78,8 +83,10 @@ async function pendingTarget(
     })
     .from(messages)
     .leftJoin(attachments, eq(attachments.messageId, messages.id))
-    .where(and(eq(messages.id, messageId), eq(messages.direction, "inbound")))
-    .for("update", { of: messages });
+    .where(and(eq(messages.id, messageId), eq(messages.direction, "inbound")));
+  const [message] = lock
+    ? await query.for("update", { of: messages })
+    : await query;
   if (!message) throw new JobError("target_missing");
   if (message.attachmentId) return null;
   return {
@@ -94,39 +101,74 @@ export function mediaDownloadHandlers(deps: {
   whatsapp: WhatsAppProvider;
   storage: ObjectStorage;
 }): {
-  handlers: Record<string, JobHandler>;
+  handlers: Record<string, AnyJobHandler>;
   dead: Record<string, DeadJobHandler>;
 } {
-  const download: JobHandler = async ({ tx, job }) => {
-    const parsed = mediaPayload.safeParse(job.payload);
-    if (!parsed.success) throw new JobError("invalid_payload");
-    const { messageId, mediaId, kind } = parsed.data;
-    const target = await pendingTarget(tx, job.organizationId, messageId);
-    if (!target) return;
-    let bytes: Uint8Array;
-    try {
-      const connector = await deps.whatsapp.connectorFor(tx);
-      bytes = await connector.downloadMedia({
-        mediaId,
-        maxBytes: kind === "photo" ? MAX_PHOTO_BYTES : MAX_VOICE_BYTES,
+  /** Échec du téléchargement : refus du fichier, ou erreur de la tâche (réessayée ou non). */
+  function downloadFailure(error: unknown): MediaRefusal {
+    if (error instanceof WhatsAppSendError && error.failure === "account")
+      throw new JobError("provider_account", { final: true });
+    if (!(error instanceof WhatsAppMediaError))
+      throw new JobError("provider_unavailable");
+    if (error.failure === "account")
+      throw new JobError("provider_account", { final: true });
+    const reason = REFUSALS[error.failure];
+    if (!reason) throw new JobError("provider_unavailable");
+    return reason;
+  }
+
+  /**
+   * En deux temps (ADR 0040) : téléchargement chez Meta hors transaction, puis fichier
+   * rattaché sous le verrou du message, s'il n'en a toujours pas.
+   */
+  const download: StagedJobHandler<
+    { bytes: Uint8Array } | { refused: MediaRefusal } | null
+  > = {
+    async prepare({ job, read }) {
+      const parsed = mediaPayload.safeParse(job.payload);
+      if (!parsed.success) throw new JobError("invalid_payload");
+      const { messageId, mediaId, kind } = parsed.data;
+      const connector = await read(async (tx) => {
+        const target = await pendingTarget(
+          tx,
+          job.organizationId,
+          messageId,
+          false,
+        );
+        return target
+          ? deps.whatsapp.connectorFor(tx).catch((error: unknown) => ({
+              refused: downloadFailure(error),
+            }))
+          : null;
       });
-    } catch (error) {
-      if (error instanceof WhatsAppSendError && error.failure === "account")
-        throw new JobError("provider_account", { final: true });
-      if (!(error instanceof WhatsAppMediaError))
-        throw new JobError("provider_unavailable");
-      if (error.failure === "account")
-        throw new JobError("provider_account", { final: true });
-      const reason = REFUSALS[error.failure];
-      if (!reason) throw new JobError("provider_unavailable");
-      await refuseOwnerMedia(tx, target, { kind, reason });
-      return;
-    }
-    const refusal = await storeOwnerMedia(tx, deps.storage, target, {
-      kind,
-      bytes,
-    });
-    if (refusal) await refuseOwnerMedia(tx, target, { kind, reason: refusal });
+      if (!connector || "refused" in connector) return connector;
+      try {
+        return {
+          bytes: await connector.downloadMedia({
+            mediaId,
+            maxBytes: kind === "photo" ? MAX_PHOTO_BYTES : MAX_VOICE_BYTES,
+          }),
+        };
+      } catch (error) {
+        return { refused: downloadFailure(error) };
+      }
+    },
+    async commit({ tx, job, prepared }) {
+      const parsed = mediaPayload.safeParse(job.payload);
+      if (!parsed.success) throw new JobError("invalid_payload");
+      const { messageId, kind } = parsed.data;
+      const target = await pendingTarget(tx, job.organizationId, messageId);
+      if (!target || !prepared) return;
+      const refusal =
+        "refused" in prepared
+          ? prepared.refused
+          : await storeOwnerMedia(tx, deps.storage, target, {
+              kind,
+              bytes: prepared.bytes,
+            });
+      if (refusal)
+        await refuseOwnerMedia(tx, target, { kind, reason: refusal });
+    },
   };
 
   /** Téléchargement abandonné (Meta indisponible, compte à reconnecter) : fichier refusé. */

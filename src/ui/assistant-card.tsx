@@ -3,8 +3,8 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 
-import { useAppText } from "@/i18n/app/client";
-import type { AppDictionary } from "@/i18n/app/types";
+import { useSharedText } from "@/i18n/app/shared-client";
+import type { SharedDictionary } from "@/i18n/app/types";
 
 import { Card } from "./card";
 import { cn } from "./cn";
@@ -15,14 +15,11 @@ export type Assistant = "numa" | "stive";
  * Numa et Stive sont représentés par des portraits photoréalistes : la mention « IA »
  * les accompagne donc toujours (principe non négociable n° 3 du cahier des charges).
  */
-function assistantText(t: AppDictionary, assistant: Assistant) {
+function assistantText(t: SharedDictionary, assistant: Assistant) {
+  const { numaRole, numaAi, stiveRole, stiveAi } = t.assistants;
   return assistant === "numa"
-    ? { name: "Numa", role: t.ui.assistants.numaRole, aiLabel: t.common.numaAi }
-    : {
-        name: "Stive",
-        role: t.ui.assistants.stiveRole,
-        aiLabel: t.common.stiveAi,
-      };
+    ? { name: "Numa", role: numaRole, aiLabel: numaAi }
+    : { name: "Stive", role: stiveRole, aiLabel: stiveAi };
 }
 
 export function AssistantAvatar({
@@ -34,12 +31,12 @@ export function AssistantAvatar({
   size?: number;
   className?: string;
 }) {
-  const t = useAppText();
+  const t = useSharedText();
   const { name, aiLabel } = assistantText(t, assistant);
   return (
     <Image
       src={`/assistants/${assistant}.webp`}
-      alt={t.ui.assistants.avatarAlt(name, aiLabel)}
+      alt={t.assistants.avatarAlt(name, aiLabel)}
       width={size}
       height={size}
       className={cn(
@@ -51,7 +48,7 @@ export function AssistantAvatar({
 }
 
 export function AiBadge({ assistant }: { assistant: Assistant }) {
-  const t = useAppText();
+  const t = useSharedText();
   return (
     <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">
       {assistantText(t, assistant).aiLabel}
@@ -68,7 +65,7 @@ export function AssistantCard({
   children?: ReactNode;
   action?: ReactNode;
 }) {
-  const t = useAppText();
+  const t = useSharedText();
   const { name, role } = assistantText(t, assistant);
   return (
     <Card className="flex flex-col gap-4 p-5">

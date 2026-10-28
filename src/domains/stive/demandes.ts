@@ -1,4 +1,4 @@
-import { foldText } from "@/domains/commun";
+import { foldText } from "@/domains/commun/utilitaires";
 
 /**
  * Reconnaissance des demandes faites à Stive, en version simulée (ADR 0034) : des règles

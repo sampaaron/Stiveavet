@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import {
   AUTOMATIC_END_REASON,
   END_KIND,
@@ -183,7 +183,7 @@ const sourceSteps = [
   "left_group",
   "stopped_all",
 ] as const;
-type SourceStep = (typeof sourceSteps)[number];
+export type SourceStep = (typeof sourceSteps)[number];
 
 export const jobPayload = z.discriminatedUnion("step", [
   z.object({ step: z.literal("intro") }),
@@ -196,6 +196,8 @@ export const jobPayload = z.discriminatedUnion("step", [
     appointmentId: z.uuid(),
   }),
 ]);
+
+export type JobPayload = z.infer<typeof jobPayload>;
 
 export const reminderPayload = z.object({ stepId: z.uuid() });
 

@@ -11,7 +11,11 @@ import { firstName } from "@/domains/conversations/wording";
 import { JobError } from "@/domains/taches/kinds";
 import type { JobErrorCode } from "@/domains/taches/kinds";
 import { enqueue } from "@/domains/taches/queue";
-import type { DeadJobHandler, JobHandler } from "@/domains/taches/worker";
+import type {
+  AnyJobHandler,
+  DeadJobHandler,
+  StagedJobHandler,
+} from "@/domains/taches/worker";
 import {
   animals,
   consents,
@@ -324,7 +328,7 @@ export function sendHandlers(deps: {
   whatsapp: WhatsAppProvider;
   clock?: () => Date;
 }): {
-  handlers: Record<string, JobHandler>;
+  handlers: Record<string, AnyJobHandler>;
   dead: Record<string, DeadJobHandler>;
 } {
   const { whatsapp, clock = () => new Date() } = deps;
@@ -340,10 +344,13 @@ export function sendHandlers(deps: {
       .where(eq(messages.id, messageId));
   }
 
-  const send: JobHandler = async ({ tx, job }) => {
-    const parsed = sendPayload.safeParse(job.payload);
-    if (!parsed.success) throw new JobError("invalid_payload");
-    const [message] = await tx
+  /** Message à envoyer, verrouillé (avec sa conversation) pour l'écriture. */
+  async function outboundMessage(
+    tx: TenantTransaction,
+    messageId: string,
+    lock: boolean,
+  ) {
+    const query = tx
       .select({
         id: messages.id,
         organizationId: messages.organizationId,
@@ -367,26 +374,33 @@ export function sendHandlers(deps: {
         conversationThreads,
         eq(conversationThreads.id, messages.threadId),
       )
-      .where(eq(messages.id, parsed.data.messageId))
-      // La conversation aussi : deux envois d'une même conversation ne se croisent pas.
-      .for("update", { of: [messages, conversationThreads] });
+      .where(eq(messages.id, messageId));
+    // La conversation aussi : deux envois d'une même conversation ne se croisent pas.
+    const [message] = lock
+      ? await query.for("update", { of: [messages, conversationThreads] })
+      : await query;
     if (!message || message.direction !== "outbound")
       throw new JobError("target_missing");
-    const resend =
-      message.status === "failed" &&
-      message.errorCode !== null &&
-      RESENDABLE.has(message.errorCode);
-    // Déjà parti (accusé reçu entre-temps), en attente, annulé : rien à faire.
-    if (message.status !== "queued" && !resend) return;
-    const now = clock();
+    return message;
+  }
 
+  type Outbound = Awaited<ReturnType<typeof outboundMessage>>;
+
+  /** Encore à envoyer : en file, ou en échec relançable. Déjà parti, en attente, annulé : non. */
+  const toSend = (message: Outbound) =>
+    message.status === "queued" ||
+    (message.status === "failed" &&
+      message.errorCode !== null &&
+      RESENDABLE.has(message.errorCode));
+
+  /** Décision prise à la lecture (sans verrou) : ce qui part, ou pourquoi rien ne part. */
+  async function sendPlan(tx: TenantTransaction, message: Outbound, now: Date) {
+    if (!toSend(message)) return { kind: "skip" as const };
     let to: Recipient;
     let lastInbound: Date | null;
     if (message.threadKind === "group") {
-      if (!message.groupRef || message.threadClosedAt) {
-        await markFailed(tx, message.id, "group_closed");
-        return;
-      }
+      if (!message.groupRef || message.threadClosedAt)
+        return { kind: "failed" as const, code: "group_closed" };
       to = { kind: "group", groupRef: message.groupRef };
       lastInbound = await lastInboundInFollowup(tx, message.followupId);
     } else {
@@ -394,14 +408,11 @@ export function sendHandlers(deps: {
         ? await contactPhone(tx, message.contactId)
         : null;
       if (!phone || !message.contactId) throw new JobError("target_missing");
-      if (await withdrawnSince(tx, message.contactId, message.occurredAt)) {
-        await markFailed(tx, message.id, "consent_withdrawn");
-        return;
-      }
+      if (await withdrawnSince(tx, message.contactId, message.occurredAt))
+        return { kind: "failed" as const, code: "consent_withdrawn" };
       to = { kind: "phone", phone };
       lastInbound = await lastInboundFrom(tx, phone);
     }
-
     const template =
       message.templateKey && isTemplateKey(message.templateKey)
         ? message.templateKey
@@ -413,20 +424,8 @@ export function sendHandlers(deps: {
     )
       // Le texte gardé doit être exactement celui qui part.
       throw new JobError("invalid_payload", { final: true });
-
-    const hold = async () => {
-      await tx
-        .update(messages)
-        .set({ deliveryStatus: "awaiting_reply" })
-        .where(eq(messages.id, message.id));
-      if (to.kind === "phone" && message.contactId)
-        await inviteToReply(tx, message, message.contactId, to.phone);
-    };
-
-    if (!template && !windowOpen(lastInbound, now)) {
-      await hold();
-      return;
-    }
+    if (!template && !windowOpen(lastInbound, now))
+      return { kind: "hold" as const };
     const content: OutboundContent = template
       ? {
           kind: "template",
@@ -435,44 +434,108 @@ export function sendHandlers(deps: {
           params: message.templateParams,
         }
       : { kind: "text", body: message.body };
+    return {
+      kind: "send" as const,
+      to,
+      content,
+      template,
+      connector: await whatsapp.connectorFor(tx),
+    };
+  }
 
-    let externalRef: string;
-    try {
-      const connector = await whatsapp.connectorFor(tx);
-      ({ externalRef } = await connector.send({
-        to,
-        content,
-        reference: message.id,
-      }));
-    } catch (error) {
-      if (!(error instanceof WhatsAppSendError))
-        throw new JobError("provider_unavailable");
-      switch (error.failure) {
-        case "retry":
-        case "unknown":
-          // Réponse perdue (`unknown`) : l'envoi a pu partir. La tentative suivante ne
-          // renvoie que si aucun accusé de Meta n'a fait avancer le message entre-temps.
-          throw new JobError("provider_unavailable");
-        case "window_closed":
-          if (!template) {
-            await hold();
-            return;
-          }
-          throw new JobError("provider_rejected", { final: true });
-        default:
-          throw new JobError(FINAL_FAILURES[error.failure], { final: true });
+  type SendOutcome =
+    | { kind: "skip" }
+    | { kind: "failed"; code: string }
+    | { kind: "hold" }
+    | { kind: "sent"; externalRef: string; at: Date };
+
+  /**
+   * Envoi en deux temps (ADR 0040) : décision lue sans verrou, appel à Meta hors transaction,
+   * puis résultat écrit sous le verrou du message s'il est toujours à envoyer. Un envoi parti
+   * est constaté même si le bail a été perdu pendant l'appel : la reprise ne le renvoie pas.
+   */
+  const send: StagedJobHandler<SendOutcome> = {
+    keepOnLostLease: true,
+    async prepare({ job, read }) {
+      const parsed = sendPayload.safeParse(job.payload);
+      if (!parsed.success) throw new JobError("invalid_payload");
+      const now = clock();
+      let plan: Awaited<ReturnType<typeof sendPlan>>;
+      try {
+        plan = await read(async (tx) =>
+          sendPlan(
+            tx,
+            await outboundMessage(tx, parsed.data.messageId, false),
+            now,
+          ),
+        );
+      } catch (error) {
+        // Compte pas (ou plus) connecté, jeton illisible : à reconnecter.
+        if (!(error instanceof WhatsAppSendError)) throw error;
+        throw new JobError("provider_account", { final: true });
       }
-    }
-    await tx
-      .update(messages)
-      .set({
-        deliveryStatus: "sent",
-        sentAt: now,
-        externalRef,
-        failedAt: null,
-        errorCode: null,
-      })
-      .where(eq(messages.id, message.id));
+      if (plan.kind !== "send") return plan;
+      try {
+        const { externalRef } = await plan.connector.send({
+          to: plan.to,
+          content: plan.content,
+          reference: parsed.data.messageId,
+        });
+        return { kind: "sent", externalRef, at: now };
+      } catch (error) {
+        if (!(error instanceof WhatsAppSendError))
+          throw new JobError("provider_unavailable");
+        switch (error.failure) {
+          case "retry":
+          case "unknown":
+            // Réponse perdue (`unknown`) : l'envoi a pu partir. La tentative suivante ne
+            // renvoie que si aucun accusé de Meta n'a fait avancer le message entre-temps.
+            throw new JobError("provider_unavailable");
+          case "window_closed":
+            if (!plan.template) return { kind: "hold" };
+            throw new JobError("provider_rejected", { final: true });
+          default:
+            throw new JobError(FINAL_FAILURES[error.failure], { final: true });
+        }
+      }
+    },
+    async commit({ tx, job, prepared }) {
+      const parsed = sendPayload.safeParse(job.payload);
+      if (!parsed.success) throw new JobError("invalid_payload");
+      const message = await outboundMessage(tx, parsed.data.messageId, true);
+      // Déjà traité par une autre exécution (ou accusé reçu entre-temps) : rien à écrire.
+      if (!toSend(message)) return;
+      switch (prepared.kind) {
+        case "skip":
+          return;
+        case "failed":
+          return markFailed(tx, message.id, prepared.code);
+        case "hold": {
+          await tx
+            .update(messages)
+            .set({ deliveryStatus: "awaiting_reply" })
+            .where(eq(messages.id, message.id));
+          const phone =
+            message.threadKind === "direct" && message.contactId
+              ? await contactPhone(tx, message.contactId)
+              : null;
+          if (phone && message.contactId)
+            await inviteToReply(tx, message, message.contactId, phone);
+          return;
+        }
+        case "sent":
+          await tx
+            .update(messages)
+            .set({
+              deliveryStatus: "sent",
+              sentAt: prepared.at,
+              externalRef: prepared.externalRef,
+              failedAt: null,
+              errorCode: null,
+            })
+            .where(eq(messages.id, message.id));
+      }
+    },
   };
 
   /** Envoi abandonné : le message est marqué en échec et le vétérinaire est prévenu (§15). */

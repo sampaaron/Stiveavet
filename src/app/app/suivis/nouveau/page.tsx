@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DomainError } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
 import type { DrVetoSearchHit } from "@/domains/suivis/lancement";
 import { appText } from "@/i18n/app/server";
 import { requirePermission } from "@/server/authz";
@@ -52,10 +52,7 @@ export default async function NewFollowupPage({
       : [],
     query.length >= 2
       ? []
-      : services
-          .followups()
-          .list(context)
-          .then((views) => views.filter((view) => view.status === "draft")),
+      : services.followups().list(context, { statuses: ["draft"] }),
   ]);
   const { t, locale } = await appText();
   const text = t.followups.create;

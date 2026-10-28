@@ -10,15 +10,18 @@ import {
   lt,
   max,
   ne,
+  sql,
 } from "drizzle-orm";
 import { z } from "zod";
 
 import { BillingUnavailableError } from "@/adapters/billing-provider/types";
 import type { BillingProvider } from "@/adapters/billing-provider/types";
-import { auditOrganization as audit } from "@/domains/audit/journal";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
-import { assistantSeats, vetSeats } from "@/domains/equipe/service";
+import { auditOrganization } from "@/domains/audit/journal";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
+import { assistantSeats, lockSeats, vetSeats } from "@/domains/equipe/service";
+import { enqueue } from "@/domains/taches/queue";
+import type { JobHandler } from "@/domains/taches/worker";
 import {
   auditEvents,
   followups,
@@ -104,9 +107,13 @@ export type BillingOverview = {
   simulated: boolean;
 };
 
-/** Suivis actifs (hors suivis test) et fin du dernier suivi terminé. */
+/**
+ * Suivis actifs (hors suivis test) et fin du dernier suivi terminé. `lastEnd` : sans objet
+ * tant que le cabinet n'est ni résilié ni impayé, cette lecture de tout l'historique est évitée.
+ */
 export async function followupActivity(
   tx: TenantTransaction,
+  options: { lastEnd: boolean } = { lastEnd: true },
 ): Promise<Activity> {
   const [active] = await tx
     .select({ n: count() })
@@ -117,13 +124,45 @@ export async function followupActivity(
         eq(followups.isTest, false),
       ),
     );
-  const [ended] = await tx
-    .select({ last: max(followups.endedAt) })
-    .from(followups)
-    .where(eq(followups.isTest, false));
+  const [ended] = options.lastEnd
+    ? await tx
+        .select({ last: max(followups.endedAt) })
+        .from(followups)
+        .where(eq(followups.isTest, false))
+    : [];
   return {
     activeFollowups: active?.n ?? 0,
     lastFollowupEndedAt: ended?.last ?? null,
+  };
+}
+
+/** Ce que la garde des droits sait de la facturation du cabinet, à chaque requête. */
+export type BillingSnapshot = {
+  access: Access;
+  /** Choix entre engagement annuel et mensuel à faire (ADR 0023). */
+  commitmentReminder: boolean;
+  plan: Plan | null;
+  activeFollowups: number;
+};
+
+/**
+ * Accès du cabinet selon son abonnement, en lecture seule : les échéances sont émises et
+ * prélevées par la tâche quotidienne `billing.sync` (ADR 0040), jamais pendant une page.
+ */
+export async function billingSnapshot(
+  tx: TenantTransaction,
+  now = new Date(),
+): Promise<BillingSnapshot> {
+  const facts = await loadFacts(tx);
+  // La fin du dernier suivi ne compte qu'après une résiliation ou un impayé.
+  const activity = await followupActivity(tx, {
+    lastEnd: Boolean(facts?.unpaidSince || facts?.canceledAt),
+  });
+  return {
+    access: access(facts, now, activity),
+    commitmentReminder: facts ? commitmentReminder(facts, now) : false,
+    plan: facts?.plan ?? null,
+    activeFollowups: activity.activeFollowups,
   };
 }
 
@@ -190,20 +229,8 @@ export async function recordUsage(
   return { amountCents };
 }
 
-export function billingService(deps: {
-  db: Database;
-  provider: BillingProvider;
-}) {
-  const { db, provider } = deps;
-  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) => {
-    assertPermission(actor, "billing.manage");
-    return withTenant(
-      db,
-      { organizationId: actor.organizationId, userId: actor.userId },
-      fn,
-    );
-  };
-
+/** Échéances, prélèvements et vue d'ensemble, communs au service et à la tâche quotidienne. */
+function billingCore(provider: BillingProvider) {
   /** Mandat signé ; avec Stripe, seul un mandat confirmé par Stripe compte. */
   async function mandateSigned(tx: TenantTransaction): Promise<boolean> {
     const [row] = await tx
@@ -269,7 +296,7 @@ export function billingService(deps: {
       });
     } catch (error) {
       if (!(error instanceof BillingUnavailableError)) throw error;
-      await audit(
+      await auditOrganization(
         tx,
         { organizationId: organizationId, membershipId: null },
         "invoice.collection_deferred",
@@ -298,7 +325,7 @@ export function billingService(deps: {
           ),
         );
       await refreshUnpaid(tx, now);
-      await audit(
+      await auditOrganization(
         tx,
         { organizationId: organizationId, membershipId: null },
         "invoice.submitted",
@@ -348,8 +375,8 @@ export function billingService(deps: {
 
   /**
    * Émet les échéances dues (une facture par mois d'abonnement, jamais deux) et prélève les
-   * factures ouvertes une fois le mandat signé. Idempotent ; en phase 1 il tourne à la
-   * première requête qui suit une échéance, une tâche planifiée le fera ensuite.
+   * factures ouvertes une fois le mandat signé. Idempotent ; lancé par la tâche quotidienne
+   * `billing.sync` et par les écrans de facturation, jamais par la garde des droits.
    */
   async function sync(
     tx: TenantTransaction,
@@ -390,8 +417,12 @@ export function billingService(deps: {
           ),
         );
       const draft = draftInvoice(facts, month, usage);
-      const [issued] = await tx.select({ n: count() }).from(invoices);
-      const number = `SV-${period.start.getUTCFullYear()}-${String((issued?.n ?? 0) + 1).padStart(3, "0")}`;
+      // Suite unique et continue par année, tous cabinets confondus (migration 0026).
+      const numbered = await tx.execute<{ number: string }>(
+        sql`SELECT app.next_invoice_number(${period.start.getUTCFullYear()}) AS number`,
+      );
+      const number = numbered.rows[0]?.number;
+      if (!number) throw new Error("Numéro de facture indisponible");
       const [invoice] = await tx
         .insert(invoices)
         .values({
@@ -418,7 +449,7 @@ export function billingService(deps: {
               usage.map((event) => event.id),
             ),
           );
-      await audit(
+      await auditOrganization(
         tx,
         { organizationId: organizationId, membershipId: null },
         "invoice.issued",
@@ -514,26 +545,75 @@ export function billingService(deps: {
   }
 
   return {
-    /**
-     * Accès du cabinet, après rattrapage des échéances, et choix d'engagement en attente ;
-     * lu par la garde serveur à chaque requête.
-     */
+    mandateSigned,
+    recentlyDeferred,
+    collect,
+    sync,
+    overviewIn,
+    editableFacts,
+  };
+}
+
+export const BILLING_SYNC_JOB = "billing.sync";
+
+/** Premier passage du jour : une tâche `billing.sync` par cabinet (heure de Paris). */
+export async function planBillingSyncs(db: Database): Promise<number> {
+  const result = await db.execute<{ planned: number }>(
+    sql`SELECT jobs.plan_billing_syncs() AS planned`,
+  );
+  return Number(result.rows[0]?.planned ?? 0);
+}
+
+/**
+ * Tâche quotidienne `billing.sync` (ADR 0040) : émet les échéances dues et prélève les
+ * factures ouvertes, hors de toute requête de page. Prestataire en panne : nouvel essai une
+ * heure plus tard (une seule tâche par heure).
+ */
+export function billingSyncHandlers(deps: {
+  provider: BillingProvider;
+  clock?: () => Date;
+}): Record<string, JobHandler> {
+  const { sync, recentlyDeferred } = billingCore(deps.provider);
+  const clock = deps.clock ?? (() => new Date());
+  return {
+    [BILLING_SYNC_JOB]: async ({ tx, job }) => {
+      const now = clock();
+      await sync(tx, job.organizationId, now);
+      if (!(await recentlyDeferred(tx, now))) return;
+      const retryAt = new Date(now.getTime() + 3_600_000);
+      await enqueue(tx, {
+        organizationId: job.organizationId,
+        kind: BILLING_SYNC_JOB,
+        idempotencyKey: `billing:sync:${retryAt.toISOString().slice(0, 13)}`,
+        runAt: retryAt,
+      });
+    },
+  };
+}
+
+export function billingService(deps: {
+  db: Database;
+  provider: BillingProvider;
+}) {
+  const { db, provider } = deps;
+  const run = <T>(actor: Actor, fn: (tx: TenantTransaction) => Promise<T>) => {
+    assertPermission(actor, "billing.manage");
+    return withTenant(
+      db,
+      { organizationId: actor.organizationId, userId: actor.userId },
+      fn,
+    );
+  };
+  const { mandateSigned, collect, sync, overviewIn, editableFacts } =
+    billingCore(provider);
+
+  return {
+    /** Accès du cabinet et choix d'engagement en attente, en lecture seule. */
     async accessFor(
       context: { organizationId: string; userId: string },
       now = new Date(),
-    ): Promise<{
-      access: Access;
-      commitmentReminder: boolean;
-      plan: Plan | null;
-    }> {
-      return withTenant(db, context, async (tx) => {
-        const facts = await sync(tx, context.organizationId, now);
-        return {
-          access: access(facts, now, await followupActivity(tx)),
-          commitmentReminder: facts ? commitmentReminder(facts, now) : false,
-          plan: facts?.plan ?? null,
-        };
-      });
+    ): Promise<BillingSnapshot> {
+      return withTenant(db, context, (tx) => billingSnapshot(tx, now));
     },
 
     async overview(actor: Actor, now = new Date()): Promise<BillingOverview> {
@@ -549,6 +629,8 @@ export function billingService(deps: {
         if (facts.plan === parsed.data) return;
         if (facts.cycle === "annual") throw new DomainError("invalid_target");
         const target = PLAN_CATALOG[parsed.data];
+        // Sous le verrou des places : une invitation acceptée en même temps compte avant.
+        await lockSeats(tx);
         if ((await vetSeats(tx)) > target.maxVets)
           throw new DomainError("plan_vet_limit");
         if (
@@ -564,7 +646,7 @@ export function billingService(deps: {
           if (drveto) throw new DomainError("plan_integration_connected");
         }
         await tx.update(subscriptions).set({ plan: parsed.data });
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,
@@ -601,7 +683,7 @@ export function billingService(deps: {
             throw new DomainError("invalid_target");
           await tx.update(subscriptions).set({ cycleChosenAt: now });
         }
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,
@@ -621,7 +703,7 @@ export function billingService(deps: {
         const facts = await editableFacts(tx, actor.organizationId, now);
         const endsAt = cancellationEffectiveAt(facts, now);
         await tx.update(subscriptions).set({ canceledAt: now, endsAt });
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,
@@ -668,7 +750,7 @@ export function billingService(deps: {
           : results.includes("processing")
             ? "processing"
             : "paid";
-        await audit(
+        await auditOrganization(
           tx,
           {
             organizationId: actor.organizationId,

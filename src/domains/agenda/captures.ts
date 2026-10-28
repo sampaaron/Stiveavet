@@ -5,8 +5,8 @@ import { z } from "zod";
 
 import type { AiGateway, FreeSlot } from "@/adapters/ai-gateway/types";
 import type { ObjectStorage } from "@/adapters/object-storage";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import {
   MAX_CAPTURE_BYTES,
   sha256Hex,
@@ -22,7 +22,7 @@ import {
 } from "@/server/db/schema";
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
-import { auditAttachment as audit, recordAudit } from "@/domains/audit/journal";
+import { auditAttachment, recordAudit } from "@/domains/audit/journal";
 
 /**
  * Capture d'écran d'agenda (cahier des charges §8, architecture §7, ADR 0019), en attendant
@@ -237,7 +237,7 @@ export function agendaService(deps: {
               target: [agendaFreeSlots.membershipId, agendaFreeSlots.startsAt],
             });
         }
-        await audit(tx, actor, "agenda.capture_read", attachmentId, {
+        await auditAttachment(tx, actor, "agenda.capture_read", attachmentId, {
           slots: slots.length,
           vetMembershipId: input.vetMembershipId,
         });

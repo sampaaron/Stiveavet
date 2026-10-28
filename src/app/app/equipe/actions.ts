@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { PLAIN_NAME } from "@/domains/auth/validators";
 import { appText } from "@/i18n/app/server";
 import type { AppDictionary } from "@/i18n/app/types";
 import { memberContext } from "@/server/authz";
@@ -25,7 +26,8 @@ const inviteInput = z.object({
     .string()
     .trim()
     .min(2, "name_missing")
-    .max(120, "name_too_long"),
+    .max(120, "name_too_long")
+    .regex(PLAIN_NAME, "name_chars"),
   role,
 });
 const idInput = z.object({ id: z.uuid() });

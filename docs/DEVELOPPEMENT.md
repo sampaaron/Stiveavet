@@ -17,7 +17,7 @@ règles de sécurité dans `docs/securite/`.
 | `src/server`             | Socle transversal : configuration (`env.ts`), base (`db/`), sessions (`auth/`), droits (`authz/`), en-têtes et CSP.      |
 | `src/server/services.ts` | Assemble les services (base, adaptateurs, configuration). L'interface ne crée jamais un service elle-même.               |
 | `src/i18n`               | Dictionnaires. Le français fait foi ; l'anglais est typé sur le français, une clé oubliée ne compile pas.                |
-| `src/ui`                 | Composants visuels partagés et formats (dates, montants).                                                                |
+| `src/ui`                 | Composants visuels partagés, formats (dates, montants) et formes d'affichage d'un suivi (`types.ts`).                    |
 | `infra/scaleway`         | Infrastructure du staging en Terraform (ADR 0028). Rien n'est créé sans feu vert.                                        |
 | `db/migrations`          | Migrations SQL numérotées, chacune avec son `.up.sql` et son `.down.sql`.                                                |
 | `db/seed`                | Données fictives : les Tilleuls (Claire, Hugo, Inès, Léa) et le cabinet du Dr Martin.                                    |
@@ -44,7 +44,7 @@ Exemple : un vétérinaire relance une tâche en échec (`src/app/app/taches/act
 5. **Dans la transaction,** le service fait le changement métier et l'inscrit au journal
    (`src/domains/audit/journal.ts`). S'il le faut, il ajoute une tâche avec `enqueue`, ou un
    événement avec `emit`. Tout est validé ensemble ou annulé ensemble.
-6. **Retour.** Un refus métier lève une `DomainError` (`src/domains/equipe/actor.ts`), que
+6. **Retour.** Un refus métier lève une `DomainError` (`src/domains/commun/actor.ts`), que
    `attempt()` ou `domainFailure()` traduit dans la langue de la personne. Toute autre erreur
    remonte vers la page d'erreur générique, sans détail.
 
@@ -71,7 +71,8 @@ file de PostgreSQL (ADR 0014). Le code est dans `src/domains/taches/`.
   cabinet.
 
 Pour observer la file en local, lancez `pnpm worker --once` : il fait un seul passage et
-n'affiche que des compteurs.
+n'affiche que des compteurs. Sa configuration est validée au démarrage (`taches/config.ts`) ; en image
+Docker, le worker est un seul fichier compilé par `pnpm build:scripts` (ADR 0041).
 
 ## Base de données et migrations
 
@@ -79,6 +80,8 @@ n'affiche que des compteurs.
   - Le superutilisateur ne sert qu'à créer les rôles et les bases de test.
   - `stivea_migrator` possède le schéma et applique les migrations.
   - `stivea_app` est le rôle de l'application, soumis à la RLS.
+- **Hors local, les migrations sont une tâche ponctuelle** (image `--target migrate`) : l'URL
+  du migrateur n'entre jamais dans les conteneurs de l'application ni du worker (ADR 0041).
 - **Ajouter une migration.** Créez `db/migrations/00NN_nom.up.sql` et `.down.sql`, puis lancez
   `pnpm db:migrate`. Pour annuler la dernière migration : `pnpm db:migrate down`. Le test
   `tests/integration/migrations.test.ts` vérifie que chaque migration a son inverse et que
@@ -89,6 +92,45 @@ n'affiche que des compteurs.
 - **Le schéma Drizzle** (`src/domains/*/schema.ts`, regroupé par `src/server/db/schema.ts`)
   décrit les tables pour TypeScript. Il ne crée rien : le SQL des migrations fait foi, et
   `migrations.test.ts` vérifie que les deux correspondent colonne par colonne.
+- **Les migrations prennent un verrou consultatif** (`MIGRATION_LOCK_KEY`) : deux déploiements
+  simultanés s'attendent au lieu d'appliquer deux fois la même migration.
+
+### Règles de la base (ADR 0038)
+
+- **Une colonne nouvellement modifiée par l'application** demande un `GRANT UPDATE (colonne)`
+  dans la migration. Sur `organizations`, `users`, `memberships`, `followups`, `invitations` et
+  `followup_shares`, `stivea_app` n'a pas de droit de mise à jour sur la table entière.
+  `tests/integration/durcissement.test.ts` vérifie les colonnes interdites.
+- **Toute fonction `SECURITY DEFINER`** fixe son `search_path` et le termine par `pg_temp`, par
+  exemple `SET search_path = pg_catalog, public, pg_temp`. Un test échoue sinon.
+- **Les tables cliniques** (`messages`, transcriptions, photos, synthèses, triage, imports,
+  traitements) ont une politique restrictive `clinical_access`. Elle relit les permissions dans
+  `membership_permissions`. Un droit donné seulement en mémoire, dans un test par exemple, ne
+  suffit pas. Une nouvelle table clinique reçoit la même politique.
+- **Les journaux** `audit_events` et `login_events` ne s'effacent pas, même pour le
+  propriétaire. Seule `auth.purge_expired()` efface les connexions de plus de 12 mois.
+- **Numéros de facture** : toujours `app.next_invoice_number(année)`, jamais un comptage.
+
+### Créer la base en production
+
+`db/bootstrap/roles.sql` crée la base seulement si elle n'existe pas. Quand l'hébergeur ou
+Terraform l'a déjà créée, elle appartient à un autre rôle. L'administrateur exécute alors une
+fois, avant la première migration :
+
+```sql
+ALTER DATABASE stivea OWNER TO stivea_migrator;
+-- Seulement si \dn montre un autre propriétaire que pg_database_owner :
+ALTER SCHEMA public OWNER TO stivea_migrator;
+REVOKE ALL ON DATABASE stivea FROM PUBLIC;
+GRANT CONNECT ON DATABASE stivea TO stivea_app;
+```
+
+Pour vérifier :
+
+- `stivea_app` n'a ni `CREATE` ni `TEMPORARY` sur la base :
+  `SELECT has_database_privilege('stivea_app', 'stivea', 'CREATE')`, puis la même requête avec
+  `'TEMP'`, doivent renvoyer `false`.
+- Aucun rôle applicatif n'a `BYPASSRLS` : `SELECT rolname FROM pg_roles WHERE rolbypassrls`.
 
 ### Pièges connus
 
@@ -107,17 +149,20 @@ n'affiche que des compteurs.
 
 Avant d'écrire une aide, vérifiez qu'elle n'existe pas déjà :
 
-- `text` et `parseJson` (`src/app/app/form-data.ts`) lisent les champs d'un formulaire dans une Server Action.
+- `text`, `fields` et `parseJson` (`src/app/app/form-data.ts`) lisent les champs d'un formulaire dans une Server Action.
 - `parseConfig` (`src/server/config.ts`) valide une configuration. En cas d'erreur, il ne cite que les noms des variables, jamais leurs valeurs.
 - `activeVets` (`src/domains/equipe/veterinaires.ts`) liste les vétérinaires actifs du cabinet courant.
 - `loadFacts` (`src/domains/facturation/faits.ts`) lit l'abonnement du cabinet courant.
+- `formatEuros`, `initials` et les dates (`src/ui/format.ts`), `Fact` (`src/ui/card.tsx`) pour l'affichage.
+- `concatBytes` et `foldText` (`src/domains/commun/utilitaires.ts`), `clientIp` (`src/server/http/client-ip.ts`).
 
 ## Heure de Paris
 
 Les règles métier (rappels, jour courant, horaires de garde) suivent l'heure murale de Paris.
-Les aides sont `parisWallMinutes` et `parisLocalToDate` dans `src/domains/reglages/content.ts`,
-et `minutesOfDay` dans `src/domains/commun.ts`. N'utilisez jamais `new Date().getHours()` : le
-serveur tourne en UTC. Les tests e2e attendent le jour suivant quand minuit approche à Paris
+Toutes les aides sont dans `src/domains/heure-paris.ts` : `parisWallMinutes` (heure murale),
+`parisLocalToDate` (saisie `datetime-local` lue à Paris), `parisDayIndex` (numéro du jour) et
+`parisDate` (« AAAA-MM-JJ »). `minutesOfDay` est dans `src/domains/commun/utilitaires.ts`. N'en recopiez
+pas une, et n'utilisez jamais `new Date().getHours()` : le serveur tourne en UTC. Les tests e2e attendent le jour suivant quand minuit approche à Paris
 (`tests/e2e/prepare-database.mts`).
 
 ## Journaux, erreurs et données sensibles

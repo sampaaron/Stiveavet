@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { toE164 } from "@/domains/whatsapp/numero";
+import { parisDate } from "@/domains/heure-paris";
 
 /**
  * Saisie du registre (animal et propriétaires), validée côté serveur. Les messages d'erreur
@@ -18,17 +19,7 @@ const optionalText = (max: number) =>
     .max(max)
     .transform((value) => value || null);
 
-/** Date du jour à Paris (AAAA-MM-JJ) : une naissance ne peut pas être dans le futur. */
-function parisToday(now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-}
-
-export const ownerInput = z.object({
+const ownerInput = z.object({
   fullName: z.string().trim().min(2).max(160),
   phone: z
     .string()
@@ -75,10 +66,11 @@ function animalInput(now: Date = new Date()) {
       .trim()
       .transform((value, context) => {
         if (value === "") return null;
+        // Jamais dans le futur, au jour de Paris.
         if (
           !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
           Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ||
-          value > parisToday(now) ||
+          value > parisDate(now) ||
           value < "1990-01-01"
         ) {
           context.addIssue({ code: "custom", message: "birthDate" });
@@ -101,8 +93,6 @@ function animalInput(now: Date = new Date()) {
     notes: optionalText(NOTES_MAX),
   });
 }
-
-export type AnimalInput = z.output<ReturnType<typeof animalInput>>;
 
 export const patientInput = (now?: Date) =>
   z.object({
@@ -141,7 +131,7 @@ export function ageInMonths(
     number,
     number,
   ];
-  const [ty, tm, td] = parisToday(now).split("-").map(Number) as [
+  const [ty, tm, td] = parisDate(now).split("-").map(Number) as [
     number,
     number,
     number,

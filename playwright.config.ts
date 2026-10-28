@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,6 +65,8 @@ export default defineConfig({
       SMTP_PORT: process.env.E2E_SMTP_PORT ?? "1025",
       // Photos, vocaux et captures des tests : hors du dépôt, jamais versionnés.
       OBJECT_STORAGE_DIR: join(tmpdir(), "stivea-e2e-objets"),
+      // Clé des empreintes (ADR 0039), tirée au hasard pour chaque exécution.
+      FINGERPRINT_SECRET: randomBytes(32).toString("base64url"),
     },
   },
 });

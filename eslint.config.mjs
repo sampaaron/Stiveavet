@@ -13,6 +13,23 @@ const eslintConfig = defineConfig([
       "no-console": ["error", { allow: ["warn", "error"] }],
     },
   },
+  // Règles qui s'appuient sur les types (ADR 0041) : aucune promesse oubliée ou mal passée,
+  // aucune assertion « ! » ni conversion inutile.
+  {
+    files: ["**/*.{ts,tsx,mts}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",

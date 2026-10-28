@@ -3,15 +3,14 @@ import { createHash } from "node:crypto";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 
 import { alertRules } from "../../src/domains/protocoles/schema";
-import { parisLocalToDate } from "../../src/domains/reglages/content";
-import { parisDayIndex } from "../../src/domains/suivis/calendrier";
+import { parisDayIndex, parisLocalToDate } from "../../src/domains/heure-paris";
 import { copyProtocolPlan } from "../../src/domains/suivis/lancement";
 import {
   scheduleAutomaticEnd,
   scheduleReminders,
 } from "../../src/domains/suivis/rappels";
 import { assessOwnerMessage } from "../../src/domains/urgences/triage";
-import type { Followup, Message, Triage } from "../../src/fixtures/types";
+import type { Followup, Message, Triage } from "../../src/ui/types";
 import {
   acknowledgements,
   alerts,

@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 
+import { fingerprint } from "@/server/crypto/fingerprint";
+
 /** Jeton opaque transmis au navigateur (cookie ou lien) ; seule son empreinte est stockée. */
 export function createToken(): string {
   return randomBytes(32).toString("base64url");
@@ -26,19 +28,15 @@ export function securityCodeHash(challengeToken: string, code: string): Buffer {
     .digest();
 }
 
-/** Clé de compteur : empreinte, jamais l'e-mail ou l'adresse IP en clair. */
+/**
+ * Clé de compteur : empreinte à clé secrète (HMAC), jamais l'e-mail ou l'adresse IP en clair
+ * ni une empreinte qu'un dictionnaire suffirait à retrouver.
+ */
 export function rateLimitBucket(name: string, subject: string): string {
-  const digest = createHash("sha256")
-    .update(subject.toLowerCase(), "utf8")
-    .digest("hex");
-  return `${name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}:${digest}`;
+  return `${name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}:${fingerprint(subject.toLowerCase())}`;
 }
 
-/** Empreinte tronquée d'une adresse IP pour le journal de connexion. */
+/** Empreinte tronquée, à clé secrète, d'une adresse IP pour le journal de connexion. */
 export function ipFingerprint(ip: string | null): string | null {
-  if (!ip) return null;
-  return createHash("sha256")
-    .update(`stivea-ip:${ip}`, "utf8")
-    .digest("hex")
-    .slice(0, 16);
+  return ip ? fingerprint(`ip:${ip}`).slice(0, 16) : null;
 }

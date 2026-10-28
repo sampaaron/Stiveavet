@@ -16,14 +16,16 @@ import {
 import { z } from "zod";
 
 import { WhatsAppSendError } from "@/adapters/whatsapp/types";
-import { DomainError, assertPermission } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError, assertPermission } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import { VET_ROLES, isPermissionKey } from "@/domains/equipe/permissions";
 import { DEFAULT_INSTRUCTIONS } from "@/domains/reglages/content";
 import type { EmergencyPeriod } from "@/domains/reglages/content";
 import { loadFollowup } from "@/domains/suivis/lancement";
+import type { LoadedFollowup } from "@/domains/suivis/lancement";
 import { followupAccess } from "@/domains/suivis/policies";
+import { followupAccessMap } from "@/domains/suivis/service";
 import { messageWindows } from "@/domains/suivis/rappels";
 import { JobError } from "@/domains/taches/kinds";
 import type { JobErrorCode } from "@/domains/taches/kinds";
@@ -54,7 +56,7 @@ import {
 import { tenantRunner } from "@/server/db/tenant";
 import type { Database, TenantTransaction } from "@/server/db/tenant";
 import {
-  auditFollowup as audit,
+  auditFollowup,
   recordAudit,
   systemAuthor,
 } from "@/domains/audit/journal";
@@ -288,7 +290,7 @@ export async function triageOwnerMessage(
     .returning({ id: alerts.id });
   if (!alert) throw new Error("Alerte non enregistrée");
   // Traçabilité sans contenu clinique : le niveau et l'identifiant suffisent.
-  await audit(
+  await auditFollowup(
     tx,
     systemAuthor(input.organizationId),
     "alert.raised",
@@ -588,7 +590,7 @@ export function alertHandlers(deps: {
       );
     for (const other of others)
       await notify(tx, alert, other.id, "whatsapp", "escalation");
-    await audit(
+    await auditFollowup(
       tx,
       systemAuthor(alert.organizationId),
       "alert.escalated",
@@ -710,6 +712,17 @@ export function alertsService(db: Database) {
           ) === "clinical",
       )
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  /** Alertes d'un suivi déjà chargé, dans la transaction de l'appelant (ADR 0040). */
+  async function ofFollowupIn(
+    tx: TenantTransaction,
+    actor: Actor,
+    followup: LoadedFollowup,
+  ): Promise<AlertView[]> {
+    assertPermission(actor, "clinical.read");
+    if (followup.access !== "clinical") throw new DomainError("not_found");
+    return listAlerts(tx, actor, { followupId: followup.id, view: "all" });
   }
 
   async function listAlerts(
@@ -893,6 +906,41 @@ export function alertsService(db: Database) {
       return run(actor, (tx) => listAlerts(tx, actor, { view: "open" }));
     },
 
+    /**
+     * Alertes sans accusé de réception (ouvertes ou escaladées) des dossiers que l'acteur lit
+     * en clinique : deux décomptes seulement, pour la cloche et le bandeau de chaque page.
+     */
+    async pendingCounts(
+      actor: Actor,
+    ): Promise<{ pending: number; urgent: number }> {
+      if (!actor.permissions.has("clinical.read"))
+        return { pending: 0, urgent: 0 };
+      return run(actor, async (tx) => {
+        const rows = await tx
+          .select({
+            level: alerts.level,
+            followupId: alerts.followupId,
+            responsibleMembershipId: followups.responsibleMembershipId,
+            isPrivate: followups.isPrivate,
+          })
+          .from(alerts)
+          .innerJoin(followups, eq(followups.id, alerts.followupId))
+          .where(inArray(alerts.status, ["open", "escalated"]));
+        const access = await followupAccessMap(tx, actor, [
+          ...new Map(
+            rows.map((row) => [row.followupId, { ...row, id: row.followupId }]),
+          ).values(),
+        ]);
+        const readable = rows.filter(
+          (row) => access.get(row.followupId) === "clinical",
+        );
+        return {
+          pending: readable.length,
+          urgent: readable.filter((row) => row.level === "urgent").length,
+        };
+      });
+    },
+
     /** Historique : les 100 dernières alertes closes, avec qui les a closes. */
     async history(actor: Actor): Promise<AlertView[]> {
       if (!actor.permissions.has("clinical.read")) return [];
@@ -902,12 +950,12 @@ export function alertsService(db: Database) {
     /** Alertes d'un dossier, closes comprises. */
     async ofFollowup(actor: Actor, followupId: string): Promise<AlertView[]> {
       assertPermission(actor, "clinical.read");
-      return run(actor, async (tx) => {
-        const followup = await loadFollowup(tx, actor, followupId);
-        if (followup.access !== "clinical") throw new DomainError("not_found");
-        return listAlerts(tx, actor, { followupId, view: "all" });
-      });
+      return run(actor, async (tx) =>
+        ofFollowupIn(tx, actor, await loadFollowup(tx, actor, followupId)),
+      );
     },
+
+    ofFollowupIn,
 
     /** « Accuser réception » : arrête l'escalade d'une urgence. Décision de vétérinaire. */
     async acknowledge(actor: Actor, alertId: string) {
@@ -921,7 +969,7 @@ export function alertsService(db: Database) {
           .update(alerts)
           .set({ status: "acknowledged" })
           .where(eq(alerts.id, alert.id));
-        await audit(tx, actor, "alert.acknowledged", alert.followupId, {
+        await auditFollowup(tx, actor, "alert.acknowledged", alert.followupId, {
           alertId: alert.id,
           level: alert.level,
           escalated: alert.status === "escalated",
@@ -959,7 +1007,7 @@ export function alertsService(db: Database) {
           followupId: alert.followupId,
           payload: { alertId: alert.id },
         });
-        await audit(tx, actor, "alert.reassigned", alert.followupId, {
+        await auditFollowup(tx, actor, "alert.reassigned", alert.followupId, {
           alertId: alert.id,
           from: alert.targetMembershipId,
           to: membershipId,
@@ -985,7 +1033,7 @@ export function alertsService(db: Database) {
           })
           .where(eq(alerts.id, alert.id));
         await refreshFollowupTriage(tx, alert.followupId);
-        await audit(tx, actor, "alert.resolved", alert.followupId, {
+        await auditFollowup(tx, actor, "alert.resolved", alert.followupId, {
           alertId: alert.id,
           level: alert.level,
         });

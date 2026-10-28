@@ -1,5 +1,6 @@
 import { ArrowLeft, Lock, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -26,7 +27,7 @@ import { memberContext } from "@/server/authz";
 import { serverEnv } from "@/server/env";
 import { services } from "@/server/services";
 import { AlertBanner } from "@/ui/alert-banner";
-import { SectionCard } from "@/ui/card";
+import { Fact, SectionCard } from "@/ui/card";
 import { AnimalAvatar } from "@/ui/animal-avatar";
 import {
   formatDate,
@@ -73,10 +74,22 @@ export default async function FollowupPage({
   const doneCode = doneKey(fait, t);
   const done = doneCode ? t.dossier.done[doneCode] : undefined;
   const context = await memberContext();
+  const now = new Date();
+  // Une seule transaction pour l'ouverture et les lectures cliniques (ADR 0040).
   // Inexistant, autre cabinet ou non autorisé : même réponse 404, pour ne rien révéler.
-  const opened = await services.followups().open(context, id);
+  const opened = await services
+    .followups()
+    .dossier(context, id, async (tx, loaded) => ({
+      view: await services.conversations().viewIn(tx, context, loaded),
+      attachments: await services.media().readableIn(tx, context, loaded),
+      alerts: await services.alerts().ofFollowupIn(tx, context, loaded),
+      programme: await services.launch().programmeIn(tx, context, loaded),
+      appointments: context.permissions.has("agenda.read")
+        ? await services.appointments().ofFollowupIn(tx, context, loaded, now)
+        : [],
+    }));
   if (!opened) notFound();
-  const { followup, record } = opened;
+  const { followup, record, clinical } = opened;
 
   const protocolLink =
     followup.access === "clinical" && followup.protocol ? (
@@ -116,6 +129,7 @@ export default async function FollowupPage({
 
   // Organisation seulement, ou suivi pas encore lancé : vue simple, sans conversation.
   if (
+    !clinical ||
     followup.access !== "clinical" ||
     record.access !== "clinical" ||
     followup.status === "draft"
@@ -135,22 +149,10 @@ export default async function FollowupPage({
       </>
     );
 
-  // Dossier clinique d'un suivi lancé : tout est lu dans la base, au moment de l'ouverture.
-  const now = new Date();
-  const [view, links, alerts, programme, synthesis, appointments] =
-    await Promise.all([
-      services.conversations().view(context, followup.id),
-      services.media().readLinks(context, followup.id),
-      services.alerts().ofFollowup(context, followup.id),
-      services.launch().programme(context, followup.id),
-      // Synthèse rédigée dans la langue de la personne qui la lit.
-      services
-        .synthesis()
-        .forFollowup(context, followup.id, { now, language: locale }),
-      context.permissions.has("agenda.read")
-        ? services.appointments().ofFollowup(context, followup.id, now)
-        : Promise.resolve([]),
-    ]);
+  // Dossier clinique d'un suivi lancé : tout est lu dans la base, au moment de l'ouverture ;
+  // les liens des fichiers sont signés après la transaction.
+  const { view, alerts, programme, appointments } = clinical;
+  const links = await services.media().signLinks(context, clinical.attachments);
   const openAlerts = alerts.filter((alert) => alert.status !== "resolved");
   // Brouillon préparé par Stive : posé dans la zone de saisie, jamais envoyé sans clic.
   const draft =
@@ -244,7 +246,16 @@ export default async function FollowupPage({
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          <Synthesis t={t} locale={locale} synthesis={synthesis} />
+          {/* La synthèse peut attendre l'IA : le reste du dossier s'affiche sans elle. */}
+          <Suspense fallback={<SynthesisPending t={t} />}>
+            <SynthesisSection
+              t={t}
+              locale={locale}
+              context={context}
+              followupId={followup.id}
+              now={now}
+            />
+          </Suspense>
           <Contacts
             t={t}
             followupId={followup.id}
@@ -504,15 +515,6 @@ function BasicDossier({
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className="font-semibold">{value}</dd>
-    </div>
-  );
-}
-
 function alertState(t: AppDictionary, alert: SynthesisAlert): string {
   const states = t.dossier.synthesis.alertState;
   switch (alert.status) {
@@ -541,6 +543,37 @@ function alertLine(
 }
 
 /** Synthèse pré-consultation (§9) : rédigée par l'IA (simulée), sous garde-fous. */
+/** Synthèse rédigée dans la langue de la personne qui la lit. */
+async function SynthesisSection({
+  t,
+  locale,
+  context,
+  followupId,
+  now,
+}: {
+  t: AppDictionary;
+  locale: Locale;
+  context: MemberContext;
+  followupId: string;
+  now: Date;
+}) {
+  const synthesis = await services
+    .synthesis()
+    .forFollowup(context, followupId, { now, language: locale });
+  return <Synthesis t={t} locale={locale} synthesis={synthesis} />;
+}
+
+function SynthesisPending({ t }: { t: AppDictionary }) {
+  const text = t.dossier.synthesis;
+  return (
+    <SectionCard title={text.title} description={text.description}>
+      <p role="status" className="text-sm text-ink-muted">
+        {t.auth.pending}
+      </p>
+    </SectionCard>
+  );
+}
+
 function Synthesis({
   t,
   locale,

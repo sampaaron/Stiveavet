@@ -7,7 +7,7 @@ import type { AppDictionary } from "@/i18n/app/types";
 import { requirePermission } from "@/server/authz";
 import { services } from "@/server/services";
 import { Card, SectionCard } from "@/ui/card";
-import { formatDate } from "@/ui/format";
+import { formatDate, initials } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 
 import {
@@ -132,15 +132,6 @@ export default async function TeamPage() {
 }
 
 /** Monogramme d'un membre : ses initiales, sans titre (« Dr »). */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter((part) => /^\p{L}/u.test(part))
-    .slice(-2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
 /** Dégradés des monogrammes, en rotation (décor seulement). */
 const MONOGRAMS = [
   "linear-gradient(135deg,#0f766e,#14b8a6)",

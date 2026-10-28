@@ -41,4 +41,15 @@ variable "secrets" {
   description = "Secrets de l'application : clés WhatsApp, IA, Stripe, chiffrement, liens signés."
   type        = map(string)
   sensitive   = true
+  # Ces secrets sont injectés dans l'application et le worker : jamais le rôle migrateur,
+  # propriétaire des tables, qui pourrait lever la RLS (ADR 0041).
+  validation {
+    condition     = !contains(keys(var.secrets), "MIGRATOR_DATABASE_URL")
+    error_message = "MIGRATOR_DATABASE_URL ne va jamais dans les conteneurs : voir la procédure de migration du README."
+  }
+  # Clé HMAC des empreintes d'IP et d'e-mail : l'application refuse de démarrer sans elle.
+  validation {
+    condition     = length(lookup(var.secrets, "FINGERPRINT_SECRET", "")) >= 32
+    error_message = "FINGERPRINT_SECRET (32 caractères au moins) est obligatoire : voir le README."
+  }
 }

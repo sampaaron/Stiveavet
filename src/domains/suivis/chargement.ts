@@ -2,8 +2,8 @@ import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { DrVetoAnimalHit } from "@/adapters/drveto/types";
-import { DomainError } from "@/domains/equipe/actor";
-import type { Actor } from "@/domains/equipe/actor";
+import { DomainError } from "@/domains/commun/actor";
+import type { Actor } from "@/domains/commun/actor";
 import { canReadProtocol } from "@/domains/protocoles/policies";
 import { enqueue } from "@/domains/taches/queue";
 import {

@@ -92,7 +92,7 @@ describe("passerelle IA réelle", () => {
     });
     expect(await failureOf(wrongKey.numaReply(replyInput))).toBe("account");
     const offline = apiAiGateway({
-      fetch: (() => Promise.reject(new Error("hors ligne"))) as typeof fetch,
+      fetch: () => Promise.reject(new Error("hors ligne")),
       baseUrl: "https://api.scaleway.ai/v1",
       apiKey: KEY,
       models,

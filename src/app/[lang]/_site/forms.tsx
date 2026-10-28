@@ -24,7 +24,9 @@ function message(
   code: string | undefined,
 ): string[] | undefined {
   if (!code) return undefined;
-  const known = code in copy.errors ? (code as DemoErrorCode) : "email";
+  const known = Object.hasOwn(copy.errors, code)
+    ? (code as DemoErrorCode)
+    : "email";
   return [copy.errors[known]];
 }
 
