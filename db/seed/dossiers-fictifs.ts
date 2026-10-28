@@ -216,6 +216,9 @@ export async function insertFollowupRecord(
     level: "watch" | "urgent";
     at: Date;
   } | null = null;
+  // Le premier message de Numa est sa prise de nouvelles d'ouverture : il porte la clé du
+  // premier message, comptée dans le temps gagné (ADR 0046).
+  let introduced = false;
   for (const [index, message] of data.messages.entries()) {
     const occurredAt = times[index] ?? now;
     const outbound = message.author === "numa" || message.author === "vet";
@@ -244,7 +247,12 @@ export async function insertFollowupRecord(
         body: message.text,
         language: message.author === "system" ? null : "fr",
         deliveryStatus: outbound ? "read" : null,
-        idempotencyKey: outbound ? `seed:${followupId}:${message.id}` : null,
+        idempotencyKey:
+          message.author === "numa" && !introduced
+            ? `intro:${primaryId}`
+            : outbound
+              ? `seed:${followupId}:${message.id}`
+              : null,
         occurredAt,
         sentAt: outbound ? occurredAt : null,
         deliveredAt: outbound ? occurredAt : null,
@@ -252,6 +260,7 @@ export async function insertFollowupRecord(
       })
       .returning({ id: messages.id });
     if (!row) throw new Error("Insertion du message impossible");
+    if (message.author === "numa") introduced = true;
 
     // Fichiers fictifs : seule la trace est en base, aucun objet dans le stockage.
     if (message.attachment && message.attachment.kind !== "deleted") {

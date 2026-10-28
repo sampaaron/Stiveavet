@@ -9,7 +9,8 @@ import { parisDate } from "@/domains/heure-paris";
  * Activité du cabinet pour le tableau de bord (cahier des charges §12) : des totaux, jamais
  * de détail d'un suivi, si bien qu'ils ne dépendent pas des droits sur chaque dossier. Les
  * messages étant filtrés par dossier lisible (`clinical_access`, 0026), leurs compteurs passent
- * par `app.activity_messages` et `app.activity_answered` (0028), qui ne rendent que des nombres.
+ * par `app.activity_messages`, `app.activity_answered` (0028) et `app.activity_check_ins` (0030),
+ * qui ne rendent que des nombres.
  * Les suivis test de l'installation ne comptent pas.
  */
 
@@ -22,6 +23,8 @@ export type ActivityStats = {
   ended: number;
   ownerMessages: number;
   outboundMessages: number;
+  /** Prises de nouvelles faites par Numa (premier message, étapes programmées), 0030. */
+  checkIns: number;
   /** Suivis lancés sur la période dont le propriétaire a répondu au moins une fois. */
   response: { launched: number; answered: number };
   alerts: { created: number; open: number; unacknowledged: number };
@@ -68,6 +71,8 @@ export function statsService(db: Database) {
           SELECT day, inbound, outbound FROM app.activity_messages(${since})`);
         const answeredRows = await tx.execute<Record<string, unknown>>(sql`
           SELECT app.activity_answered(${since}) AS answered`);
+        const checkInRows = await tx.execute<Record<string, unknown>>(sql`
+          SELECT app.activity_check_ins(${since}) AS check_ins`);
         const alertRows = await tx.execute<Record<string, unknown>>(sql`
           SELECT
             count(*) FILTER (WHERE a.created_at >= ${since}) AS created,
@@ -113,6 +118,7 @@ export function statsService(db: Database) {
             (sum, row) => sum + int(row.outbound),
             0,
           ),
+          checkIns: int(checkInRows.rows[0]?.check_ins),
           response: {
             launched: int(counts.launched),
             answered: int(answeredRows.rows[0]?.answered),

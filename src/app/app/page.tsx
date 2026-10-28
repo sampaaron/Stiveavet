@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  Timer,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -22,6 +23,12 @@ import Link from "next/link";
 import type { PermissionKey } from "@/domains/equipe/permissions";
 import type { StiveBriefing } from "@/domains/stive/service";
 import { daysSince } from "@/domains/suivis/calendrier";
+import type { ActivityStats } from "@/domains/suivis/statistiques";
+import {
+  CHECK_IN_CALL_MINUTES,
+  LAUNCH_MINUTES,
+  timeSaved,
+} from "@/domains/suivis/temps-gagne";
 import type {
   DashboardAgendaItem,
   DashboardFollowup,
@@ -43,6 +50,7 @@ import type { FollowupCardData } from "@/ui/followup-card";
 import {
   formatDayTitle,
   formatDuration,
+  formatMinutes,
   formatRelativeMoment,
   formatTime,
   shortPersonName,
@@ -56,6 +64,7 @@ import { StatusBadge } from "@/ui/status-badge";
 import type { Status } from "@/ui/status-badge";
 
 import { ActivityPanel, NextActions } from "./activity-panel";
+import { ReadyQueue } from "./ready-queue";
 import { AskStiveBar } from "./stive/stive-forms";
 import { triageReasonText } from "./triage-reason";
 
@@ -278,6 +287,7 @@ function TodayBriefing({
   canSearch,
   chips,
   stive,
+  stats,
 }: {
   t: AppDictionary;
   locale: Locale;
@@ -289,8 +299,10 @@ function TodayBriefing({
   canSearch: boolean;
   chips: Chip[];
   stive: StiveBriefing | null;
+  stats: ActivityStats;
 }) {
   const text = t.dashboard;
+  const saved = timeSaved(stats);
   const links = stive ? [...stiveChips(t, stive), ...chips] : chips;
   const next = stive ? nextAppointmentLine(t, locale, stive, now) : null;
   return (
@@ -327,6 +339,23 @@ function TodayBriefing({
             <p className="mt-2 text-sm text-white/70">
               {t.stive.dashboard.promise}
               {next ? ` ${next}` : null}
+            </p>
+          ) : null}
+          {saved.minutes > 0 ? (
+            <p className="mt-3 flex items-start gap-2 text-sm text-white/85">
+              <Timer
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-mint"
+              />
+              <span>
+                {text.timeSaved.line(
+                  formatMinutes(saved.minutes, locale),
+                  saved.checkIns,
+                )}{" "}
+                <span className="text-white/60">
+                  {text.timeSaved.how(CHECK_IN_CALL_MINUTES, LAUNCH_MINUTES)}
+                </span>
+              </span>
             </p>
           ) : null}
         </div>
@@ -656,7 +685,7 @@ function TodayAgenda({
   );
 }
 
-export default async function TodayPage() {
+export default async function TodayPage({ searchParams }: PageProps<"/app">) {
   const context = await memberContext();
   const can = (permission: PermissionKey) =>
     context.permissions.has(permission);
@@ -669,6 +698,23 @@ export default async function TodayPage() {
     services.today().today(context, now, context),
     services.stats().activity(context, now),
   ]);
+  // File « Prêts à lancer » (ADR 0046) : pour qui prépare les fiches avec l'accès clinique.
+  const [ready, { lances, echecs }] = await Promise.all([
+    can("followups.launch") && can("clinical.read")
+      ? services.launch().readyQueue(context)
+      : Promise.resolve([]),
+    searchParams,
+  ]);
+  const launchedNow = Number(lances);
+  const failedNow = Number(echecs);
+  const launchNotice =
+    Number.isSafeInteger(launchedNow) &&
+    Number.isSafeInteger(failedNow) &&
+    launchedNow >= 0 &&
+    failedNow >= 0 &&
+    launchedNow + failedNow > 0
+      ? text.ready.done(launchedNow, failedNow)
+      : null;
   // Le point de Stive reprend la vue déjà lue : ni demande comptée, ni échange enregistré.
   const briefing = can("stive.use")
     ? await services.stive().briefing(context, now, today)
@@ -762,7 +808,17 @@ export default async function TodayPage() {
           canSearch={canSearch}
           chips={chips}
           stive={briefing}
+          stats={stats}
         />
+
+        {launchNotice ? (
+          <p
+            role="status"
+            className="rounded-[var(--radius-card)] bg-brand-soft px-4 py-3 text-sm font-medium text-brand-ink"
+          >
+            {launchNotice}
+          </p>
+        ) : null}
 
         <UrgentBanners t={t} locale={locale} now={now} urgent={urgent} />
 
@@ -776,6 +832,7 @@ export default async function TodayPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
+            {ready.length > 0 ? <ReadyQueue drafts={ready} now={now} /> : null}
             {clinical ? (
               <ClinicalLists
                 t={t}

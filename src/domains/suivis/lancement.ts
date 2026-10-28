@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import type { DrVetoConnector } from "@/adapters/drveto/types";
 import { DomainError, assertPermission } from "@/domains/commun/actor";
@@ -343,6 +344,104 @@ async function replaceFutureSteps(
   return kept.length + data.steps.length;
 }
 
+/** Traitements importés de dr.veto que le vétérinaire n'a pas encore validés. */
+function pendingImports(tx: TenantTransaction, followupId: string) {
+  return tx
+    .select({
+      id: followupTreatments.id,
+      name: followupTreatments.name,
+      instructions: followupTreatments.instructions,
+    })
+    .from(followupTreatments)
+    .where(
+      and(
+        eq(followupTreatments.followupId, followupId),
+        eq(followupTreatments.source, "drveto"),
+        isNull(followupTreatments.validatedAt),
+        isNull(followupTreatments.removedAt),
+      ),
+    )
+    .orderBy(asc(followupTreatments.createdAt));
+}
+
+/** Ce qui empêche encore un brouillon d'être lancé, dans l'ordre où la fiche le demande. */
+export type LaunchBlocker =
+  "launch_incomplete" | "integration_missing" | "optin_missing";
+
+/**
+ * Brouillon prêt à lancer ? Protocole validé, premier message daté, étapes et signes d'alerte,
+ * WhatsApp relié et accord de chaque contact actif (un suivi test n'envoie rien). Renvoie le
+ * premier manque, et les nombres d'étapes et de signes d'alerte pour le journal.
+ */
+async function launchReadiness(
+  tx: TenantTransaction,
+  followup: LoadedFollowup,
+  whatsappReady: boolean,
+): Promise<{ blocker: LaunchBlocker | null; steps: number; alerts: number }> {
+  const steps = (await currentSteps(tx, followup.id)).length;
+  const alerts = (await currentAlerts(tx, followup.id)).length;
+  const [version] = followup.protocolVersionId
+    ? await tx
+        .select({ validatedAt: protocolVersions.validatedAt })
+        .from(protocolVersions)
+        .where(eq(protocolVersions.id, followup.protocolVersionId))
+    : [];
+  if (!version?.validatedAt || !followup.firstContactAt || !steps || !alerts)
+    return { blocker: "launch_incomplete", steps, alerts };
+  if (!whatsappReady) return { blocker: "integration_missing", steps, alerts };
+  // Pas de premier message sans l'accord pour WhatsApp, recueilli au cabinet.
+  if (!followup.isTest) {
+    const [missing] = await tx
+      .select({ id: followupContacts.id })
+      .from(followupContacts)
+      .where(
+        and(
+          eq(followupContacts.followupId, followup.id),
+          eq(followupContacts.active, true),
+          isNull(followupContacts.whatsappOptinAt),
+        ),
+      )
+      .limit(1);
+    if (missing) return { blocker: "optin_missing", steps, alerts };
+  }
+  return { blocker: null, steps, alerts };
+}
+
+/** Brouillons montrés dans « Prêts à lancer », au plus. */
+export const MAX_READY_DRAFTS = 30;
+
+/**
+ * Brouillon de la file « Prêts à lancer » (ADR 0046) : ce que le vétérinaire relit avant de
+ * lancer en un clic, dont les traitements importés qu'il valide du même geste.
+ */
+export type ReadyDraft = {
+  id: string;
+  animalName: string;
+  species: "dog" | "cat";
+  procedure: string;
+  procedureAt: Date;
+  protocolName: string | null;
+  firstContactAt: Date | null;
+  controlAppointmentAt: Date | null;
+  responsibleName: string;
+  /** L'acteur est le vétérinaire responsable et peut lancer. */
+  canLaunch: boolean;
+  blocker: LaunchBlocker | null;
+  /** Traitements importés de dr.veto, pas encore validés. */
+  treatments: { id: string; name: string; instructions: string }[];
+};
+
+/** Lancement depuis la file : chaque suivi avec les traitements que le vétérinaire a relus. */
+export const queueLaunchInput = z
+  .array(
+    z.object({
+      followupId: z.uuid(),
+      treatmentIds: z.array(z.uuid()).max(MAX_TREATMENTS),
+    }),
+  )
+  .min(1)
+  .max(MAX_READY_DRAFTS);
+
 /**
  * Lancement manuel d'un suivi (cahier des charges §4 et §5, ADR 0015) :
  * 1. recherche de l'animal dans dr.veto, import en lecture seule du résumé utile ;
@@ -369,6 +468,7 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
     actor: Actor,
     followupId: string,
     now: Date,
+    via: "sheet" | "queue" = "sheet",
   ) {
     const followup = await loadFollowup(tx, actor, followupId, true);
     if (followup.status !== "draft")
@@ -381,34 +481,14 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
       )
     )
       throw new DomainError("forbidden");
+    const { blocker, steps, alerts } = await launchReadiness(
+      tx,
+      followup,
+      followup.isTest || (await isConnected(tx, "whatsapp")),
+    );
+    if (blocker) throw new DomainError(blocker);
     if (!followup.protocolVersionId || !followup.firstContactAt)
       throw new DomainError("launch_incomplete");
-    const [version] = await tx
-      .select({ validatedAt: protocolVersions.validatedAt })
-      .from(protocolVersions)
-      .where(eq(protocolVersions.id, followup.protocolVersionId));
-    const steps = await currentSteps(tx, followupId);
-    const alerts = await currentAlerts(tx, followupId);
-    if (!version?.validatedAt || !steps.length || !alerts.length)
-      throw new DomainError("launch_incomplete");
-    // Un suivi test n'envoie rien : il ne demande ni WhatsApp ni facturation.
-    if (!followup.isTest && !(await isConnected(tx, "whatsapp")))
-      throw new DomainError("integration_missing");
-    // Pas de premier message sans l'accord pour WhatsApp, recueilli au cabinet.
-    if (!followup.isTest) {
-      const [missing] = await tx
-        .select({ id: followupContacts.id })
-        .from(followupContacts)
-        .where(
-          and(
-            eq(followupContacts.followupId, followupId),
-            eq(followupContacts.active, true),
-            isNull(followupContacts.whatsappOptinAt),
-          ),
-        )
-        .limit(1);
-      if (missing) throw new DomainError("optin_missing");
-    }
 
     await setStatusReason(tx, "launched");
     await tx
@@ -439,9 +519,10 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
         followup.procedureAt,
         followup.firstContactAt,
       ),
-      steps: steps.length,
-      alerts: alerts.length,
+      steps,
+      alerts,
       test: followup.isTest,
+      ...(via === "queue" ? { via } : {}),
     });
   }
 
@@ -1062,6 +1143,144 @@ export function launchService(deps: { db: Database; drveto: DrVetoConnector }) {
           );
         if (options.launch) await launchInTx(tx, actor, followupId, now);
       });
+    },
+
+    /**
+     * File « Prêts à lancer » (ADR 0046) : brouillons que l'acteur peut préparer, ceux qu'il
+     * lance lui-même d'abord, chacun avec ce qui manque encore et les traitements à valider.
+     */
+    async readyQueue(actor: Actor): Promise<ReadyDraft[]> {
+      assertCanPrepare(actor);
+      return run(actor, async (tx) => {
+        const drafts = await tx
+          .select({ id: followups.id })
+          .from(followups)
+          .where(
+            and(eq(followups.status, "draft"), eq(followups.isTest, false)),
+          )
+          .orderBy(desc(followups.procedureAt))
+          .limit(MAX_READY_DRAFTS);
+        if (!drafts.length) return [];
+        const whatsappReady = await isConnected(tx, "whatsapp");
+        const queue: ReadyDraft[] = [];
+        for (const { id } of drafts) {
+          const followup = await loadFollowup(tx, actor, id).catch(
+            (error: unknown) => {
+              if (error instanceof DomainError) return null;
+              throw error;
+            },
+          );
+          if (!followup || !canPrepareFollowup(actor, followup.access))
+            continue;
+          const { blocker } = await launchReadiness(
+            tx,
+            followup,
+            whatsappReady,
+          );
+          const [responsible] = await tx
+            .select({ name: users.displayName })
+            .from(memberships)
+            .innerJoin(users, eq(users.id, memberships.userId))
+            .where(eq(memberships.id, followup.responsibleMembershipId));
+          const [version] = followup.protocolVersionId
+            ? await tx
+                .select({ name: protocolVersions.name })
+                .from(protocolVersions)
+                .where(eq(protocolVersions.id, followup.protocolVersionId))
+            : [];
+          const treatments = await pendingImports(tx, id);
+          queue.push({
+            id,
+            animalName: followup.animalName,
+            species: followup.species,
+            procedure: followup.procedure,
+            procedureAt: followup.procedureAt,
+            protocolName: version?.name ?? null,
+            firstContactAt: followup.firstContactAt,
+            controlAppointmentAt: followup.controlAppointmentAt,
+            responsibleName: responsible?.name ?? "—",
+            canLaunch: canLaunchFollowup(
+              actor,
+              followup.access,
+              followup.responsibleMembershipId,
+            ),
+            blocker,
+            treatments,
+          });
+        }
+        return queue.sort((a, b) => Number(b.canLaunch) - Number(a.canLaunch));
+      });
+    },
+
+    /**
+     * « Lancer » et « Tout lancer » depuis la file : pour chaque suivi, les traitements importés
+     * relus sont validés puis le suivi est lancé, dans sa propre transaction. Si la liste des
+     * traitements a changé depuis l'affichage, rien n'est fait pour ce suivi. Un seul suivi : le
+     * refus remonte tel quel ; plusieurs : les refus sont comptés.
+     */
+    async launchFromQueue(
+      actor: Actor,
+      input: unknown,
+      now = new Date(),
+    ): Promise<{ launched: number; failed: number }> {
+      assertCanPrepare(actor);
+      const parsed = queueLaunchInput.safeParse(input);
+      if (!parsed.success) throw new DomainError("invalid_target");
+      const items = parsed.data;
+      const launchOne = (item: (typeof items)[number]) =>
+        run(actor, async (tx) => {
+          const followup = await loadFollowup(tx, actor, item.followupId, true);
+          if (followup.status !== "draft")
+            throw new DomainError("invalid_transition");
+          if (
+            !canLaunchFollowup(
+              actor,
+              followup.access,
+              followup.responsibleMembershipId,
+            )
+          )
+            throw new DomainError("forbidden");
+          const pending = (await pendingImports(tx, item.followupId)).map(
+            (treatment) => treatment.id,
+          );
+          const reviewed = new Set(item.treatmentIds);
+          if (
+            reviewed.size !== pending.length ||
+            pending.some((id) => !reviewed.has(id))
+          )
+            throw new DomainError("sheet_changed");
+          if (pending.length) {
+            await tx
+              .update(followupTreatments)
+              .set({
+                validatedByMembershipId: actor.membershipId,
+                validatedAt: now,
+              })
+              .where(inArray(followupTreatments.id, pending));
+            await auditFollowup(
+              tx,
+              actor,
+              "followup.treatments_validated",
+              item.followupId,
+              { count: pending.length, via: "queue" },
+            );
+          }
+          await launchInTx(tx, actor, item.followupId, now, "queue");
+        });
+      const [only] = items;
+      if (only && items.length === 1) {
+        await launchOne(only);
+        return { launched: 1, failed: 0 };
+      }
+      let launched = 0;
+      for (const item of items)
+        try {
+          await launchOne(item);
+          launched += 1;
+        } catch (error) {
+          if (!(error instanceof DomainError)) throw error;
+        }
+      return { launched, failed: items.length - launched };
     },
 
     /** Programme du suivi lancé (étapes et fin automatique), réservé à l'accès clinique. */

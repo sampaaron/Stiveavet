@@ -61,6 +61,11 @@ export function SheetForm({
       .filter((contact) => contact.active)
       .every((contact) => contact.optedIn),
   );
+  // Accord déjà noté au cabinet (par l'accueil, ADR 0046) pour chaque contact qui écrira : la
+  // case n'est plus à cocher.
+  const optInRecorded = sheet.contacts
+    .filter((contact) => contact.role === "primary" || secondActive)
+    .every((contact) => contact.optedIn);
   const [control, setControl] = useState(controlInput);
   const [steps, setSteps] = useState<EditableStep[]>(() =>
     sheet.steps
@@ -83,7 +88,8 @@ export function SheetForm({
     responsibleMembershipId: draft ? responsible : undefined,
     firstContactHours: draft ? firstHours : undefined,
     secondContactActive: draft && second ? secondActive : undefined,
-    whatsappOptIn: draft && !followup.isTest ? optIn : undefined,
+    whatsappOptIn:
+      draft && !followup.isTest && !optInRecorded ? optIn : undefined,
     controlAppointmentAt: control,
     steps: steps.map(({ offsetHours, kind, content }) => ({
       offsetHours,
@@ -111,6 +117,15 @@ export function SheetForm({
   const firstContact = Number.isFinite(firstHours)
     ? new Date(procedureAt.getTime() + firstHours * HOUR)
     : null;
+  const importedToValidate = sheet.treatments
+    .filter(
+      (treatment) =>
+        treatment.source === "drveto" &&
+        !treatment.validatedAt &&
+        !validated.includes(treatment.id) &&
+        !removed.includes(treatment.id),
+    )
+    .map((treatment) => treatment.id);
   const pendingTreatments = sheet.treatments.filter(
     (treatment) =>
       !treatment.validatedAt &&
@@ -175,7 +190,11 @@ export function SheetForm({
                 type="checkbox"
                 className="mt-0.5 size-4 accent-[var(--color-brand)]"
                 checked={secondActive}
-                onChange={(event) => setSecondActive(event.target.checked)}
+                onChange={(event) => {
+                  setSecondActive(event.target.checked);
+                  // Accord à recueillir pour le second : la case repart décochée.
+                  if (event.target.checked && !second.optedIn) setOptIn(false);
+                }}
               />
               <span>
                 <span className="font-semibold">
@@ -185,7 +204,12 @@ export function SheetForm({
               </span>
             </label>
           ) : null}
-          {followup.isTest ? null : (
+          {followup.isTest ? null : optInRecorded ? (
+            <p className="mt-4 flex items-center gap-2 text-sm font-medium text-brand-ink">
+              <ShieldCheck aria-hidden="true" className="size-4" />
+              {text.optInGiven(second && secondActive ? 2 : 1)}
+            </p>
+          ) : (
             <label className="mt-4 flex items-start gap-3 rounded-[var(--radius-control)] border border-line p-3 text-sm">
               <input
                 type="checkbox"
@@ -349,7 +373,18 @@ export function SheetForm({
           ))}
         </ul>
         {rights.canSteer ? (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-2">
+            {importedToValidate.length > 0 ? (
+              <Button
+                size="sm"
+                onClick={() =>
+                  setValidated((list) => [...list, ...importedToValidate])
+                }
+                icon={<ShieldCheck aria-hidden="true" className="size-3.5" />}
+              >
+                {text.validateAllImported(importedToValidate.length)}
+              </Button>
+            ) : null}
             <Button
               variant="secondary"
               size="sm"

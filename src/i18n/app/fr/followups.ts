@@ -164,6 +164,14 @@ export const followups = {
     validatedBy: (name: string) => `Validé par ${name}`,
     toValidate: "Importé de dr.veto, à valider",
     validateTreatment: (name: string) => `Je valide ce traitement : ${name}`,
+    validateAllImported: (count: number) =>
+      count > 1
+        ? `Valider les ${count} traitements importés`
+        : "Valider le traitement importé",
+    optInGiven: (count: number) =>
+      count > 1
+        ? "Accord WhatsApp des propriétaires déjà noté au cabinet."
+        : "Accord WhatsApp du propriétaire déjà noté au cabinet.",
     keep: "Garder",
     remove: "Retirer",
     keepTreatmentLabel: (name: string) => `Garder le traitement ${name}`,

@@ -381,6 +381,53 @@ const ANIMALS: readonly FakeAnimal[] = [
     antecedents: [],
     treatments: [],
   },
+  // Prêts à lancer (ADR 0046) : préparés puis lancés depuis la vue d'ensemble.
+  {
+    ref: "DV-20746",
+    animal: {
+      name: "Brindille",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2025-04-18",
+      weightGrams: 3000,
+    },
+    owners: [
+      { fullName: "Sarah Dumas", phone: "+33639980123", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 2 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [
+      {
+        name: "Anti-inflammatoire (exemple fictif)",
+        instructions: "1 comprimé le matin pendant 3 jours, au cours du repas",
+      },
+    ],
+  },
+  {
+    ref: "DV-20753",
+    animal: {
+      name: "Réglisse",
+      species: "cat",
+      breed: "Européen",
+      birthDate: "2025-02-09",
+      weightGrams: 3300,
+    },
+    owners: [
+      { fullName: "Hugo Lambert", phone: "+33639980124", language: "fr" },
+    ],
+    procedure: { label: "Ovariectomie", hoursAgo: 3 },
+    controlInDays: 10,
+    allergies: [],
+    antecedents: [],
+    treatments: [
+      {
+        name: "Anti-inflammatoire (exemple fictif)",
+        instructions: "1 comprimé le matin pendant 3 jours, au cours du repas",
+      },
+    ],
+  },
 ];
 
 /** Minuscules sans accents, pour une recherche tolérante. */

@@ -91,6 +91,59 @@ export const dashboard: AppDictionary["dashboard"] = {
     chartRow: (day: string, inbound: number, outbound: number) =>
       `${day}: ${inbound} received, ${outbound} sent`,
   },
+  ready: {
+    title: "Ready to launch",
+    description:
+      "Sheets prepared by the team. Review each card: only the responsible vet launches the follow-up.",
+    protocol: (name: string) => `Protocol “${name}”`,
+    noProtocol: "No protocol chosen",
+    firstMessage: (at: string) => `First message: ${at}`,
+    firstMessageNow: "First message as soon as it is launched",
+    control: (at: string) => `Check-up: ${at}`,
+    treatments: (count: number) =>
+      count > 1
+        ? `${count} treatments imported from dr.veto, approved on launch:`
+        : "1 treatment imported from dr.veto, approved on launch:",
+    blockers: {
+      launch_incomplete: "Sheet to complete",
+      integration_missing: "WhatsApp to connect to the practice",
+      optin_missing: "Owner's WhatsApp agreement to record",
+    },
+    waiting: (vet: string) => `Ready, waiting for ${vet}`,
+    launch: "Launch",
+    launchWithTreatments: (count: number) =>
+      count > 1
+        ? `Approve the ${count} treatments and launch`
+        : "Approve the treatment and launch",
+    review: "Review the sheet",
+    complete: "Complete the sheet",
+    forAnimal: (animal: string) => `: ${animal}`,
+    launchAll: (count: number) => `Launch all (${count})`,
+    launchAllTitle: (count: number) =>
+      `Launch ${count} follow-up${count > 1 ? "s" : ""}?`,
+    launchAllDescription:
+      "The imported treatments shown on each card will be approved in your name. Numa will then send each first message at the planned time.",
+    launchAllConfirm: "Launch all",
+    done: (launched: number, failed: number) =>
+      [
+        launched
+          ? `${launched} follow-up${launched > 1 ? "s" : ""} launched: Numa will send each first message at the planned time.`
+          : null,
+        failed
+          ? failed > 1
+            ? `${failed} sheets changed or are no longer ready: open them to review.`
+            : "1 sheet changed or is no longer ready: open it to review."
+          : null,
+      ]
+        .filter((part) => part !== null)
+        .join(" "),
+  },
+  timeSaved: {
+    line: (duration: string, checkIns: number) =>
+      `About ${duration} saved over 30 days: ${checkIns} check-in${checkIns > 1 ? "s" : ""} made by Numa instead of a phone call.`,
+    how: (callMinutes: number, launchMinutes: number) =>
+      `Estimate: ${callMinutes} min per call avoided, minus ${launchMinutes} min per follow-up launched.`,
+  },
   next: {
     title: "Next actions",
     drafts: (count: number) =>
