@@ -50,6 +50,8 @@ export const errors = {
       "Les traitements importés ont changé depuis l'affichage. Relisez-les avant de lancer le suivi.",
     document_limit:
       "La bibliothèque du cabinet est pleine (200 documents). Supprimez un document devenu inutile avant d'en ajouter un.",
+    template_limit:
+      "Le cabinet a déjà 30 modèles de réponse. Supprimez un modèle devenu inutile avant d'en ajouter un.",
     capture_unreadable:
       "Aucun créneau libre n'a pu être lu sur cette capture. Elle a été supprimée ; réessayez avec une capture plus nette.",
     whatsapp_signup_failed:

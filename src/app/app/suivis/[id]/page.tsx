@@ -11,7 +11,7 @@ import type {
   FollowupContactView,
   TreatmentView,
 } from "@/domains/suivis/record";
-import type { SynthesisAlert, SynthesisView } from "@/domains/suivis/synthese";
+import type { SynthesisView } from "@/domains/suivis/synthese";
 import { daysSince } from "@/domains/suivis/calendrier";
 import type { ConversationView } from "@/domains/conversations/service";
 import { canBrowseProtocols } from "@/domains/protocoles/policies";
@@ -41,12 +41,14 @@ import type { Status } from "@/ui/status-badge";
 
 import { followupBadge } from "../followup-labels";
 import { AlertCard } from "../../alert-card";
-import { triageReasonText } from "../../triage-reason";
+import { CopySynthesisButton } from "../../copy-synthesis";
+import { alertLine, synthesisCopyText } from "../../synthesis-copy";
 import { TestMark } from "../test-mark";
 
 import { AccessPanel } from "./access-panel";
 import { OwnerLanguageForm } from "./conversation-controls";
 import { LiveConversation } from "./live-conversation";
+import { readyReplies } from "./ready-replies";
 import { NextStepsCard } from "./programme-card";
 import { SteeringButtons } from "./steering";
 
@@ -159,6 +161,7 @@ export default async function FollowupPage({
     typeof brouillon === "string"
       ? await services.stive().draftFor(context, brouillon, followup.id)
       : null;
+  const ready = await readyReplies(t, context, view);
   const askStive = context.permissions.has("stive.use") ? (
     <ButtonLink
       href={`/app/stive?suivi=${followup.id}`}
@@ -236,6 +239,7 @@ export default async function FollowupPage({
             view={view}
             links={links}
             draft={draft}
+            ready={ready}
             simulatorHref={
               serverEnv().APP_ENV === "local" && !followup.isTest
                 ? `/app/suivis/${followup.id}/simulateur`
@@ -252,7 +256,7 @@ export default async function FollowupPage({
               t={t}
               locale={locale}
               context={context}
-              followupId={followup.id}
+              followup={followup}
               now={now}
             />
           </Suspense>
@@ -515,52 +519,49 @@ function BasicDossier({
   );
 }
 
-function alertState(t: AppDictionary, alert: SynthesisAlert): string {
-  const states = t.dossier.synthesis.alertState;
-  switch (alert.status) {
-    case "acknowledged":
-      return states.acknowledged(
-        alert.acknowledgedBy
-          ? shortPersonName(alert.acknowledgedBy)
-          : states.aVet,
-      );
-    default:
-      return states[alert.status];
-  }
-}
-
-function alertLine(
-  t: AppDictionary,
-  locale: Locale,
-  alert: SynthesisAlert,
-): string {
-  return [
-    t.labels.triage[alert.level],
-    triageReasonText(t, alert.reason),
-    formatDateTime(alert.createdAt, locale),
-    alertState(t, alert),
-  ].join(" · ");
-}
-
 /** Synthèse pré-consultation (§9) : rédigée par l'IA (simulée), sous garde-fous. */
 /** Synthèse rédigée dans la langue de la personne qui la lit. */
 async function SynthesisSection({
   t,
   locale,
   context,
-  followupId,
+  followup,
   now,
 }: {
   t: AppDictionary;
   locale: Locale;
   context: MemberContext;
-  followupId: string;
+  followup: {
+    id: string;
+    animalName: string;
+    procedure: string;
+    procedureAt: Date;
+  };
   now: Date;
 }) {
   const synthesis = await services
     .synthesis()
-    .forFollowup(context, followupId, { now, language: locale });
-  return <Synthesis t={t} locale={locale} synthesis={synthesis} />;
+    .forFollowup(context, followup.id, { now, language: locale });
+  return (
+    <Synthesis
+      t={t}
+      locale={locale}
+      synthesis={synthesis}
+      copy={
+        synthesis ? (
+          <CopySynthesisButton
+            followupId={followup.id}
+            animalName={followup.animalName}
+            text={synthesisCopyText(t, locale, synthesis, {
+              animalName: followup.animalName,
+              procedure: followup.procedure,
+              day: daysSince(followup.procedureAt, now),
+            })}
+          />
+        ) : null
+      }
+    />
+  );
 }
 
 function SynthesisPending({ t }: { t: AppDictionary }) {
@@ -578,14 +579,21 @@ function Synthesis({
   t,
   locale,
   synthesis,
+  copy,
 }: {
   t: AppDictionary;
   locale: Locale;
   synthesis: SynthesisView | null;
+  /** « Copier pour dr.veto » : presse-papiers seulement (ADR 0048). */
+  copy: ReactNode;
 }) {
   const text = t.dossier.synthesis;
   return (
-    <SectionCard title={text.title} description={text.description}>
+    <SectionCard
+      title={text.title}
+      description={text.description}
+      action={copy}
+    >
       {synthesis ? (
         <div className="grid gap-4 text-sm">
           <p className="text-ink-muted">

@@ -16,6 +16,8 @@ import type { ConversationsService } from "@/domains/conversations/service";
 import { demoService } from "@/domains/demo/service";
 import { documentsService } from "@/domains/documents/service";
 import type { DocumentsService } from "@/domains/documents/service";
+import { replyTemplatesService } from "@/domains/reponses/service";
+import type { ReplyTemplatesService } from "@/domains/reponses/service";
 import type { DemoService } from "@/domains/demo/service";
 import { teamService } from "@/domains/equipe/service";
 import { mediaService } from "@/domains/fichiers/service";
@@ -69,6 +71,7 @@ let conversations: ConversationsService | undefined;
 let alerts: AlertsService | undefined;
 let media: MediaService | undefined;
 let documents: DocumentsService | undefined;
+let replyTemplates: ReplyTemplatesService | undefined;
 let agenda: AgendaService | undefined;
 let appointments: AppointmentsService | undefined;
 let synthesis: SynthesisService | undefined;
@@ -170,6 +173,11 @@ export const services = {
       linkSecret: fileLinkSecret(),
     });
     return documents;
+  },
+  /** Modèles de réponse du cabinet (ADR 0048). */
+  replyTemplates(): ReplyTemplatesService {
+    replyTemplates ??= replyTemplatesService(appDatabase());
+    return replyTemplates;
   },
   /** Captures d'agenda et créneaux libres, lecture simulée (ADR 0019). */
   agenda(): AgendaService {

@@ -39,6 +39,7 @@ export class DomainError extends Error {
       | "consent_missing"
       | "invalid_file"
       | "document_limit"
+      | "template_limit"
       | "sheet_changed"
       | "capture_unreadable"
       | "whatsapp_signup_failed"

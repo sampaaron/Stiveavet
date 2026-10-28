@@ -80,6 +80,14 @@ export const journal: AppDictionary["journal"] = {
     "document.opened": (actor: string) => `${actor} opened a practice document`,
     "document.removed": (actor: string) =>
       `${actor} deleted a practice document`,
+    "reply_template.created": (actor: string) =>
+      `${actor} added a reply template`,
+    "reply_template.updated": (actor: string) =>
+      `${actor} edited a reply template`,
+    "reply_template.removed": (actor: string) =>
+      `${actor} deleted a reply template`,
+    "synthesis.copied": (actor: string) =>
+      `${actor} copied a file's summary for dr.veto`,
     "attachment.opened": (actor: string) =>
       `${actor} opened a photo or voice note from a follow-up`,
     "agenda.capture_read": (actor: string) =>

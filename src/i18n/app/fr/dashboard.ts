@@ -211,11 +211,40 @@ export const dashboard = {
     appointments: "Rendez-vous Stivea",
     appointmentsHint: "Aujourd'hui, confirmés par le cabinet",
   },
-  priorities: {
-    title: "Priorités",
-    description: "Urgences et cas à surveiller, du plus grave au plus récent.",
-    emptyTitle: "Aucune priorité",
-    emptyDescription: "Tous les suivis évoluent normalement.",
+  controlsChip: (count: number) =>
+    `${nombre(count, "contrôle", "contrôles")} aujourd'hui : synthèses prêtes`,
+  /** Boîte « À traiter » (ADR 0048) : alertes, réponses attendues, tâches en échec. */
+  inbox: {
+    title: (count: number) => (count ? `À traiter (${count})` : "À traiter"),
+    label: "À traiter",
+    description:
+      "Alertes, propriétaires qui attendent l'équipe et tâches en échec, du plus urgent au moins urgent. Chaque ligne propose l'action à faire.",
+    emptyTitle: "Rien à traiter",
+    emptyDescription:
+      "Aucune alerte, aucune réponse attendue, aucune tâche en échec.",
+    reply: "Répondre",
+    appointment: "Voir l'agenda",
+    awaiting: (animal: string) => `${animal} · le propriétaire attend l'équipe`,
+    awaitingSince: (when: string, paused: boolean) =>
+      `Dernier message du propriétaire ${when}. ${paused ? "Numa est en pause" : "L'équipe a repris la main"} : la réponse vient de vous.`,
+    task: (label: string) => `Tâche en échec · ${label}`,
+    more: (count: number) =>
+      `${nombre(count, "autre élément", "autres éléments")} : voir toutes les alertes`,
+    done: {
+      "alerte-recue": "Réception confirmée : l'escalade est annulée.",
+      "alerte-close": "Alerte close.",
+      "alerte-confiee": "Alerte confiée : le vétérinaire choisi est prévenu.",
+      "tache-relance": "Tâche relancée.",
+      "tache-abandon": "Tâche abandonnée.",
+    },
+  },
+  /** « Contrôles du jour » (ADR 0048) : synthèse prête avant la consultation. */
+  controls: {
+    title: "Contrôles du jour",
+    description:
+      "La synthèse de chaque animal est prête avant la consultation. « Copier pour dr.veto » la met dans votre presse-papiers : rien n'est écrit seul dans dr.veto.",
+    at: (time: string, day: number) => `Contrôle à ${time} · J${day}`,
+    read: "Lire la synthèse",
   },
   others: {
     quiet: (count: number) =>

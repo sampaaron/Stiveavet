@@ -62,6 +62,7 @@ export const TENANT_TABLES = [
   "stive_proposals",
   "stive_usage",
   "cabinet_documents",
+  "reply_templates",
 ] as const;
 
 export function pools() {

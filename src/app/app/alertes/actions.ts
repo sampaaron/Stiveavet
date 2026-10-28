@@ -25,7 +25,7 @@ const input = z.object({
   // Destinataire choisi pour « Confier » ; le service vérifie son accès clinique au dossier.
   membershipId: z.uuid().optional(),
   // Retour vers la liste des alertes ou le dossier, jamais vers une adresse libre.
-  from: z.enum(["alertes", "dossier"]),
+  from: z.enum(["alertes", "dossier", "accueil"]),
 });
 
 /** Numéro d'alerte WhatsApp du vétérinaire connecté (vide : retiré). */
@@ -84,6 +84,8 @@ export async function alertAction(
   redirect(
     from === "dossier"
       ? `/app/suivis/${followupId}?fait=alerte-${done}`
-      : `/app/alertes?fait=${done}`,
+      : from === "accueil"
+        ? `/app?fait=alerte-${done}#a-traiter`
+        : `/app/alertes?fait=${done}`,
   );
 }

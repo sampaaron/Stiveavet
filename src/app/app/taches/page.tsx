@@ -13,6 +13,7 @@ import { PageHeader } from "@/ui/page-header";
 import { EmptyState } from "@/ui/states";
 
 import { JobActions } from "./job-forms";
+import { kindLabel } from "./labels";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await appText();
@@ -24,14 +25,6 @@ function doneNotice(t: AppDictionary, done: unknown): string | undefined {
   if (done === "relance") return t.tasks.done.retried;
   if (done === "abandon") return t.tasks.done.cancelled;
   return undefined;
-}
-
-/** Libellé d'un type de tâche ; un type inconnu de l'écran reste « technique ». */
-function kindLabel(t: AppDictionary, kind: string): string {
-  const kinds = t.tasks.kinds;
-  return Object.hasOwn(kinds, kind)
-    ? kinds[kind as keyof typeof kinds]
-    : t.tasks.unknownKind;
 }
 
 export default async function FailedJobsPage({

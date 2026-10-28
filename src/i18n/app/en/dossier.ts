@@ -82,6 +82,16 @@ export const dossier: AppDictionary["dossier"] = {
       aVet: "a vet",
       resolved: "closed",
     },
+    copy: {
+      button: "Copy for dr.veto",
+      forAnimal: (animal) => `: ${animal}'s summary`,
+      copied: "Summary copied: paste it into the dr.veto record, then read it.",
+      failed: "This browser cannot copy: select the summary text to copy it.",
+      heading: (animal, procedure, day) =>
+        `Stivea Vet · ${animal}'s follow-up (${procedure}, day ${day})`,
+      footer: (date) =>
+        `Summary prepared by Stivea Vet's AI on ${date}, to be read: no diagnosis or treatment advice.`,
+    },
   },
   contacts: {
     title: "Owners and consent",
@@ -258,6 +268,17 @@ export const dossier: AppDictionary["dossier"] = {
       staysPaused: "Numa stays paused.",
       placeholder: (animal) => `Your message about ${animal}`,
       send: "Send",
+      ready: {
+        title: "Ready replies",
+        byStive: "(prepared by Stive, AI assistant)",
+        placed: (label) =>
+          `“${label}” is in the message box: read it, edit it, then send.`,
+        stive: {
+          news: "Check in",
+          photo: "Ask for a photo",
+          call: "Ask them to call the practice",
+        },
+      },
     },
     resumeNuma: "Resume Numa",
   },

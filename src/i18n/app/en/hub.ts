@@ -170,6 +170,53 @@ export const hub: AppDictionary["hub"] = {
       readOnly: "Documents added by the team will appear here.",
     },
   },
+  replies: {
+    title: "Ready replies",
+    description:
+      "The practice's reply templates. In a file, one click puts the text in the message box: you read it, edit it, then send it yourself.",
+    notice:
+      "Write organisational sentences, with no medical advice. Names are filled in within the file: {animal}, {proprietaire}, {veterinaire}, {cabinet}.",
+    count: (n) =>
+      n === 0 ? "No templates" : `${n} template${n > 1 ? "s" : ""}`,
+    languages: { fr: "French", en: "English" },
+    empty: {
+      title: "No templates yet",
+      description: "Add the first reply your team often writes.",
+      readOnly:
+        "The practice administrator can add the replies your team often writes.",
+    },
+    updated: (when, by) =>
+      by ? `Updated ${when} · added by ${by}` : `Updated ${when}`,
+    form: {
+      addTitle: "Add a template",
+      titleLabel: "Template name",
+      titlePlaceholder: "For example: Message received",
+      bodyLabel: "Text",
+      bodyHint:
+        "1,000 characters at most. Fields filled in within the file: {animal}, {proprietaire}, {veterinaire}, {cabinet}.",
+      languageLabel: "Owner's language",
+      add: "Add template",
+      edit: "Edit",
+      save: "Save",
+    },
+    remove: {
+      trigger: "Delete",
+      triggerLabel: (title) => `Delete ${title}`,
+      title: (title) => `Delete “${title}”?`,
+      description:
+        "The template disappears from files. Messages already sent do not change.",
+      confirm: "Delete template",
+    },
+    validation: {
+      title: "Give the template a name (60 characters at most).",
+      body: "Write the template text (1,000 characters at most).",
+    },
+    done: {
+      added: "Template added.",
+      saved: "Template saved.",
+      removed: "Template deleted.",
+    },
+  },
   contents: {
     title: "Contents",
     description:
