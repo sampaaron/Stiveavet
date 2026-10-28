@@ -15,12 +15,26 @@ import type { Plan } from "@/domains/facturation/rules";
 import { isUniqueViolation } from "@/server/db/errors";
 import { withTenant } from "@/server/db/tenant";
 import type { Database } from "@/server/db/tenant";
+import {
+  generateAuthenticationOptions,
+  generateRegistrationOptions,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+} from "@simplewebauthn/server";
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/server";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { deviceLabel } from "./appareil";
+import { PASSKEY_POLICY, relyingParty } from "./cles-d-acces";
 import {
   existingAccountEmail,
+  passkeyAddedEmail,
   passwordChangedEmail,
   passwordChangedInAccountEmail,
   passwordResetEmail,
@@ -34,6 +48,7 @@ import { authRepository } from "./repository";
 import type {
   AccountSession,
   MemberRole,
+  Passkey,
   ResolvedSession,
   TrustedDevice,
 } from "./repository";
@@ -89,6 +104,15 @@ export type AccountSecurity = {
   devices: TrustedDevice[];
 };
 
+export type PasskeyOptionsResult =
+  | { status: "options"; options: PublicKeyCredentialCreationOptionsJSON }
+  | { status: "invalid_password" }
+  | { status: "limit" }
+  | { status: "signed_out" };
+
+export type PasskeyRegistrationResult =
+  "added" | "invalid" | "limit" | "signed_out";
+
 export type RegisterResult =
   | { status: "code_required"; challengeToken: string }
   | { status: "invalid_password"; problems: PasswordProblem[] }
@@ -103,6 +127,7 @@ export function authService({
   defer = (task) => task(),
 }: AuthDependencies) {
   const repo = authRepository(db);
+  const rp = relyingParty(appUrl);
 
   /** Compte une tentative et indique si elle reste dans la limite. Sans sujet connu, pas de compteur. */
   async function allowed(name: RateLimitName, subject: string | null) {
@@ -165,6 +190,53 @@ export function authService({
     );
     await email.send(securityCodeEmail(to, code));
     return challengeToken;
+  }
+
+  /**
+   * Mot de passe redemandé dans « Mon compte », session déverrouillée. Les erreurs comptent
+   * avec celles du changement de mot de passe ; trop d'erreurs ferment la session.
+   */
+  async function confirmPassword(
+    session: ResolvedSession,
+    hash: Buffer,
+    password: string,
+    origin: RequestOrigin,
+  ): Promise<"ok" | "invalid" | "signed_out"> {
+    const failures = await reserveFailure(
+      "passwordChangeFailuresPerAccount",
+      session.userId,
+    );
+    if (!failures.ok) {
+      await repo.revokeSession(hash);
+      await repo.recordLoginEvent({
+        kind: "login_rate_limited",
+        userId: session.userId,
+        organizationId: session.organizationId,
+        ...eventOrigin(origin),
+      });
+      return "signed_out";
+    }
+    const ok = await verifyPassword(
+      await repo.passwordHashFor(session.userId),
+      password,
+    );
+    if (!ok) return "invalid";
+    await failures.release();
+    return "ok";
+  }
+
+  function ownerOf(session: ResolvedSession) {
+    return withTenant(
+      db,
+      { organizationId: session.organizationId, userId: session.userId },
+      async (tx) => {
+        const [row] = await tx
+          .select({ email: users.email, displayName: users.displayName })
+          .from(users)
+          .where(eq(users.id, session.userId));
+        return row;
+      },
+    );
   }
 
   return {
@@ -377,6 +449,115 @@ export function authService({
       return "unlocked";
     },
 
+    /** La personne de la session a-t-elle une clé d'accès ? (bouton de la page verrouillée) */
+    async hasPasskeys(sessionToken: string | undefined): Promise<boolean> {
+      if (!isWellFormedToken(sessionToken)) return false;
+      return (await repo.sessionPasskeys(tokenHash(sessionToken))).length > 0;
+    },
+
+    /** Défi de déverrouillage par clé d'accès, lié à la session verrouillée (ADR 0050). */
+    async passkeyUnlockOptions(
+      sessionToken: string | undefined,
+    ): Promise<PublicKeyCredentialRequestOptionsJSON | null> {
+      const session = await this.resolveSession(sessionToken);
+      if (!session?.locked || !sessionToken) return null;
+      const hash = tokenHash(sessionToken);
+      const credentials = await repo.sessionPasskeys(hash);
+      if (!credentials.length) return null;
+      const options = await generateAuthenticationOptions({
+        rpID: rp.id,
+        allowCredentials: credentials.map((credential) => ({
+          id: credential.credentialId,
+          transports: credential.transports,
+        })),
+        userVerification: "required",
+      });
+      const created = await repo.createWebAuthnChallenge(
+        hash,
+        "unlock",
+        options.challenge,
+        PASSKEY_POLICY.challengeMinutes,
+      );
+      return created ? options : null;
+    },
+
+    /**
+     * Déverrouillage par clé d'accès : signature vérifiée sur le défi de cette session, avec
+     * vérification de la personne sur l'appareil (empreinte, visage ou code). Les échecs
+     * comptent avec ceux du mot de passe ; trop d'échecs ferment la session.
+     */
+    async unlockWithPasskey(
+      input: {
+        sessionToken: string | undefined;
+        response: AuthenticationResponseJSON;
+      },
+      origin: RequestOrigin,
+    ): Promise<"unlocked" | "invalid" | "signed_out"> {
+      const session = await this.resolveSession(input.sessionToken);
+      if (!session || !input.sessionToken) return "signed_out";
+      if (!session.locked) return "unlocked";
+      const hash = tokenHash(input.sessionToken);
+
+      const failures = await reserveFailure(
+        "unlockFailuresPerAccount",
+        session.userId,
+      );
+      if (!failures.ok) {
+        await repo.revokeSession(hash);
+        await repo.recordLoginEvent({
+          kind: "login_rate_limited",
+          userId: session.userId,
+          organizationId: session.organizationId,
+          ...eventOrigin(origin),
+        });
+        return "signed_out";
+      }
+      const event = (kind: "session_unlocked_passkey" | "unlock_failed") =>
+        repo.recordLoginEvent({
+          kind,
+          userId: session.userId,
+          organizationId: session.organizationId,
+          ...eventOrigin(origin),
+        });
+      const refused = async () => {
+        await event("unlock_failed");
+        return "invalid" as const;
+      };
+
+      const challenge = await repo.consumeWebAuthnChallenge(hash, "unlock");
+      const credential = (await repo.sessionPasskeys(hash)).find(
+        (candidate) => candidate.credentialId === input.response.id,
+      );
+      if (!challenge || !credential) return refused();
+      const verification = await verifyAuthenticationResponse({
+        response: input.response,
+        expectedChallenge: challenge,
+        expectedOrigin: rp.origin,
+        expectedRPID: rp.id,
+        credential: {
+          id: credential.credentialId,
+          publicKey: credential.publicKey,
+          counter: credential.counter,
+          transports: credential.transports,
+        },
+        requireUserVerification: true,
+      }).catch(() => null);
+      if (
+        !verification?.verified ||
+        !(await repo.usePasskey(
+          hash,
+          credential.credentialId,
+          verification.authenticationInfo.newCounter,
+        ))
+      )
+        return refused();
+
+      await event("session_unlocked_passkey");
+      await failures.release();
+      await repo.unlockSession(hash);
+      return "unlocked";
+    },
+
     async logout(sessionToken: string | undefined) {
       if (!isWellFormedToken(sessionToken)) return;
       const session = await repo.resolveSession(
@@ -509,34 +690,16 @@ export function authService({
         userId: session.userId,
       };
 
-      const failures = await reserveFailure(
-        "passwordChangeFailuresPerAccount",
-        session.userId,
-      );
-      if (!failures.ok) {
-        await repo.revokeSession(hash);
-        await repo.recordLoginEvent({
-          kind: "login_rate_limited",
-          userId: session.userId,
-          organizationId: session.organizationId,
-          ...eventOrigin(origin),
-        });
-        return { status: "signed_out" };
-      }
-      const ok = await verifyPassword(
-        await repo.passwordHashFor(session.userId),
+      const confirmed = await confirmPassword(
+        session,
+        hash,
         input.currentPassword,
+        origin,
       );
-      if (!ok) return { status: "invalid_current" };
-      await failures.release();
+      if (confirmed === "signed_out") return { status: "signed_out" };
+      if (confirmed === "invalid") return { status: "invalid_current" };
 
-      const owner = await withTenant(db, tenant, async (tx) => {
-        const [row] = await tx
-          .select({ email: users.email, displayName: users.displayName })
-          .from(users)
-          .where(eq(users.id, session.userId));
-        return row;
-      });
+      const owner = await ownerOf(session);
       const problems = passwordProblems(input.password, owner);
       if (input.password === input.currentPassword)
         problems.push({ code: "unchanged" });
@@ -608,6 +771,154 @@ export function authService({
               id: session.membershipId,
             });
           return revoked;
+        },
+      );
+    },
+
+    /** Clés d'accès de la personne connectée (« Mon compte »). */
+    async accountPasskeys(
+      sessionToken: string | undefined,
+    ): Promise<Passkey[]> {
+      if (!isWellFormedToken(sessionToken)) return [];
+      return repo.accountPasskeys(tokenHash(sessionToken));
+    },
+
+    /**
+     * Ajout d'une clé d'accès, étape 1 : le mot de passe à l'appui (une session laissée
+     * ouverte ne suffit pas), puis un défi lié à la session pour le navigateur.
+     */
+    async passkeyRegistrationOptions(
+      input: { sessionToken: string | undefined; password: string },
+      origin: RequestOrigin,
+    ): Promise<PasskeyOptionsResult> {
+      const session = await this.resolveSession(input.sessionToken);
+      if (!session || session.locked || !input.sessionToken)
+        return { status: "signed_out" };
+      const hash = tokenHash(input.sessionToken);
+      const confirmed = await confirmPassword(
+        session,
+        hash,
+        input.password,
+        origin,
+      );
+      if (confirmed === "signed_out") return { status: "signed_out" };
+      if (confirmed === "invalid") return { status: "invalid_password" };
+
+      const existing = await repo.sessionPasskeys(hash);
+      if (existing.length >= PASSKEY_POLICY.maxPerUser)
+        return { status: "limit" };
+      const owner = await ownerOf(session);
+      if (!owner) return { status: "signed_out" };
+      const options = await generateRegistrationOptions({
+        rpName: rp.name,
+        rpID: rp.id,
+        userName: owner.email,
+        userDisplayName: owner.displayName,
+        userID: new TextEncoder().encode(session.userId),
+        attestationType: "none",
+        excludeCredentials: existing.map((credential) => ({
+          id: credential.credentialId,
+          transports: credential.transports,
+        })),
+        authenticatorSelection: {
+          residentKey: "preferred",
+          userVerification: "required",
+        },
+      });
+      const created = await repo.createWebAuthnChallenge(
+        hash,
+        "register",
+        options.challenge,
+        PASSKEY_POLICY.challengeMinutes,
+      );
+      return created
+        ? { status: "options", options }
+        : { status: "signed_out" };
+    },
+
+    /** Ajout d'une clé d'accès, étape 2 : réponse de l'appareil vérifiée, clé enregistrée. */
+    async registerPasskey(input: {
+      sessionToken: string | undefined;
+      label: string;
+      response: RegistrationResponseJSON;
+    }): Promise<PasskeyRegistrationResult> {
+      const session = await this.resolveSession(input.sessionToken);
+      if (!session || session.locked || !input.sessionToken)
+        return "signed_out";
+      const hash = tokenHash(input.sessionToken);
+      const challenge = await repo.consumeWebAuthnChallenge(hash, "register");
+      if (!challenge) return "invalid";
+      const verification = await verifyRegistrationResponse({
+        response: input.response,
+        expectedChallenge: challenge,
+        expectedOrigin: rp.origin,
+        expectedRPID: rp.id,
+        requireUserVerification: true,
+      }).catch(() => null);
+      if (!verification?.verified) return "invalid";
+      const { credential } = verification.registrationInfo;
+
+      const id = await withTenant(
+        db,
+        { organizationId: session.organizationId, userId: session.userId },
+        async (tx) => {
+          const added = await authRepository(tx).addPasskey(
+            hash,
+            {
+              credentialId: credential.id,
+              publicKey: credential.publicKey,
+              counter: credential.counter,
+              transports: input.response.response.transports ?? [],
+              label: input.label,
+            },
+            PASSKEY_POLICY.maxPerUser,
+          );
+          if (added)
+            await recordAudit(tx, session, "account.passkey_added", {
+              type: "membership",
+              id: session.membershipId,
+            });
+          return added;
+        },
+      ).catch((error: unknown) => {
+        // Clé déjà enregistrée (même authentificateur) : refusée comme une réponse invalide.
+        if (isUniqueViolation(error)) return "duplicate" as const;
+        throw error;
+      });
+      if (id === "duplicate") return "invalid";
+      if (!id) return "limit";
+      const owner = await ownerOf(session);
+      if (owner)
+        await email
+          .send(passkeyAddedEmail(owner.email, input.label))
+          .catch(() =>
+            console.error("Avis d'ajout de clé d'accès non envoyé."),
+          );
+      return "added";
+    },
+
+    /** Retire une clé d'accès de la personne : elle ne déverrouille plus rien. */
+    async removePasskey(
+      sessionToken: string | undefined,
+      passkeyId: string,
+    ): Promise<boolean> {
+      if (!z.uuid().safeParse(passkeyId).success) return false;
+      const session = await this.resolveSession(sessionToken);
+      if (!session || session.locked || !sessionToken) return false;
+      return withTenant(
+        db,
+        { organizationId: session.organizationId, userId: session.userId },
+        async (tx) => {
+          const removed = await authRepository(tx).removePasskey(
+            tokenHash(sessionToken),
+            passkeyId,
+          );
+          if (removed)
+            await recordAudit(tx, session, "account.passkey_removed", {
+              type: "membership",
+              id: session.membershipId,
+            });
+          return removed;
         },
       );
     },

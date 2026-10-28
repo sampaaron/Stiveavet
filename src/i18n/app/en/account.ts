@@ -85,4 +85,31 @@ export const account: AppDictionary["account"] = {
       "Device removed: the security code will be requested at the next sign-in.",
     notFound: "This device is no longer in the list. Please reload the page.",
   },
+  passkeys: {
+    title: "Passkeys",
+    description:
+      "After 40 minutes of inactivity, Stivea Vet locks itself. With a passkey, you unlock it in one gesture (fingerprint, face or device code) without typing your password again.",
+    loginNote:
+      "A passkey only unlocks. To sign in, your password and, for vets, the security code are still required.",
+    none: "No passkey: your password is required to unlock.",
+    addedOn: (date: string) => `Added on ${date}`,
+    lastUsed: (date: string) => `used on ${date}`,
+    neverUsed: "never used",
+    label: "Passkey name",
+    labelHint: "To recognise it, for example “Consultation room computer”.",
+    password: "Your password",
+    submit: "Add a passkey",
+    added: "Passkey added. A confirmation email has been sent to you.",
+    cancelled: "Cancelled on the device: nothing was saved.",
+    already: "This device already has a passkey for your account.",
+    invalid: "The device could not create the passkey. Please try again.",
+    limit: (max: number) =>
+      `You already have ${max} passkeys. Remove one before adding another.`,
+    unsupported:
+      "This browser does not support passkeys. Your password is still required to unlock.",
+    remove: "Remove",
+    removeLabel: (label: string) => `Remove passkey ${label}`,
+    removed: "Passkey removed: it no longer unlocks Stivea Vet.",
+    notFound: "This passkey is no longer in the list. Please reload the page.",
+  },
 };

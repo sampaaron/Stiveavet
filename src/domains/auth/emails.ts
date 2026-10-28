@@ -57,3 +57,15 @@ export function passwordChangedInAccountEmail(to: string): EmailMessage {
     "Si vous n'êtes pas à l'origine de ce changement, choisissez un nouveau mot de passe depuis « Mot de passe oublié » sur la page de connexion, puis prévenez le vétérinaire administrateur de votre cabinet.",
   ]);
 }
+
+/** Clé d'accès ajoutée depuis « Mon compte » : la personne la retire au même endroit. */
+export function passkeyAddedEmail(to: string, label: string): EmailMessage {
+  return message(
+    to,
+    "Une clé d'accès a été ajoutée à votre compte Stivea Vet",
+    [
+      `La clé d'accès « ${label} » vient d'être ajoutée à votre compte. Elle permet de déverrouiller Stivea Vet sur cet appareil sans retaper votre mot de passe.`,
+      "Si vous n'êtes pas à l'origine de cet ajout, retirez-la dans « Mon compte », changez votre mot de passe, puis prévenez le vétérinaire administrateur de votre cabinet.",
+    ],
+  );
+}

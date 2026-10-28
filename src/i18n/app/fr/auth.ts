@@ -59,6 +59,13 @@ export const auth = {
       `${name}, Stivea Vet s'est verrouillé après 40 minutes sans activité. Saisissez votre mot de passe pour reprendre.`,
     submit: "Déverrouiller",
     notMe: "Ce n'est pas moi : se déconnecter",
+    passkey: "Déverrouiller avec ma clé d'accès",
+    passkeyHint: "Empreinte, visage ou code de l'appareil.",
+    orPassword: "ou avec votre mot de passe",
+    passkeyFailed:
+      "La clé d'accès n'a pas été acceptée. Réessayez ou saisissez votre mot de passe.",
+    passkeyCancelled:
+      "Déverrouillage annulé sur l'appareil. Réessayez ou saisissez votre mot de passe.",
   },
   forgot: {
     title: "Mot de passe oublié",
@@ -158,6 +165,9 @@ export const auth = {
     terms_required: "Acceptez les conditions d'utilisation pour continuer.",
     authority_required:
       "Confirmez que vous êtes autorisé à souscrire au nom du cabinet.",
+    passkey_label_required: "Donnez un nom à la clé.",
+    passkey_label_long: "Nom trop long : 60 caractères au plus.",
+    passkey_label_chars: "Indiquez un nom simple, sans caractère spécial.",
   },
   /** Message d'un code de validation inconnu (message par défaut de Zod). */
   invalidField: "Valeur invalide. Vérifiez ce champ.",

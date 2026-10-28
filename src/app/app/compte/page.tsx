@@ -13,7 +13,9 @@ import { formatDate, formatDateTime, initials } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
 
 import {
+  AddPasskeyForm,
   PasswordForm,
+  RemovePasskeyForm,
   RevokeDeviceForm,
   RevokeOtherSessionsForm,
 } from "./account-forms";
@@ -29,13 +31,12 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function AccountPage() {
   const context = await memberContext();
-  const [{ t, locale }, overview, security] = await Promise.all([
+  const sessionToken = await readAuthCookie("session");
+  const [{ t, locale }, overview, security, passkeys] = await Promise.all([
     appText(),
     accountOverview(context),
-    auth().accountSecurity(
-      await readAuthCookie("session"),
-      await readAuthCookie("device"),
-    ),
+    auth().accountSecurity(sessionToken, await readAuthCookie("device")),
+    auth().accountPasskeys(sessionToken),
   ]);
   const text = t.account;
   const others = security.sessions.filter((session) => !session.current);
@@ -172,6 +173,45 @@ export default async function AccountPage() {
           description={text.password.description}
         >
           <PasswordForm />
+        </SectionCard>
+
+        <SectionCard
+          id="cles-d-acces"
+          title={text.passkeys.title}
+          description={text.passkeys.description}
+        >
+          {passkeys.length === 0 ? (
+            <p className="mb-4 text-sm text-ink-muted">{text.passkeys.none}</p>
+          ) : (
+            <ul className="mb-5 grid gap-3">
+              {passkeys.map((passkey) => (
+                <li
+                  key={passkey.id}
+                  className="flex flex-wrap items-start justify-between gap-3 text-sm"
+                >
+                  <span>
+                    <span className="block font-semibold">{passkey.label}</span>
+                    <span className="block text-ink-muted">
+                      {text.passkeys.addedOn(
+                        formatDate(passkey.createdAt, locale),
+                      )}{" "}
+                      ·{" "}
+                      {passkey.lastUsedAt
+                        ? text.passkeys.lastUsed(
+                            formatDateTime(passkey.lastUsedAt, locale),
+                          )
+                        : text.passkeys.neverUsed}
+                    </span>
+                  </span>
+                  <RemovePasskeyForm id={passkey.id} label={passkey.label} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <AddPasskeyForm />
+          <p className="mt-4 text-sm text-ink-muted">
+            {text.passkeys.loginNote}
+          </p>
         </SectionCard>
 
         <SectionCard

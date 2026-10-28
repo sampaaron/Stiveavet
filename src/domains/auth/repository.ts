@@ -42,6 +42,24 @@ export type TrustedDevice = {
   current: boolean;
 };
 
+/** Clé d'accès de la personne (déverrouillage sans mot de passe, ADR 0050). */
+export type Passkey = {
+  id: string;
+  label: string;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+};
+
+/** Clé publique d'une clé d'accès, pour vérifier une signature. */
+export type PasskeyCredential = {
+  credentialId: string;
+  publicKey: Uint8Array<ArrayBuffer>;
+  counter: number;
+  transports: string[];
+};
+
+export type WebAuthnPurpose = "register" | "unlock";
+
 /** Base ou transaction d'un cabinet : les fonctions `auth` s'appellent dans l'une ou l'autre. */
 type Executor = Pick<Database, "execute">;
 
@@ -294,6 +312,103 @@ export function authRepository(db: Executor) {
         sql`SELECT * FROM auth.change_password(${sessionHash}, ${passwordHash})`,
       );
       return row ? { userId: row.user_id, email: row.email } : null;
+    },
+
+    // Clés d'accès (migration 0033), toujours à partir du jeton de la session courante.
+
+    async accountPasskeys(sessionHash: Buffer): Promise<Passkey[]> {
+      const result = await rows<{
+        passkey_id: string;
+        label: string;
+        created_at: string;
+        last_used_at: string | null;
+      }>(db, sql`SELECT * FROM auth.account_passkeys(${sessionHash})`);
+      return result.map((row) => ({
+        id: row.passkey_id,
+        label: row.label,
+        createdAt: new Date(row.created_at),
+        lastUsedAt: row.last_used_at ? new Date(row.last_used_at) : null,
+      }));
+    },
+
+    async sessionPasskeys(sessionHash: Buffer): Promise<PasskeyCredential[]> {
+      const result = await rows<{
+        credential_id: string;
+        public_key: Buffer;
+        counter: string;
+        transports: string[];
+      }>(db, sql`SELECT * FROM auth.session_passkeys(${sessionHash})`);
+      return result.map((row) => ({
+        credentialId: row.credential_id,
+        publicKey: new Uint8Array(row.public_key),
+        counter: Number(row.counter),
+        transports: row.transports,
+      }));
+    },
+
+    async createWebAuthnChallenge(
+      sessionHash: Buffer,
+      purpose: WebAuthnPurpose,
+      challenge: string,
+      lifetimeMinutes: number,
+    ) {
+      const [row] = await rows<{ created: boolean }>(
+        db,
+        sql`SELECT auth.create_webauthn_challenge(${sessionHash}, ${purpose}, ${challenge}, ${minutes(lifetimeMinutes)}::interval) AS created`,
+      );
+      return row?.created === true;
+    },
+
+    async consumeWebAuthnChallenge(
+      sessionHash: Buffer,
+      purpose: WebAuthnPurpose,
+    ) {
+      const [row] = await rows<{ challenge: string | null }>(
+        db,
+        sql`SELECT auth.consume_webauthn_challenge(${sessionHash}, ${purpose}) AS challenge`,
+      );
+      return row?.challenge ?? null;
+    },
+
+    async addPasskey(
+      sessionHash: Buffer,
+      passkey: {
+        credentialId: string;
+        publicKey: Uint8Array;
+        counter: number;
+        transports: string[];
+        label: string;
+      },
+      max: number,
+    ) {
+      // Littéral de tableau : Drizzle déplierait un tableau JS en liste de paramètres. Les
+      // transports sont pris dans une liste fermée (cles-d-acces.ts), sans virgule ni guillemet.
+      const transports = `{${passkey.transports.join(",")}}`;
+      const [row] = await rows<{ id: string | null }>(
+        db,
+        sql`SELECT auth.add_passkey(${sessionHash}, ${passkey.credentialId}, ${Buffer.from(passkey.publicKey)}, ${passkey.counter}, ${transports}::text[], ${passkey.label}, ${max}) AS id`,
+      );
+      return row?.id ?? null;
+    },
+
+    async removePasskey(sessionHash: Buffer, passkeyId: string) {
+      const [row] = await rows<{ removed: boolean | null }>(
+        db,
+        sql`SELECT auth.remove_passkey(${sessionHash}, ${passkeyId}) AS removed`,
+      );
+      return row?.removed === true;
+    },
+
+    async usePasskey(
+      sessionHash: Buffer,
+      credentialId: string,
+      counter: number,
+    ) {
+      const [row] = await rows<{ used: boolean | null }>(
+        db,
+        sql`SELECT auth.use_passkey(${sessionHash}, ${credentialId}, ${counter}) AS used`,
+      );
+      return row?.used === true;
     },
 
     async hitRateLimit(bucket: string, windowMinutes: number, max: number) {

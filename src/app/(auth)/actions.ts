@@ -3,6 +3,10 @@
 import { redirect } from "next/navigation";
 
 import {
+  authenticationResponse,
+  parseResponse,
+} from "@/domains/auth/cles-d-acces";
+import {
   codeInput,
   invitationInput,
   loginInput,
@@ -110,6 +114,30 @@ export async function unlockAction(
   );
   if (outcome === "invalid")
     return { fieldErrors: { password: [t.errors.passwordIncorrect] } };
+  if (outcome === "signed_out") {
+    await clearAuthCookie("session");
+    redirect("/connexion?raison=session");
+  }
+  redirect("/app");
+}
+
+/** Défi de déverrouillage par clé d'accès ; null sans clé ou hors session verrouillée. */
+export async function passkeyUnlockOptionsAction() {
+  return auth().passkeyUnlockOptions(await readAuthCookie("session"));
+}
+
+export async function passkeyUnlockAction(
+  response: string,
+): Promise<FormState> {
+  const t = (await appText()).t.auth;
+  const parsed = parseResponse(authenticationResponse, response);
+  if (!parsed) return { error: t.lock.passkeyFailed };
+
+  const outcome = await auth().unlockWithPasskey(
+    { sessionToken: await readAuthCookie("session"), response: parsed },
+    await requestOrigin(),
+  );
+  if (outcome === "invalid") return { error: t.lock.passkeyFailed };
   if (outcome === "signed_out") {
     await clearAuthCookie("session");
     redirect("/connexion?raison=session");

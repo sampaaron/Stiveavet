@@ -1,7 +1,9 @@
 "use client";
 
+import { startAuthentication } from "@simplewebauthn/browser";
+import { Fingerprint } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState, useTransition } from "react";
 
 import {
   PLANS,
@@ -17,10 +19,13 @@ import { Button } from "@/ui/button";
 import { formatEuros } from "@/ui/format";
 import { planHighlights } from "@/ui/plan-summary";
 import { TextField } from "@/ui/text-field";
+import { useWebAuthnSupport } from "@/ui/webauthn";
 
 import {
   acceptInvitationAction,
   loginAction,
+  passkeyUnlockAction,
+  passkeyUnlockOptionsAction,
   requestResetAction,
   resetPasswordAction,
   signupAction,
@@ -125,7 +130,7 @@ export function CodeForm({ afterSignup = false }: { afterSignup?: boolean }) {
   );
 }
 
-export function UnlockForm() {
+export function UnlockForm({ autoFocus = true }: { autoFocus?: boolean }) {
   const t = useAppText().auth;
   const [state, action, pending] = useActionState(
     unlockAction,
@@ -140,11 +145,54 @@ export function UnlockForm() {
         type="password"
         autoComplete="current-password"
         required
-        autoFocus
+        autoFocus={autoFocus}
         errors={state.fieldErrors?.password}
       />
       <Submit pending={pending}>{t.lock.submit}</Submit>
     </form>
+  );
+}
+
+/** Déverrouillage par clé d'accès (ADR 0050) ; le mot de passe reste proposé dessous. */
+export function PasskeyUnlock() {
+  const t = useAppText().auth;
+  const supported = useWebAuthnSupport();
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+  if (!supported) return null;
+
+  function unlock() {
+    setError(undefined);
+    startTransition(async () => {
+      const options = await passkeyUnlockOptionsAction();
+      if (!options) return setError(t.lock.passkeyFailed);
+      const response = await startAuthentication({
+        optionsJSON: options,
+      }).catch(() => null);
+      if (!response) return setError(t.lock.passkeyCancelled);
+      const state = await passkeyUnlockAction(JSON.stringify(response));
+      if (state.error) setError(state.error);
+    });
+  }
+
+  return (
+    <div className="mb-5 flex flex-col gap-3">
+      {error ? <AlertBanner tone="urgent" title={error} /> : null}
+      <Button
+        type="button"
+        onClick={unlock}
+        disabled={pending}
+        aria-busy={pending}
+        className="w-full"
+        icon={<Fingerprint aria-hidden="true" className="size-4" />}
+      >
+        {t.lock.passkey}
+      </Button>
+      <p className="text-center text-sm text-ink-muted">{t.lock.passkeyHint}</p>
+      <p className="flex items-center gap-3 text-xs font-medium tracking-wide text-ink-muted uppercase before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
+        {t.lock.orPassword}
+      </p>
+    </div>
   );
 }
 

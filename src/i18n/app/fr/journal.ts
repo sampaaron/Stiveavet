@@ -35,6 +35,10 @@ export const journal = {
       `${actor} a déconnecté ses autres appareils`,
     "account.device_revoked": (actor: string) =>
       `${actor} a retiré un de ses appareils de confiance`,
+    "account.passkey_added": (actor: string) =>
+      `${actor} a ajouté une clé d'accès`,
+    "account.passkey_removed": (actor: string) =>
+      `${actor} a retiré une de ses clés d'accès`,
     "animal.created": (actor: string) =>
       `${actor} a enregistré un animal dans le registre`,
     "animal.updated": (actor: string) =>
@@ -230,6 +234,7 @@ export const journal = {
     session_locked: "Session verrouillée",
     session_unlocked: "Session déverrouillée",
     unlock_failed: "Déverrouillage refusé",
+    session_unlocked_passkey: "Session déverrouillée avec une clé d'accès",
     logout: "Déconnexion",
     password_reset_requested: "Réinitialisation du mot de passe demandée",
     password_reset_completed: "Mot de passe réinitialisé",
