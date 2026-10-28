@@ -32,6 +32,9 @@ export const journal: AppDictionary["journal"] = {
       `${actor} signed out their other devices`,
     "account.device_revoked": (actor: string) =>
       `${actor} removed one of their trusted devices`,
+    "account.passkey_added": (actor: string) => `${actor} added a passkey`,
+    "account.passkey_removed": (actor: string) =>
+      `${actor} removed one of their passkeys`,
     "animal.created": (actor: string) => `${actor} registered an animal`,
     "animal.updated": (actor: string) => `${actor} edited an animal's record`,
     "animal.viewed": (actor: string) => `${actor} viewed an animal's record`,
@@ -217,6 +220,7 @@ export const journal: AppDictionary["journal"] = {
     session_locked: "Session locked",
     session_unlocked: "Session unlocked",
     unlock_failed: "Unlock refused",
+    session_unlocked_passkey: "Session unlocked with a passkey",
     logout: "Sign-out",
     password_reset_requested: "Password reset requested",
     password_reset_completed: "Password reset",

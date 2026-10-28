@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 
 import { logoutAction } from "../actions";
 import { appText } from "@/i18n/app/server";
-import { currentSession } from "@/server/auth";
+import { auth, currentSession } from "@/server/auth";
+import { readAuthCookie } from "@/server/auth/cookies";
 import { memberProfile } from "@/server/auth/profile";
 import { Button } from "@/ui/button";
 
 import { AuthHeading } from "../auth-heading";
-import { UnlockForm } from "../auth-forms";
+import { PasskeyUnlock, UnlockForm } from "../auth-forms";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await appText();
@@ -20,9 +21,10 @@ export default async function LockPage() {
   const session = await currentSession();
   if (!session) redirect("/connexion");
   if (!session.locked) redirect("/app");
-  const [profile, { t }] = await Promise.all([
+  const [profile, { t }, hasPasskeys] = await Promise.all([
     memberProfile(session),
     appText(),
+    auth().hasPasskeys(await readAuthCookie("session")),
   ]);
 
   return (
@@ -36,7 +38,8 @@ export default async function LockPage() {
       <AuthHeading title={t.auth.lock.title}>
         {t.auth.lock.intro(profile.displayName)}
       </AuthHeading>
-      <UnlockForm />
+      {hasPasskeys ? <PasskeyUnlock /> : null}
+      <UnlockForm autoFocus={!hasPasskeys} />
       <form action={logoutAction} className="mt-4">
         <Button type="submit" variant="quiet" className="w-full">
           {t.auth.lock.notMe}

@@ -17,6 +17,8 @@ export const loginEventKind = pgEnum("login_event_kind", [
   "password_reset_requested",
   "password_reset_completed",
   "signup_completed",
+  // 0033 : déverrouillage par clé d'accès (ADR 0050).
+  "session_unlocked_passkey",
 ]);
 
 /** Journal de connexion : lecture seule pour l'application (ajout par les fonctions `auth`). */

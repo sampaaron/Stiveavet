@@ -27,7 +27,10 @@ export const RATE_LIMITS = {
   loginFailuresPerAccount: [25, 15],
   loginPerIp: [30, 15],
   unlockFailuresPerAccount: [5, 15],
-  /** Ancien mot de passe refusé dans « Sécurité du compte » : la session est alors fermée. */
+  /**
+   * Mot de passe refusé dans « Mon compte » (changement de mot de passe, ajout d'une clé
+   * d'accès) : la session est alors fermée.
+   */
   passwordChangeFailuresPerAccount: [5, 15],
   /** Codes e-mail envoyés : 5 essais chacun, soit 30 essais par heure au plus. */
   securityCodesPerAccount: [6, 60],

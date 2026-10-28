@@ -84,4 +84,32 @@ export const account = {
       "Appareil retiré : le code de sécurité y sera demandé à la prochaine connexion.",
     notFound: "Cet appareil n'est plus dans la liste. Rechargez la page.",
   },
+  passkeys: {
+    title: "Clés d'accès",
+    description:
+      "Après 40 minutes sans activité, Stivea Vet se verrouille. Avec une clé d'accès, vous le déverrouillez d'un geste (empreinte, visage ou code de l'appareil) sans retaper votre mot de passe.",
+    loginNote:
+      "Une clé d'accès ne sert qu'à déverrouiller. Pour vous connecter, le mot de passe et, pour un vétérinaire, le code de sécurité restent demandés.",
+    none: "Aucune clé d'accès : le mot de passe est demandé pour déverrouiller.",
+    addedOn: (date: string) => `Ajoutée le ${date}`,
+    lastUsed: (date: string) => `utilisée le ${date}`,
+    neverUsed: "jamais utilisée",
+    label: "Nom de la clé",
+    labelHint:
+      "Pour la reconnaître, par exemple « Ordinateur de la consultation ».",
+    password: "Votre mot de passe",
+    submit: "Ajouter une clé d'accès",
+    added: "Clé d'accès ajoutée. Un e-mail de confirmation vous a été envoyé.",
+    cancelled: "Ajout annulé sur l'appareil : rien n'a été enregistré.",
+    already: "Cet appareil a déjà une clé d'accès pour votre compte.",
+    invalid: "L'appareil n'a pas pu créer la clé. Réessayez.",
+    limit: (max: number) =>
+      `Vous avez déjà ${max} clés d'accès. Retirez-en une avant d'en ajouter une autre.`,
+    unsupported:
+      "Ce navigateur ne gère pas les clés d'accès. Le mot de passe reste demandé pour déverrouiller.",
+    remove: "Retirer",
+    removeLabel: (label: string) => `Retirer la clé d'accès ${label}`,
+    removed: "Clé d'accès retirée : elle ne déverrouille plus Stivea Vet.",
+    notFound: "Cette clé n'est plus dans la liste. Rechargez la page.",
+  },
 };

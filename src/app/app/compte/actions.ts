@@ -1,10 +1,17 @@
 "use server";
 
+import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { passwordChangeInput } from "@/domains/auth/validators";
+import {
+  PASSKEY_POLICY,
+  parseResponse,
+  passkeyLabel,
+  registrationResponse,
+} from "@/domains/auth/cles-d-acces";
+import { passwordChangeInput, unlockInput } from "@/domains/auth/validators";
 import { appText } from "@/i18n/app/server";
 import { auth } from "@/server/auth";
 import { clearAuthCookie, readAuthCookie } from "@/server/auth/cookies";
@@ -91,4 +98,91 @@ export async function revokeDeviceAction(
   return revoked
     ? { notice: t.account.devices.revoked }
     : { error: t.account.devices.notFound };
+}
+
+// Clés d'accès (ADR 0050) : mot de passe à l'appui, puis réponse de l'appareil vérifiée.
+
+const passkeyStartInput = z.object({
+  label: passkeyLabel,
+  password: unlockInput.shape.password,
+});
+
+export type PasskeyStartState = FormState & {
+  options?: PublicKeyCredentialCreationOptionsJSON;
+};
+
+export async function startPasskeyAction(
+  form: FormData,
+): Promise<PasskeyStartState> {
+  await memberContext();
+  const t = (await appText()).t;
+  const parsed = passkeyStartInput.safeParse({
+    label: text(form, "label"),
+    password: text(form, "password"),
+  });
+  if (!parsed.success)
+    return { fieldErrors: fieldErrors(t.auth, parsed.error) };
+
+  const result = await auth().passkeyRegistrationOptions(
+    {
+      sessionToken: await readAuthCookie("session"),
+      password: parsed.data.password,
+    },
+    await requestOrigin(),
+  );
+  switch (result.status) {
+    case "invalid_password":
+      return { fieldErrors: { password: [t.auth.errors.passwordIncorrect] } };
+    case "limit":
+      return { error: t.account.passkeys.limit(PASSKEY_POLICY.maxPerUser) };
+    case "signed_out":
+      return signedOut();
+    case "options":
+      return { options: result.options };
+  }
+}
+
+export async function finishPasskeyAction(
+  label: string,
+  response: string,
+): Promise<ActionState> {
+  await memberContext();
+  const { t } = await appText();
+  const name = passkeyLabel.safeParse(label);
+  const parsed = parseResponse(registrationResponse, response);
+  if (!name.success || !parsed) return { error: t.account.passkeys.invalid };
+  const result = await auth().registerPasskey({
+    sessionToken: await readAuthCookie("session"),
+    label: name.data,
+    response: parsed,
+  });
+  switch (result) {
+    case "added":
+      revalidatePath("/app/compte");
+      return { notice: t.account.passkeys.added };
+    case "invalid":
+      return { error: t.account.passkeys.invalid };
+    case "limit":
+      return { error: t.account.passkeys.limit(PASSKEY_POLICY.maxPerUser) };
+    case "signed_out":
+      return signedOut();
+  }
+}
+
+export async function removePasskeyAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const parsed = deviceInput.safeParse({ id: text(form, "id") });
+  if (!parsed.success) return invalidRequest();
+  await memberContext();
+  const { t } = await appText();
+  const removed = await auth().removePasskey(
+    await readAuthCookie("session"),
+    parsed.data.id,
+  );
+  revalidatePath("/app/compte");
+  return removed
+    ? { notice: t.account.passkeys.removed }
+    : { error: t.account.passkeys.notFound };
 }

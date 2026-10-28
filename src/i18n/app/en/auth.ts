@@ -56,6 +56,13 @@ export const auth: AppDictionary["auth"] = {
       `${name}, Stivea Vet locked itself after 40 minutes of inactivity. Enter your password to continue.`,
     submit: "Unlock",
     notMe: "Not me: sign out",
+    passkey: "Unlock with my passkey",
+    passkeyHint: "Fingerprint, face or device code.",
+    orPassword: "or with your password",
+    passkeyFailed:
+      "The passkey was not accepted. Try again or enter your password.",
+    passkeyCancelled:
+      "Unlock cancelled on the device. Try again or enter your password.",
   },
   forgot: {
     title: "Forgotten password",
@@ -154,6 +161,9 @@ export const auth: AppDictionary["auth"] = {
     terms_required: "Accept the terms of use to continue.",
     authority_required:
       "Confirm that you are authorised to subscribe on behalf of the practice.",
+    passkey_label_required: "Give the passkey a name.",
+    passkey_label_long: "Name too long: 60 characters at most.",
+    passkey_label_chars: "Use a plain name, without special characters.",
   },
   invalidField: "Invalid value. Please check this field.",
   passwordProblems: {
