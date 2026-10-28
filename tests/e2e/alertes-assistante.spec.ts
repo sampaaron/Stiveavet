@@ -74,11 +74,15 @@ test.describe("alertes « à surveiller » et assistante", () => {
     await page
       .getByRole("button", { name: "Envoyer en tant que propriétaire" })
       .click();
+    // L'alerte naît du tri du message, en tâche de fond : la page est rechargée jusqu'à elle.
     await page.goto("/app");
     const inbox = page.getByRole("list", { name: "À traiter" });
-    await expect(
-      inbox.getByRole("listitem").filter({ hasText: "Noisette" }),
-    ).toBeVisible();
+    await expect(async () => {
+      await page.reload();
+      await expect(
+        inbox.getByRole("listitem").filter({ hasText: "Noisette" }),
+      ).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
 
     // 3. Une assistante rejoint le cabinet ; l'administrateur lui donne le droit.
     const email = `asv-${randomUUID().slice(0, 8)}@essai.test`;
