@@ -51,21 +51,24 @@ export function sectionOf(pathname: string): Section {
 
 /**
  * Teinte d'accent de chaque rubrique, choisie pour un contraste d'au moins 4,5:1 sur blanc
- * (texte de l'en-tête), et sa lueur claire pour le fond décoratif.
+ * (texte de l'en-tête), sa variante éclaircie pour le mode sombre (au moins 4,5:1 sur la
+ * nuit, ADR 0052) et sa lueur claire pour le fond décoratif.
  */
-export const sectionAccents: Record<Section, { accent: string; glow: string }> =
-  {
-    today: { accent: "#087a54", glow: "#f5c46b" },
-    followups: { accent: "#0b7480", glow: "#7fe3d6" },
-    patients: { accent: "#6a4dd3", glow: "#c9b8ff" },
-    alerts: { accent: "#b8432d", glow: "#ffb39e" },
-    agenda: { accent: "#3557cf", glow: "#a9c1ff" },
-    assistants: { accent: "#5b4fe0", glow: "#8ce8c3" },
-    protocols: { accent: "#56743f", glow: "#d6e6a8" },
-    team: { accent: "#0f766e", glow: "#9ee7da" },
-    billing: { accent: "#8a5f12", glow: "#f3d27a" },
-    tasks: { accent: "#475569", glow: "#cbd5e1" },
-    journal: { accent: "#475569", glow: "#c7d2fe" },
-    help: { accent: "#087a54", glow: "#bfe9d6" },
-    onboarding: { accent: "#087a54", glow: "#8ce8c3" },
-  };
+export const sectionAccents: Record<
+  Section,
+  { accent: string; night: string; glow: string }
+> = {
+  today: { accent: "#087a54", night: "#5fd3a5", glow: "#f5c46b" },
+  followups: { accent: "#0b7480", night: "#5cc9d4", glow: "#7fe3d6" },
+  patients: { accent: "#6a4dd3", night: "#b5a3ff", glow: "#c9b8ff" },
+  alerts: { accent: "#b8432d", night: "#ff9a85", glow: "#ffb39e" },
+  agenda: { accent: "#3557cf", night: "#9db4ff", glow: "#a9c1ff" },
+  assistants: { accent: "#5b4fe0", night: "#b4abff", glow: "#8ce8c3" },
+  protocols: { accent: "#56743f", night: "#b5cf8f", glow: "#d6e6a8" },
+  team: { accent: "#0f766e", night: "#6fd6c8", glow: "#9ee7da" },
+  billing: { accent: "#8a5f12", night: "#e9c46a", glow: "#f3d27a" },
+  tasks: { accent: "#475569", night: "#b6c2d1", glow: "#cbd5e1" },
+  journal: { accent: "#475569", night: "#b6c2d1", glow: "#c7d2fe" },
+  help: { accent: "#087a54", night: "#5fd3a5", glow: "#bfe9d6" },
+  onboarding: { accent: "#087a54", night: "#5fd3a5", glow: "#8ce8c3" },
+};

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 
 import { LocaleProvider } from "@/i18n/app/locale-context";
 import { uiLocale } from "@/i18n/app/server";
+import { currentColorMode } from "@/server/color-mode";
 
 export const metadata: Metadata = {
   title: { default: "Stivea Vet", template: "%s · Stivea Vet" },
@@ -21,8 +22,10 @@ export default async function RootLayout({
   await connection();
   // Posée par le proxy : langue de l'adresse sur le site, sinon choix de la personne (ADR 0022).
   const lang = await uiLocale();
+  // Posé dès le rendu serveur : la page arrive dans le mode choisi, sans éclair (ADR 0052).
+  const mode = await currentColorMode();
   return (
-    <html lang={lang} className="h-full">
+    <html lang={lang} data-mode={mode} className="h-full">
       <body className="min-h-full">
         <LocaleProvider locale={lang}>{children}</LocaleProvider>
       </body>

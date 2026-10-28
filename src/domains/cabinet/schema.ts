@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { language } from "@/domains/suivis/schema";
+import { COLOR_MODES } from "@/ui/color-mode";
 
 // Miroir typé de db/migrations (source de vérité) ; un test d'intégration vérifie la concordance.
 
@@ -37,6 +38,10 @@ export const users = pgTable("users", {
   disabledAt: timestamp("disabled_at", { withTimezone: true }),
   /** Migration 0015 : langue de l'interface choisie par la personne. */
   uiLocale: language("ui_locale").notNull().default("fr"),
+  /** Migration 0035 : mode d'affichage choisi par la personne. */
+  colorMode: text("color_mode", { enum: COLOR_MODES })
+    .notNull()
+    .default("light"),
   ...timestamps,
 });
 

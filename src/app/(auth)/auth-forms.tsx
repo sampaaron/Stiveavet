@@ -489,7 +489,7 @@ function PlanChoice({
                       formatEuros(definition.monthlyCents, locale),
                     )}
                 {plan === FEATURED_PLAN ? (
-                  <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-white">
+                  <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-on-strong">
                     {text.labels.planFeatured}
                   </span>
                 ) : null}

@@ -23,7 +23,8 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 /**
  * Langues (lot 19, ADR 0022) : langue de l'interface par personne, langue de Numa reconnue
  * dans les messages du propriétaire et corrigeable par un vétérinaire, motifs de triage et
- * traces de groupe codés pour être lus dans la langue de chacun.
+ * traces de groupe codés pour être lus dans la langue de chacun. Le mode d'affichage
+ * (ADR 0052) suit la même règle que la langue de l'interface.
  */
 
 const { app, admin, appDb } = pools();
@@ -214,6 +215,44 @@ describe("langue de l'interface, par personne", () => {
         ]),
       ),
     ).toBe("22P02");
+  });
+});
+
+describe("mode d'affichage, par personne (ADR 0052)", () => {
+  it("chacun choisit le sien, clair par défaut ; la base refuse celui d'un collègue", async () => {
+    const max = await actor(ids.vet);
+    const ada = await actor(ids.admin);
+    await withTenant(appDb, max, (tx) =>
+      tx
+        .update(users)
+        .set({ colorMode: "dark" })
+        .where(eq(users.id, max.userId)),
+    );
+    expect(
+      await sqlState(
+        withTenant(appDb, max, (tx) =>
+          tx
+            .update(users)
+            .set({ colorMode: "dark" })
+            .where(eq(users.id, ada.userId)),
+        ),
+      ),
+    ).toBe("42501");
+    const { rows } = await admin.query(
+      `SELECT id, color_mode FROM users WHERE id = ANY($1) ORDER BY color_mode`,
+      [[max.userId, ada.userId]],
+    );
+    expect(rows).toEqual([
+      { id: max.userId, color_mode: "dark" },
+      { id: ada.userId, color_mode: "light" },
+    ]);
+    expect(
+      await sqlState(
+        admin.query(`UPDATE users SET color_mode = 'sepia' WHERE id = $1`, [
+          max.userId,
+        ]),
+      ),
+    ).toBe("23514");
   });
 });
 

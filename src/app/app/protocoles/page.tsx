@@ -170,11 +170,11 @@ function ProtocolList({
               <li key={protocol.id}>
                 <Link
                   href={`/app/protocoles/${protocol.id}`}
-                  className="group relative flex h-full flex-col gap-4 overflow-hidden rounded-[18px] rounded-tr-[4px] border border-line/80 bg-[linear-gradient(180deg,#fff,#fbfcf8)] p-5 shadow-[0_1px_2px_rgb(11_18_32/0.05),0_2px_0_-1px_#fff,0_4px_0_-1px_var(--color-line)] transition-all duration-300 hover:-translate-y-1 hover:rotate-[-0.4deg] hover:shadow-[0_22px_40px_-26px_var(--section-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                  className="group relative flex h-full flex-col gap-4 overflow-hidden rounded-[18px] rounded-tr-[4px] border border-line/80 bg-[linear-gradient(180deg,#fff,#fbfcf8)] p-5 shadow-[0_1px_2px_rgb(11_18_32/0.05),0_2px_0_-1px_#fff,0_4px_0_-1px_var(--color-line)] transition-all duration-300 hover:-translate-y-1 hover:rotate-[-0.4deg] hover:shadow-[0_22px_40px_-26px_var(--section-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:bg-[linear-gradient(180deg,var(--color-surface),var(--color-canvas-subtle))] dark:shadow-[0_1px_2px_rgb(0_0_0/0.3),0_2px_0_-1px_var(--color-surface),0_4px_0_-1px_var(--color-line)]"
                 >
                   <span
                     aria-hidden="true"
-                    className="absolute top-0 right-0 size-7 bg-[linear-gradient(225deg,var(--color-canvas)_50%,color-mix(in_oklab,var(--section-glow)_70%,white)_50%)] shadow-[-2px_2px_4px_rgb(11_18_32/0.06)]"
+                    className="absolute top-0 right-0 size-7 bg-[linear-gradient(225deg,var(--color-canvas)_50%,color-mix(in_oklab,var(--section-glow)_70%,var(--color-surface))_50%)] shadow-[-2px_2px_4px_rgb(11_18_32/0.06)]"
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block font-display text-lg leading-snug font-semibold tracking-tight">

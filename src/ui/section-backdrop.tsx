@@ -5,11 +5,15 @@ import { SectionMotif } from "./section-motif";
 import { sectionAccents } from "./sections";
 import type { Section } from "./sections";
 
-/** Teintes d'une rubrique en variables CSS (`--section-accent`, `--section-glow`). */
+/**
+ * Teintes d'une rubrique en variables CSS. `--section-accent` est choisi par la feuille de
+ * style (`.section-tint`) entre la teinte de jour et celle du mode sombre.
+ */
 export function sectionStyle(section: Section): CSSProperties {
-  const { accent, glow } = sectionAccents[section];
+  const { accent, night, glow } = sectionAccents[section];
   return {
-    "--section-accent": accent,
+    "--section-accent-day": accent,
+    "--section-accent-night": night,
     "--section-glow": glow,
   } as CSSProperties;
 }

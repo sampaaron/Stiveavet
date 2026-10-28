@@ -85,7 +85,7 @@ export default async function AnimalsPage({
         }
       />
 
-      <Card className="mb-8 rounded-[28px] border-white/70 bg-surface/75 p-3 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_18px_40px_-24px_rgb(11_18_32/0.25)] sm:p-4">
+      <Card className="mb-8 rounded-[28px] border-white/70 bg-surface/75 p-3 shadow-[0_1px_2px_rgb(11_18_32/0.04),0_18px_40px_-24px_rgb(11_18_32/0.25)] sm:p-4 dark:border-line/80">
         <form
           role="search"
           aria-label={text.filters.label}

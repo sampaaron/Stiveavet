@@ -108,7 +108,7 @@ export default async function AgendaPage({
                       return (
                         <li
                           key={slot.id}
-                          className="group flex items-center justify-between gap-3 rounded-[14px] border border-[var(--section-accent)]/15 bg-[linear-gradient(90deg,color-mix(in_oklab,var(--section-glow)_22%,white),white_70%)] py-2.5 pr-2 pl-3 transition-shadow hover:shadow-[0_10px_24px_-16px_var(--section-accent)]"
+                          className="group flex items-center justify-between gap-3 rounded-[14px] border border-[var(--section-accent)]/15 bg-[linear-gradient(90deg,color-mix(in_oklab,var(--section-glow)_22%,var(--color-surface)),var(--color-surface)_70%)] py-2.5 pr-2 pl-3 transition-shadow hover:shadow-[0_10px_24px_-16px_var(--section-accent)]"
                         >
                           <span className="flex min-w-0 items-center gap-3 text-sm">
                             <CalendarClock

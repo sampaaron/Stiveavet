@@ -35,7 +35,7 @@ export function SegmentedTabs({
           className={cn(
             "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap transition-all duration-200",
             tab.active
-              ? "bg-[var(--section-accent,var(--color-brand))] text-white shadow-[0_6px_16px_-8px_var(--section-accent,var(--color-brand))]"
+              ? "bg-[var(--section-accent,var(--color-brand))] text-on-strong shadow-[0_6px_16px_-8px_var(--section-accent,var(--color-brand))]"
               : "text-ink-muted hover:bg-surface hover:text-ink",
           )}
         >

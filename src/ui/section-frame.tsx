@@ -16,7 +16,7 @@ export function SectionFrame({ children }: { children: ReactNode }) {
   return (
     <div
       data-section={section}
-      className="relative isolate min-h-[inherit]"
+      className="section-tint relative isolate min-h-[inherit]"
       style={sectionStyle(section)}
     >
       <SectionBackdrop section={section} />

@@ -155,7 +155,7 @@ export default async function OnboardingPage() {
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold",
                       steps[step]
-                        ? "bg-brand text-white"
+                        ? "bg-brand text-on-strong"
                         : "border border-line bg-surface text-ink-muted",
                     )}
                   >

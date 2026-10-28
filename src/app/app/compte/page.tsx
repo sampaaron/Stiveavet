@@ -8,6 +8,7 @@ import { auth } from "@/server/auth";
 import { accountOverview } from "@/server/auth/account-overview";
 import { readAuthCookie } from "@/server/auth/cookies";
 import { memberContext } from "@/server/authz";
+import { currentColorMode } from "@/server/color-mode";
 import { Card, SectionCard } from "@/ui/card";
 import { formatDate, formatDateTime, initials } from "@/ui/format";
 import { PageHeader } from "@/ui/page-header";
@@ -19,6 +20,7 @@ import {
   RevokeDeviceForm,
   RevokeOtherSessionsForm,
 } from "./account-forms";
+import { ColorModeCard } from "../color-mode-form";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await appText();
@@ -32,12 +34,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AccountPage() {
   const context = await memberContext();
   const sessionToken = await readAuthCookie("session");
-  const [{ t, locale }, overview, security, passkeys] = await Promise.all([
-    appText(),
-    accountOverview(context),
-    auth().accountSecurity(sessionToken, await readAuthCookie("device")),
-    auth().accountPasskeys(sessionToken),
-  ]);
+  const [{ t, locale }, overview, security, passkeys, colorMode] =
+    await Promise.all([
+      appText(),
+      accountOverview(context),
+      auth().accountSecurity(sessionToken, await readAuthCookie("device")),
+      auth().accountPasskeys(sessionToken),
+      currentColorMode(),
+    ]);
   const text = t.account;
   const others = security.sessions.filter((session) => !session.current);
   const rights = Object.keys(t.labels.permissions)
@@ -68,7 +72,7 @@ export default async function AccountPage() {
           <div className="flex items-center gap-4 border-b border-line/70 bg-gradient-to-r from-mint/25 via-surface to-surface p-5 sm:p-6">
             <span
               aria-hidden="true"
-              className="grid size-16 shrink-0 place-items-center rounded-full bg-night text-xl font-bold text-mint ring-4 ring-white"
+              className="grid size-16 shrink-0 place-items-center rounded-full bg-night text-xl font-bold text-mint ring-4 ring-surface"
             >
               {initials(overview.displayName)}
             </span>
@@ -139,6 +143,8 @@ export default async function AccountPage() {
             {text.passkeys.loginNote}
           </p>
         </SectionCard>
+
+        <ColorModeCard t={t} current={colorMode} back="/app/compte" />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard
