@@ -2,7 +2,7 @@
 # Images de Stivea Vet : multi-étapes, sortie `standalone`, exécution sans root.
 # Images de base épinglées par empreinte (tag en clair pour la lecture) ; Dependabot les relève.
 
-FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS base
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
 WORKDIR /app
@@ -18,7 +18,7 @@ RUN pnpm build && pnpm build:scripts
 
 # Tâches hors Next.js : un fichier compilé par esbuild avec ses dépendances (pnpm
 # build:scripts), sans node_modules, sources ni outils de développement, et sans root.
-FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS node-job
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS node-job
 ENV NODE_ENV=production
 WORKDIR /app
 RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea
@@ -39,7 +39,7 @@ COPY --from=build /app/dist/scripts/worker.mjs ./dist/worker.mjs
 USER stivea
 CMD ["node", "dist/worker.mjs"]
 
-FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS runtime
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 RUN groupadd --system --gid 1001 stivea && useradd --system --uid 1001 --gid stivea stivea
