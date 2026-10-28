@@ -1,6 +1,8 @@
 # 0031 — Offres Starter, Pro et Premium
 
 - Statut : accepté (14 octobre 2026), remplace les formules de l'ADR 0011 et le prix d'essai de l'ADR 0023
+- Prix revus le 20 octobre 2026 : Aaron a confié la grille à l'équipe technique, « alignée sur la concurrence mais un peu moins chère », avec une bonne marge. Voir « Prix et concurrence » ci-dessous.
+- Offre de lancement (−25 % les 6 premiers mois) : ADR 0037
 - Migration : `0022_offres_starter_pro_premium`
 
 ## Contexte
@@ -13,9 +15,9 @@ Le cahier des charges du MVP fixe trois offres : Starter à 79 €, Pro à 129 �
 
    | Offre   | Mois  | Annuel | Vétérinaires | Assistants  | Suivis inclus / plafond | Stive | dr.veto |
    | ------- | ----- | ------ | ------------ | ----------- | ----------------------- | ----- | ------- |
-   | Starter | 79 €  | 67 €   | 1            | 1           | 15 / 30                 | non   | non     |
-   | Pro     | 129 € | 109 €  | 2            | 3           | 40 / 80                 | oui   | non     |
-   | Premium | 199 € | 169 €  | 3            | sans limite | 100 / 200               | oui   | oui     |
+   | Starter | 89 €  | 76 €   | 1            | 1           | 10 / 30                 | non   | non     |
+   | Pro     | 179 € | 152 €  | 2            | 2           | 30 / 50                 | oui   | non     |
+   | Premium | 359 € | 305 €  | 3            | sans limite | 80 / 120                | oui   | oui     |
 
 2. **Fin de l'essai pilote.** Le prix de l'offre s'applique dès le premier mois. Les deux premiers mois restent sans engagement possible ; l'engagement annuel est proposé au 45e jour et commence au 3e mois, comme dans l'ADR 0023.
 3. **Limites appliquées côté serveur.**
@@ -24,6 +26,16 @@ Le cahier des charges du MVP fixe trois offres : Starter à 79 €, Pro à 129 �
    - Stive : la permission `stive.use` est retirée des offres qui ne le comprennent pas.
    - dr.veto : connexion refusée hors Premium (`plan_feature_missing`) ; passer à une offre sans intégrations demande d'abord de déconnecter dr.veto (`plan_integration_connected`). Le registre des animaux (ADR 0030) permet de suivre ses patients sans logiciel connecté.
 4. **Cabinets existants.** Solo devient Starter, Solo Pro devient Pro, Clinique et Clinique Pro deviennent Premium. Un cabinet sans abonnement enregistré garde les limites de Premium.
+
+## Prix et concurrence
+
+Relevé du 20 octobre 2026, prix HT publiés par les éditeurs :
+
+- **VetAgent** (France), le plus proche : Starter 99 € (83 € en annuel), Pro 199 € (167 €), Premium 399 € (335 €), plus 390 € à 1 990 € d'installation. Le suivi post-opératoire et la détection d'urgence n'arrivent qu'en Premium.
+- Outils de messagerie des cabinets (Vello, Weave, PetDesk, Vetstoria) : environ 200 € à 450 € par cabinet et par mois, sans suivi post-opératoire.
+- Scribes IA (VetRec, CoVet) : de 50 € à 250 € par vétérinaire et par mois, sans échange avec les propriétaires.
+
+Chaque offre est environ 10 % sous l'offre VetAgent correspondante, sans frais d'installation, et le suivi par Numa est compris dès Starter. L'engagement annuel garde environ 15 % de remise. Le coût direct d'un cabinet (conversations WhatsApp, IA, hébergement) reste une petite part du prix ; il sera mesuré sur les cabinets pilotes.
 
 ## Conséquences
 

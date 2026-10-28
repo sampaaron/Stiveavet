@@ -77,6 +77,7 @@ export const en: SiteDictionary = {
     brandVet: "vet",
     skipToContent: "Skip to content",
     ctaTrial: "Start from {price} excl. VAT per month",
+    ctaPlan: "Start at {price} excl. VAT per month",
     ctaDemo: "See the demo",
     login: "Log in",
     numaAi: "AI assistant",
@@ -485,6 +486,12 @@ export const en: SiteDictionary = {
       "{price} excl. VAT / month with an annual commitment, available from month 3",
     perMonthExclVat: "excl. VAT / month",
     monthly: "no commitment",
+    intro: {
+      title: "Launch offer: {percent}% off for {months} months",
+      body: "For practices that sign up by {date}, on all three plans. After that, the regular price applies, monthly or with an annual commitment.",
+      regular: "Regular price",
+      then: "for the first {months} months, then {price} excl. VAT / month with no commitment",
+    },
     plans: {
       starter: {
         name: "Starter",

@@ -38,7 +38,7 @@ const CTA_TONES = {
 
 /**
  * Bouton-lien du site public : hauteur minimale de 44 px et texte qui peut passer à la ligne
- * (le libellé « Démarrer dès 79 € HT par mois » doit tenir dans 320 px).
+ * (le libellé « Démarrer dès 89 € HT par mois » doit tenir dans 320 px).
  */
 export function CtaLink({
   href,

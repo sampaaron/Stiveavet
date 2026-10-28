@@ -86,6 +86,13 @@ export const auth: AppDictionary["auth"] = {
       help: "Monthly with no commitment: change plan or cancel at any time. The cheaper annual commitment is offered after six weeks; it is never automatic.",
       option: (name: string, price: string) =>
         `${name} · ${price} excl. VAT per month`,
+      introOption: (
+        name: string,
+        intro: string,
+        months: number,
+        price: string,
+      ) =>
+        `${name} · launch offer: ${intro} excl. VAT per month for the first ${months} months, then ${price}`,
       details: (summary: string, annualPrice: string) =>
         `${summary}. With an annual commitment: ${annualPrice} excl. VAT per month.`,
     },

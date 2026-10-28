@@ -21,6 +21,8 @@ export type PlanDefinition = {
   monthlyCents: number;
   /** Prix mensuel avec engagement annuel. */
   annualMonthlyCents: number;
+  /** Prix mensuel de l'offre de lancement (`INTRO_OFFER`), arrondi à l'euro. */
+  introMonthlyCents: number;
   maxVets: number;
   /** Assistants vétérinaires ; null : sans limite. */
   maxAssistants: number | null;
@@ -42,11 +44,12 @@ export type PlanDefinition = {
 export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   starter: {
     label: "Starter",
-    monthlyCents: 7_900,
-    annualMonthlyCents: 6_700,
+    monthlyCents: 8_900,
+    annualMonthlyCents: 7_600,
+    introMonthlyCents: 6_700,
     maxVets: 1,
     maxAssistants: 1,
-    includedActiveFollowups: 15,
+    includedActiveFollowups: 10,
     maxActiveFollowups: 30,
     stive: false,
     stiveMonthlyRequests: 0,
@@ -54,24 +57,26 @@ export const PLAN_CATALOG: Record<Plan, PlanDefinition> = {
   },
   pro: {
     label: "Pro",
-    monthlyCents: 12_900,
-    annualMonthlyCents: 10_900,
+    monthlyCents: 17_900,
+    annualMonthlyCents: 15_200,
+    introMonthlyCents: 13_400,
     maxVets: 2,
-    maxAssistants: 3,
-    includedActiveFollowups: 40,
-    maxActiveFollowups: 80,
+    maxAssistants: 2,
+    includedActiveFollowups: 30,
+    maxActiveFollowups: 50,
     stive: true,
     stiveMonthlyRequests: 200,
     advancedIntegrations: false,
   },
   premium: {
     label: "Premium",
-    monthlyCents: 19_900,
-    annualMonthlyCents: 16_900,
+    monthlyCents: 35_900,
+    annualMonthlyCents: 30_500,
+    introMonthlyCents: 26_900,
     maxVets: 3,
     maxAssistants: null,
-    includedActiveFollowups: 100,
-    maxActiveFollowups: 200,
+    includedActiveFollowups: 80,
+    maxActiveFollowups: 120,
     stive: true,
     stiveMonthlyRequests: 600,
     advancedIntegrations: true,
@@ -85,6 +90,31 @@ export const FEATURED_PLAN: Plan = "pro";
 export const STARTING_PRICE_CENTS = Math.min(
   ...PLANS.map((plan) => PLAN_CATALOG[plan].monthlyCents),
 );
+
+/**
+ * Offre de lancement (décision d'Aaron du 20 octobre 2026, ADR 0037) : 25 % de remise sur
+ * les 6 premiers mois d'abonnement, quel que soit le cycle, pour les cabinets inscrits avant
+ * `signupsUntil` (fin du 30 juin 2027, heure de Paris). Elle se termine avec la période
+ * souple, avant le choix du 7e mois ; le prix normal s'applique ensuite.
+ */
+export const INTRO_OFFER = {
+  discountPercent: 25,
+  months: 6,
+  signupsUntil: new Date("2027-06-30T22:00:00Z"),
+} as const;
+
+/** L'offre de lancement est-elle encore proposée aux nouveaux cabinets ? */
+export function introOfferOpen(now: Date): boolean {
+  return now < INTRO_OFFER.signupsUntil;
+}
+
+/** L'offre de lancement s'applique-t-elle au mois d'abonnement `month` ? */
+export function introOfferApplies(
+  facts: Pick<SubscriptionFacts, "startedAt">,
+  month: number,
+): boolean {
+  return introOfferOpen(facts.startedAt) && month <= INTRO_OFFER.months;
+}
 
 /** Cabinet antérieur aux abonnements : limites de la formule la plus complète. */
 const LEGACY_PLAN: Plan = "premium";
@@ -176,10 +206,11 @@ export function phase(facts: SubscriptionFacts, now: Date): Phase {
 
 /** Prix HT du mois d'abonnement `month`. */
 export function monthlyPriceCents(
-  facts: Pick<SubscriptionFacts, "plan" | "cycle">,
+  facts: Pick<SubscriptionFacts, "plan" | "cycle" | "startedAt">,
   month: number,
 ): number {
   const plan = PLAN_CATALOG[facts.plan];
+  if (introOfferApplies(facts, month)) return plan.introMonthlyCents;
   return facts.cycle === "annual" && month > TRIAL_MONTHS
     ? plan.annualMonthlyCents
     : plan.monthlyCents;
@@ -341,14 +372,14 @@ export type InvoiceDraft = {
  * (« prélevés avec l'abonnement suivant »).
  */
 export function draftInvoice(
-  facts: Pick<SubscriptionFacts, "plan" | "cycle">,
+  facts: Pick<SubscriptionFacts, "plan" | "cycle" | "startedAt">,
   month: number,
   usage: { kind: UsageKind; amountCents: number }[],
 ): InvoiceDraft {
   const plan = PLAN_CATALOG[facts.plan];
   const lines: InvoiceLine[] = [
     {
-      label: `Formule ${plan.label}, ${facts.cycle === "annual" && month > TRIAL_MONTHS ? "engagement annuel" : "sans engagement"}, mois ${month}`,
+      label: `Formule ${plan.label}, ${facts.cycle === "annual" && month > TRIAL_MONTHS ? "engagement annuel" : "sans engagement"}${introOfferApplies(facts, month) ? ", offre de lancement" : ""}, mois ${month}`,
       amountCents: monthlyPriceCents(facts, month),
     },
   ];

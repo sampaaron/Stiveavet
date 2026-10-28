@@ -2,11 +2,13 @@ import { CircleDashed, ShieldAlert } from "lucide-react";
 
 import {
   FEATURED_PLAN,
+  INTRO_OFFER,
   LAUNCH_SURCHARGE_CENTS,
   PLANS,
   PLAN_CATALOG,
   REACTIVATION_SURCHARGE_CENTS,
   STARTING_PRICE_CENTS,
+  introOfferOpen,
 } from "@/domains/facturation/rules";
 import type { PlanDefinition } from "@/domains/facturation/rules";
 import { formatPrice } from "@/i18n/locales";
@@ -25,7 +27,7 @@ import {
   TextLink,
   TextSections,
 } from "../blocks";
-import { CtaLink, trialCta } from "../chrome";
+import { CtaLink } from "../chrome";
 import type { SiteProps } from "../chrome";
 import { PricingVisual, SecurityVisual, SupportVisual } from "../illustrations";
 
@@ -33,6 +35,15 @@ import { PricingVisual, SecurityVisual, SupportVisual } from "../illustrations";
 export function PricingPage({ locale, t }: SiteProps) {
   const pricing = t.pricing;
   const price = (cents: number) => formatPrice(cents, locale);
+  const intro = introOfferOpen(new Date());
+  const introValues = {
+    percent: INTRO_OFFER.discountPercent,
+    months: INTRO_OFFER.months,
+    date: new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", {
+      dateStyle: "long",
+      timeZone: "Europe/Paris",
+    }).format(new Date(INTRO_OFFER.signupsUntil.getTime() - 1)),
+  };
   return (
     <>
       <PageIntro
@@ -42,6 +53,16 @@ export function PricingPage({ locale, t }: SiteProps) {
       />
       <Section labelledBy="formules">
         <SectionTitle id="formules" title={pricing.plansTitle} />
+        {intro ? (
+          <Card className="mt-6 border-brand bg-brand-soft p-6">
+            <h3 className="font-bold text-brand-ink">
+              {fill(pricing.intro.title, introValues)}
+            </h3>
+            <p className="mt-1 text-sm text-ink-muted">
+              {fill(pricing.intro.body, introValues)}
+            </p>
+          </Card>
+        ) : null}
         <ul className="mt-8 grid gap-4 lg:grid-cols-3">
           {PLANS.map((plan) => {
             const copy = pricing.plans[plan];
@@ -65,14 +86,39 @@ export function PricingPage({ locale, t }: SiteProps) {
                     ) : null}
                   </div>
                   <p className="mt-1 text-sm text-ink-muted">{copy.pitch}</p>
-                  <p className="mt-5">
-                    <span className="text-3xl font-bold tracking-tight">
-                      {price(definition.monthlyCents)}
-                    </span>{" "}
-                    <span className="text-sm text-ink-muted">
-                      {pricing.perMonthExclVat} · {pricing.monthly}
-                    </span>
-                  </p>
+                  {intro ? (
+                    <>
+                      <p className="mt-5">
+                        <s className="text-lg text-ink-muted">
+                          <span className="sr-only">
+                            {pricing.intro.regular}{" "}
+                          </span>
+                          <span>{price(definition.monthlyCents)}</span>
+                        </s>{" "}
+                        <span className="text-3xl font-bold tracking-tight">
+                          {price(definition.introMonthlyCents)}
+                        </span>{" "}
+                        <span className="text-sm text-ink-muted">
+                          {pricing.perMonthExclVat}
+                        </span>
+                      </p>
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {fill(pricing.intro.then, {
+                          ...introValues,
+                          price: price(definition.monthlyCents),
+                        })}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-5">
+                      <span className="text-3xl font-bold tracking-tight">
+                        {price(definition.monthlyCents)}
+                      </span>{" "}
+                      <span className="text-sm text-ink-muted">
+                        {pricing.perMonthExclVat} · {pricing.monthly}
+                      </span>
+                    </p>
+                  )}
                   <p className="mt-1 text-sm text-ink-muted">
                     {fill(pricing.annual, {
                       price: price(definition.annualMonthlyCents),
@@ -88,7 +134,13 @@ export function PricingPage({ locale, t }: SiteProps) {
                       tone={featured ? "primary" : "outline"}
                       className="w-full"
                     >
-                      {trialCta(locale, t)}
+                      {fill(t.common.ctaPlan, {
+                        price: price(
+                          intro
+                            ? definition.introMonthlyCents
+                            : definition.monthlyCents,
+                        ),
+                      })}
                     </CtaLink>
                   </div>
                 </Card>
