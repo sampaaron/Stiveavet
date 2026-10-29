@@ -67,6 +67,11 @@ export const en: SiteDictionary = {
       title: "Privacy",
       description: "Stivea Vet privacy policy (draft).",
     },
+    cookies: {
+      title: "Cookie policy",
+      description:
+        "Stivea Vet cookies, what they are for and how to change your choice.",
+    },
     unsubscribe: {
       title: "Unsubscribe",
       description: "Stop receiving Stivea Vet e-mails.",
@@ -115,6 +120,7 @@ export const en: SiteDictionary = {
       login: "Log in",
       terms: "Terms of use",
       privacy: "Privacy",
+      cookies: "Manage cookies",
     },
     fictional: "Demonstration version: all data shown is fictional.",
     rights: "© 2026 Stivea Vet",

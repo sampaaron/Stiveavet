@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { expectAccessible, login, signUp } from "./support/flows";
 import { latestEmail } from "./support/mailpit";

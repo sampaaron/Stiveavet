@@ -10,10 +10,15 @@ import {
   introOfferOpen,
 } from "@/domains/facturation/rules";
 import type { PlanDefinition } from "@/domains/facturation/rules";
+import { COOKIE_CATALOG } from "@/domains/consentement/cookies";
+import { consentText } from "@/i18n/consent";
 import { formatPrice } from "@/i18n/locales";
 import { pathFor } from "@/i18n/routes";
 import { fill } from "@/i18n/site";
+import { currentConsent } from "@/server/consent";
 import { Card } from "@/ui/card";
+import { ConsentForm } from "@/ui/consent-form";
+import { formatDate } from "@/ui/format";
 
 import {
   CheckList,
@@ -344,6 +349,92 @@ export function LegalPage({
       </PageIntro>
       <Section theme="protocols">
         <TextSections sections={content.sections} />
+      </Section>
+    </>
+  );
+}
+
+/** Politique de cookies (ADR 0053) : la liste réelle des cookies, et le choix modifiable. */
+export async function CookiesPage({ locale }: SiteProps) {
+  const text = consentText(locale);
+  const consent = await currentConsent();
+  return (
+    <>
+      <PageIntro title={text.policy.title} lead={text.policy.intro} />
+      <Section theme="protocols">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
+          <Card className="p-5 sm:p-6">
+            <h2 className="text-lg font-bold tracking-tight">
+              {text.policy.choiceTitle}
+            </h2>
+            <p className="mt-1 mb-4 text-sm text-ink-muted">
+              {consent
+                ? text.policy.current(formatDate(consent.givenAt, locale))
+                : text.policy.none}
+            </p>
+            <ConsentForm
+              locale={locale}
+              current={consent}
+              open
+              idPrefix="politique"
+            />
+          </Card>
+          <Card className="overflow-hidden">
+            <h2
+              id="liste-des-cookies"
+              className="px-5 pt-5 text-lg font-bold tracking-tight sm:px-6 sm:pt-6"
+            >
+              {text.policy.listTitle}
+            </h2>
+            {/* Défilable au clavier sur petit écran. */}
+            <div
+              role="region"
+              aria-labelledby="liste-des-cookies"
+              tabIndex={0}
+              className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              <table className="mt-3 w-full min-w-[34rem] text-left text-sm">
+                <thead className="text-xs tracking-wide text-ink-muted uppercase">
+                  <tr className="border-b border-line">
+                    <th scope="col" className="px-5 py-2.5 font-medium sm:px-6">
+                      {text.policy.columns.name}
+                    </th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">
+                      {text.policy.columns.purpose}
+                    </th>
+                    <th scope="col" className="px-5 py-2.5 font-medium sm:px-6">
+                      {text.policy.columns.duration}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {COOKIE_CATALOG.map((cookie) => (
+                    <tr
+                      key={cookie.name}
+                      className="border-b border-line/60 last:border-0"
+                    >
+                      <th
+                        scope="row"
+                        className="px-5 py-3 font-mono text-[13px] font-semibold whitespace-nowrap sm:px-6"
+                      >
+                        {cookie.name}
+                      </th>
+                      <td className="px-3 py-3 text-ink-muted">
+                        {text.policy.purposes[cookie.purpose]}
+                      </td>
+                      <td className="px-5 py-3 whitespace-nowrap sm:px-6">
+                        {text.policy.durations[cookie.duration]}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="px-5 pt-1 pb-5 text-xs text-ink-muted sm:px-6 sm:pb-6">
+              {text.policy.secureNote}
+            </p>
+          </Card>
+        </div>
       </Section>
     </>
   );

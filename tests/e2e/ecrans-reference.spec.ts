@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import { expect, test } from "./support/test";
+import type { Page } from "./support/test";
 
 const caramel = "/app/suivis/3f6b2a9e-1c4d-4e8a-9b51-7a0c2d5e8f11";
 

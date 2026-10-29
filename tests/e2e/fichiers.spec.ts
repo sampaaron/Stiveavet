@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { fictionalPng } from "../support/png";
 import { expectAccessible } from "./support/flows";

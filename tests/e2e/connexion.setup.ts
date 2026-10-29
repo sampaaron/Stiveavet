@@ -1,4 +1,4 @@
-import { expect, test as setup } from "@playwright/test";
+import { expect, test as setup } from "./support/test";
 
 import { CLAIRE, PHRASE } from "./support/accounts";
 import { securityCode } from "./support/mailpit";
