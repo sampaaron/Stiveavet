@@ -20,6 +20,7 @@ export const SITE_PAGES = {
   demoSpace: { fr: "demo/espace", en: "demo/workspace" },
   terms: { fr: "conditions", en: "terms" },
   privacy: { fr: "confidentialite", en: "privacy" },
+  cookies: { fr: "cookies", en: "cookies" },
   unsubscribe: { fr: "desinscription", en: "unsubscribe" },
 } as const satisfies Record<string, Record<Locale, string>>;
 

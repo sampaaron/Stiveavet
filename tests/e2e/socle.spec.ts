@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 test("la page d'accueil s'affiche en français", async ({ page }) => {
   await page.goto("/fr");

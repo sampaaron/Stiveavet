@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 
 import { expectAccessible } from "./support/flows";
 import { OPT_IN } from "./support/suivis";

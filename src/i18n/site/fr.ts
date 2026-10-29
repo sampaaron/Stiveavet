@@ -72,6 +72,11 @@ export const fr = {
       title: "Confidentialité",
       description: "Politique de confidentialité de Stivea Vet (projet).",
     },
+    cookies: {
+      title: "Politique de cookies",
+      description:
+        "Les cookies de Stivea Vet, à quoi ils servent et comment changer votre choix.",
+    },
     unsubscribe: {
       title: "Désinscription",
       description: "Ne plus recevoir les e-mails de Stivea Vet.",
@@ -120,6 +125,7 @@ export const fr = {
       login: "Connexion",
       terms: "Conditions d'utilisation",
       privacy: "Confidentialité",
+      cookies: "Gérer les cookies",
     },
     fictional:
       "Version de démonstration : toutes les données affichées sont fictives.",

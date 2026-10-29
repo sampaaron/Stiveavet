@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./support/test";
+import type { Browser, Page } from "./support/test";
 
 import { LEA, PAUL, PHRASE } from "./support/accounts";
 import {

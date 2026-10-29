@@ -14,6 +14,7 @@ import { SiteFooter, SiteHeader } from "../_site/chrome";
 import { DemoPage, DemoSpacePage, UnsubscribePage } from "../_site/pages/demo";
 import { HomePage } from "../_site/pages/home";
 import {
+  CookiesPage,
   HelpPage,
   LegalPage,
   PricingPage,
@@ -87,6 +88,7 @@ export default async function SitePage({
     ),
     terms: () => <LegalPage {...props} document="terms" />,
     privacy: () => <LegalPage {...props} document="privacy" />,
+    cookies: () => <CookiesPage {...props} />,
     unsubscribe: () => (
       <UnsubscribePage {...props} token={single(query.jeton)} />
     ),

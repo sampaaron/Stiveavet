@@ -314,6 +314,9 @@ export function SiteFooter({
           <FooterLink href={link("privacy")}>
             {t.footer.links.privacy}
           </FooterLink>
+          <FooterLink href={link("cookies")}>
+            {t.footer.links.cookies}
+          </FooterLink>
           <li>
             <LanguageLink
               locale={locale}

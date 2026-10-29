@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/test";
 import { Client } from "pg";
 
 import { SEED } from "../../src/fixtures/seed-ids";

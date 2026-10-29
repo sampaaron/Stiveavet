@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import type { BrowserContext, Page } from "@playwright/test";
+import { expect, test, withConsent } from "./support/test";
+import type { BrowserContext, Page } from "./support/test";
 
 import { en } from "../../src/i18n/app/en";
 import { fr } from "../../src/i18n/app/fr";
@@ -187,11 +187,13 @@ test.describe("connexion en anglais", () => {
     // Nouvel appareil, sans cookie de langue : le code est demandé en français, puis
     // l'espace cabinet revient dans la langue enregistrée dans le compte.
     await context.clearCookies();
+    await withConsent(context, new URL(page.url()).origin);
     await loginWithCode(page, email, password);
     await expectEnglish(page, /^Hello/);
 
     // Écran du code de sécurité en anglais.
     await context.clearCookies();
+    await withConsent(context, new URL(page.url()).origin);
     await chooseEnglish(context, new URL(page.url()).origin);
     await page.goto("/connexion");
     await page.getByLabel("E-mail address").fill(email);
