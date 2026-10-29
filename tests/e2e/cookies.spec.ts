@@ -12,7 +12,7 @@ import { expectAccessible } from "./support/flows";
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const banner = (page: Page) =>
-  page.getByRole("region", { name: "Vos cookies, votre choix" });
+  page.getByRole("region", { name: "Cookies", exact: true });
 
 async function consentCookie(page: Page) {
   const cookies = await page.context().cookies();
@@ -27,8 +27,8 @@ test("à l'arrivée sur le site, refuser est aussi simple qu'accepter", async ({
   expect(await consentCookie(page)).toBeUndefined();
   await expectAccessible(page);
 
-  const refuse = banner(page).getByRole("button", { name: "Tout refuser" });
-  const accept = banner(page).getByRole("button", { name: "Tout accepter" });
+  const refuse = banner(page).getByRole("button", { name: "Refuser" });
+  const accept = banner(page).getByRole("button", { name: "Accepter" });
   expect(await refuse.getAttribute("class")).toBe(
     await accept.getAttribute("class"),
   );
@@ -40,22 +40,22 @@ test("à l'arrivée sur le site, refuser est aussi simple qu'accepter", async ({
   await expect(banner(page)).toBeHidden();
 });
 
-test("personnaliser, puis changer d'avis sur la politique de cookies", async ({
+test("personnaliser sur la politique de cookies, puis changer d'avis", async ({
   page,
 }) => {
   await page.goto("/connexion");
-  await banner(page).locator("summary", { hasText: "Personnaliser" }).click();
-  const audience = banner(page).getByRole("checkbox", {
-    name: /Mesure d'audience/,
-  });
+  await banner(page).getByRole("link", { name: "Personnaliser" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Politique de cookies" }),
+  ).toBeVisible();
+  await expect(banner(page)).toBeVisible();
+  const audience = page.getByRole("checkbox", { name: /Mesure d'audience/ });
   await expect(audience).not.toBeChecked();
   await expect(
-    banner(page).getByRole("checkbox", { name: /Marketing/ }),
+    page.getByRole("checkbox", { name: /Marketing/ }),
   ).not.toBeChecked();
   await audience.check();
-  await banner(page)
-    .getByRole("button", { name: "Enregistrer mes choix" })
-    .click();
+  await page.getByRole("button", { name: "Enregistrer mes choix" }).click();
   await expect(banner(page)).toBeHidden();
   expect(await consentCookie(page)).toMatch(/^v1\.10\./);
 
@@ -90,6 +90,6 @@ test("un choix de plus de six mois est redemandé", async ({
     ]);
   await page.goto("/en");
   await expect(
-    page.getByRole("region", { name: "Your cookies, your choice" }),
+    page.getByRole("region", { name: "Cookies", exact: true }),
   ).toBeVisible();
 });

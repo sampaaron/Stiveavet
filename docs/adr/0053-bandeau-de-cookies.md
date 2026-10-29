@@ -10,11 +10,12 @@ Stivea Vet ne dépose aujourd'hui que des cookies nécessaires : session, appare
 ## Décision
 
 1. **Un bandeau à la première visite**, sur toutes les pages (site, connexion, espace cabinet). Il revient au bout de six mois, durée de validité recommandée par la CNIL.
-   - Il propose « Tout refuser » et « Tout accepter », de même forme et de même poids, ainsi que « Personnaliser ».
+   - C'est une petite carte en bas à gauche, voulue sobre par Aaron : une phrase, « Refuser » et « Accepter » côte à côte, de même forme et de même poids, et un lien « Personnaliser ».
+   - « Personnaliser » mène à la politique de cookies, où se trouve le détail des finalités : le bandeau reste court.
    - Il ne bloque pas la page : sans réponse, seuls les cookies nécessaires sont déposés.
    - Il garde les couleurs du site (nuit verte) quel que soit le mode d'affichage.
 2. **Deux finalités facultatives, refusées par défaut** : mesure d'audience et marketing.
-   - Le bandeau dit honnêtement qu'aucun outil n'y est branché aujourd'hui : rien n'est déposé, même avec un accord.
+   - La politique de cookies dit honnêtement qu'aucun outil n'y est branché aujourd'hui : rien n'est déposé, même avec un accord.
    - Les finalités sont listées à un seul endroit (`src/domains/consentement/cookies.ts`).
    - Changer cette liste demande un nouveau choix : `CONSENT_VERSION` augmente et le bandeau revient pour tous.
 3. **Le choix reste dans le navigateur** : cookie `sv_consent` (`__Host-` en HTTPS), httpOnly, six mois.

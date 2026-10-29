@@ -10,13 +10,13 @@ import type { Locale } from "./locales";
 type ConsentText = {
   banner: {
     label: string;
-    title: string;
     body: string;
+    refuse: string;
+    accept: string;
     acceptAll: string;
     refuseAll: string;
     customize: string;
     save: string;
-    learnMore: string;
   };
   purposes: Record<
     "necessary" | OptionalPurpose,
@@ -41,13 +41,13 @@ type ConsentText = {
 const fr: ConsentText = {
   banner: {
     label: "Cookies",
-    title: "Vos cookies, votre choix",
-    body: "Stivea Vet n'utilise que les cookies nécessaires au site : connexion, langue et mode d'affichage. Les autres, refusés par défaut, ne seraient déposés qu'avec votre accord.",
+    body: "Nous n'utilisons que les cookies nécessaires au site. Les autres restent refusés, sauf si vous les acceptez.",
+    refuse: "Refuser",
+    accept: "Accepter",
     acceptAll: "Tout accepter",
     refuseAll: "Tout refuser",
     customize: "Personnaliser",
     save: "Enregistrer mes choix",
-    learnMore: "Politique de cookies",
   },
   purposes: {
     necessary: {
@@ -103,13 +103,13 @@ const fr: ConsentText = {
 const en: ConsentText = {
   banner: {
     label: "Cookies",
-    title: "Your cookies, your choice",
-    body: "Stivea Vet only uses the cookies the site needs: sign-in, language and display mode. Any others are refused by default and would only be set with your consent.",
+    body: "We only use the cookies the site needs. Any others stay refused unless you accept them.",
+    refuse: "Refuse",
+    accept: "Accept",
     acceptAll: "Accept all",
     refuseAll: "Refuse all",
     customize: "Customise",
     save: "Save my choices",
-    learnMore: "Cookie policy",
   },
   purposes: {
     necessary: {
