@@ -14,6 +14,20 @@ describe("buildContentSecurityPolicy", () => {
     expect(csp).not.toMatch(/https?:\/\//);
   });
 
+  it("ne force le https des ressources qu'hors du mode local", () => {
+    const local = buildContentSecurityPolicy("abc123", false, {
+      localHttp: true,
+    });
+
+    expect(local).not.toContain("upgrade-insecure-requests");
+    expect(local).toContain(
+      "script-src 'self' 'nonce-abc123' 'strict-dynamic'",
+    );
+    expect(buildContentSecurityPolicy("abc123", false)).toContain(
+      "upgrade-insecure-requests",
+    );
+  });
+
   it("n'accepte jamais unsafe-eval ni unsafe-inline pour les scripts et les balises style", () => {
     const directives = parseDirectives(
       buildContentSecurityPolicy("abc123", false),

@@ -6,6 +6,9 @@
  * En développement seulement : `'unsafe-eval'` (traces d'erreur de React) et des styles en ligne
  * sans nonce, pour que la fenêtre d'erreurs de Next.js s'affiche mise en forme au lieu de
  * s'empiler sous la page.
+ * `localHttp` (mode local seulement) : sans `upgrade-insecure-requests`, pour ouvrir le site du
+ * poste depuis un téléphone du même réseau en http://<adresse>:<port>. Sinon le navigateur
+ * réclame feuilles de style et scripts en https et la page s'affiche sans mise en forme.
  */
 const META_SIGNUP_HOSTS = {
   script: ["https://connect.facebook.net"],
@@ -25,7 +28,7 @@ const META_SIGNUP_HOSTS = {
 export function buildContentSecurityPolicy(
   nonce: string,
   isDev: boolean,
-  options: { metaSignup?: boolean } = {},
+  options: { metaSignup?: boolean; localHttp?: boolean } = {},
 ): string {
   const meta = options.metaSignup === true;
   const directives: Record<string, string[]> = {
@@ -59,7 +62,9 @@ export function buildContentSecurityPolicy(
   const policy = Object.entries(directives)
     .map(([name, values]) => `${name} ${values.join(" ")}`)
     .join("; ");
-  return isDev ? policy : `${policy}; upgrade-insecure-requests`;
+  return isDev || options.localHttp === true
+    ? policy
+    : `${policy}; upgrade-insecure-requests`;
 }
 
 /** Nonce aléatoire et imprévisible, régénéré à chaque requête. */
