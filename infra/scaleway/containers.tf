@@ -18,6 +18,9 @@ locals {
     SCW_QUEUE_ACCESS_KEY = scaleway_mnq_sqs_credentials.app.access_key
     SCW_QUEUE_SECRET_KEY = scaleway_mnq_sqs_credentials.app.secret_key
   })
+  # Le rôle du worker (ADR 0054) ne va qu'au worker ; l'application web n'en a pas besoin.
+  app_secrets    = { for name, value in local.secrets : name => value if name != "WORKER_DATABASE_URL" }
+  worker_secrets = { for name, value in local.secrets : name => value if name != "DATABASE_URL" }
 }
 
 resource "scaleway_container_namespace" "main" {
@@ -39,7 +42,7 @@ resource "scaleway_container" "app" {
   deploy                       = true
   private_network_id           = scaleway_vpc_private_network.main.id
   environment_variables        = local.environment
-  secret_environment_variables = local.secrets
+  secret_environment_variables = local.app_secrets
 
   health_check {
     http {
@@ -68,5 +71,5 @@ resource "scaleway_container" "worker" {
   deploy                       = true
   private_network_id           = scaleway_vpc_private_network.main.id
   environment_variables        = local.environment
-  secret_environment_variables = local.secrets
+  secret_environment_variables = local.worker_secrets
 }

@@ -1,5 +1,5 @@
 # Environnement local Stivea Vet : données fictives uniquement, aucun service externe.
-# Usage : cp .env.example .env (puis renseigner les trois mots de passe), puis
+# Usage : cp .env.example .env (puis renseigner les quatre mots de passe), puis
 #         docker compose -f docker/compose.yaml --env-file .env up --build
 #         pnpm db:migrate && pnpm db:seed   (depuis la machine hôte)
 name: stivea-vet
@@ -16,6 +16,8 @@ services:
       APP_URL: http://localhost:3000
       # Rôle applicatif : ni propriétaire du schéma, ni BYPASSRLS (voir docs/adr/0006).
       DATABASE_URL: postgres://stivea_app:${STIVEA_APP_PASSWORD:?Renseigner STIVEA_APP_PASSWORD dans .env}@db:5432/stivea
+      # Rôle du worker, pour les passages lancés par le simulateur du propriétaire (ADR 0054).
+      WORKER_DATABASE_URL: postgres://stivea_worker:${STIVEA_WORKER_PASSWORD:?Renseigner STIVEA_WORKER_PASSWORD dans .env}@db:5432/stivea
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       # Stockage objet local (photos, vocaux, captures), partagé avec le worker (ADR 0019).
@@ -44,7 +46,8 @@ services:
       target: worker
     environment:
       APP_ENV: local
-      DATABASE_URL: postgres://stivea_app:${STIVEA_APP_PASSWORD:?Renseigner STIVEA_APP_PASSWORD dans .env}@db:5432/stivea
+      # Rôle du worker : seul à prendre les tâches et à purger (ADR 0054).
+      WORKER_DATABASE_URL: postgres://stivea_worker:${STIVEA_WORKER_PASSWORD:?Renseigner STIVEA_WORKER_PASSWORD dans .env}@db:5432/stivea
       OBJECT_STORAGE_DIR: /data/objets
       # E-mails de service envoyés par le worker (offre d'engagement annuel, ADR 0023).
       APP_URL: http://localhost:3000
@@ -81,7 +84,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # Crée les rôles stivea_migrator / stivea_app et la base (idempotent), puis s'arrête.
+  # Crée les rôles stivea_migrator / stivea_app / stivea_worker et la base (idempotent), puis s'arrête.
   db-roles:
     image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
     depends_on:
@@ -93,6 +96,7 @@ services:
       PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Renseigner POSTGRES_ADMIN_PASSWORD dans .env}
       MIGRATOR_PASSWORD: ${STIVEA_MIGRATOR_PASSWORD:?Renseigner STIVEA_MIGRATOR_PASSWORD dans .env}
       APP_PASSWORD: ${STIVEA_APP_PASSWORD:?Renseigner STIVEA_APP_PASSWORD dans .env}
+      WORKER_PASSWORD: ${STIVEA_WORKER_PASSWORD:?Renseigner STIVEA_WORKER_PASSWORD dans .env}
     volumes:
       - ../db/bootstrap:/bootstrap:ro
     command:
@@ -100,7 +104,7 @@ services:
       - -c
       - >-
         psql -v migrator_password="$$MIGRATOR_PASSWORD" -v app_password="$$APP_PASSWORD"
-        -v database=stivea -f /bootstrap/roles.sql
+        -v worker_password="$$WORKER_PASSWORD" -v database=stivea -f /bootstrap/roles.sql
     restart: "no"
 
   # Capture tous les e-mails (codes de sécurité, factures…) : rien ne sort de la machine.

@@ -18,8 +18,9 @@ describe("stockage objet local", () => {
     await storage.putObject(key, object);
     expect(await storage.getObject(key)).toEqual(object);
     expect(await storage.hasObject(key)).toBe(true);
-    // Fichier lisible par le seul processus.
-    expect((await stat(join(root, key))).mode & 0o077).toBe(0);
+    // Fichier lisible par le seul processus (droits POSIX, sans équivalent sous Windows).
+    if (process.platform !== "win32")
+      expect((await stat(join(root, key))).mode & 0o077).toBe(0);
     await expect(storage.putObject(key, object)).rejects.toThrow();
     await storage.deleteObject(key);
     expect(await storage.getObject(key)).toBeNull();

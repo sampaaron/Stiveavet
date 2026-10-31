@@ -19,7 +19,7 @@ import { WEEKDAYS } from "@/domains/reglages/content";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 
-import { asApp, errorCode, pools } from "./support/db";
+import { asApp, errorCode, pools, workerDatabase } from "./support/db";
 import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
@@ -29,6 +29,7 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -52,7 +53,7 @@ const protocols = protocolsService(appDb);
 const whatsapp = recordingWhatsApp();
 const { sent } = whatsapp;
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-rendez-vous",
   organizationId: () => org,
   whatsapp,

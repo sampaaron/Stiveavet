@@ -19,8 +19,8 @@ L'audit de sécurité du 23 octobre 2026 n'a trouvé aucun point critique ni él
 
 ## Différé
 
-- **Inscription en attente (F7).** Une inscription non confirmée réserve encore l'adresse d'un tiers jusqu'au code. La corriger demande un compte « en attente » activé au premier code et purgé après 24 heures, ce qui touche l'inscription, les invitations, la connexion et la conservation : chantier à part, à décider avant le premier vrai cabinet.
-- **Changement d'offre** (facturation) : il compte les places sans prendre `lockSeats` ; à aligner dans ce domaine.
+- **Inscription en attente (F7).** Réglé par l'ADR 0054 : une inscription attend son code sans rien créer.
+- **Changement d'offre** (facturation) : il compte désormais les places sous `lockSeats`.
 
 ## Conséquences
 

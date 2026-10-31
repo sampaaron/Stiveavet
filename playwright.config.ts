@@ -10,9 +10,9 @@ const port = Number(process.env.E2E_PORT ?? 3100);
 const baseURL = `http://localhost:${port}`;
 
 /** Base préparée par tests/e2e/prepare-database.mts (voir `pnpm test:e2e`). */
-function e2eDatabaseUrl(): string {
+function e2eDatabaseUrl(name: "DATABASE_URL" | "WORKER_DATABASE_URL"): string {
   try {
-    return parseEnv(readFileSync(".env.e2e", "utf8")).DATABASE_URL ?? "";
+    return parseEnv(readFileSync(".env.e2e", "utf8"))[name] ?? "";
   } catch {
     return "";
   }
@@ -60,7 +60,9 @@ export default defineConfig({
     env: {
       APP_ENV: "local",
       APP_URL: baseURL,
-      DATABASE_URL: e2eDatabaseUrl(),
+      DATABASE_URL: e2eDatabaseUrl("DATABASE_URL"),
+      // Passages du worker lancés par le simulateur du propriétaire (ADR 0054).
+      WORKER_DATABASE_URL: e2eDatabaseUrl("WORKER_DATABASE_URL"),
       SMTP_HOST: process.env.E2E_SMTP_HOST ?? "localhost",
       SMTP_PORT: process.env.E2E_SMTP_PORT ?? "1025",
       // Photos, vocaux et captures des tests : hors du dépôt, jamais versionnés.

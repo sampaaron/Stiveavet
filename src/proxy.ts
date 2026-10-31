@@ -18,6 +18,8 @@ export function proxy(request: NextRequest) {
       metaSignup:
         process.env.WHATSAPP_PROVIDER === "cloud_api" &&
         META_SIGNUP_PAGES.test(request.nextUrl.pathname),
+      // Hors local, APP_URL est en https (src/server/env.ts) : la montée en https reste.
+      localHttp: process.env.APP_ENV === "local",
     },
   );
 

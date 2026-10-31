@@ -24,7 +24,7 @@ import { launchService } from "@/domains/suivis/lancement";
 import { followupEndHandlers } from "@/domains/suivis/rappels";
 import { MemoryEmailSender } from "@/adapters/email/memory";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
@@ -33,6 +33,7 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -88,7 +89,7 @@ const tag = org.slice(0, 8);
 let ids: { admin: string; vet: string; assistant: string };
 
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-fichiers",
   organizationId: () => org,
   whatsapp,

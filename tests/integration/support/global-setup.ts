@@ -9,6 +9,7 @@ declare module "vitest" {
     adminUrl: string;
     migratorUrl: string;
     appUrl: string;
+    workerUrl: string;
   }
 }
 
@@ -24,6 +25,7 @@ export default async function setup(project: TestProject) {
   project.provide("adminUrl", urls.adminUrl);
   project.provide("migratorUrl", urls.migratorUrl);
   project.provide("appUrl", urls.appUrl);
+  project.provide("workerUrl", urls.workerUrl);
 
   return () => dropDatabase(adminRoot, database);
 }

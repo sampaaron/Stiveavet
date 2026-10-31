@@ -47,6 +47,11 @@ variable "secrets" {
     condition     = !contains(keys(var.secrets), "MIGRATOR_DATABASE_URL")
     error_message = "MIGRATOR_DATABASE_URL ne va jamais dans les conteneurs : voir la procédure de migration du README."
   }
+  # Deux rôles de base distincts (ADR 0054) : l'application web et le worker.
+  validation {
+    condition     = alltrue([for name in ["DATABASE_URL", "WORKER_DATABASE_URL"] : contains(keys(var.secrets), name)])
+    error_message = "DATABASE_URL (stivea_app) et WORKER_DATABASE_URL (stivea_worker) sont obligatoires : voir le README."
+  }
   # Clé HMAC des empreintes d'IP et d'e-mail : l'application refuse de démarrer sans elle.
   validation {
     condition     = length(lookup(var.secrets, "FINGERPRINT_SECRET", "")) >= 32

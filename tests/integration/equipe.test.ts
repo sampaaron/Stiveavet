@@ -499,11 +499,12 @@ describe("équipe et droits", () => {
         /(http\S+jeton=[\w-]+)/.exec(mailbox.lastTo(later)?.text ?? "")?.[1] ??
           "http://x",
       ).searchParams.get("jeton") ?? undefined;
-    const registered = await authService({
+    const auth = authService({
       db: appDb,
       email: mailbox,
       appUrl: "http://localhost",
-    }).register(
+    });
+    const registered = await auth.register(
       {
         organizationName: "Autre cabinet",
         displayName: "Dr Ailleurs",
@@ -515,7 +516,20 @@ describe("équipe et droits", () => {
       },
       { ip: null, userAgent: null },
     );
-    expect(registered.status).toBe("code_required");
+    if (registered.status !== "code_required") throw new Error("inscription");
+    // L'inscription ne prend l'adresse qu'une fois son code saisi (ADR 0054).
+    expect((await previewInvitation(appDb, token))?.emailRegistered).toBe(
+      false,
+    );
+    const code = /\b(\d{6})\b/.exec(mailbox.lastTo(later)?.subject ?? "")?.[1];
+    expect(
+      (
+        await auth.verifyCode(
+          { challengeToken: registered.challengeToken, code: code ?? "" },
+          { ip: null, userAgent: null },
+        )
+      ).status,
+    ).toBe("signed_in");
     expect((await previewInvitation(appDb, token))?.emailRegistered).toBe(true);
     expect(
       await acceptInvitation(appDb, {

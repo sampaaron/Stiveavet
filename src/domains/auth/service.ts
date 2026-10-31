@@ -49,6 +49,7 @@ import type {
   AccountSession,
   MemberRole,
   Passkey,
+  PendingSignup,
   ResolvedSession,
   TrustedDevice,
 } from "./repository";
@@ -175,6 +176,120 @@ export function authService({
       sessionToken,
       sessionExpiresAt: new Date(Date.now() + lifetimeMinutes * 60_000),
     };
+  }
+
+  /**
+   * Cabinet et vétérinaire administrateur d'une inscription confirmée par son code. `null` si
+   * l'adresse a pris un compte entre-temps : la personne est alors prévenue par e-mail.
+   */
+  async function createCabinet(signup: PendingSignup) {
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+    const membershipId = randomUUID();
+    try {
+      await withTenant(db, { organizationId, userId }, async (tx) => {
+        await tx.insert(organizations).values({
+          id: organizationId,
+          name: signup.organizationName,
+        });
+        await tx.insert(users).values({
+          id: userId,
+          email: signup.email,
+          displayName: signup.displayName,
+          uiLocale: signup.uiLocale,
+        });
+        await tx.insert(memberships).values({
+          id: membershipId,
+          organizationId,
+          userId,
+          role: "admin_vet",
+        });
+        await tx.execute(
+          sql`SELECT auth.set_initial_password(${userId}, ${signup.passwordHash})`,
+        );
+        // Formule choisie, sans engagement possible les 2 premiers mois (ADR 0031).
+        await startSubscription(tx, organizationId, signup.plan);
+        await tx.insert(auditEvents).values([
+          {
+            organizationId,
+            actorMembershipId: membershipId,
+            action: "organization.created",
+            targetType: "organization",
+            targetId: organizationId,
+            // Conditions acceptées et pouvoir de souscrire confirmé, exigés à l'inscription.
+            metadata: {
+              termsVersion: signup.termsVersion,
+              termsAccepted: true,
+              authorityConfirmed: true,
+            },
+          },
+          {
+            organizationId,
+            actorMembershipId: membershipId,
+            action: "membership.created",
+            targetType: "membership",
+            targetId: membershipId,
+            metadata: { role: "admin_vet", source: "signup" },
+          },
+        ]);
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      await email.send(
+        existingAccountEmail(
+          signup.email,
+          new URL("/connexion", appUrl).toString(),
+        ),
+      );
+      return null;
+    }
+    return { organizationId, userId, membershipId };
+  }
+
+  /** Session et appareil de confiance après un code valide. */
+  async function signInWithCode(
+    userId: string,
+    membershipId: string,
+    origin: RequestOrigin,
+  ): Promise<SignedIn> {
+    const signedIn = await openSession(userId, membershipId, origin);
+    const deviceToken = createToken();
+    await repo.trustDevice(
+      tokenHash(deviceToken),
+      userId,
+      AUTH_POLICY.trustedDeviceDays,
+      deviceLabel(origin.userAgent),
+    );
+    return { ...signedIn, deviceToken };
+  }
+
+  /** Code d'une inscription en attente : le bon code crée le cabinet et ouvre la session. */
+  async function completeSignup(
+    hash: Buffer,
+    codeHash: Buffer,
+    origin: RequestOrigin,
+  ): Promise<CodeResult> {
+    const verified = await repo.verifyPendingSignup(
+      hash,
+      codeHash,
+      AUTH_POLICY.codeMaxAttempts,
+    );
+    if (verified.outcome !== "ok") return { status: verified.outcome };
+    const created = await createCabinet(verified.signup);
+    if (!created) return { status: "expired" };
+    const signedIn = await signInWithCode(
+      created.userId,
+      created.membershipId,
+      origin,
+    );
+    for (const kind of ["signup_completed", "login_succeeded"] as const)
+      await repo.recordLoginEvent({
+        kind,
+        userId: created.userId,
+        organizationId: created.organizationId,
+        ...eventOrigin(origin),
+      });
+    return signedIn;
   }
 
   /** Nouveau code, dans la limite par compte : `null` si elle est atteinte. */
@@ -342,11 +457,16 @@ export function authService({
       const code = input.code.replace(/\s/g, "");
       if (!/^\d{6}$/.test(code)) return { status: "invalid" };
 
+      const hash = tokenHash(input.challengeToken);
+      const codeHash = securityCodeHash(input.challengeToken, code);
       const { outcome, userId } = await repo.verifyLoginChallenge(
-        tokenHash(input.challengeToken),
-        securityCodeHash(input.challengeToken, code),
+        hash,
+        codeHash,
         AUTH_POLICY.codeMaxAttempts,
       );
+      // Jeton inconnu des connexions : c'est peut-être celui d'une inscription en attente.
+      if (outcome === "expired" && !userId)
+        return completeSignup(hash, codeHash, origin);
       if (outcome !== "ok" || !userId) {
         if (userId)
           await repo.recordLoginEvent({
@@ -359,17 +479,10 @@ export function authService({
 
       const [membership] = await repo.activeMemberships(userId);
       if (!membership) return { status: "expired" };
-      const signedIn = await openSession(
+      const signedIn = await signInWithCode(
         userId,
         membership.membershipId,
         origin,
-      );
-      const deviceToken = createToken();
-      await repo.trustDevice(
-        tokenHash(deviceToken),
-        userId,
-        AUTH_POLICY.trustedDeviceDays,
-        deviceLabel(origin.userAgent),
       );
       await repo.recordLoginEvent({
         kind: "login_succeeded",
@@ -377,7 +490,7 @@ export function authService({
         organizationId: membership.organizationId,
         ...eventOrigin(origin),
       });
-      return { ...signedIn, deviceToken };
+      return signedIn;
     },
 
     /** Session du jeton, après contrôle de l'inactivité (verrouillage à 40 min). */
@@ -924,9 +1037,10 @@ export function authService({
     },
 
     /**
-     * Création d'un cabinet et de son vétérinaire administrateur. L'adresse est prouvée par le
-     * code envoyé : aucune session n'est ouverte avant. Si l'adresse a déjà un compte, le
-     * parcours est identique à l'écran et la personne reçoit un e-mail l'en informant.
+     * Inscription d'un cabinet et de son vétérinaire administrateur. Elle attend son code
+     * (ADR 0054) : le cabinet n'est créé qu'au bon code, preuve de l'adresse. Si l'adresse a
+     * déjà un compte, le parcours est identique à l'écran et la personne reçoit un e-mail l'en
+     * informant.
      */
     async register(
       input: {
@@ -967,70 +1081,24 @@ export function authService({
       // Empreinte calculée dans tous les cas : même durée de réponse, compte existant ou non.
       const passwordHash = await hashPassword(input.password);
       if (await repo.emailRegistered(address)) return decoy();
-
-      const organizationId = randomUUID();
-      const userId = randomUUID();
-      const membershipId = randomUUID();
-      try {
-        await withTenant(db, { organizationId, userId }, async (tx) => {
-          await tx.insert(organizations).values({
-            id: organizationId,
-            name: input.organizationName.trim(),
-          });
-          await tx.insert(users).values({
-            id: userId,
-            email: address,
-            displayName: input.displayName.trim(),
-            uiLocale: input.uiLocale ?? DEFAULT_LOCALE,
-          });
-          await tx.insert(memberships).values({
-            id: membershipId,
-            organizationId,
-            userId,
-            role: "admin_vet",
-          });
-          await tx.execute(
-            sql`SELECT auth.set_initial_password(${userId}, ${passwordHash})`,
-          );
-          // Formule choisie, sans engagement possible les 2 premiers mois (ADR 0031).
-          await startSubscription(tx, organizationId, input.plan);
-          await tx.insert(auditEvents).values([
-            {
-              organizationId,
-              actorMembershipId: membershipId,
-              action: "organization.created",
-              targetType: "organization",
-              targetId: organizationId,
-              metadata: {
-                termsVersion: TERMS_VERSION,
-                termsAccepted: input.acceptTerms,
-                authorityConfirmed: input.authorized,
-              },
-            },
-            {
-              organizationId,
-              actorMembershipId: membershipId,
-              action: "membership.created",
-              targetType: "membership",
-              targetId: membershipId,
-              metadata: { role: "admin_vet", source: "signup" },
-            },
-          ]);
-        });
-      } catch (error) {
-        // Inscription simultanée avec la même adresse : même réponse qu'un compte existant.
-        if (isUniqueViolation(error)) return decoy();
-        throw error;
-      }
-
-      const challengeToken = await sendSecurityCode(userId, address);
-      if (!challengeToken) return { status: "rate_limited" };
-      await repo.recordLoginEvent({
-        kind: "signup_completed",
-        userId,
-        organizationId,
-        ...eventOrigin(origin),
+      // Rien n'est créé avant le code (ADR 0054) : l'adresse d'un tiers n'est jamais réservée.
+      if (!(await allowed("securityCodesPerAccount", `signup:${address}`)))
+        return { status: "rate_limited" };
+      const challengeToken = createToken();
+      const code = createSecurityCode();
+      await repo.createPendingSignup({
+        hash: tokenHash(challengeToken),
+        codeHash: securityCodeHash(challengeToken, code),
+        email: address,
+        organizationName: input.organizationName.trim(),
+        displayName: input.displayName.trim(),
+        plan: input.plan,
+        passwordHash,
+        uiLocale: input.uiLocale ?? DEFAULT_LOCALE,
+        termsVersion: TERMS_VERSION,
+        lifetimeMinutes: AUTH_POLICY.codeMinutes,
       });
+      await email.send(securityCodeEmail(address, code));
       return { status: "code_required", challengeToken };
     },
   };

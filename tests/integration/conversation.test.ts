@@ -19,7 +19,7 @@ import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 import { simulatedProvider } from "@/domains/whatsapp/connexion";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import {
   conversationWorker,
   recordingWhatsApp,
@@ -27,6 +27,7 @@ import {
 } from "./support/whatsapp";
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -75,7 +76,7 @@ const ai: AiGateway = {
 };
 // Base partagée : les tâches laissées par les autres fichiers de test ne sont pas exécutées.
 const { conversation: handlers, worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-conversation",
   organizationId: () => org,
   whatsapp,
@@ -411,7 +412,7 @@ describe("travail hors transaction (ADR 0040)", () => {
     // Pendant l'appel, le bail expire et la tâche est rendue à la file (worker trop lent).
     const slow: string[] = [];
     const late = conversationWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "test-bail-perdu",
       organizationId: () => org,
       whatsapp: {

@@ -26,7 +26,7 @@ import {
 } from "@/domains/urgences/service";
 import { withTenant } from "@/server/db/tenant";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
@@ -35,6 +35,7 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -81,7 +82,7 @@ let ids: {
 
 // Base partagée : seules les tâches de ce cabinet sont exécutées ici.
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-urgences",
   organizationId: () => org,
   whatsapp,
@@ -975,7 +976,7 @@ describe("l'assistante prend d'abord les alertes « à surveiller » (ADR 0049)"
   });
 
   it("le planificateur n'inscrit le récapitulatif qu'une fois par créneau", async () => {
-    await planAlertRecaps(appDb);
-    expect(await planAlertRecaps(appDb)).toBe(0);
+    await planAlertRecaps(workerDb);
+    expect(await planAlertRecaps(workerDb)).toBe(0);
   });
 });

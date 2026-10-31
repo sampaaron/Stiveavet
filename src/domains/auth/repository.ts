@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
 
+import type { Plan } from "@/domains/facturation/rules";
+import type { Locale } from "@/i18n/locales";
 import { withSafeDbErrors } from "@/server/db/errors";
 import type { Database } from "@/server/db/tenant";
 
@@ -59,6 +61,17 @@ export type PasskeyCredential = {
 };
 
 export type WebAuthnPurpose = "register" | "unlock";
+
+/** Inscription confirmée par son code, prête à devenir un cabinet (ADR 0054). */
+export type PendingSignup = {
+  email: string;
+  organizationName: string;
+  displayName: string;
+  plan: Plan;
+  passwordHash: string;
+  uiLocale: Locale;
+  termsVersion: string;
+};
 
 /** Base ou transaction d'un cabinet : les fonctions `auth` s'appellent dans l'une ou l'autre. */
 type Executor = Pick<Database, "execute">;
@@ -189,6 +202,67 @@ export function authRepository(db: Executor) {
         outcome: row?.outcome ?? "expired",
         userId: row?.user_id ?? null,
       };
+    },
+
+    async createPendingSignup(signup: {
+      hash: Buffer;
+      codeHash: Buffer;
+      email: string;
+      organizationName: string;
+      displayName: string;
+      plan: Plan;
+      passwordHash: string;
+      uiLocale: Locale;
+      termsVersion: string;
+      lifetimeMinutes: number;
+    }) {
+      await db.execute(
+        sql`SELECT auth.create_pending_signup(${signup.hash}, ${signup.codeHash}, ${signup.email}, ${signup.organizationName}, ${signup.displayName}, ${signup.plan}::subscription_plan, ${signup.passwordHash}, ${signup.uiLocale}::language, ${signup.termsVersion}, ${minutes(signup.lifetimeMinutes)}::interval)`,
+      );
+    },
+
+    /** Inscription en attente du jeton : rendue et effacée seulement si le code est le bon. */
+    async verifyPendingSignup(
+      hash: Buffer,
+      codeHash: Buffer,
+      maxAttempts: number,
+    ) {
+      const [row] = await rows<{
+        outcome: "ok" | "invalid" | "expired";
+        email: string | null;
+        organization_name: string | null;
+        display_name: string | null;
+        plan: Plan | null;
+        password_hash: string | null;
+        ui_locale: Locale | null;
+        terms_version: string | null;
+      }>(
+        db,
+        sql`SELECT * FROM auth.verify_pending_signup(${hash}, ${codeHash}, ${maxAttempts})`,
+      );
+      if (
+        row?.outcome !== "ok" ||
+        !row.email ||
+        !row.organization_name ||
+        !row.display_name ||
+        !row.plan ||
+        !row.password_hash ||
+        !row.ui_locale ||
+        !row.terms_version
+      )
+        return {
+          outcome: row?.outcome === "invalid" ? "invalid" : "expired",
+        } as const;
+      const signup: PendingSignup = {
+        email: row.email,
+        organizationName: row.organization_name,
+        displayName: row.display_name,
+        plan: row.plan,
+        passwordHash: row.password_hash,
+        uiLocale: row.ui_locale,
+        termsVersion: row.terms_version,
+      };
+      return { outcome: "ok", signup } as const;
     },
 
     async trustDevice(

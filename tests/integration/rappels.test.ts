@@ -21,7 +21,7 @@ import {
 } from "@/domains/suivis/rappels";
 import { withTenant } from "@/server/db/tenant";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import {
   conversationWorker,
   recordingWhatsApp,
@@ -35,6 +35,7 @@ import {
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -61,7 +62,7 @@ const tag = org.slice(0, 8);
 let ids: { admin: string; vet: string };
 
 const { worker, handlers: allHandlers } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-rappels",
   organizationId: () => org,
   whatsapp,
@@ -157,6 +158,17 @@ async function jobsOf(followupId: string, kind: string): Promise<JobRow[]> {
     [followupId, kind],
   );
   return rows as JobRow[];
+}
+
+/**
+ * Rappels que « avancer » rend dus avec `next` : tous ceux prévus au même créneau. Le soir et le
+ * week-end, plusieurs étapes attendent souvent l'ouverture de la même plage d'envoi.
+ */
+async function releasedWith(next: JobRow) {
+  const until = Math.max(next.run_at.getTime(), Date.now()) + 1;
+  return (await jobsOf(plume, "followup.reminder")).filter(
+    (job) => job.status === "pending" && job.run_at.getTime() <= until,
+  );
 }
 
 async function currentSteps(followupId: string) {
@@ -283,14 +295,17 @@ describe("rappels planifiés", () => {
     const [first] = await jobsOf(plume, "followup.reminder");
     if (!first) throw new Error("aucun rappel");
     expect(first.status).toBe("pending");
+    const released = await releasedWith(first);
     const before = sent.length;
     await advance(plume);
-    expect(sent).toHaveLength(before + 1);
+    expect(sent).toHaveLength(before + released.length);
     const step = (await currentSteps(plume)).find(
       (candidate) => candidate.id === first.payload.stepId,
     );
     if (!step) throw new Error("étape");
-    const message = (await messagesOf(plume)).at(-1);
+    const message = (await messagesOf(plume)).find(
+      (candidate) => candidate.idempotency_key === `step:${step.id}`,
+    );
     expect(message).toMatchObject({
       author: "numa",
       idempotency_key: `step:${step.id}`,
@@ -314,22 +329,17 @@ describe("rappels planifiés", () => {
       payload: { stepId: step.id },
       idempotencyKey: `followup:${plume}:step:${step.id}`,
     });
-    expect(sent).toHaveLength(before + 1);
+    expect(sent).toHaveLength(before + released.length);
   });
 
   it("en pause, le rappel ne part pas, et ne repart pas à la reprise", async () => {
     const leo = await actor(ids.vet);
     await launches.changeStatus(leo, plume, "pause");
-    const next = (await jobsOf(plume, "followup.reminder")).find(
-      (job) => job.status === "pending",
-    );
+    const all = await jobsOf(plume, "followup.reminder");
+    const done = all.filter((job) => job.status !== "pending").length;
+    const next = all.find((job) => job.status === "pending");
     if (!next) throw new Error("aucun rappel à venir");
-    // « Avancer » rend dus tous les rappels prévus au même créneau que le prochain : le soir,
-    // plusieurs étapes attendent souvent l'ouverture de la même plage d'envoi.
-    const until = Math.max(next.run_at.getTime(), Date.now()) + 1;
-    const released = (await jobsOf(plume, "followup.reminder")).filter(
-      (job) => job.status === "pending" && job.run_at.getTime() <= until,
-    );
+    const released = await releasedWith(next);
     const before = sent.length;
     await advance(plume);
     expect(sent).toHaveLength(before);
@@ -347,9 +357,9 @@ describe("rappels planifiés", () => {
         ),
       ).toBe(false);
     }
-    // Le rappel déjà parti au test précédent, plus ceux passés pendant la pause.
+    // Les rappels déjà partis au test précédent, plus ceux passés pendant la pause.
     expect(jobs.filter((job) => job.status === "pending").length).toBe(
-      jobs.length - 1 - released.length,
+      jobs.length - done - released.length,
     );
   });
 
