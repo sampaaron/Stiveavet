@@ -13,6 +13,7 @@ import { onTenantCommitWake } from "./tenant";
 import type { Database } from "./tenant";
 
 let database: Database | undefined;
+let simulatorDatabase: Database | undefined;
 
 /**
  * Délais de la base pour l'application web : une requête trop longue, ou une transaction
@@ -60,4 +61,19 @@ export function appDatabase(): Database {
     });
   }
   return database;
+}
+
+/**
+ * Connexion du rôle stivea_worker pour le simulateur du propriétaire, en local seulement
+ * (ADR 0054) : l'application web n'a plus le droit de prendre les tâches de la file.
+ */
+export function simulatorWorkerDatabase(): Database {
+  if (!simulatorDatabase) {
+    const url = serverEnv().WORKER_DATABASE_URL;
+    if (!url) throw new Error("Configuration invalide : WORKER_DATABASE_URL");
+    simulatorDatabase = drizzle(new Pool({ connectionString: url, max: 2 }), {
+      schema,
+    });
+  }
+  return simulatorDatabase;
 }

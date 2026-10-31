@@ -10,7 +10,8 @@ import { parseConfig } from "@/server/config";
 const workerSchema = z
   .object({
     APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
-    DATABASE_URL: z.url(),
+    // Rôle stivea_worker (ADR 0054), jamais celui de l'application web.
+    WORKER_DATABASE_URL: z.url(),
     // Attente entre deux passages sans signal de réveil : bornée, jamais une boucle continue.
     WORKER_INTERVAL_MS: z.coerce
       .number()
@@ -40,7 +41,7 @@ export function workerConfig(
 ): WorkerConfig {
   const env = parseConfig(workerSchema, source);
   return {
-    databaseUrl: env.DATABASE_URL,
+    databaseUrl: env.WORKER_DATABASE_URL,
     intervalMs: env.WORKER_INTERVAL_MS,
     appUrl: env.APP_URL ?? "http://localhost:3000",
   };

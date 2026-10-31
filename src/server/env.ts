@@ -16,6 +16,8 @@ const serverEnvSchema = z
     APP_URL: z.url().default("http://localhost:3000"),
     // Obligatoire à partir du lot 3 (base de données).
     DATABASE_URL: z.url().optional(),
+    // Rôle du worker (ADR 0054), pour les passages du simulateur du propriétaire, en local.
+    WORKER_DATABASE_URL: z.url().optional(),
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
     // Clé des liens de lecture signés des fichiers (ADR 0019), 32 caractères au moins.

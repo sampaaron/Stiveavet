@@ -32,7 +32,7 @@ import {
 } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 
 /**
  * Stive, lot 29 (ADR 0034), sur les dossiers fictifs : il ne lit que ce que la personne peut
@@ -512,7 +512,7 @@ describe("Stive : confidentialité et conservation", () => {
     ).toBe(false);
 
     const purged = await withTenant(
-      appDb,
+      workerDatabase(),
       { organizationId: SEED.tilleuls },
       (tx) => tx.execute(sql`SELECT app.purge_stive_messages() AS removed`),
     );

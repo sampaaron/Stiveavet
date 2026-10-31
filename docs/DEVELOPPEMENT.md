@@ -76,10 +76,14 @@ Docker, le worker est un seul fichier compilé par `pnpm build:scripts` (ADR 004
 
 ## Base de données et migrations
 
-- **Trois rôles.**
+- **Quatre rôles.**
   - Le superutilisateur ne sert qu'à créer les rôles et les bases de test.
   - `stivea_migrator` possède le schéma et applique les migrations.
   - `stivea_app` est le rôle de l'application, soumis à la RLS.
+  - `stivea_worker` hérite de `stivea_app` et reçoit seul la file de tâches (`jobs.*`) et les
+    purges (ADR 0054). Le worker le lit dans `WORKER_DATABASE_URL`, comme le simulateur du
+    propriétaire en local. Une fonction réservée au worker se donne à `stivea_worker`, jamais à
+    `stivea_app`.
 - **Hors local, les migrations sont une tâche ponctuelle** (image `--target migrate`) : l'URL
   du migrateur n'entre jamais dans les conteneurs de l'application ni du worker (ADR 0041).
 - **Ajouter une migration.** Créez `db/migrations/00NN_nom.up.sql` et `.down.sql`, puis lancez
@@ -123,6 +127,8 @@ ALTER DATABASE stivea OWNER TO stivea_migrator;
 ALTER SCHEMA public OWNER TO stivea_migrator;
 REVOKE ALL ON DATABASE stivea FROM PUBLIC;
 GRANT CONNECT ON DATABASE stivea TO stivea_app;
+GRANT CONNECT ON DATABASE stivea TO stivea_worker;
+GRANT stivea_app TO stivea_worker;
 ```
 
 Pour vérifier :

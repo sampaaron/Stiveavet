@@ -25,15 +25,16 @@ import type { JobHandler, StagedJobHandler } from "@/domains/taches/worker";
 import * as schema from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
-import { errorCode, pools } from "./support/db";
+import { errorCode, pools, workerDatabase } from "./support/db";
 
 const { app, admin, appDb } = pools();
-// Second accès applicatif, pour deux workers réellement concurrents.
-const otherApp = new Pool({ connectionString: inject("appUrl"), max: 2 });
-const otherDb = drizzle(otherApp, { schema });
+const workerDb = workerDatabase();
+// Second accès du worker, pour deux workers réellement concurrents.
+const otherWorker = new Pool({ connectionString: inject("workerUrl"), max: 2 });
+const otherDb = drizzle(otherWorker, { schema });
 afterAll(async () => {
   await app.end();
-  await otherApp.end();
+  await otherWorker.end();
   await admin.end();
 });
 
@@ -183,7 +184,7 @@ describe("worker", () => {
     const { id } = await addJob("essai.ping");
     let seenOrganization: unknown;
     const worker = createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: {
         "essai.ping": async ({ tx }) => {
@@ -217,7 +218,7 @@ describe("worker", () => {
     );
     const unknown = await addJob("essai.inconnu");
     await createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: { "essai.ping": ok },
     }).runOnce();
@@ -232,7 +233,7 @@ describe("worker", () => {
   it("espace les tentatives (1 min, 5 min, 15 min, 1 h) puis met la tâche en échec", async () => {
     const { id } = await addJob("essai.panne");
     const worker = createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: {
         "essai.panne": async () => {
@@ -266,7 +267,7 @@ describe("worker", () => {
   it("n'enregistre qu'un code d'erreur, jamais le message d'une exception", async () => {
     const { id } = await addJob("essai.bug");
     await createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: {
         "essai.bug": async () => {
@@ -286,7 +287,7 @@ describe("worker", () => {
   it("annule les écritures d'une exécution qui échoue", async () => {
     const { id } = await addJob("essai.partiel");
     await createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: {
         "essai.partiel": async ({ tx }) => {
@@ -320,7 +321,7 @@ describe("worker", () => {
     const options = { handlers: { "essai.compte": handler }, batchSize: 3 };
 
     await Promise.all([
-      createWorker({ ...options, db: appDb, workerId: "essai-a" }).runOnce(),
+      createWorker({ ...options, db: workerDb, workerId: "essai-a" }).runOnce(),
       createWorker({ ...options, db: otherDb, workerId: "essai-b" }).runOnce(),
     ]);
 
@@ -331,7 +332,7 @@ describe("worker", () => {
   it("reprend une tâche dont le worker s'est arrêté, et l'ancien worker ne peut plus rien écrire", async () => {
     const { id } = await addJob("essai.long");
     // Le worker A prend la tâche puis « tombe » : rien n'est terminé.
-    const claimed = await appDb.execute(
+    const claimed = await workerDb.execute(
       sql`SELECT job_id, attempt FROM jobs.claim('essai-a', ARRAY['essai.long'], 10, 30)`,
     );
     expect(claimed.rows).toHaveLength(1);
@@ -342,7 +343,7 @@ describe("worker", () => {
 
     // Au passage suivant, la tâche est reprogrammée avec le motif « arrêt du worker ».
     await createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-b",
       handlers: { "essai.autre": ok },
     }).runOnce();
@@ -352,14 +353,14 @@ describe("worker", () => {
       last_error_code: "lease_expired",
     });
 
-    const late = await inOrg((tx) =>
+    const late = await withTenant(workerDb, { organizationId: org }, (tx) =>
       tx.execute(sql`SELECT jobs.complete(${id}, 'essai-a', 1) AS ok`),
     );
     expect(late.rows[0]).toEqual({ ok: false });
 
     await makeDue(id);
     await createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-b",
       handlers: { "essai.long": ok },
     }).runOnce();
@@ -382,7 +383,7 @@ describe("worker", () => {
     let crash = true;
     const { id } = await addJob("essai.envoi");
     const worker = createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: {
         "essai.envoi": async ({ job: claimed }) => {
@@ -447,7 +448,7 @@ describe("worker", () => {
     };
 
     const result = await createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: { "essai.deux_temps": staged },
       leaseSeconds: 120,
@@ -463,12 +464,21 @@ describe("worker", () => {
     expect(rows[0]).toEqual({ n: 3 });
   });
 
+  it("l'application web ne prend, ne clôt ni ne relance aucune tâche (ADR 0054)", async () => {
+    for (const query of [
+      "SELECT * FROM jobs.claim('essai-web', ARRAY['essai.ping'], 1, 30)",
+      "SELECT * FROM jobs.pending_outbox(10)",
+      `SELECT jobs.complete('${randomUUID()}', 'essai-web', 1)`,
+    ])
+      expect(await errorCode(app.query(query))).toBe("42501");
+  });
+
   it("refuse un identifiant de worker mal formé", async () => {
     expect(() =>
-      createWorker({ db: appDb, workerId: "Worker 1", handlers: {} }),
+      createWorker({ db: workerDb, workerId: "Worker 1", handlers: {} }),
     ).toThrow();
     const code = await errorCode(
-      app.query(
+      otherWorker.query(
         "SELECT * FROM jobs.claim('Worker 1', ARRAY['essai.ping'], 1, 30)",
       ),
     );
@@ -488,7 +498,7 @@ describe("outbox", () => {
       }),
     );
     const worker = createWorker({
-      db: appDb,
+      db: workerDb,
       workerId: "essai-a",
       handlers: {},
       routes: {
@@ -620,8 +630,8 @@ describe("tâches en échec", () => {
 
 describe("délais entre tentatives", () => {
   it("suivent le calendrier 1 min, 5 min, 15 min, 1 h, 3 h", async () => {
-    const { rows } = await app.query(
-      "SELECT array_agg(extract(epoch FROM jobs.retry_delay(n))::int ORDER BY n) AS s FROM generate_series(1, 7) n",
+    const { rows } = await workerDb.execute(
+      sql`SELECT array_agg(extract(epoch FROM jobs.retry_delay(n))::int ORDER BY n) AS s FROM generate_series(1, 7) n`,
     );
     expect(rows[0]).toEqual({ s: [60, 300, 900, 3600, 10800, 10800, 10800] });
   });

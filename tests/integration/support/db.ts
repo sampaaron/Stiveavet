@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import type { PoolClient } from "pg";
-import { inject } from "vitest";
+import { afterAll, inject } from "vitest";
 
 import * as schema from "@/server/db/schema";
 
@@ -71,6 +71,16 @@ export function pools() {
   return { app, admin, appDb: drizzle(app, { schema }) };
 }
 
+/**
+ * Connexion du rôle stivea_worker (ADR 0054), seul à prendre les tâches et à purger. Fermée à
+ * la fin du fichier de test qui l'ouvre.
+ */
+export function workerDatabase() {
+  const worker = new Pool({ connectionString: inject("workerUrl"), max: 1 });
+  afterAll(() => worker.end());
+  return drizzle(worker, { schema });
+}
+
 /** Exécute `run` en tant que stivea_app dans une transaction annulée à la fin, cabinet fixé. */
 export async function asApp<T>(
   pool: Pool,
@@ -100,5 +110,29 @@ export async function errorCode(
     return undefined;
   } catch (error) {
     return (error as { code?: string }).code;
+  }
+}
+
+/**
+ * Exécute `run` en tant que stivea_worker (ADR 0054), depuis la connexion superutilisateur,
+ * dans une transaction annulée à la fin, cabinet fixé.
+ */
+export async function asWorker<T>(
+  admin: Pool,
+  organizationId: string | null,
+  run: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await admin.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL ROLE stivea_worker");
+    if (organizationId)
+      await client.query("SELECT set_config('app.organization_id', $1, true)", [
+        organizationId,
+      ]);
+    return await run(client);
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
   }
 }

@@ -17,7 +17,7 @@ import { launchService } from "@/domains/suivis/lancement";
 import { users } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
@@ -28,6 +28,7 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -47,7 +48,7 @@ const protocols = protocolsService(appDb);
 const whatsapp = recordingWhatsApp();
 const { sent } = whatsapp;
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-langue",
   organizationId: () => org,
   whatsapp,

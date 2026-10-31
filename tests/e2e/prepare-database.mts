@@ -1,6 +1,6 @@
 /**
  * Base dédiée aux tests de bout en bout (`stivea_e2e`), recréée à chaque exécution.
- * Écrit l'URL du rôle applicatif dans .env.e2e, lu par playwright.config.ts.
+ * Écrit les URL des rôles de l'application et du worker dans .env.e2e, lu par playwright.config.ts.
  */
 import { writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -25,6 +25,10 @@ if (minutesToMidnight <= MARGIN_MINUTES) {
   await sleep(minutesToMidnight * 60_000 + 5_000);
 }
 
-const { appUrl } = await prepareDatabase(adminRoot, "stivea_e2e");
-await writeFile(".env.e2e", `DATABASE_URL=${appUrl}\n`, { mode: 0o600 });
+const { appUrl, workerUrl } = await prepareDatabase(adminRoot, "stivea_e2e");
+await writeFile(
+  ".env.e2e",
+  `DATABASE_URL=${appUrl}\nWORKER_DATABASE_URL=${workerUrl}\n`,
+  { mode: 0o600 },
+);
 console.warn("Base stivea_e2e prête.");

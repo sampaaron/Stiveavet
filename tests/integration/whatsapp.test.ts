@@ -33,7 +33,7 @@ import { parseSecretKeys, secretBox } from "@/server/crypto/secret-box";
 import { whatsappAccounts } from "@/server/db/schema";
 import { withTenant } from "@/server/db/tenant";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import { conversationWorker } from "./support/whatsapp";
 import { fictionalPng } from "../support/png";
 
@@ -44,6 +44,7 @@ import { fictionalPng } from "../support/png";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -104,7 +105,7 @@ const storage = createMemoryStorage();
 const provider = liveProvider({ fetch: meta.fetch, box });
 const downloads = mediaDownloadHandlers({ whatsapp: provider, storage });
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-whatsapp",
   organizationId: () => org,
   whatsapp: { provider },

@@ -17,6 +17,8 @@ export async function prepareDatabase(adminRoot: string, database: string) {
   const migratorPassword =
     process.env.STIVEA_MIGRATOR_PASSWORD || "migrator-test-only";
   const appPassword = process.env.STIVEA_APP_PASSWORD || "app-test-only";
+  const workerPassword =
+    process.env.STIVEA_WORKER_PASSWORD || "worker-test-only";
   const root = process.cwd();
 
   const admin = new Client({ connectionString: adminRoot });
@@ -35,6 +37,8 @@ export async function prepareDatabase(adminRoot: string, database: string) {
       "-v",
       `app_password=${appPassword}`,
       "-v",
+      `worker_password=${workerPassword}`,
+      "-v",
       `database=${database}`,
       "-f",
       path.join(root, "db/bootstrap/roles.sql"),
@@ -50,6 +54,12 @@ export async function prepareDatabase(adminRoot: string, database: string) {
     migratorPassword,
   );
   const appUrl = withDatabase(adminRoot, database, "stivea_app", appPassword);
+  const workerUrl = withDatabase(
+    adminRoot,
+    database,
+    "stivea_worker",
+    workerPassword,
+  );
 
   const migrator = new Client({ connectionString: migratorUrl });
   await migrator.connect();
@@ -63,7 +73,7 @@ export async function prepareDatabase(adminRoot: string, database: string) {
   await seedFictionalCabinets(drizzle(appPool, { schema }));
   await appPool.end();
 
-  return { adminUrl, migratorUrl, appUrl };
+  return { adminUrl, migratorUrl, appUrl, workerUrl };
 }
 
 export async function dropDatabase(adminRoot: string, database: string) {

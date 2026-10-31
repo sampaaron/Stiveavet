@@ -22,8 +22,10 @@ tant qu'Aaron n'a pas donné son feu vert (plan de la phase 3, partie B).
 3. Copier `staging.tfvars.example` vers `staging.tfvars`, fournir `TF_VAR_secrets`, puis
    `terraform init`, `terraform plan -var-file=staging.tfvars` : relire le plan avant
    tout `apply`.
-4. Créer les rôles `stivea_migrator` et `stivea_app` avec `db/bootstrap/roles.sql`, depuis le
-   réseau privé. Seul `DATABASE_URL` (rôle `stivea_app`) va dans `TF_VAR_secrets`.
+4. Créer les rôles `stivea_migrator`, `stivea_app` et `stivea_worker` avec
+   `db/bootstrap/roles.sql`, depuis le réseau privé. Seuls `DATABASE_URL` (rôle `stivea_app`,
+   donné à l'application) et `WORKER_DATABASE_URL` (rôle `stivea_worker`, donné au seul worker,
+   ADR 0054) vont dans `TF_VAR_secrets`.
 5. Poser les enregistrements DNS donnés par `terraform output email_dns_records`.
 
 ## Migrations : tâche ponctuelle, hors des conteneurs (ADR 0041)
@@ -39,7 +41,7 @@ donnée aux conteneurs `app` et `worker`. Terraform refuse `MIGRATOR_DATABASE_UR
    `docker run --rm -e MIGRATOR_DATABASE_URL rg.fr-par.scw.cloud/stivea-staging/migrate:<commit>`.
 3. Une fois les migrations appliquées, on déploie `app` puis `worker` (`terraform apply`).
 
-Secrets attendus dans `TF_VAR_secrets` : `DATABASE_URL`, `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`,
+Secrets attendus dans `TF_VAR_secrets` : `DATABASE_URL`, `WORKER_DATABASE_URL`, `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`,
 `SCW_DEFAULT_PROJECT_ID`, `SECRETS_ENCRYPTION_KEYS`, `FILE_LINK_SECRET`, `META_APP_ID`,
 `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`,
 `AI_API_KEY`, `AI_BASE_URL`, `AI_TEXT_MODEL`, `AI_VISION_MODEL`, `AI_TRANSCRIPTION_MODEL`,

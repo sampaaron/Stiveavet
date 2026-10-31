@@ -21,7 +21,7 @@ import { enqueue } from "@/domains/taches/queue";
 import { createWorker } from "@/domains/taches/worker";
 import { withTenant } from "@/server/db/tenant";
 
-import { asApp, pools } from "./support/db";
+import { asApp, asWorker, pools, workerDatabase } from "./support/db";
 import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
@@ -31,6 +31,7 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -59,7 +60,7 @@ const tag = org.slice(0, 8);
 let vetId: string;
 
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-conservation",
   organizationId: () => org,
   whatsapp: recordingWhatsApp(),
@@ -302,15 +303,30 @@ describe("l'application ne peut rien effacer hors de l'échéance", () => {
     ).toBe("42501");
   });
 
+  it("seul le worker efface (ADR 0054)", async () => {
+    for (const purge of [
+      "SELECT app.purge_followup($1)",
+      "SELECT app.purge_past_appointments()",
+      "SELECT jobs.plan_retention_sweeps()",
+    ])
+      expect(
+        await sqlState(
+          asApp(app, org, (client) =>
+            client.query(purge, purge.includes("$1") ? [plume] : []),
+          ),
+        ),
+      ).toBe("42501");
+  });
+
   it("l'effacement exige un cabinet et ne touche jamais un autre cabinet", async () => {
     expect(
       await sqlState(
-        asApp(app, null, (client) =>
+        asWorker(admin, null, (client) =>
           client.query("SELECT app.purge_followup($1)", [plume]),
         ),
       ),
     ).toBe("42501");
-    const crossed = await asApp(app, SEED.tilleuls, async (client) => {
+    const crossed = await asWorker(admin, SEED.tilleuls, async (client) => {
       const { rows } = await client.query(
         "SELECT app.purge_followup($1) AS purged",
         [plume],
@@ -321,7 +337,7 @@ describe("l'application ne peut rien effacer hors de l'échéance", () => {
   });
 
   it("un suivi pas encore dû n'est pas effacé", async () => {
-    const purged = await asApp(app, org, async (client) => {
+    const purged = await asWorker(admin, org, async (client) => {
       const { rows } = await client.query(
         "SELECT app.purge_followup($1) AS purged",
         [tango],
@@ -333,7 +349,7 @@ describe("l'application ne peut rien effacer hors de l'échéance", () => {
   });
 
   it("une seule planification par jour, une tâche par cabinet", async () => {
-    await asApp(app, null, async (client) => {
+    await asWorker(admin, null, async (client) => {
       const first = await client.query(
         "SELECT jobs.plan_retention_sweeps() AS planned",
       );
@@ -458,7 +474,7 @@ describe("conservation renforcée (ADR 0038)", () => {
   if (!sweepHandler) throw new Error("balayage attendu");
   /** Worker qui ne fait que balayer : l'effacement qu'il programme attend. */
   const sweepOnly = createWorker({
-    db: appDb,
+    db: workerDb,
     workerId: "test-balayage-seul",
     handlers: {
       [SWEEP_KIND]: async (context) => {
@@ -650,7 +666,7 @@ describe("conservation renforcée (ADR 0038)", () => {
         [`ip-${tag}`],
       );
       await client.query("DELETE FROM jobs.daily_runs");
-      await client.query("SET LOCAL ROLE stivea_app");
+      await client.query("SET LOCAL ROLE stivea_worker");
       await client.query("SELECT jobs.plan_retention_sweeps()");
       await client.query("RESET ROLE");
 

@@ -57,7 +57,7 @@ import {
 } from "@/domains/whatsapp/connexion";
 import type { JobsService } from "@/domains/taches/service";
 import type { FollowupsService } from "@/domains/suivis/service";
-import { appDatabase } from "@/server/db/client";
+import { appDatabase, simulatorWorkerDatabase } from "@/server/db/client";
 import { serverEnv } from "@/server/env";
 
 let team: TeamService | undefined;
@@ -256,7 +256,7 @@ export const services = {
       appUrl: serverEnv().APP_URL,
     });
     simulatorWorker ??= createWorker({
-      db: appDatabase(),
+      db: simulatorWorkerDatabase(),
       workerId: "app-simulateur",
       handlers: registry.handlers,
       deadHandlers: registry.dead,

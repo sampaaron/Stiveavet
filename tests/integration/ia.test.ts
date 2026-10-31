@@ -15,7 +15,7 @@ import { protocolsService } from "@/domains/protocoles/service";
 import { settingsService } from "@/domains/reglages/service";
 import { launchService } from "@/domains/suivis/lancement";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
 
 /**
@@ -25,6 +25,7 @@ import { conversationWorker, recordingWhatsApp } from "./support/whatsapp";
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -51,7 +52,7 @@ const settings = settingsService({
 const protocols = protocolsService(appDb);
 const whatsapp = recordingWhatsApp();
 const { worker } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-ia",
   organizationId: () => org,
   whatsapp,

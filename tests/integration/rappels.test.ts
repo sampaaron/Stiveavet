@@ -21,7 +21,7 @@ import {
 } from "@/domains/suivis/rappels";
 import { withTenant } from "@/server/db/tenant";
 
-import { pools } from "./support/db";
+import { pools, workerDatabase } from "./support/db";
 import {
   conversationWorker,
   recordingWhatsApp,
@@ -35,6 +35,7 @@ import {
  */
 
 const { app, admin, appDb } = pools();
+const workerDb = workerDatabase();
 afterAll(async () => {
   await app.end();
   await admin.end();
@@ -61,7 +62,7 @@ const tag = org.slice(0, 8);
 let ids: { admin: string; vet: string };
 
 const { worker, handlers: allHandlers } = conversationWorker({
-  db: appDb,
+  db: workerDb,
   workerId: "test-rappels",
   organizationId: () => org,
   whatsapp,
