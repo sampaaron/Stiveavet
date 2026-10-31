@@ -1,0 +1,2 @@
+# Fins de ligne LF partout, y compris sur Windows : Prettier et les tests comparent des fichiers LF.
+* text=auto eol=lf

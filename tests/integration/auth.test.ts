@@ -237,9 +237,9 @@ describe("connexion", () => {
       statuses.push(
         (await service.login({ email, password: STRONG }, origin)).status,
       );
-    // L'inscription a déjà envoyé un code : 5 de plus, puis plus aucun dans l'heure.
-    expect(statuses.slice(0, 5).every((s) => s === "code_required")).toBe(true);
-    expect(statuses.slice(5)).toEqual(["rate_limited", "rate_limited"]);
+    // Le code de l'inscription se compte à part, sur l'adresse : 6 codes, puis plus aucun dans l'heure.
+    expect(statuses.slice(0, 6).every((s) => s === "code_required")).toBe(true);
+    expect(statuses.slice(6)).toEqual(["rate_limited"]);
   });
 
   it("limite les tentatives par adresse IP quand elle est connue", async () => {
@@ -826,6 +826,113 @@ describe("inscription", () => {
     ).toBe("expired");
   });
 
+  it("une inscription non confirmée ne crée rien et ne réserve pas l'adresse d'un tiers", async () => {
+    const email = `cible-${randomUUID().slice(0, 8)}@essai.test`;
+    const signup = (organizationName: string) =>
+      service.register(
+        {
+          organizationName,
+          displayName: "Dr Essai Test",
+          email,
+          plan: "pro",
+          acceptTerms: true,
+          authorized: true,
+          password: STRONG,
+        },
+        origin,
+      );
+    const countOrganizations = async () =>
+      (
+        await admin.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM organizations",
+        )
+      ).rows[0]?.n;
+    const before = await countOrganizations();
+
+    const intruder = await signup("Cabinet de l'intrus");
+    expect(intruder.status).toBe("code_required");
+    expect(await countOrganizations()).toBe(before);
+    const { rows: users } = await admin.query(
+      "SELECT 1 FROM users WHERE email = $1",
+      [email],
+    );
+    expect(users).toHaveLength(0);
+
+    // La vraie titulaire de l'adresse s'inscrit à son tour et reçoit son propre code.
+    const owner = await signup("Cabinet de la titulaire");
+    if (owner.status !== "code_required") throw new Error("inscription");
+    const signedIn = await service.verifyCode(
+      { challengeToken: owner.challengeToken, code: codeSentTo(email) },
+      origin,
+    );
+    expect(signedIn.status).toBe("signed_in");
+    expect(await countOrganizations()).toBe((before ?? 0) + 1);
+    const { rows: created } = await admin.query(
+      `SELECT o.name FROM organizations o JOIN memberships m ON m.organization_id = o.id
+       JOIN users u ON u.id = m.user_id WHERE u.email = $1`,
+      [email],
+    );
+    expect(created).toEqual([{ name: "Cabinet de la titulaire" }]);
+    const { rows: pending } = await admin.query(
+      "SELECT 1 FROM auth.pending_signups WHERE email = $1 AND expires_at > now()",
+      [email],
+    );
+    expect(pending).toHaveLength(1);
+
+    // Le jeton de l'intrus, sans son code, ne mène à rien.
+    if (intruder.status !== "code_required") return;
+    expect(
+      (
+        await service.verifyCode(
+          { challengeToken: intruder.challengeToken, code: "123456" },
+          origin,
+        )
+      ).status,
+    ).not.toBe("signed_in");
+  });
+
+  it("une inscription confirmée après qu'un compte a pris l'adresse ne crée pas de second cabinet", async () => {
+    const email = `double-${randomUUID().slice(0, 8)}@essai.test`;
+    const input = {
+      organizationName: "Cabinet en double",
+      displayName: "Dr Essai Test",
+      email,
+      plan: "starter" as const,
+      acceptTerms: true as const,
+      authorized: true as const,
+      password: STRONG,
+    };
+    const first = await service.register(input, origin);
+    if (first.status !== "code_required") throw new Error("inscription");
+    const firstCode = codeSentTo(email);
+    const second = await service.register(input, origin);
+    if (second.status !== "code_required") throw new Error("inscription");
+    const secondCode = codeSentTo(email);
+
+    expect(
+      (
+        await service.verifyCode(
+          { challengeToken: second.challengeToken, code: secondCode },
+          origin,
+        )
+      ).status,
+    ).toBe("signed_in");
+    expect(
+      (
+        await service.verifyCode(
+          { challengeToken: first.challengeToken, code: firstCode },
+          origin,
+        )
+      ).status,
+    ).toBe("expired");
+    expect(mailbox.lastTo(email)?.subject).toMatch(/existe déjà/);
+    const { rows } = await admin.query(
+      "SELECT count(*)::int AS n FROM users WHERE email = $1",
+      [email],
+    );
+    expect(rows[0]).toEqual({ n: 1 });
+  });
+
   it("refuse un mot de passe courant ou contenant le nom", async () => {
     const result = await service.register(
       {
@@ -851,6 +958,7 @@ describe("cloisonnement du schéma auth", () => {
     "auth.password_resets",
     "auth.trusted_devices",
     "auth.rate_limits",
+    "auth.pending_signups",
   ])("le rôle applicatif ne lit pas %s directement", async (table) => {
     const code = await asApp(app, null, (client) =>
       errorCode(client.query(`SELECT 1 FROM ${table} LIMIT 1`)),

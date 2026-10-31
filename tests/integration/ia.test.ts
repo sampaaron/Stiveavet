@@ -271,7 +271,8 @@ describe("passerelle IA réelle face au pire modèle", () => {
       model.answerNext({ status: 500 });
       await runDue();
     }
-    expect(whatsapp.sent.slice(before).at(-1)?.template).toBe(
+    // Le soir et le week-end, d'autres étapes peuvent partir au même créneau.
+    expect(whatsapp.sent.slice(before).map((sent) => sent.template)).toContain(
       "suivi_nouvelles",
     );
   });
