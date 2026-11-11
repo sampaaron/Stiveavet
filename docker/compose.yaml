@@ -67,7 +67,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    image: postgres:16-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Renseigner POSTGRES_ADMIN_PASSWORD dans .env}
@@ -83,7 +83,7 @@ services:
 
   # Crée les rôles stivea_migrator / stivea_app et la base (idempotent), puis s'arrête.
   db-roles:
-    image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    image: postgres:16-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
     depends_on:
       db:
         condition: service_healthy
